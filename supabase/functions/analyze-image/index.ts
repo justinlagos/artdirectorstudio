@@ -124,23 +124,45 @@ You MUST respond with a valid JSON object in this exact format:
     const messageContent = data.choices?.[0]?.message?.content;
     
     if (!messageContent) {
-      console.error("No content in AI response");
+      console.error("No content in AI response", JSON.stringify(data));
       return new Response(
         JSON.stringify({ error: "Invalid AI response" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log("Raw AI content:", messageContent.substring(0, 500));
+
     // Parse the JSON from the AI response
     let analysisData;
     try {
-      // Remove markdown code blocks if present
-      const cleanContent = messageContent.replace(/```json\n?|\n?```/g, '').trim();
+      // Try multiple cleanup strategies
+      let cleanContent = messageContent;
+      
+      // Remove markdown code blocks
+      cleanContent = cleanContent.replace(/```json\n?/g, '').replace(/\n?```/g, '');
+      
+      // Try to find JSON object in the content
+      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanContent = jsonMatch[0];
+      }
+      
+      cleanContent = cleanContent.trim();
+      console.log("Cleaned content:", cleanContent.substring(0, 300));
+      
       analysisData = JSON.parse(cleanContent);
+      
+      // Validate the structure
+      if (!analysisData.breakdown) {
+        throw new Error("Missing breakdown in response");
+      }
     } catch (e) {
-      console.error("Failed to parse AI response:", e, messageContent);
+      const errorMessage = e instanceof Error ? e.message : "Unknown parsing error";
+      console.error("Failed to parse AI response:", errorMessage);
+      console.error("Content sample:", messageContent.substring(0, 1000));
       return new Response(
-        JSON.stringify({ error: "Failed to parse AI analysis" }),
+        JSON.stringify({ error: "Failed to parse AI analysis: " + errorMessage }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
