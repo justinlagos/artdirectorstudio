@@ -42,37 +42,25 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an image analysis AI that produces structured metadata and a professional descriptive prompt capable of regenerating an image in text-to-image tools like Midjourney or DALL·E.
+            content: `You are a professional image analysis AI that creates comprehensive creative briefs for image reconstruction.
 
-Analyze the uploaded image and describe it across 20 creative dimensions including:
-camera/lens, composition, lighting, color palette, design style, aesthetic mood, texture, environment, background, artistic medium, light source behavior, typography, aspect ratio, focal emotion, visual hierarchy, detail density, art direction, cultural influence, and intended use.
+Analyze the uploaded image in extreme detail across 13 professional categories. Be specific, technical, and actionable.
 
-Be objective, concise, and specific. Avoid generic adjectives like "beautiful" or "stunning".
-
-You MUST respond with a valid JSON object in this exact format:
+You MUST respond with ONLY a valid JSON object (no other text) in this exact format:
 {
-  "breakdown": {
-    "subject": "description",
-    "camera_lens": "description",
-    "composition": "description",
-    "lighting": "description",
-    "color_palette": "description",
-    "design_style": "description",
-    "aesthetic_mood": "description",
-    "texture": "description",
-    "environment": "description",
-    "background": "description",
-    "artistic_medium": "description",
-    "light_source_behavior": "description",
-    "typography": "description",
-    "aspect_ratio": "description",
-    "focal_emotion_or_posture": "description",
-    "visual_hierarchy": "description",
-    "detail_density": "description",
-    "art_direction": "description",
-    "cultural_influence": "description",
-    "intended_use": "description"
-  }
+  "overview": "High-level technical description of image quality and production method",
+  "subject": "Detailed description of the main subject including physical features, clothing, pose, expression",
+  "camera_composition": "Camera type, lens, framing, angle, and compositional approach",
+  "lighting": "Lighting setup, type, position, mood, and technical details",
+  "color_palette": "Dominant colors, secondary colors, accents, and color relationships",
+  "design_style": "Visual style, design influences, aesthetic approach",
+  "texture_material": "Physical textures and materials visible in the image",
+  "mood_emotion": "Emotional tone, atmosphere, and feeling conveyed",
+  "background_environment": "Background description, environment type, and spatial context",
+  "artistic_medium": "Production medium and optional alternative interpretations",
+  "art_direction": "Creative direction, visual influences, and cultural references",
+  "intended_use": "Recommended applications and platforms",
+  "regeneration_prompt": "A comprehensive single-paragraph prompt suitable for Midjourney, DALL-E, etc."
 }`
           },
           {
@@ -80,7 +68,7 @@ You MUST respond with a valid JSON object in this exact format:
             content: [
               {
                 type: 'text',
-                text: 'Analyze this image and provide detailed metadata for all 20 parameters. Return ONLY valid JSON, no other text.'
+                text: 'Analyze this image across all 13 categories with professional-level detail. Return ONLY the JSON object, no markdown formatting, no extra text.'
               },
               {
                 type: 'image_url',
@@ -154,8 +142,8 @@ You MUST respond with a valid JSON object in this exact format:
       analysisData = JSON.parse(cleanContent);
       
       // Validate the structure
-      if (!analysisData.breakdown) {
-        throw new Error("Missing breakdown in response");
+      if (!analysisData.regeneration_prompt) {
+        throw new Error("Missing regeneration_prompt in response");
       }
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Unknown parsing error";
@@ -167,15 +155,9 @@ You MUST respond with a valid JSON object in this exact format:
       );
     }
 
-    // Generate the natural language prompt from the breakdown
-    const breakdown = analysisData.breakdown;
-    const prompt = `A ${breakdown.artistic_medium} of ${breakdown.subject} in a ${breakdown.environment}, captured with ${breakdown.camera_lens}, using ${breakdown.lighting} that enhances ${breakdown.texture}. The design style is ${breakdown.design_style}, evoking a ${breakdown.aesthetic_mood} atmosphere. The color palette features ${breakdown.color_palette}. Composition is ${breakdown.composition}, emphasizing ${breakdown.visual_hierarchy}. Background is ${breakdown.background}. Influences include ${breakdown.art_direction} with elements of ${breakdown.cultural_influence}. Ideal for a ${breakdown.intended_use} visual.`;
-
+    // Return the comprehensive analysis
     return new Response(
-      JSON.stringify({ 
-        prompt,
-        breakdown 
-      }),
+      JSON.stringify(analysisData),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }

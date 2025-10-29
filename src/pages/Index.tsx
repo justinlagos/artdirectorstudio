@@ -8,29 +8,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export interface AnalysisResult {
-  prompt: string;
-  breakdown: {
-    subject: string;
-    camera_lens: string;
-    composition: string;
-    lighting: string;
-    color_palette: string;
-    design_style: string;
-    aesthetic_mood: string;
-    texture: string;
-    environment: string;
-    background: string;
-    artistic_medium: string;
-    light_source_behavior: string;
-    typography: string;
-    aspect_ratio: string;
-    focal_emotion_or_posture: string;
-    visual_hierarchy: string;
-    detail_density: string;
-    art_direction: string;
-    cultural_influence: string;
-    intended_use: string;
-  };
+  overview: string;
+  subject: string;
+  camera_composition: string;
+  lighting: string;
+  color_palette: string;
+  design_style: string;
+  texture_material: string;
+  mood_emotion: string;
+  background_environment: string;
+  artistic_medium: string;
+  art_direction: string;
+  intended_use: string;
+  regeneration_prompt: string;
 }
 
 const Index = () => {
