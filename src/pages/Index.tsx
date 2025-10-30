@@ -7,9 +7,9 @@ import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export interface AnalysisResult {
-  overview: string;
-  subject: string;
+export interface Analysis {
+  image_overview: string;
+  subject_description: string;
   camera_composition: string;
   lighting: string;
   color_palette: string;
@@ -18,9 +18,25 @@ export interface AnalysisResult {
   mood_emotion: string;
   background_environment: string;
   artistic_medium: string;
-  art_direction: string;
+  art_direction_influence: string;
   intended_use: string;
-  regeneration_prompt: string;
+}
+
+export interface AnalysisResult {
+  full_regeneration_prompt: string;
+  analysis: Analysis;
+}
+
+export interface UserEdits {
+  subject_gender?: string;
+  subject_ethnicity?: string;
+  camera_type?: string;
+  lighting_type?: string;
+  dominant_color_1?: string;
+  dominant_color_2?: string;
+  art_style?: string;
+  background_type?: string;
+  intended_platform?: string;
 }
 
 const Index = () => {
@@ -76,6 +92,36 @@ const Index = () => {
     }
   };
 
+  const handleRegenerate = async (userEdits: UserEdits) => {
+    if (!result) return;
+
+    setIsAnalyzing(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("regenerate-prompt", {
+        body: { 
+          base_analysis: result.analysis,
+          user_edits: userEdits 
+        },
+      });
+
+      if (error) {
+        console.error("Regeneration error:", error);
+        toast.error("Failed to regenerate prompt. Please try again.");
+        setIsAnalyzing(false);
+        return;
+      }
+
+      setResult(data as AnalysisResult);
+      setIsAnalyzing(false);
+      toast.success("Prompt regenerated successfully!");
+    } catch (error) {
+      console.error("Error during regeneration:", error);
+      toast.error("An error occurred during regeneration.");
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
@@ -91,7 +137,13 @@ const Index = () => {
           
           {isAnalyzing && <LoadingState />}
           
-          {result && <ResultsSection result={result} />}
+          {result && (
+            <ResultsSection 
+              result={result} 
+              onRegenerate={handleRegenerate}
+              isRegenerating={isAnalyzing}
+            />
+          )}
         </div>
       </main>
 

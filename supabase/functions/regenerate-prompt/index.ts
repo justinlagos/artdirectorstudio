@@ -11,11 +11,11 @@ serve(async (req) => {
   }
 
   try {
-    const { image } = await req.json();
+    const { base_analysis, user_edits } = await req.json();
     
-    if (!image) {
+    if (!base_analysis || !user_edits) {
       return new Response(
-        JSON.stringify({ error: "No image provided" }),
+        JSON.stringify({ error: "Missing base_analysis or user_edits" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -29,7 +29,13 @@ serve(async (req) => {
       );
     }
 
-    console.log("Calling Lovable AI for image analysis...");
+    console.log("Regenerating prompt with user edits...");
+
+    // Merge user edits into base analysis
+    const mergedAnalysis = {
+      ...base_analysis,
+      ...user_edits
+    };
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -38,47 +44,32 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
-            content: `You are a professional image analysis AI that creates comprehensive creative briefs for image reconstruction.
+            content: `You are a professional AI prompt engineer. Given an image analysis with user edits, synthesize an improved, coherent Full Regeneration Prompt.
 
-Analyze the uploaded image in extreme detail across 12 professional categories. Be specific, technical, and actionable.
+The prompt should:
+- Be 150-200 words in a single flowing paragraph
+- Incorporate all the provided analysis parameters naturally
+- Use technical, professional language suitable for AI image generation
+- Maintain visual coherence and artistic direction
+- Be optimized for Midjourney, DALL-E, Stable Diffusion, etc.
 
-You MUST respond with ONLY a valid JSON object (no other text) in this exact format:
+You MUST respond with ONLY a valid JSON object in this format:
 {
-  "full_regeneration_prompt": "A comprehensive 150-200 word single-paragraph prompt suitable for Midjourney, DALL-E, etc.",
-  "analysis": {
-    "image_overview": "High-level technical description of image quality and production method",
-    "subject_description": "Detailed description of the main subject including physical features, clothing, pose, expression",
-    "camera_composition": "Camera type, lens, framing, angle, and compositional approach",
-    "lighting": "Lighting setup, type, position, mood, and technical details",
-    "color_palette": "Dominant colors, secondary colors, accents, and color relationships",
-    "design_style": "Visual style, design influences, aesthetic approach",
-    "texture_material": "Physical textures and materials visible in the image",
-    "mood_emotion": "Emotional tone, atmosphere, and feeling conveyed",
-    "background_environment": "Background description, environment type, and spatial context",
-    "artistic_medium": "Production medium and optional alternative interpretations",
-    "art_direction_influence": "Creative direction, visual influences, and cultural references",
-    "intended_use": "Recommended applications and platforms"
-  }
+  "full_regeneration_prompt": "your regenerated prompt here",
+  "analysis": { ...the same analysis object passed in... }
 }`
           },
           {
             role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Analyze this image across all 12 categories with professional-level detail. Return ONLY the JSON object, no markdown formatting, no extra text.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: image
-                }
-              }
-            ]
+            content: `Here is the updated image analysis with user edits. Generate an improved Full Regeneration Prompt that incorporates these details naturally:
+
+${JSON.stringify(mergedAnalysis, null, 2)}
+
+Return ONLY the JSON object, no markdown, no extra text.`
           }
         ],
       }),
@@ -103,13 +94,13 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
       }
       
       return new Response(
-        JSON.stringify({ error: "AI analysis failed" }),
+        JSON.stringify({ error: "AI regeneration failed" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const data = await response.json();
-    console.log("AI response received");
+    console.log("AI regeneration response received");
     
     const messageContent = data.choices?.[0]?.message?.content;
     
@@ -121,52 +112,40 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
       );
     }
 
-    console.log("Raw AI content:", messageContent.substring(0, 500));
-
     // Parse the JSON from the AI response
-    let analysisData;
+    let regeneratedData;
     try {
-      // Try multiple cleanup strategies
       let cleanContent = messageContent;
-      
-      // Remove markdown code blocks
       cleanContent = cleanContent.replace(/```json\n?/g, '').replace(/\n?```/g, '');
-      
-      // Try to find JSON object in the content
       const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         cleanContent = jsonMatch[0];
       }
-      
       cleanContent = cleanContent.trim();
-      console.log("Cleaned content:", cleanContent.substring(0, 300));
       
-      analysisData = JSON.parse(cleanContent);
+      regeneratedData = JSON.parse(cleanContent);
       
-      // Validate the structure
-      if (!analysisData.full_regeneration_prompt || !analysisData.analysis) {
-        throw new Error("Missing full_regeneration_prompt or analysis object in response");
+      if (!regeneratedData.full_regeneration_prompt) {
+        throw new Error("Missing full_regeneration_prompt in response");
       }
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "Unknown parsing error";
       console.error("Failed to parse AI response:", errorMessage);
-      console.error("Content sample:", messageContent.substring(0, 1000));
       return new Response(
-        JSON.stringify({ error: "Failed to parse AI analysis: " + errorMessage }),
+        JSON.stringify({ error: "Failed to parse AI regeneration: " + errorMessage }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Return the comprehensive analysis
     return new Response(
-      JSON.stringify(analysisData),
+      JSON.stringify(regeneratedData),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
 
   } catch (error) {
-    console.error("Error in analyze-image function:", error);
+    console.error("Error in regenerate-prompt function:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
