@@ -14,7 +14,135 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      credit_transactions: {
+        Row: {
+          action: Database["public"]["Enums"]["credit_action"]
+          amount: number
+          asset_id: string | null
+          id: string
+          notes: string | null
+          provider: Database["public"]["Enums"]["credit_provider"]
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["credit_action"]
+          amount: number
+          asset_id?: string | null
+          id?: string
+          notes?: string | null
+          provider: Database["public"]["Enums"]["credit_provider"]
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["credit_action"]
+          amount?: number
+          asset_id?: string | null
+          id?: string
+          notes?: string | null
+          provider?: Database["public"]["Enums"]["credit_provider"]
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      credits: {
+        Row: {
+          balance: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      generated_assets: {
+        Row: {
+          analysis_data: Json | null
+          created_at: string
+          id: string
+          image_url: string | null
+          prompt: string | null
+          type: Database["public"]["Enums"]["asset_type"]
+          user_id: string
+        }
+        Insert: {
+          analysis_data?: Json | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          prompt?: string | null
+          type: Database["public"]["Enums"]["asset_type"]
+          user_id: string
+        }
+        Update: {
+          analysis_data?: Json | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          prompt?: string | null
+          type?: Database["public"]["Enums"]["asset_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pricing_config: {
+        Row: {
+          action: string
+          active: boolean
+          credits: number
+          id: string
+          provider: string
+        }
+        Insert: {
+          action: string
+          active?: boolean
+          credits: number
+          id?: string
+          provider: string
+        }
+        Update: {
+          action?: string
+          active?: boolean
+          credits?: number
+          id?: string
+          provider?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +151,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      asset_type: "analysis" | "image" | "prompt"
+      credit_action: "analyze" | "generate" | "refine" | "blend" | "upscale"
+      credit_provider: "lovable" | "openai" | "replicate"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +280,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      asset_type: ["analysis", "image", "prompt"],
+      credit_action: ["analyze", "generate", "refine", "blend", "upscale"],
+      credit_provider: ["lovable", "openai", "replicate"],
+    },
   },
 } as const
