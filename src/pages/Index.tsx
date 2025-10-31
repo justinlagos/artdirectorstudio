@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { UploadSection } from "@/components/UploadSection";
 import { LoadingState } from "@/components/LoadingState";
@@ -40,10 +42,26 @@ export interface UserEdits {
 }
 
 const Index = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return <LoadingState />;
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -127,6 +145,11 @@ const Index = () => {
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-12 max-w-5xl">
+        <div className="mb-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Welcome back! Upload an image to get started.
+          </p>
+        </div>
         <div className="space-y-12 animate-fade-in">
           <UploadSection 
             onFileSelect={handleFileSelect}
