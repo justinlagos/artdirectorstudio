@@ -76,9 +76,20 @@ const Index = () => {
     setIsAnalyzing(true);
     
     try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to continue.");
+        setIsAnalyzing(false);
+        return;
+      }
+
       // First deduct credits
       const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
         body: { action: "image_analysis", provider: "lovable_ai" },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (deductError || !deductData?.success) {
@@ -131,9 +142,20 @@ const Index = () => {
     setIsAnalyzing(true);
     
     try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to continue.");
+        setIsAnalyzing(false);
+        return;
+      }
+
       // First deduct credits
       const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
         body: { action: "prompt_regeneration", provider: "lovable_ai" },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (deductError || !deductData?.success) {
