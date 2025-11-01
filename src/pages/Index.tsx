@@ -185,6 +185,9 @@ const Index = () => {
           base_analysis: result.analysis,
           user_edits: userEdits 
         },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) {
