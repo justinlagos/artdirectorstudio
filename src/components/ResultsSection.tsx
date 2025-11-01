@@ -2,19 +2,32 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, Download, RefreshCw } from "lucide-react";
+import { Copy, Download, RefreshCw, Wand2 } from "lucide-react";
 import { toast } from "sonner";
-import { AnalysisResult, UserEdits } from "@/pages/Index";
+import { AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
 import { Separator } from "@/components/ui/separator";
+import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
+import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 
 interface ResultsSectionProps {
   result: AnalysisResult;
   onRegenerate: (userEdits: UserEdits) => void;
   isRegenerating: boolean;
+  onGenerateImage: (prompt: string, options: GenerationOptions) => Promise<string | null>;
+  generatedImages: GeneratedImage[];
+  onDeleteImage: (id: string) => void;
 }
 
-export const ResultsSection = ({ result, onRegenerate, isRegenerating }: ResultsSectionProps) => {
+export const ResultsSection = ({ 
+  result, 
+  onRegenerate, 
+  isRegenerating,
+  onGenerateImage,
+  generatedImages,
+  onDeleteImage
+}: ResultsSectionProps) => {
   const [userEdits, setUserEdits] = useState<UserEdits>({});
+  const [showGenerationDialog, setShowGenerationDialog] = useState(false);
 
   // Load edits from local storage on mount
   useEffect(() => {
@@ -254,15 +267,25 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="text-2xl font-semibold">Comprehensive Analysis</h2>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleRegenerate}
-            disabled={isRegenerating || Object.keys(userEdits).length === 0}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
-            Regenerate with Edits
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowGenerationDialog(true)}
+            >
+              <Wand2 className="w-4 h-4 mr-2" />
+              Generate Image
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleRegenerate}
+              disabled={isRegenerating || Object.keys(userEdits).length === 0}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
+              Regenerate with Edits
+            </Button>
+          </div>
         </div>
         
         <div className="grid gap-6 md:grid-cols-2">
@@ -312,6 +335,25 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
           ))}
         </div>
       </div>
+
+      {/* Generated Images Gallery */}
+      {generatedImages.length > 0 && (
+        <>
+          <Separator />
+          <GeneratedImagesGallery 
+            images={generatedImages}
+            onDelete={onDeleteImage}
+          />
+        </>
+      )}
+
+      {/* Image Generation Dialog */}
+      <ImageGenerationDialog
+        open={showGenerationDialog}
+        onOpenChange={setShowGenerationDialog}
+        initialPrompt={result.full_regeneration_prompt}
+        onGenerate={onGenerateImage}
+      />
     </section>
   );
 };

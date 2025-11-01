@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.deduct-credits]
 verify_jwt = true
+
+[functions.generate-image]
+verify_jwt = true

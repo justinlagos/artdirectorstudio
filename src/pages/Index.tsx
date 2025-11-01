@@ -8,6 +8,7 @@ import { ResultsSection } from "@/components/ResultsSection";
 import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 
 export interface Analysis {
   image_overview: string;
@@ -41,6 +42,13 @@ export interface UserEdits {
   intended_platform?: string;
 }
 
+export interface GeneratedImage {
+  id: string;
+  imageUrl: string;
+  prompt: string;
+  timestamp: Date;
+}
+
 const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -48,6 +56,7 @@ const Index = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -195,6 +204,86 @@ const Index = () => {
     }
   };
 
+  const handleGenerateImage = async (prompt: string, options: GenerationOptions): Promise<string | null> => {
+    try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to continue.");
+        return null;
+      }
+
+      // First deduct credits
+      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
+        body: { action: "generate", provider: "lovable" },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (deductError || !deductData?.success) {
+        if (deductError?.message?.includes("Insufficient credits")) {
+          toast.error("Insufficient credits. You need 3 credits to generate an image.");
+        } else {
+          toast.error("Failed to process payment. Please try again.");
+        }
+        return null;
+      }
+
+      // Call generate-image edge function
+      const { data, error } = await supabase.functions.invoke("generate-image", {
+        body: { 
+          prompt,
+          quality: options.quality,
+          size: options.size,
+          background: options.background
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error("Generation error:", error);
+        
+        if (error.message?.includes("Rate limit")) {
+          toast.error("Too many requests. Please wait a moment and try again.");
+        } else if (error.message?.includes("credits exhausted")) {
+          toast.error("AI service temporarily unavailable. Please try again later.");
+        } else {
+          toast.error("Failed to generate image. Please try again.");
+        }
+        return null;
+      }
+
+      if (!data?.image) {
+        toast.error("Failed to generate image. Please try again.");
+        return null;
+      }
+
+      // Add to generated images list
+      const newImage: GeneratedImage = {
+        id: data.assetId || crypto.randomUUID(),
+        imageUrl: data.image,
+        prompt: prompt,
+        timestamp: new Date()
+      };
+      
+      setGeneratedImages(prev => [newImage, ...prev]);
+      toast.success(`Image generated! ${deductData.remaining_balance} credits remaining.`);
+      
+      return data.image;
+    } catch (error) {
+      console.error("Error during image generation:", error);
+      toast.error("An error occurred during image generation.");
+      return null;
+    }
+  };
+
+  const handleDeleteImage = (id: string) => {
+    setGeneratedImages(prev => prev.filter(img => img.id !== id));
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
@@ -220,6 +309,9 @@ const Index = () => {
               result={result} 
               onRegenerate={handleRegenerate}
               isRegenerating={isAnalyzing}
+              onGenerateImage={handleGenerateImage}
+              generatedImages={generatedImages}
+              onDeleteImage={handleDeleteImage}
             />
           )}
         </div>
