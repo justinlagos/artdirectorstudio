@@ -1,7 +1,10 @@
 project_id = "vsbjxktlrbfxfhxiqzlr"
 
 [functions.analyze-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.regenerate-prompt]
-verify_jwt = false
+verify_jwt = true
+
+[functions.deduct-credits]
+verify_jwt = true

@@ -76,6 +76,21 @@ const Index = () => {
     setIsAnalyzing(true);
     
     try {
+      // First deduct credits
+      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
+        body: { action: "image_analysis", provider: "lovable_ai" },
+      });
+
+      if (deductError || !deductData?.success) {
+        if (deductError?.message?.includes("Insufficient credits")) {
+          toast.error("Insufficient credits. Please purchase more credits.");
+        } else {
+          toast.error("Failed to process payment. Please try again.");
+        }
+        setIsAnalyzing(false);
+        return;
+      }
+
       // Convert file to base64
       const reader = new FileReader();
       reader.readAsDataURL(selectedFile);
@@ -96,7 +111,7 @@ const Index = () => {
 
         setResult(data as AnalysisResult);
         setIsAnalyzing(false);
-        toast.success("Image analyzed successfully!");
+        toast.success(`Image analyzed! ${deductData.remaining_balance} credits remaining.`);
       };
 
       reader.onerror = () => {
@@ -116,6 +131,21 @@ const Index = () => {
     setIsAnalyzing(true);
     
     try {
+      // First deduct credits
+      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
+        body: { action: "prompt_regeneration", provider: "lovable_ai" },
+      });
+
+      if (deductError || !deductData?.success) {
+        if (deductError?.message?.includes("Insufficient credits")) {
+          toast.error("Insufficient credits. Please purchase more credits.");
+        } else {
+          toast.error("Failed to process payment. Please try again.");
+        }
+        setIsAnalyzing(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("regenerate-prompt", {
         body: { 
           base_analysis: result.analysis,
@@ -132,7 +162,7 @@ const Index = () => {
 
       setResult(data as AnalysisResult);
       setIsAnalyzing(false);
-      toast.success("Prompt regenerated successfully!");
+      toast.success(`Prompt regenerated! ${deductData.remaining_balance} credits remaining.`);
     } catch (error) {
       console.error("Error during regeneration:", error);
       toast.error("An error occurred during regeneration.");
