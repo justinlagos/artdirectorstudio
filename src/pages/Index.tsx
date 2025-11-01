@@ -111,6 +111,9 @@ const Index = () => {
         
         const { data, error } = await supabase.functions.invoke("analyze-image", {
           body: { image: base64Image },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
         });
 
         if (error) {

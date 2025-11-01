@@ -20,20 +20,40 @@ serve(async (req) => {
       );
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    
-    if (userError || !user) {
+    // Extract and decode JWT to get user ID
+    const token = authHeader.replace('Bearer ', '');
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.error("Invalid JWT format");
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Invalid token format" }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Decode the payload (second part of JWT)
+    const payload = JSON.parse(atob(parts[1]));
+    const userId = payload.sub;
+    
+    if (!userId) {
+      console.error("No user ID in JWT");
+      return new Response(
+        JSON.stringify({ error: "Invalid token: no user ID" }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Authenticated user:", userId);
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { 
+        global: { 
+          headers: { Authorization: authHeader } 
+        }
+      }
+    );
 
     const { image } = await req.json();
     
@@ -190,7 +210,7 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
     supabaseAdmin
       .from('generated_assets')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         type: 'analysis',
         prompt: analysisData.full_regeneration_prompt,
         analysis_data: analysisData.analysis,
