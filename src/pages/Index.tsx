@@ -6,6 +6,7 @@ import { UploadSection } from "@/components/UploadSection";
 import { LoadingState } from "@/components/LoadingState";
 import { ResultsSection } from "@/components/ResultsSection";
 import { Footer } from "@/components/Footer";
+import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { GenerationOptions } from "@/components/ImageGenerationDialog";
@@ -304,6 +305,12 @@ const Index = () => {
             onAnalyze={handleAnalyze}
             disabled={!selectedFile || isAnalyzing}
           />
+          
+          {selectedFile && !isAnalyzing && !result && (
+            <div className="flex justify-center">
+              <CreditCostIndicator cost={1} action="analysis" />
+            </div>
+          )}
           
           {isAnalyzing && <LoadingState />}
           

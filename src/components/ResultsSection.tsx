@@ -8,6 +8,7 @@ import { AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
 import { Separator } from "@/components/ui/separator";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
+import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 
 interface ResultsSectionProps {
   result: AnalysisResult;
@@ -265,26 +266,32 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
 
       {/* Comprehensive Analysis */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <h2 className="text-2xl font-semibold">Comprehensive Analysis</h2>
-          <div className="flex gap-2">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setShowGenerationDialog(true)}
-            >
-              <Wand2 className="w-4 h-4 mr-2" />
-              Generate Image
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRegenerate}
-              disabled={isRegenerating || Object.keys(userEdits).length === 0}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
-              Regenerate with Edits
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setShowGenerationDialog(true)}
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                Generate Image
+              </Button>
+              <CreditCostIndicator cost={3} action="image generation" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRegenerate}
+                disabled={isRegenerating || Object.keys(userEdits).length === 0}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
+                Regenerate with Edits
+              </Button>
+              <CreditCostIndicator cost={1} action="prompt refinement" />
+            </div>
           </div>
         </div>
         
