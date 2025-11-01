@@ -95,7 +95,7 @@ const Index = () => {
 
       // First deduct credits
       const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "image_analysis", provider: "lovable_ai" },
+        body: { action: "analyze", provider: "lovable_ai" },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -164,7 +164,7 @@ const Index = () => {
 
       // First deduct credits
       const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "prompt_regeneration", provider: "lovable_ai" },
+        body: { action: "refine", provider: "lovable_ai" },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
