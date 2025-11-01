@@ -22,40 +22,41 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with the user's JWT
+    // Extract and decode JWT to get user ID
+    const token = authHeader.replace('Bearer ', '');
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.error("Invalid JWT format");
+      return new Response(
+        JSON.stringify({ error: "Invalid token format" }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Decode the payload (second part of JWT)
+    const payload = JSON.parse(atob(parts[1]));
+    const userId = payload.sub;
+    
+    if (!userId) {
+      console.error("No user ID in JWT");
+      return new Response(
+        JSON.stringify({ error: "Invalid token: no user ID" }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Authenticated user:", userId);
+
+    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { 
         global: { 
           headers: { Authorization: authHeader } 
-        },
-        auth: {
-          persistSession: false
         }
       }
     );
-
-    // Get the authenticated user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    
-    if (userError) {
-      console.error("Error getting user:", userError);
-      return new Response(
-        JSON.stringify({ error: "Authentication failed", details: userError.message }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (!user) {
-      console.error("No user found in JWT");
-      return new Response(
-        JSON.stringify({ error: "User not found" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log("Authenticated user:", user.id);
 
     const { action, provider } = await req.json();
     
@@ -89,7 +90,7 @@ serve(async (req) => {
     const { data: creditsData, error: creditsError } = await supabaseClient
       .from('credits')
       .select('balance')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (creditsError || !creditsData) {
@@ -121,7 +122,7 @@ serve(async (req) => {
     const { error: updateError } = await supabaseAdmin
       .from('credits')
       .update({ balance: creditsData.balance - creditsRequired })
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     if (updateError) {
       console.error("Credits deduction error:", updateError);
@@ -135,7 +136,7 @@ serve(async (req) => {
     const { error: transactionError } = await supabaseAdmin
       .from('credit_transactions')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         amount: -creditsRequired,
         action: action,
         provider: provider,
