@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, User, History, Shield } from "lucide-react";
+import { LogOut, User, History, Shield, Settings } from "lucide-react";
 
 export const UserMenu = () => {
   const { user, signOut } = useAuth();
@@ -46,9 +46,13 @@ export const UserMenu = () => {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer">
+          <Settings className="mr-2 h-4 w-4" />
+          <span>Settings</span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate("/history")} className="cursor-pointer">
           <History className="mr-2 h-4 w-4" />
-          <span>History</span>
+          <span>My Projects</span>
         </DropdownMenuItem>
         {isAdmin && (
           <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">

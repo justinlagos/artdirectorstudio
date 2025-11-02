@@ -82,9 +82,9 @@ export const Header = () => {
                     <p className="text-xs text-muted-foreground pl-6">Analyze multiple images</p>
                   </DropdownMenuItem>
                   <div className="h-px bg-border/50 my-2" />
-                  <DropdownMenuItem onClick={() => navigate("/gallery")} className="p-3">
+                  <DropdownMenuItem onClick={() => navigate("/inspire")} className="p-3">
                     <Images className="w-4 h-4 mr-2" />
-                    <span>Explore</span>
+                    <span>Inspire</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/analytics")} className="p-3">
                     <BarChart3 className="w-4 h-4 mr-2" />
@@ -168,20 +168,20 @@ export const Header = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                {/* Explore */}
+                {/* Inspire */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => navigate("/gallery")}
+                      onClick={() => navigate("/inspire")}
                       className="h-9 text-sm font-medium tracking-wide hover:bg-accent/50 transition-all duration-200"
                     >
-                      Explore
+                      Inspire
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">
-                    Discover public creations and user-submitted projects
+                    Get inspired by community-shared AI creations
                   </TooltipContent>
                 </Tooltip>
 

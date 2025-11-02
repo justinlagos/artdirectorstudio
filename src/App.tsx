@@ -9,12 +9,19 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import History from "./pages/History";
 import Admin from "./pages/Admin";
-import Gallery from "./pages/Gallery";
+import Inspire from "./pages/Inspire";
 import Analytics from "./pages/Analytics";
+import Settings from "./pages/Settings";
+import Contact from "./pages/Contact";
+import Help from "./pages/Help";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import Cookies from "./pages/Cookies";
 import SharedAsset from "./pages/SharedAsset";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
 import NotFound from "./pages/NotFound";
+import { ArtieChat } from "./components/ArtieChat";
 
 const queryClient = new QueryClient();
 
@@ -31,14 +38,22 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/history" element={<History />} />
               <Route path="/admin" element={<Admin />} />
-              <Route path="/gallery" element={<Gallery />} />
+              <Route path="/inspire" element={<Inspire />} />
+              <Route path="/gallery" element={<Inspire />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/help" element={<Help />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/cookies" element={<Cookies />} />
               <Route path="/shared/:token" element={<SharedAsset />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/payment-cancelled" element={<PaymentCancelled />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <ArtieChat />
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
