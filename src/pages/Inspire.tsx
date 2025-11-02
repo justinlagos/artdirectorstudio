@@ -135,7 +135,7 @@ const Inspire = () => {
           {/* Header */}
           <div className="text-center space-y-4 max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
-              <Sparkles className="w-4 h-4 text-primary" />
+              <Sparkles className="w-4 h-4" />
               <span className="text-sm font-medium">Inspire</span>
             </div>
             <h1 className="text-5xl md:text-6xl font-display font-bold tracking-tight">

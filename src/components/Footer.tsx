@@ -12,7 +12,7 @@ export const Footer = () => {
           {/* Platform */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-6">
-              <Sparkles className="h-5 w-5 text-primary" />
+              <Sparkles className="h-5 w-5" />
               <h3 className="font-display font-semibold text-lg">ArtDirector Studio</h3>
             </div>
             <nav className="flex flex-col space-y-3">
@@ -31,7 +31,7 @@ export const Footer = () => {
           {/* Tools */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-6">
-              <Wrench className="h-5 w-5 text-primary" />
+              <Wrench className="h-5 w-5" />
               <h3 className="font-display font-semibold text-lg">Tools</h3>
             </div>
             <nav className="flex flex-col space-y-3">
@@ -74,7 +74,7 @@ export const Footer = () => {
           {/* Legal */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-6">
-              <FileText className="h-5 w-5 text-primary" />
+              <FileText className="h-5 w-5" />
               <h3 className="font-display font-semibold text-lg">Legal</h3>
             </div>
             <nav className="flex flex-col space-y-3">
@@ -93,7 +93,7 @@ export const Footer = () => {
           {/* Support */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-6">
-              <HelpCircle className="h-5 w-5 text-primary" />
+              <HelpCircle className="h-5 w-5" />
               <h3 className="font-display font-semibold text-lg">Support</h3>
             </div>
             <nav className="flex flex-col space-y-3">

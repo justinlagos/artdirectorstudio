@@ -96,7 +96,7 @@ export const PricingTable = () => {
             <ul className="space-y-3">
               {pkg.features.map((feature) => (
                 <li key={feature} className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <span className="text-sm">{feature}</span>
                 </li>
               ))}

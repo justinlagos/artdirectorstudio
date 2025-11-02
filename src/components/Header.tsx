@@ -34,7 +34,7 @@ export const Header = () => {
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center space-x-2 group">
             <Sparkles className="h-6 w-6 transition-all duration-200 stroke-foreground group-hover:stroke-transparent group-hover:fill-primary" />
-            <span className="hidden xs:inline font-display font-bold text-lg">ArtDirector Studio</span>
+            <span className="hidden xs:inline font-display font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white">ArtDirector Studio</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -111,7 +111,7 @@ export const Header = () => {
             <>
               {/* Credits - Compact on mobile */}
               <div className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] justify-center">
-                <Coins className="h-4 w-4 text-primary" />
+                <Coins className="h-4 w-4" />
                 <span className="text-sm font-medium">{credits}</span>
               </div>
               

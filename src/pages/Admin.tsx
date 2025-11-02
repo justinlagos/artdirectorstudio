@@ -40,7 +40,7 @@ const Admin = () => {
       <main className="flex-1 container mx-auto px-4 py-12 max-w-7xl">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Shield className="w-8 h-8 text-primary" />
+            <Shield className="w-8 h-8" />
             <h1 className="text-3xl font-semibold">Admin Dashboard</h1>
           </div>
           <p className="text-muted-foreground">

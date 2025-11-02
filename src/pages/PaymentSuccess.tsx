@@ -48,7 +48,7 @@ const PaymentSuccess = () => {
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-primary/5">
         <Card className="max-w-md w-full">
           <CardContent className="py-12 flex flex-col items-center gap-4">
-            <Loader2 className="w-12 h-12 animate-spin text-primary" />
+            <Loader2 className="w-12 h-12 animate-spin" />
             <p className="text-center text-muted-foreground">Verifying your payment...</p>
           </CardContent>
         </Card>

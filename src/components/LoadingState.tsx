@@ -14,7 +14,7 @@ export const LoadingState = () => {
         
         {/* Central icon */}
         <div className="relative w-12 h-12 flex items-center justify-center">
-          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          <Loader2 className="w-12 h-12 animate-spin" />
         </div>
       </div>
       

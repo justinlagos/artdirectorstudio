@@ -364,14 +364,14 @@ const Index = () => {
                 ArtDirector Studio
               </span>
             </h1>
-            <p className="text-2xl md:text-3xl font-light tracking-[0.15em] leading-loose text-muted-foreground">
+            <p className="text-2xl md:text-3xl font-light text-muted-foreground">
               Reconstruct. Refine. Reimagine.
             </p>
           </div>
         </div>
       </section>
       
-      <main id="studio" className="flex-1 container mx-auto px-4 py-16 max-w-7xl">
+      <main id="studio" className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
         <div className="space-y-16 animate-fade-in">
           <UploadSection
             onFileSelect={handleFileSelect}
@@ -405,9 +405,9 @@ const Index = () => {
               <h2 className="text-4xl font-display font-bold tracking-tight">
                 How It Works
               </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Three simple steps to transform your creative vision
-              </p>
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                  Three simple steps to transform your creative vision
+                </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {[
@@ -430,7 +430,7 @@ const Index = () => {
                 <div key={index} className="glass rounded-2xl p-8 text-center hover-lift transition-all duration-300">
                   <div className="text-5xl mb-4">{step.icon}</div>
                   <h3 className="text-2xl font-display font-semibold mb-3">{step.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed">{step.description}</p>
+                  <p className="text-muted-foreground">{step.description}</p>
                 </div>
               ))}
             </div>
@@ -444,16 +444,16 @@ const Index = () => {
                   <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight">
                     Built for Creators, Privacy First
                   </h2>
-                  <p className="text-lg text-muted-foreground leading-relaxed">
+                  <p className="text-lg text-muted-foreground">
                     Your images and prompts are processed securely. We use industry-standard encryption
-                    and never share your creative work. Start with 50 free credits—no card required.
+                    and never share your creative work. Start with 50 free credits, no card required.
                   </p>
                   <div className="pt-6">
                     <Button size="lg" onClick={() => document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth' })}>
                       Start Creating Free
                     </Button>
                     <p className="text-sm text-muted-foreground mt-3">
-                      50 credits included • No credit card needed
+                      50 credits included, No credit card needed
                     </p>
                   </div>
                 </div>

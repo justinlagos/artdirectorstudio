@@ -83,8 +83,11 @@ const Contact = () => {
     setMessage(topic.messageTemplate);
     setSearchParams({ topic: topic.id });
     
-    // Trigger Artie (in real implementation, this would open the Artie panel)
-    toast.info(`Opening Artie with: ${topic.title}`);
+    // Scroll to the message form
+    const formSection = document.getElementById('contact-form');
+    if (formSection) {
+      formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,7 +125,7 @@ const Contact = () => {
                     onClick={() => handleTopicClick(topic)}
                   >
                     <CardContent className="p-4 flex items-start gap-3">
-                      <Icon className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                      <Icon className="w-5 h-5 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="font-medium">{topic.title}</p>
                         <p className="text-sm text-muted-foreground">{topic.description}</p>
@@ -134,7 +137,7 @@ const Contact = () => {
             </div>
 
             {/* Contact Form */}
-            <Card className="lg:col-span-2 glass">
+            <Card id="contact-form" className="lg:col-span-2 glass scroll-mt-20">
               <CardHeader>
                 <CardTitle>Send us a message</CardTitle>
                 <CardDescription>
