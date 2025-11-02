@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Sparkles, Mail, HelpCircle, FileText, Shield, Cookie } from "lucide-react";
+import { Sparkles, Mail, HelpCircle, FileText, Shield, Cookie, Blend, Maximize2, Layers } from "lucide-react";
 
 export const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -7,7 +7,7 @@ export const Footer = () => {
   return (
     <footer className="border-t border-border/30 backdrop-blur-sm mt-auto">
       <div className="container mx-auto px-6 max-w-7xl py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-12">
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-2.5">
@@ -48,6 +48,40 @@ export const Footer = () => {
                 >
                   Analytics
                 </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Tools */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-sm tracking-wide">Tools</h3>
+            <ul className="space-y-3">
+              <li>
+                <a 
+                  href="#blend" 
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2 min-h-[44px]"
+                >
+                  <Blend className="w-4 h-4" />
+                  Blend
+                </a>
+              </li>
+              <li>
+                <a 
+                  href="#upscale" 
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2 min-h-[44px]"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                  Upscale
+                </a>
+              </li>
+              <li>
+                <a 
+                  href="#batch" 
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2 min-h-[44px]"
+                >
+                  <Layers className="w-4 h-4" />
+                  Batch
+                </a>
               </li>
             </ul>
           </div>

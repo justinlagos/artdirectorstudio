@@ -199,7 +199,7 @@ export const UserAnalytics = () => {
               <CardTitle>Activity Over Time</CardTitle>
               <CardDescription>Your asset creation in the last 7 days</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               <ChartContainer
                 config={{
                   count: {
@@ -207,19 +207,21 @@ export const UserAnalytics = () => {
                     color: "hsl(var(--primary))",
                   },
                 }}
-                className="h-[300px]"
+                className="h-[250px] sm:h-[300px] w-full"
               >
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={analytics.activityByDay}>
+                  <LineChart data={analytics.activityByDay} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis 
                       dataKey="date" 
-                      className="text-xs"
+                      className="text-[10px] sm:text-xs"
                       tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                      interval="preserveStartEnd"
                     />
                     <YAxis 
-                      className="text-xs"
+                      className="text-[10px] sm:text-xs"
                       tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                      width={30}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Line 
@@ -227,7 +229,7 @@ export const UserAnalytics = () => {
                       dataKey="count" 
                       stroke="hsl(var(--primary))" 
                       strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))' }}
+                      dot={{ fill: 'hsl(var(--primary))', r: 3 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -242,14 +244,14 @@ export const UserAnalytics = () => {
               <CardTitle>Assets by Type</CardTitle>
               <CardDescription>Distribution of your generated content</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4 flex justify-center">
               <ChartContainer
                 config={{
                   value: {
                     label: "Count",
                   },
                 }}
-                className="h-[300px]"
+                className="h-[250px] sm:h-[300px] w-full max-w-[300px] sm:max-w-none"
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -259,7 +261,7 @@ export const UserAnalytics = () => {
                       cy="50%"
                       labelLine={false}
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius={window.innerWidth < 640 ? 60 : 80}
                       fill="hsl(var(--primary))"
                       dataKey="value"
                     >

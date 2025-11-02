@@ -42,6 +42,58 @@ export const Header = () => {
               </span>
             </button>
 
+            {/* Mobile Menu */}
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild className="md:hidden">
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-72 glass-strong shadow-strong">
+                  <DropdownMenuItem onClick={() => navigate("/")} className="flex flex-col items-start gap-1 p-3">
+                    <div className="flex items-center gap-2 w-full">
+                      <Sparkles className="w-4 h-4" />
+                      <span className="font-medium">Studio</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-6">Upload and analyze images</p>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowBlendDialog(true)} className="flex flex-col items-start gap-1 p-3">
+                    <div className="flex items-center gap-2 w-full">
+                      <Blend className="w-4 h-4" />
+                      <span className="font-medium">Blend</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-6">Merge 2–4 images</p>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowUpscaleDialog(true)} className="flex flex-col items-start gap-1 p-3">
+                    <div className="flex items-center gap-2 w-full">
+                      <Maximize2 className="w-4 h-4" />
+                      <span className="font-medium">Upscale</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-6">Enhance resolution up to 4K</p>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowBatchDialog(true)} className="flex flex-col items-start gap-1 p-3">
+                    <div className="flex items-center gap-2 w-full">
+                      <Layers className="w-4 h-4" />
+                      <span className="font-medium">Batch</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-6">Analyze multiple images</p>
+                  </DropdownMenuItem>
+                  <div className="h-px bg-border/50 my-2" />
+                  <DropdownMenuItem onClick={() => navigate("/gallery")} className="p-3">
+                    <Images className="w-4 h-4 mr-2" />
+                    <span>Explore</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/analytics")} className="p-3">
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    <span>Analytics</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             {/* Center Menu Area */}
             {user && (
               <nav className="hidden md:flex items-center gap-6">
