@@ -65,6 +65,15 @@ const Index = () => {
     }
   }, [user, loading, navigate]);
 
+  // Cleanup on unmount - MUST be before early returns
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   if (loading) {
     return <LoadingState />;
   }
@@ -83,15 +92,6 @@ const Index = () => {
     setPreviewUrl(url);
     setResult(null);
   };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
 
   const handleAnalyze = async (retryCount = 0) => {
     if (!selectedFile) return;
