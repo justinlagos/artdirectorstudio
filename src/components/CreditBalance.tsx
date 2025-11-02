@@ -18,29 +18,23 @@ export const CreditBalance = () => {
   return (
     <>
       <div className="flex items-center gap-2">
-        {isLowBalance && (
-          <Alert variant="destructive" className="py-2 px-3 border-destructive/50">
-            <AlertTriangle className="w-4 h-4" />
-            <AlertDescription className="text-xs ml-2">
-              Low balance!
-            </AlertDescription>
-          </Alert>
-        )}
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
-          isLowBalance ? 'bg-destructive/10 border-destructive/50' : 'bg-card border-border'
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all duration-200 ${
+          isLowBalance 
+            ? 'bg-destructive/5 border-destructive/30 ring-1 ring-destructive/20' 
+            : 'bg-card/50 border-border/50 hover:bg-card/80'
         }`}>
-          <Coins className={`w-4 h-4 ${isLowBalance ? 'text-destructive' : 'text-primary'}`} />
-          <span className="text-sm font-medium">
-            {balance ?? 0} credits
+          <Coins className={`w-3.5 h-3.5 ${isLowBalance ? 'text-destructive' : 'text-muted-foreground'}`} strokeWidth={1.5} />
+          <span className="text-xs font-medium tracking-wide">
+            {balance ?? 0}
           </span>
         </div>
         <Button 
           size="sm" 
           variant="outline"
           onClick={() => setShowPurchaseDialog(true)}
-          className="gap-2"
+          className="h-8 gap-1.5 text-xs font-medium shadow-xs hover:shadow-sm transition-all duration-200"
         >
-          <ShoppingCart className="w-4 h-4" />
+          <ShoppingCart className="w-3.5 h-3.5" strokeWidth={1.5} />
           Buy Credits
         </Button>
       </div>
