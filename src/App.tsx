@@ -12,6 +12,8 @@ import Admin from "./pages/Admin";
 import Gallery from "./pages/Gallery";
 import Analytics from "./pages/Analytics";
 import SharedAsset from "./pages/SharedAsset";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancelled from "./pages/PaymentCancelled";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +34,8 @@ const App = () => (
               <Route path="/gallery" element={<Gallery />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/shared/:token" element={<SharedAsset />} />
+              <Route path="/payment-success" element={<PaymentSuccess />} />
+              <Route path="/payment-cancelled" element={<PaymentCancelled />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

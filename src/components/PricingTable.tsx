@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const packages = [
   {
@@ -36,9 +39,38 @@ const packages = [
 ];
 
 export const PricingTable = () => {
-  const handlePurchase = (packageName: string, credits: number) => {
-    // TODO: Integrate with actual payment processor (Stripe)
-    toast.info(`Payment integration coming soon! You selected ${packageName} (${credits} credits)`);
+  const { session } = useAuth();
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const handlePurchase = async (packageName: string, credits: number, price: number) => {
+    if (!session) {
+      toast.error("Please sign in to purchase credits");
+      return;
+    }
+
+    setLoading(packageName);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          packageName,
+          credits,
+          price,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      toast.error('Failed to create checkout session. Please try again.');
+    } finally {
+      setLoading(null);
+    }
   };
 
   return (
@@ -75,9 +107,17 @@ export const PricingTable = () => {
             <Button 
               className="w-full" 
               variant={pkg.popular ? "default" : "outline"}
-              onClick={() => handlePurchase(pkg.name, pkg.credits)}
+              onClick={() => handlePurchase(pkg.name, pkg.credits, pkg.price)}
+              disabled={loading === pkg.name}
             >
-              Purchase {pkg.name}
+              {loading === pkg.name ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Purchase ${pkg.name}`
+              )}
             </Button>
           </CardFooter>
         </Card>
