@@ -48,6 +48,7 @@ const App = () => (
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/cookies" element={<Cookies />} />
               <Route path="/shared/:token" element={<SharedAsset />} />
+              <Route path="/share/:slug" element={<SharedAsset />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/payment-cancelled" element={<PaymentCancelled />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

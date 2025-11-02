@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
 import { Sparkles, FileText, HelpCircle, Layers, Maximize2, ImageIcon, Wrench } from "lucide-react";
+import { ToolDialog } from "./ToolDialog";
+import { Button } from "./ui/button";
+import { toast } from "sonner";
 
 export const Footer = () => {
   return (
@@ -13,9 +16,9 @@ export const Footer = () => {
               <h3 className="font-display font-semibold text-lg">ArtDirector Studio</h3>
             </div>
             <nav className="flex flex-col space-y-3">
-              <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
+              <a href="/#hero" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
                 Studio
-              </Link>
+              </a>
               <Link to="/inspire" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
                 Inspire
               </Link>
@@ -32,18 +35,39 @@ export const Footer = () => {
               <h3 className="font-display font-semibold text-lg">Tools</h3>
             </div>
             <nav className="flex flex-col space-y-3">
-              <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                Blend
-              </Link>
-              <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center gap-2">
-                <Maximize2 className="h-4 w-4" />
-                Upscale
-              </Link>
-              <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" />
-                Batch
-              </Link>
+              <ToolDialog
+                trigger={
+                  <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
+                    <Layers className="h-4 w-4" />
+                    Blend
+                  </Button>
+                }
+                title="Blend Images"
+                description="Seamlessly combine two images with customizable blend modes"
+                toolType="blend"
+              />
+              <ToolDialog
+                trigger={
+                  <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
+                    <Maximize2 className="h-4 w-4" />
+                    Upscale
+                  </Button>
+                }
+                title="Upscale Image"
+                description="Enhance image resolution with AI-powered upscaling"
+                toolType="upscale"
+              />
+              <ToolDialog
+                trigger={
+                  <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    Batch
+                  </Button>
+                }
+                title="Batch Processing"
+                description="Process multiple images at once with consistent operations"
+                toolType="batch"
+              />
             </nav>
           </div>
 
@@ -79,6 +103,15 @@ export const Footer = () => {
               <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
                 Help Center
               </Link>
+              <button
+                onClick={() => {
+                  // In real implementation, this would open the Artie panel
+                  toast.info("Opening Artie Assistant...");
+                }}
+                className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center text-left"
+              >
+                Artie Assistant
+              </button>
             </nav>
           </div>
         </div>

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
 import { Separator } from "./ui/separator";
+import { ToolDialog } from "./ToolDialog";
 
 export const Header = () => {
   const navigate = useNavigate();
@@ -31,8 +32,8 @@ export const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center justify-between">
         <div className="flex items-center gap-6">
-          <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-            <Sparkles className="h-6 w-6" />
+          <Link to="/" className="flex items-center space-x-2 group">
+            <Sparkles className="h-6 w-6 transition-all duration-200 stroke-foreground group-hover:stroke-transparent group-hover:fill-primary" />
             <span className="hidden xs:inline font-display font-bold text-lg">ArtDirector Studio</span>
           </Link>
 
@@ -50,27 +51,48 @@ export const Header = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 bg-background/95 backdrop-blur-xl z-50">
-                <DropdownMenuItem onClick={() => navigate("/")}>
-                  <Layers className="mr-2 h-4 w-4" />
-                  <div>
-                    <p className="font-medium">Blend</p>
-                    <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/")}>
-                  <Maximize2 className="mr-2 h-4 w-4" />
-                  <div>
-                    <p className="font-medium">Upscale</p>
-                    <p className="text-xs text-muted-foreground">Enhance resolution</p>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/")}>
-                  <ImageIcon className="mr-2 h-4 w-4" />
-                  <div>
-                    <p className="font-medium">Batch</p>
-                    <p className="text-xs text-muted-foreground">Process multiple images</p>
-                  </div>
-                </DropdownMenuItem>
+                <ToolDialog
+                  trigger={
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <Layers className="mr-2 h-4 w-4" />
+                      <div>
+                        <p className="font-medium">Blend</p>
+                        <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
+                      </div>
+                    </DropdownMenuItem>
+                  }
+                  title="Blend Images"
+                  description="Seamlessly combine two images with customizable blend modes"
+                  toolType="blend"
+                />
+                <ToolDialog
+                  trigger={
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <Maximize2 className="mr-2 h-4 w-4" />
+                      <div>
+                        <p className="font-medium">Upscale</p>
+                        <p className="text-xs text-muted-foreground">Enhance resolution</p>
+                      </div>
+                    </DropdownMenuItem>
+                  }
+                  title="Upscale Image"
+                  description="Enhance image resolution with AI-powered upscaling"
+                  toolType="upscale"
+                />
+                <ToolDialog
+                  trigger={
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <ImageIcon className="mr-2 h-4 w-4" />
+                      <div>
+                        <p className="font-medium">Batch</p>
+                        <p className="text-xs text-muted-foreground">Process multiple images</p>
+                      </div>
+                    </DropdownMenuItem>
+                  }
+                  title="Batch Processing"
+                  description="Process multiple images at once with consistent operations"
+                  toolType="batch"
+                />
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -152,39 +174,48 @@ export const Header = () => {
                       </AccordionTrigger>
                       <AccordionContent className="pb-2">
                         <div className="flex flex-col space-y-1 pl-4">
-                          <Button 
-                            variant="ghost" 
-                            asChild 
-                            className="justify-start min-h-[48px]"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <Link to="/">
-                              <Layers className="mr-3 h-4 w-4" />
-                              Blend
-                            </Link>
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            asChild 
-                            className="justify-start min-h-[48px]"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <Link to="/">
-                              <Maximize2 className="mr-3 h-4 w-4" />
-                              Upscale
-                            </Link>
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            asChild 
-                            className="justify-start min-h-[48px]"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <Link to="/">
-                              <ImageIcon className="mr-3 h-4 w-4" />
-                              Batch
-                            </Link>
-                          </Button>
+                          <ToolDialog
+                            trigger={
+                              <Button 
+                                variant="ghost" 
+                                className="justify-start min-h-[48px] w-full"
+                              >
+                                <Layers className="mr-3 h-4 w-4" />
+                                Blend
+                              </Button>
+                            }
+                            title="Blend Images"
+                            description="Seamlessly combine two images"
+                            toolType="blend"
+                          />
+                          <ToolDialog
+                            trigger={
+                              <Button 
+                                variant="ghost" 
+                                className="justify-start min-h-[48px] w-full"
+                              >
+                                <Maximize2 className="mr-3 h-4 w-4" />
+                                Upscale
+                              </Button>
+                            }
+                            title="Upscale Image"
+                            description="Enhance image resolution"
+                            toolType="upscale"
+                          />
+                          <ToolDialog
+                            trigger={
+                              <Button 
+                                variant="ghost" 
+                                className="justify-start min-h-[48px] w-full"
+                              >
+                                <ImageIcon className="mr-3 h-4 w-4" />
+                                Batch
+                              </Button>
+                            }
+                            title="Batch Processing"
+                            description="Process multiple images at once"
+                            toolType="batch"
+                          />
                         </div>
                       </AccordionContent>
                     </AccordionItem>

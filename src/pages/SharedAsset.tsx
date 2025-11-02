@@ -25,17 +25,18 @@ interface SharedAssetData {
 }
 
 const SharedAsset = () => {
-  const { token } = useParams<{ token: string }>();
+  const { token, slug } = useParams<{ token?: string; slug?: string }>();
   const navigate = useNavigate();
   const [asset, setAsset] = useState<SharedAssetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (token) {
-      fetchSharedAsset(token);
+    const shareToken = token || slug;
+    if (shareToken) {
+      fetchSharedAsset(shareToken);
     }
-  }, [token]);
+  }, [token, slug]);
 
   const fetchSharedAsset = async (shareToken: string) => {
     try {
