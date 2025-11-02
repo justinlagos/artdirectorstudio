@@ -70,19 +70,38 @@ export default function Auth() {
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/`
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
+      });
+      
+      if (error) {
+        // Check if it's a provider not enabled error
+        if (error.message.includes('provider is not enabled') || error.message.includes('Unsupported provider')) {
+          toast({
+            title: "Google sign-in not configured",
+            description: "Please use email/password to sign in. Google authentication will be available soon!",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Sign in failed",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
       }
-    });
-    
-    if (error) {
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
       toast({
         title: "Sign in failed",
-        description: error.message,
+        description: error.message || 'An unexpected error occurred',
         variant: "destructive",
       });
+    } finally {
       setLoading(false);
     }
   };

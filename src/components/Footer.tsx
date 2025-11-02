@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Sparkles, FileText, HelpCircle, Layers, Maximize2, ImageIcon, Wrench } from "lucide-react";
 import { ToolDialog } from "./ToolDialog";
 import { Button } from "./ui/button";
@@ -22,6 +22,13 @@ export const Footer = () => {
       }, 100);
     }
   };
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
+  };
   return (
     <footer className="mt-auto border-t border-border/40 bg-gradient-to-b from-background via-surface-1/50 to-surface-2">
       <div className="container py-8 md:py-10">
@@ -36,57 +43,59 @@ export const Footer = () => {
               <a href="/#hero" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
                 Studio
               </a>
-              <Link to="/inspire" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
+              <button onClick={() => handleNavigation('/inspire')} className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center text-left w-full">
                 Inspire
-              </Link>
-              <Link to="/analytics" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
+              </button>
+              <button onClick={() => handleNavigation('/analytics')} className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center text-left w-full">
                 Analytics
-              </Link>
+              </button>
             </nav>
           </div>
 
-          {/* Tools */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-6">
-              <Wrench className="h-5 w-5" />
-              <h3 className="font-display font-semibold text-lg">Tools</h3>
+          {/* Tools - Only show for logged-in users */}
+          {user && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-6">
+                <Wrench className="h-5 w-5" />
+                <h3 className="font-display font-semibold text-lg">Tools</h3>
+              </div>
+              <nav className="flex flex-col space-y-3">
+                <ToolDialog
+                  trigger={
+                    <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
+                      <Layers className="h-4 w-4" />
+                      Blend
+                    </Button>
+                  }
+                  title="Blend Images"
+                  description="Seamlessly combine two images with customizable blend modes"
+                  toolType="blend"
+                />
+                <ToolDialog
+                  trigger={
+                    <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
+                      <Maximize2 className="h-4 w-4" />
+                      Upscale
+                    </Button>
+                  }
+                  title="Upscale Image"
+                  description="Enhance image resolution with AI-powered upscaling"
+                  toolType="upscale"
+                />
+                <ToolDialog
+                  trigger={
+                    <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Batch
+                    </Button>
+                  }
+                  title="Batch Processing"
+                  description="Process multiple images at once with consistent operations"
+                  toolType="batch"
+                />
+              </nav>
             </div>
-            <nav className="flex flex-col space-y-3">
-              <ToolDialog
-                trigger={
-                  <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
-                    <Layers className="h-4 w-4" />
-                    Blend
-                  </Button>
-                }
-                title="Blend Images"
-                description="Seamlessly combine two images with customizable blend modes"
-                toolType="blend"
-              />
-              <ToolDialog
-                trigger={
-                  <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
-                    <Maximize2 className="h-4 w-4" />
-                    Upscale
-                  </Button>
-                }
-                title="Upscale Image"
-                description="Enhance image resolution with AI-powered upscaling"
-                toolType="upscale"
-              />
-              <ToolDialog
-                trigger={
-                  <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
-                    <ImageIcon className="h-4 w-4" />
-                    Batch
-                  </Button>
-                }
-                title="Batch Processing"
-                description="Process multiple images at once with consistent operations"
-                toolType="batch"
-              />
-            </nav>
-          </div>
+          )}
 
           {/* Legal */}
           <div className="space-y-4">
@@ -95,15 +104,15 @@ export const Footer = () => {
               <h3 className="font-display font-semibold text-lg">Legal</h3>
             </div>
             <nav className="flex flex-col space-y-3">
-              <Link to="/terms" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
+              <button onClick={() => handleNavigation('/terms')} className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center text-left w-full">
                 Terms & Conditions
-              </Link>
-              <Link to="/privacy" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
+              </button>
+              <button onClick={() => handleNavigation('/privacy')} className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center text-left w-full">
                 Privacy Policy
-              </Link>
-              <Link to="/cookies" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
+              </button>
+              <button onClick={() => handleNavigation('/cookies')} className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center text-left w-full">
                 Cookie Policy
-              </Link>
+              </button>
             </nav>
           </div>
 
@@ -114,12 +123,12 @@ export const Footer = () => {
               <h3 className="font-display font-semibold text-lg">Support</h3>
             </div>
             <nav className="flex flex-col space-y-3">
-              <Link to="/contact" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
+              <button onClick={() => handleNavigation('/contact')} className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center text-left w-full">
                 Contact
-              </Link>
-              <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">
+              </button>
+              <button onClick={() => handleNavigation('/help')} className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center text-left w-full">
                 Help Center
-              </Link>
+              </button>
               <button
                 onClick={() => {
                   // In real implementation, this would open the Artie panel

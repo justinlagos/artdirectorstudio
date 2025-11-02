@@ -3,6 +3,8 @@ import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface UploadSectionProps {
   onFileSelect: (file: File) => void;
@@ -17,6 +19,23 @@ export const UploadSection = ({
   onAnalyze,
   disabled 
 }: UploadSectionProps) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleAuthCheck = useCallback(() => {
+    if (!user) {
+      toast.info("Please sign in to upload and analyze images", {
+        description: "Create an account or log in to get started",
+        action: {
+          label: "Sign In",
+          onClick: () => navigate("/auth")
+        }
+      });
+      return false;
+    }
+    return true;
+  }, [user, navigate]);
+
   const compressAndSelectFile = useCallback(
     async (file: File) => {
       try {
@@ -47,6 +66,9 @@ export const UploadSection = ({
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
+      
+      if (!handleAuthCheck()) return;
+      
       const file = e.dataTransfer.files[0];
       
       if (!file) return;
@@ -63,10 +85,15 @@ export const UploadSection = ({
       
       compressAndSelectFile(file);
     },
-    [compressAndSelectFile]
+    [compressAndSelectFile, handleAuthCheck]
   );
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!handleAuthCheck()) {
+      e.target.value = '';
+      return;
+    }
+    
     const file = e.target.files?.[0];
     if (!file) return;
     
