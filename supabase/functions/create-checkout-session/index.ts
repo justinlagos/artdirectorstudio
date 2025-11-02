@@ -1,10 +1,18 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import Stripe from 'https://esm.sh/stripe@14.21.0';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import Stripe from "https://esm.sh/stripe@18.5.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Price ID mapping
+const PRICE_IDS: Record<string, string> = {
+  'Starter': 'price_1SOzqZBOqYfTntNBPPmRVqCB',
+  'Pro': 'price_1SOzr0BOqYfTntNBih2xnB1Y',
+  'Business': 'price_1SOzrGBOqYfTntNBCF49yTpu',
+  'Enterprise': 'price_1SOzrUBOqYfTntNBAfYNELS7',
 };
 
 serve(async (req) => {
@@ -15,43 +23,45 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
-
-    if (!user) {
-      throw new Error('Not authenticated');
+    const authHeader = req.headers.get('Authorization')!;
+    const token = authHeader.replace('Bearer ', '');
+    const { data } = await supabaseClient.auth.getUser(token);
+    const user = data.user;
+    
+    if (!user?.email) {
+      throw new Error('User not authenticated or email not available');
     }
 
-    const { packageName, credits, price } = await req.json();
+    const { packageName, credits } = await req.json();
+    const priceId = PRICE_IDS[packageName];
+
+    if (!priceId) {
+      throw new Error('Invalid package name');
+    }
 
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-      apiVersion: '2023-10-16',
+      apiVersion: '2025-08-27.basil',
     });
 
     const origin = req.headers.get('origin') || 'http://localhost:8080';
 
+    // Check if customer exists
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    let customerId;
+    if (customers.data.length > 0) {
+      customerId = customers.data[0].id;
+    }
+
     // Create Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      customer: customerId,
+      customer_email: customerId ? undefined : user.email,
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `${packageName} Credits Package`,
-              description: `${credits} credits for ArtDirector Studio`,
-            },
-            unit_amount: price * 100, // Convert to cents
-          },
+          price: priceId,
           quantity: 1,
         },
       ],

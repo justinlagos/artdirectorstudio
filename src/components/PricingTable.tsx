@@ -42,7 +42,7 @@ export const PricingTable = () => {
   const { session } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
 
-  const handlePurchase = async (packageName: string, credits: number, price: number) => {
+  const handlePurchase = async (packageName: string, credits: number) => {
     if (!session) {
       toast.error("Please sign in to purchase credits");
       return;
@@ -55,7 +55,6 @@ export const PricingTable = () => {
         body: {
           packageName,
           credits,
-          price,
         },
       });
 
@@ -107,7 +106,7 @@ export const PricingTable = () => {
             <Button 
               className="w-full" 
               variant={pkg.popular ? "default" : "outline"}
-              onClick={() => handlePurchase(pkg.name, pkg.credits, pkg.price)}
+              onClick={() => handlePurchase(pkg.name, pkg.credits)}
               disabled={loading === pkg.name}
             >
               {loading === pkg.name ? (
