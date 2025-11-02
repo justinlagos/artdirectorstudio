@@ -61,7 +61,7 @@ export const ArtieChat = () => {
         body: JSON.stringify({
           messages: messages
             .filter(m => m.sender === 'user' || m.sender === 'artie')
-            .slice(-10) // Keep last 10 messages for context
+            .slice(-10)
             .map(m => ({
               role: m.sender === 'user' ? 'user' : 'assistant',
               content: m.text
@@ -78,8 +78,8 @@ export const ArtieChat = () => {
       const decoder = new TextDecoder();
       let accumulatedText = '';
       let textBuffer = '';
+      let toolCalls: any[] = [];
 
-      // Create initial assistant message
       const assistantMessageId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, {
         id: assistantMessageId,
@@ -109,9 +109,10 @@ export const ArtieChat = () => {
 
             try {
               const parsed = JSON.parse(jsonStr);
-              const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-              if (content) {
-                accumulatedText += content;
+              const delta = parsed.choices?.[0]?.delta;
+              
+              if (delta?.content) {
+                accumulatedText += delta.content;
                 setMessages(prev => 
                   prev.map(m => 
                     m.id === assistantMessageId 
@@ -120,8 +121,73 @@ export const ArtieChat = () => {
                   )
                 );
               }
+
+              if (delta?.tool_calls) {
+                delta.tool_calls.forEach((tc: any) => {
+                  if (!toolCalls[tc.index]) {
+                    toolCalls[tc.index] = {
+                      id: tc.id,
+                      type: tc.type,
+                      function: { name: tc.function?.name || '', arguments: '' }
+                    };
+                  }
+                  if (tc.function?.arguments) {
+                    toolCalls[tc.index].function.arguments += tc.function.arguments;
+                  }
+                });
+              }
             } catch (e) {
-              // Ignore parse errors for incomplete chunks
+              // Ignore parse errors
+            }
+          }
+        }
+
+        if (toolCalls.length > 0) {
+          for (const toolCall of toolCalls) {
+            if (toolCall.function.name === 'generate_image') {
+              const args = JSON.parse(toolCall.function.arguments);
+              accumulatedText += '\n\n(Generating image...)';
+              setMessages(prev => 
+                prev.map(m => 
+                  m.id === assistantMessageId 
+                    ? { ...m, text: accumulatedText }
+                    : m
+                )
+              );
+
+              try {
+                const genResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                  },
+                  body: JSON.stringify({ prompt: args.prompt })
+                });
+
+                const genData = await genResponse.json();
+                if (genData.imageUrl) {
+                  accumulatedText = accumulatedText.replace('(Generating image...)', '');
+                  accumulatedText += `\n\n[Generated Image]\n${genData.imageUrl}`;
+                  setMessages(prev => 
+                    prev.map(m => 
+                      m.id === assistantMessageId 
+                        ? { ...m, text: accumulatedText }
+                        : m
+                    )
+                  );
+                }
+              } catch (imgError) {
+                console.error('Image generation error:', imgError);
+                accumulatedText = accumulatedText.replace('(Generating image...)', '(Image generation failed)');
+                setMessages(prev => 
+                  prev.map(m => 
+                    m.id === assistantMessageId 
+                      ? { ...m, text: accumulatedText }
+                        : m
+                  )
+                );
+              }
             }
           }
         }
@@ -134,7 +200,6 @@ export const ArtieChat = () => {
         variant: "destructive",
       });
       
-      // Remove the failed message attempt
       setMessages(prev => prev.filter(m => m.id !== (Date.now() + 1).toString()));
     } finally {
       setIsLoading(false);
@@ -190,7 +255,20 @@ export const ArtieChat = () => {
                     : 'bg-muted'
                 }`}
               >
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                {message.text.includes('[Generated Image]') ? (
+                  <div className="space-y-2">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {message.text.split('[Generated Image]')[0]}
+                    </p>
+                    <img 
+                      src={message.text.split('[Generated Image]')[1].trim()} 
+                      alt="Generated by Artie"
+                      className="rounded-lg max-w-full h-auto"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                )}
               </div>
             </div>
           ))}
