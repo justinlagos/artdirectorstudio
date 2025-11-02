@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Download, Wand2, ChevronDown, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
 
 interface ImageGenerationDialogProps {
   open: boolean;
@@ -123,31 +123,14 @@ export const ImageGenerationDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Prompt Input */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="prompt">Image Prompt</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopyPrompt}
-                className="h-auto p-1"
-              >
-                <Copy className="w-3 h-3" />
-              </Button>
-            </div>
-            <Textarea
-              id="prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the image you want to generate..."
-              className="min-h-[120px] resize-none"
-              disabled={isGenerating}
-            />
-            <p className="text-xs text-muted-foreground">
-              {prompt.length} characters
-            </p>
-          </div>
+          {/* Prompt Input with AI Enhancement */}
+          <EnhancedPromptEditor
+            value={prompt}
+            onChange={setPrompt}
+            label="Image Prompt"
+            placeholder="Describe the image you want to generate..."
+            disabled={isGenerating}
+          />
 
           {/* Advanced Options */}
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
