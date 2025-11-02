@@ -3,7 +3,7 @@ import { CreditBalance } from "./CreditBalance";
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
-import { Blend, Maximize2, Layers, BarChart3, Images } from "lucide-react";
+import { Blend, Maximize2, Layers, BarChart3, Images, Home } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ImageBlendDialog } from "./ImageBlendDialog";
@@ -23,6 +23,15 @@ export const Header = () => {
         <div className="container mx-auto px-4 max-w-5xl">
           <div className="flex items-center justify-between mb-6">
             <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/")}
+                title="Home"
+              >
+                <Home className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Home</span>
+              </Button>
               {user && (
                 <>
                   <Button
