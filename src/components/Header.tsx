@@ -1,5 +1,6 @@
 import { UserMenu } from "./UserMenu";
 import { CreditBalance } from "./CreditBalance";
+import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const Header = () => {
@@ -11,6 +12,7 @@ export const Header = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex-1" />
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             {user && <CreditBalance />}
             <UserMenu />
           </div>

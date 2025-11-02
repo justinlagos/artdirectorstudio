@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import imageCompression from "browser-image-compression";
 
 interface UploadSectionProps {
   onFileSelect: (file: File) => void;
@@ -16,6 +17,33 @@ export const UploadSection = ({
   onAnalyze,
   disabled 
 }: UploadSectionProps) => {
+  const compressAndSelectFile = useCallback(
+    async (file: File) => {
+      try {
+        // Only compress if file is larger than 1MB
+        if (file.size > 1024 * 1024) {
+          toast.info("Compressing image...");
+          const options = {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 2048,
+            useWebWorker: true,
+          };
+          const compressedFile = await imageCompression(file, options);
+          const compressionRatio = ((1 - compressedFile.size / file.size) * 100).toFixed(0);
+          toast.success(`Image compressed by ${compressionRatio}%`);
+          onFileSelect(compressedFile);
+        } else {
+          onFileSelect(file);
+        }
+      } catch (error) {
+        console.error("Compression error:", error);
+        toast.error("Failed to compress image, using original");
+        onFileSelect(file);
+      }
+    },
+    [onFileSelect]
+  );
+
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
@@ -33,9 +61,9 @@ export const UploadSection = ({
         return;
       }
       
-      onFileSelect(file);
+      compressAndSelectFile(file);
     },
-    [onFileSelect]
+    [compressAndSelectFile]
   );
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,7 +80,7 @@ export const UploadSection = ({
       return;
     }
     
-    onFileSelect(file);
+    compressAndSelectFile(file);
   };
 
   return (

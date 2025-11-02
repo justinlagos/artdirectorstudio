@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, Download, RefreshCw, Wand2 } from "lucide-react";
+import { Copy, Download, RefreshCw, Wand2, FileJson } from "lucide-react";
 import { toast } from "sonner";
 import { AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
 import { Separator } from "@/components/ui/separator";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
+import jsPDF from "jspdf";
 
 interface ResultsSectionProps {
   result: AnalysisResult;
@@ -72,7 +73,7 @@ export const ResultsSection = ({
     toast.success(`${sectionName} copied to clipboard!`);
   };
 
-  const handleDownload = () => {
+  const handleDownloadTxt = () => {
     const timestamp = new Date().toISOString().split('T')[0];
     const content = `AI IMAGE PROMPT RECONSTRUCTION SHEET
 Generated: ${timestamp}
@@ -142,7 +143,93 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    toast.success("Analysis sheet downloaded!");
+    toast.success("TXT file downloaded!");
+  };
+
+  const handleDownloadPdf = () => {
+    const timestamp = new Date().toISOString().split('T')[0];
+    const doc = new jsPDF();
+    const margin = 15;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const maxWidth = pageWidth - 2 * margin;
+    let yPos = margin;
+
+    const addText = (text: string, fontSize = 10, isBold = false) => {
+      doc.setFontSize(fontSize);
+      doc.setFont("helvetica", isBold ? "bold" : "normal");
+      const lines = doc.splitTextToSize(text, maxWidth);
+      
+      lines.forEach((line: string) => {
+        if (yPos > doc.internal.pageSize.getHeight() - margin) {
+          doc.addPage();
+          yPos = margin;
+        }
+        doc.text(line, margin, yPos);
+        yPos += fontSize * 0.5;
+      });
+      yPos += 3;
+    };
+
+    addText("AI IMAGE PROMPT RECONSTRUCTION SHEET", 16, true);
+    addText(`Generated: ${timestamp}`, 9);
+    yPos += 5;
+    
+    addText("FULL REGENERATION PROMPT", 14, true);
+    addText(result.full_regeneration_prompt);
+    yPos += 5;
+    
+    addText("COMPREHENSIVE ANALYSIS", 14, true);
+    
+    const analysisFields = [
+      ["1. Image Overview", result.analysis.image_overview],
+      ["2. Subject Description", result.analysis.subject_description],
+      ["3. Camera & Composition", result.analysis.camera_composition],
+      ["4. Lighting", result.analysis.lighting],
+      ["5. Color Palette", result.analysis.color_palette],
+      ["6. Design Style", result.analysis.design_style],
+      ["7. Texture & Material", result.analysis.texture_material],
+      ["8. Mood & Emotion", result.analysis.mood_emotion],
+      ["9. Background & Environment", result.analysis.background_environment],
+      ["10. Artistic Medium", result.analysis.artistic_medium],
+      ["11. Art Direction & Influence", result.analysis.art_direction_influence],
+      ["12. Intended Use", result.analysis.intended_use],
+    ];
+    
+    analysisFields.forEach(([title, content]) => {
+      addText(title, 11, true);
+      addText(content, 10);
+      yPos += 2;
+    });
+    
+    if (Object.keys(userEdits).length > 0) {
+      addText("USER EDITS", 12, true);
+      addText(JSON.stringify(userEdits, null, 2), 9);
+    }
+    
+    doc.save(`prompt-reconstruction-${timestamp}.pdf`);
+    toast.success("PDF downloaded!");
+  };
+
+  const handleDownloadJson = () => {
+    const timestamp = new Date().toISOString().split('T')[0];
+    const jsonData = {
+      generated: timestamp,
+      full_regeneration_prompt: result.full_regeneration_prompt,
+      analysis: result.analysis,
+      user_edits: userEdits,
+    };
+    
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prompt-reconstruction-${timestamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast.success("JSON file downloaded!");
   };
 
   const handleRegenerate = () => {
@@ -241,7 +328,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="text-2xl font-semibold">Full Regeneration Prompt</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
               size="sm"
@@ -253,10 +340,26 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
             <Button
               variant="secondary"
               size="sm"
-              onClick={handleDownload}
+              onClick={handleDownloadTxt}
             >
               <Download className="w-4 h-4 mr-2" />
-              Download
+              TXT
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleDownloadPdf}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              PDF
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleDownloadJson}
+            >
+              <FileJson className="w-4 h-4 mr-2" />
+              JSON
             </Button>
           </div>
         </div>

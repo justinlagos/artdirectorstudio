@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { UploadSection } from "@/components/UploadSection";
 import { LoadingState } from "@/components/LoadingState";
 import { ResultsSection } from "@/components/ResultsSection";
+import { Tutorial } from "@/components/Tutorial";
 import { Footer } from "@/components/Footer";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +74,33 @@ const Index = () => {
       }
     };
   }, [previewUrl]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + U - Upload
+      if ((e.metaKey || e.ctrlKey) && e.key === 'u') {
+        e.preventDefault();
+        document.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+      }
+      
+      // Cmd/Ctrl + Enter - Analyze (if image is selected)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && selectedFile && !isAnalyzing) {
+        e.preventDefault();
+        handleAnalyze();
+      }
+      
+      // Cmd/Ctrl + K - Copy prompt (if result exists)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k' && result) {
+        e.preventDefault();
+        navigator.clipboard.writeText(result.full_regeneration_prompt);
+        toast.success("Prompt copied!");
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [selectedFile, isAnalyzing, result]);
 
   if (loading) {
     return <LoadingState />;
@@ -323,6 +351,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <Tutorial />
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-12 max-w-5xl">
