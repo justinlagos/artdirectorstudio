@@ -196,7 +196,7 @@ const Gallery = () => {
 
       {/* Detail Dialog */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto"
           {selectedItem && (
             <div className="space-y-4">
               {selectedItem.asset.image_url && (

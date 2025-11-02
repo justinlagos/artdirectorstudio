@@ -29,12 +29,10 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setSourceImage(e.target?.result as string);
-      setUpscaledImage(null);
-    };
-    reader.readAsDataURL(file);
+    // Use URL.createObjectURL instead of base64 for better mobile performance
+    const objectUrl = URL.createObjectURL(file);
+    setSourceImage(objectUrl);
+    setUpscaledImage(null);
   };
 
   const handleUpscale = async () => {
@@ -126,6 +124,10 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
   };
 
   const handleClose = () => {
+    // Clean up object URL to prevent memory leaks
+    if (sourceImage && sourceImage.startsWith('blob:')) {
+      URL.revokeObjectURL(sourceImage);
+    }
     setSourceImage(null);
     setUpscaledImage(null);
     setTargetSize('1536x1536');
@@ -135,7 +137,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto"
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Maximize2 className="w-5 h-5" />

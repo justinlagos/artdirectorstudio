@@ -34,12 +34,9 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setImages(prev => [...prev, result]);
-      };
-      reader.readAsDataURL(file);
+      // Use URL.createObjectURL instead of base64 for better mobile performance
+      const objectUrl = URL.createObjectURL(file);
+      setImages(prev => [...prev, objectUrl]);
     });
   };
 
@@ -136,6 +133,12 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
   };
 
   const handleClose = () => {
+    // Clean up object URLs to prevent memory leaks
+    images.forEach(url => {
+      if (url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
     setImages([]);
     setBlendedImage(null);
     setInstruction("Blend these images seamlessly together");
@@ -145,7 +148,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto"
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Blend className="w-5 h-5" />
