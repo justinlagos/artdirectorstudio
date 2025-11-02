@@ -49,7 +49,7 @@ const Inspire = () => {
   useEffect(() => {
     if (searchQuery) {
       const filtered = items.filter(item =>
-        item.asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase())
+        item.asset?.prompt?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredItems(filtered);
     } else {
@@ -84,8 +84,10 @@ const Inspire = () => {
 
       if (error) throw error;
 
-      setItems(data as unknown as InspireItem[]);
-      setFilteredItems(data as unknown as InspireItem[]);
+      // Filter out items with null assets
+      const validItems = (data as unknown as InspireItem[]).filter(item => item.asset !== null);
+      setItems(validItems);
+      setFilteredItems(validItems);
     } catch (error) {
       console.error("Error fetching inspire items:", error);
       toast.error("Failed to load inspire gallery");
@@ -301,7 +303,7 @@ const InspireGrid = ({ items, onItemClick, getCreatorName, formatDate }: Inspire
           className="group cursor-pointer overflow-hidden hover:shadow-strong transition-all duration-300 interactive-card border-border/50"
           onClick={() => onItemClick(item)}
         >
-          {item.asset.image_url && (
+          {item.asset?.image_url && (
             <div className="aspect-square overflow-hidden bg-muted">
               <img
                 src={item.asset.image_url}
