@@ -182,6 +182,13 @@ export type Database = {
             referencedRelation: "generated_assets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "shared_assets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_roles: {

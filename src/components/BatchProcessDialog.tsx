@@ -70,6 +70,14 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     setCurrentProgress(0);
 
     try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to continue.");
+        setIsProcessing(false);
+        return;
+      }
+
       const totalImages = images.length;
       let completedCount = 0;
 
@@ -84,6 +92,18 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
         );
 
         try {
+          // Deduct credits for this analysis
+          const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
+            body: { action: "analyze", provider: "lovable" },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+
+          if (deductError || !deductData?.success) {
+            throw new Error("Insufficient credits");
+          }
+
           // Convert file to base64
           const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -94,7 +114,10 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
 
           // Analyze the image
           const { data, error } = await supabase.functions.invoke("analyze-image", {
-            body: { image: base64 }
+            body: { image: base64 },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
           });
 
           if (error) throw error;
@@ -114,7 +137,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
           setImages(prev =>
             prev.map(img =>
               img.id === image.id
-                ? { ...img, status: 'error' as const, error: 'Failed to analyze' }
+                ? { ...img, status: 'error' as const, error: error instanceof Error ? error.message : 'Failed to analyze' }
                 : img
             )
           );

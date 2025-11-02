@@ -68,8 +68,39 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     }, 2000);
 
     try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to continue.");
+        setIsBlending(false);
+        clearInterval(progressInterval);
+        return;
+      }
+
+      // First deduct credits
+      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
+        body: { action: "blend", provider: "lovable" },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (deductError || !deductData?.success) {
+        if (deductError?.message?.includes("Insufficient credits")) {
+          toast.error("Insufficient credits. You need 2 credits to blend images.");
+        } else {
+          toast.error("Failed to process credit deduction.");
+        }
+        setIsBlending(false);
+        clearInterval(progressInterval);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("blend-images", {
-        body: { images, instruction }
+        body: { images, instruction },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       clearInterval(progressInterval);
@@ -79,7 +110,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
       if (data?.image) {
         setBlendedImage(data.image);
-        toast.success("Images blended successfully! Cost: 2 credits");
+        toast.success(`Images blended successfully! ${deductData.remaining_balance} credits remaining.`);
       }
     } catch (error) {
       clearInterval(progressInterval);

@@ -58,8 +58,39 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     }, 2000);
 
     try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to continue.");
+        setIsUpscaling(false);
+        clearInterval(progressInterval);
+        return;
+      }
+
+      // First deduct credits
+      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
+        body: { action: "upscale", provider: "lovable" },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (deductError || !deductData?.success) {
+        if (deductError?.message?.includes("Insufficient credits")) {
+          toast.error("Insufficient credits. You need 2 credits to upscale an image.");
+        } else {
+          toast.error("Failed to process credit deduction.");
+        }
+        setIsUpscaling(false);
+        clearInterval(progressInterval);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("upscale-image", {
-        body: { image: sourceImage, targetSize }
+        body: { image: sourceImage, targetSize },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       clearInterval(progressInterval);
@@ -69,7 +100,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
       if (data?.image) {
         setUpscaledImage(data.image);
-        toast.success("Image upscaled successfully! Cost: 2 credits");
+        toast.success(`Image upscaled successfully! ${deductData.remaining_balance} credits remaining.`);
       }
     } catch (error) {
       clearInterval(progressInterval);
