@@ -8,78 +8,100 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* Warm neutral color palette */
     --background: 0 0% 100%;
-    --foreground: 0 0% 13%;
+    --foreground: 240 5% 8%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 13%;
+    --card-foreground: 240 5% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 13%;
+    --popover-foreground: 240 5% 8%;
 
-    --primary: 0 0% 0%;
+    --primary: 240 6% 10%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 95%;
-    --secondary-foreground: 0 0% 13%;
+    --secondary: 240 4% 96%;
+    --secondary-foreground: 240 5% 12%;
 
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
 
-    --accent: 0 0% 95%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 240 5% 94%;
+    --accent-foreground: 240 6% 10%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 0%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 240 6% 10%;
 
-    --radius: 0.75rem;
+    /* Surface depth layers */
+    --surface-1: 0 0% 99%;
+    --surface-2: 240 5% 97%;
+    --surface-3: 240 5% 95%;
 
-    /* Shadows */
-    --shadow-subtle: 0 2px 8px -2px hsl(0 0% 0% / 0.08);
-    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.12);
-    --shadow-strong: 0 8px 24px -8px hsl(0 0% 0% / 0.16);
+    /* Border radius */
+    --radius: 0.875rem;
+
+    /* Enhanced shadow system */
+    --shadow-xs: 0 1px 2px 0 hsl(240 5% 8% / 0.04);
+    --shadow-sm: 0 1px 3px 0 hsl(240 5% 8% / 0.06), 0 1px 2px -1px hsl(240 5% 8% / 0.04);
+    --shadow-subtle: 0 4px 6px -1px hsl(240 5% 8% / 0.08), 0 2px 4px -2px hsl(240 5% 8% / 0.04);
+    --shadow-medium: 0 10px 15px -3px hsl(240 5% 8% / 0.1), 0 4px 6px -4px hsl(240 5% 8% / 0.08);
+    --shadow-strong: 0 20px 25px -5px hsl(240 5% 8% / 0.12), 0 8px 10px -6px hsl(240 5% 8% / 0.08);
+    --shadow-xl: 0 25px 50px -12px hsl(240 5% 8% / 0.16);
+    --shadow-glow: 0 0 0 1px hsl(240 6% 10% / 0.04), 0 10px 40px -10px hsl(240 6% 10% / 0.12);
     
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .dark {
-    --background: 0 0% 10%;
-    --foreground: 0 0% 95%;
+    /* Rich dark color palette */
+    --background: 240 6% 6%;
+    --foreground: 240 5% 96%;
 
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 95%;
+    --card: 240 6% 8%;
+    --card-foreground: 240 5% 96%;
 
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 240 6% 8%;
+    --popover-foreground: 240 5% 96%;
 
     --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 10%;
+    --primary-foreground: 240 6% 8%;
 
-    --secondary: 0 0% 18%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 240 5% 14%;
+    --secondary-foreground: 240 5% 96%;
 
-    --muted: 0 0% 18%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 4% 64%;
 
-    --accent: 0 0% 18%;
-    --accent-foreground: 0 0% 95%;
+    --accent: 240 5% 16%;
+    --accent-foreground: 240 5% 96%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 0 0% 95%;
+    --border: 240 5% 18%;
+    --input: 240 5% 18%;
+    --ring: 240 5% 90%;
 
-    /* Shadows */
-    --shadow-subtle: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
-    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
-    --shadow-strong: 0 8px 24px -8px hsl(0 0% 0% / 0.5);
+    /* Surface depth layers for dark mode */
+    --surface-1: 240 6% 9%;
+    --surface-2: 240 6% 12%;
+    --surface-3: 240 5% 16%;
+
+    /* Enhanced shadows for dark mode */
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow-subtle: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 10px 15px -3px hsl(0 0% 0% / 0.5), 0 4px 6px -4px hsl(0 0% 0% / 0.4);
+    --shadow-strong: 0 20px 25px -5px hsl(0 0% 0% / 0.6), 0 8px 10px -6px hsl(0 0% 0% / 0.5);
+    --shadow-xl: 0 25px 50px -12px hsl(0 0% 0% / 0.7);
+    --shadow-glow: 0 0 0 1px hsl(0 0% 100% / 0.04), 0 10px 40px -10px hsl(0 0% 0% / 0.6);
   }
 }
 
@@ -90,9 +112,128 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+    @apply font-display font-semibold tracking-tight;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    @apply text-4xl md:text-5xl lg:text-6xl;
+    line-height: 1.1;
+  }
+
+  h2 {
+    @apply text-3xl md:text-4xl;
+    line-height: 1.2;
+  }
+
+  h3 {
+    @apply text-2xl md:text-3xl;
+    line-height: 1.3;
+  }
+
+  p {
+    @apply leading-relaxed;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/30;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+
+  /* Focus visible improvements */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Button press effect */
+  button:active {
+    transform: scale(0.98);
+  }
+
+  /* Improved selection */
+  ::selection {
+    @apply bg-primary/10;
+  }
+}
+
+@layer utilities {
+  /* Glass morphism effect */
+  .glass {
+    @apply bg-background/80 backdrop-blur-xl border border-border/50;
+  }
+
+  .glass-strong {
+    @apply bg-background/95 backdrop-blur-2xl border border-border/50;
+  }
+
+  /* Surface elevation */
+  .surface-1 {
+    @apply bg-surface-1;
+  }
+
+  .surface-2 {
+    @apply bg-surface-2;
+  }
+
+  .surface-3 {
+    @apply bg-surface-3;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-foreground to-muted-foreground;
+  }
+
+  /* Hover lift effect */
+  .hover-lift {
+    @apply transition-all duration-300 ease-smooth;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-0.5 shadow-medium;
+  }
+
+  /* Interactive card */
+  .interactive-card {
+    @apply transition-all duration-300 ease-smooth cursor-pointer;
+  }
+
+  .interactive-card:hover {
+    @apply shadow-strong scale-[1.02];
+  }
+
+  /* Shimmer effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--foreground) / 0.05) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
   }
 }

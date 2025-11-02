@@ -354,13 +354,8 @@ const Index = () => {
       <Tutorial />
       <Header />
       
-      <main className="flex-1 container mx-auto px-4 py-12 max-w-5xl">
-        <div className="mb-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Welcome back! Upload an image to get started.
-          </p>
-        </div>
-        <div className="space-y-12 animate-fade-in">
+      <main className="flex-1 container mx-auto px-4 py-16 max-w-7xl">
+        <div className="space-y-16 animate-fade-in">
           <UploadSection 
             onFileSelect={handleFileSelect}
             previewUrl={previewUrl}

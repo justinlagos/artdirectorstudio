@@ -323,16 +323,19 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
   ];
 
   return (
-    <section className="space-y-8 animate-fade-in">
+    <section className="space-y-12 animate-fade-in">
       {/* Full Regeneration Prompt */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h2 className="text-2xl font-semibold">Full Regeneration Prompt</h2>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <h2 className="text-3xl font-display font-bold tracking-tight">
+            Full Regeneration Prompt
+          </h2>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
               size="sm"
               onClick={handleCopyPrompt}
+              className="shadow-xs"
             >
               <Copy className="w-4 h-4 mr-2" />
               Copy
@@ -341,6 +344,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
               variant="secondary"
               size="sm"
               onClick={handleDownloadTxt}
+              className="shadow-xs"
             >
               <Download className="w-4 h-4 mr-2" />
               TXT
@@ -349,6 +353,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
               variant="secondary"
               size="sm"
               onClick={handleDownloadPdf}
+              className="shadow-xs"
             >
               <Download className="w-4 h-4 mr-2" />
               PDF
@@ -357,6 +362,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
               variant="secondary"
               size="sm"
               onClick={handleDownloadJson}
+              className="shadow-xs"
             >
               <FileJson className="w-4 h-4 mr-2" />
               JSON
@@ -364,27 +370,33 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
           </div>
         </div>
         
-        <div className="bg-card border border-border rounded-lg p-6 shadow-subtle">
-          <Textarea
-            value={result.full_regeneration_prompt}
-            readOnly
-            className="min-h-[150px] resize-none bg-background"
-          />
+        <div className="relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="relative bg-surface-1 rounded-2xl p-8 shadow-subtle ring-1 ring-border/50 hover:shadow-medium hover:ring-border transition-all duration-300">
+            <Textarea
+              value={result.full_regeneration_prompt}
+              readOnly
+              className="min-h-[180px] resize-none bg-transparent border-0 focus-visible:ring-0 text-base leading-relaxed"
+            />
+          </div>
         </div>
       </div>
 
-      <Separator />
+      <Separator className="my-12" />
 
       {/* Comprehensive Analysis */}
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-2xl font-semibold">Comprehensive Analysis</h2>
-          <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-3xl font-display font-bold tracking-tight">
+            Comprehensive Analysis
+          </h2>
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <Button
                 variant="default"
                 size="sm"
                 onClick={() => setShowGenerationDialog(true)}
+                className="shadow-sm"
               >
                 <Wand2 className="w-4 h-4 mr-2" />
                 Generate Image
@@ -397,53 +409,59 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
                 size="sm"
                 onClick={handleRegenerate}
                 disabled={isRegenerating || Object.keys(userEdits).length === 0}
+                className="shadow-xs"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
-                Regenerate with Edits
+                Regenerate
               </Button>
               <CreditCostIndicator cost={1} action="prompt refinement" />
             </div>
           </div>
         </div>
         
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
           {sections.map((section, index) => (
             <div 
               key={index}
-              className="bg-card border border-border rounded-lg p-6 shadow-subtle hover:shadow-md transition-shadow space-y-4"
+              className="group relative bg-surface-1 rounded-xl p-6 shadow-xs ring-1 ring-border/30 hover:shadow-medium hover:ring-border/60 transition-all duration-300 space-y-4"
             >
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="text-lg font-semibold text-foreground">
+              {/* Subtle gradient on hover */}
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-primary/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+              
+              <div className="relative flex items-start justify-between gap-2">
+                <h3 className="text-lg font-semibold text-foreground leading-tight">
                   {section.title}
                 </h3>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleCopySection(section.content, section.title)}
-                  className="shrink-0"
+                  className="shrink-0 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  <Copy className="w-3 h-3" />
+                  <Copy className="w-3.5 h-3.5" />
                 </Button>
               </div>
               
-              <p className="text-muted-foreground leading-relaxed text-sm">
+              <p className="relative text-muted-foreground leading-relaxed text-sm">
                 {section.content}
               </p>
 
               {/* Editable Fields */}
               {section.editFields && section.editFields.length > 0 && (
-                <div className="space-y-3 pt-3 border-t border-border">
-                  <p className="text-xs font-medium text-muted-foreground">Customize:</p>
+                <div className="relative space-y-3 pt-4 border-t border-border/50">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Customize
+                  </p>
                   {section.editFields.map((field) => (
-                    <div key={field.key} className="space-y-1">
-                      <label className="text-xs text-muted-foreground">
+                    <div key={field.key} className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground font-medium">
                         {field.label}
                       </label>
                       <Input
                         placeholder={`Enter ${field.label.toLowerCase()}...`}
                         value={userEdits[field.key] || ''}
                         onChange={(e) => handleEditChange(field.key, e.target.value)}
-                        className="h-8 text-sm"
+                        className="h-9 text-sm"
                       />
                     </div>
                   ))}
@@ -457,7 +475,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       {/* Generated Images Gallery */}
       {generatedImages.length > 0 && (
         <>
-          <Separator />
+          <Separator className="my-12" />
           <GeneratedImagesGallery 
             images={generatedImages}
             onDelete={onDeleteImage}

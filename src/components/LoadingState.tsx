@@ -2,11 +2,30 @@ import { Loader2 } from "lucide-react";
 
 export const LoadingState = () => {
   return (
-    <div className="flex flex-col items-center justify-center py-16 space-y-4">
-      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      <p className="text-muted-foreground">
-        Analyzing visual composition, lighting, and mood…
-      </p>
+    <div className="flex flex-col items-center justify-center py-24 space-y-8">
+      <div className="relative">
+        {/* Animated rings */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full border-2 border-primary/20 animate-ping" />
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full border-2 border-primary/40 animate-pulse" />
+        </div>
+        
+        {/* Central icon */}
+        <div className="relative w-12 h-12 flex items-center justify-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+        </div>
+      </div>
+      
+      <div className="text-center space-y-3 max-w-md">
+        <p className="text-lg font-medium animate-pulse-subtle">
+          Analyzing visual composition
+        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Examining lighting, color harmony, artistic style, and creative intent…
+        </p>
+      </div>
     </div>
   );
 };

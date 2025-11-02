@@ -67,23 +67,34 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-semibold">ArtDirector Studio</CardTitle>
-          <CardDescription>Reconstruct. Refine. Reimagine.</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      
+      <div className="relative w-full max-w-md animate-fade-in">
+        <div className="text-center mb-8 space-y-3">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 shadow-strong mb-4">
+            <span className="text-primary-foreground font-bold text-2xl">AD</span>
+          </div>
+          <h1 className="text-4xl font-display font-bold tracking-tight">
+            <span className="gradient-text">ArtDirector Studio</span>
+          </h1>
+          <p className="text-muted-foreground text-lg">
+            Reconstruct. Refine. Reimagine.
+          </p>
+        </div>
+
+        <div className="glass-strong rounded-2xl p-8 shadow-xl">
           <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50 p-1">
+              <TabsTrigger value="signin" className="rounded-lg">Sign In</TabsTrigger>
+              <TabsTrigger value="signup" className="rounded-lg">Sign Up</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
+            <TabsContent value="signin" className="mt-6">
+              <form onSubmit={handleSignIn} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
+                  <Label htmlFor="signin-email" className="text-sm font-medium">Email</Label>
                   <Input
                     id="signin-email"
                     type="email"
@@ -94,7 +105,7 @@ export default function Auth() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password">Password</Label>
+                  <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
                   <Input
                     id="signin-password"
                     type="password"
@@ -104,7 +115,7 @@ export default function Auth() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full h-11 shadow-sm" disabled={loading}>
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -117,10 +128,10 @@ export default function Auth() {
               </form>
             </TabsContent>
 
-            <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
+            <TabsContent value="signup" className="mt-6">
+              <form onSubmit={handleSignUp} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email" className="text-sm font-medium">Email</Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -131,7 +142,7 @@ export default function Auth() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
                   <Input
                     id="signup-password"
                     type="password"
@@ -145,21 +156,21 @@ export default function Auth() {
                     Password must be at least 6 characters
                   </p>
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full h-11 shadow-sm" disabled={loading}>
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Creating account...
                     </>
                   ) : (
-                    "Sign Up - Get 50 Free Credits"
+                    "Create Account • Get 50 Free Credits"
                   )}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

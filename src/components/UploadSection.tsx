@@ -84,39 +84,47 @@ export const UploadSection = ({
   };
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-8">
       <div
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
-        className="relative border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-foreground/20 transition-colors cursor-pointer bg-card shadow-subtle"
+        className="group relative border-2 border-dashed border-border/60 rounded-2xl p-16 text-center hover:border-foreground/30 hover:bg-accent/20 transition-all duration-300 cursor-pointer overflow-hidden"
       >
+        {/* Gradient background on hover */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        
         <input
           type="file"
           accept="image/png,image/jpeg,image/jpg"
           onChange={handleFileInput}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
         />
         
         {previewUrl ? (
-          <div className="space-y-4">
-            <img 
-              src={previewUrl} 
-              alt="Preview" 
-              className="max-h-64 mx-auto rounded-lg shadow-medium"
-            />
+          <div className="relative space-y-6 animate-scale-in">
+            <div className="relative inline-block">
+              <img 
+                src={previewUrl} 
+                alt="Preview" 
+                className="max-h-80 mx-auto rounded-xl shadow-strong ring-1 ring-border/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+              />
+              <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-foreground/10 pointer-events-none" />
+            </div>
             <p className="text-sm text-muted-foreground">
-              Click to change image or drag & drop a new one
+              Click anywhere or drag & drop to change image
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
-            <div className="space-y-2">
-              <p className="text-lg font-medium">
-                Drop your image here or click to browse
+          <div className="relative space-y-6 animate-fade-in">
+            <div className="inline-flex p-6 rounded-2xl bg-accent/50 group-hover:bg-accent transition-colors duration-300">
+              <Upload className="w-12 h-12 text-muted-foreground group-hover:text-foreground transition-colors duration-300" />
+            </div>
+            <div className="space-y-3">
+              <p className="text-xl font-medium">
+                Drop your image here
               </p>
-              <p className="text-sm text-muted-foreground">
-                PNG or JPG up to 15MB
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                or click to browse • PNG or JPG • up to 15MB
               </p>
             </div>
           </div>
@@ -124,12 +132,12 @@ export const UploadSection = ({
       </div>
       
       {previewUrl && (
-        <div className="flex justify-center">
+        <div className="flex justify-center animate-slide-up">
           <Button 
             onClick={onAnalyze}
             disabled={disabled}
             size="lg"
-            className="min-w-[200px]"
+            className="min-w-[240px] h-12 text-base shadow-medium hover:shadow-strong"
           >
             Analyze Image
           </Button>
