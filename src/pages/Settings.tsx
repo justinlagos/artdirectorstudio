@@ -110,12 +110,12 @@ const Settings = () => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .upsert({
-          id: user.id,
+        .update({
           username,
           bio,
           updated_at: new Date().toISOString()
-        });
+        })
+        .eq('id', user.id);
       
       if (error) throw error;
       toast.success("Profile updated successfully");

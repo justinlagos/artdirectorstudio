@@ -28,6 +28,7 @@ interface InspireItem {
   };
   profile: {
     email: string;
+    username?: string;
   };
 }
 
@@ -73,7 +74,8 @@ const Inspire = () => {
             created_at
           ),
           profile:profiles!shared_assets_user_id_fkey (
-            email
+            email,
+            username
           )
         `)
         .eq("is_public", true)
@@ -108,8 +110,11 @@ const Inspire = () => {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
-  const getCreatorName = (email: string) => {
-    return email.split('@')[0];
+  const getCreatorName = (item: InspireItem) => {
+    if (item.profile.username) {
+      return item.profile.username;
+    }
+    return item.profile.email.split('@')[0];
   };
 
   if (loading) {
@@ -189,13 +194,13 @@ const Inspire = () => {
             </div>
 
             <TabsContent value="fresh" className="mt-0">
-              <InspireGrid items={filteredItems} onItemClick={setSelectedItem} getCreatorName={getCreatorName} formatDate={formatDate} />
+              <InspireGrid items={filteredItems} onItemClick={setSelectedItem} getCreatorName={(item) => getCreatorName(item)} formatDate={formatDate} />
             </TabsContent>
             <TabsContent value="curated" className="mt-0">
-              <InspireGrid items={filteredItems.slice(0, 12)} onItemClick={setSelectedItem} getCreatorName={getCreatorName} formatDate={formatDate} />
+              <InspireGrid items={filteredItems.slice(0, 12)} onItemClick={setSelectedItem} getCreatorName={(item) => getCreatorName(item)} formatDate={formatDate} />
             </TabsContent>
             <TabsContent value="trending" className="mt-0">
-              <InspireGrid items={[...filteredItems].sort((a, b) => b.view_count - a.view_count)} onItemClick={setSelectedItem} getCreatorName={getCreatorName} formatDate={formatDate} />
+              <InspireGrid items={[...filteredItems].sort((a, b) => b.view_count - a.view_count)} onItemClick={setSelectedItem} getCreatorName={(item) => getCreatorName(item)} formatDate={formatDate} />
             </TabsContent>
           </Tabs>
         </div>
@@ -217,13 +222,13 @@ const Inspire = () => {
                 </div>
               )}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-semibold">
-                      {getCreatorName(selectedItem.profile.email)[0].toUpperCase()}
+                      {getCreatorName(selectedItem)[0].toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-medium">by {getCreatorName(selectedItem.profile.email)}</p>
+                      <p className="font-medium">by {getCreatorName(selectedItem)}</p>
                       <p className="text-xs text-muted-foreground">{formatDate(selectedItem.asset.created_at)}</p>
                     </div>
                   </div>
@@ -274,7 +279,7 @@ const Inspire = () => {
 interface InspireGridProps {
   items: InspireItem[];
   onItemClick: (item: InspireItem) => void;
-  getCreatorName: (email: string) => string;
+  getCreatorName: (item: InspireItem) => string;
   formatDate: (date: string) => string;
 }
 
@@ -318,7 +323,7 @@ const InspireGrid = ({ items, onItemClick, getCreatorName, formatDate }: Inspire
             )}
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                by {getCreatorName(item.profile.email)}
+                by {getCreatorName(item)}
               </span>
               <span className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />

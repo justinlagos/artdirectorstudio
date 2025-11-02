@@ -61,11 +61,7 @@ const Index = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
 
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
-    }
-  }, [user, loading, navigate]);
+  // Landing page is now public - no redirect needed
 
   // Cleanup on unmount - MUST be before early returns
   useEffect(() => {
@@ -107,11 +103,11 @@ const Index = () => {
     return <LoadingState />;
   }
 
-  if (!user) {
-    return null;
-  }
-
   const handleFileSelect = (file: File) => {
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
     // Revoke previous URL to prevent memory leak
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);

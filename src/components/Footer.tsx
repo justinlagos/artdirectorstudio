@@ -1,10 +1,27 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Sparkles, FileText, HelpCircle, Layers, Maximize2, ImageIcon, Wrench } from "lucide-react";
 import { ToolDialog } from "./ToolDialog";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Footer = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    e.preventDefault();
+    const element = document.getElementById(targetId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      navigate('/');
+      setTimeout(() => {
+        const el = document.getElementById(targetId);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  };
   return (
     <footer className="mt-auto border-t border-border/40 bg-gradient-to-b from-background via-surface-1/50 to-surface-2">
       <div className="container py-8 md:py-10">

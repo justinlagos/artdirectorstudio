@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageCircle, X, Send } from "lucide-react";
+import { MessageCircle, X, Send, Loader2 } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
 interface Message {
   id: string;
@@ -17,12 +18,13 @@ export const ArtieChat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi! I'm Artie, your creative assistant. How can I help you today?",
+      text: "Hi! I'm Artie, your creative assistant. I can help you brainstorm ideas, explain features, troubleshoot issues, or suggest prompt improvements. What would you like to explore today?",
       sender: 'artie',
       timestamp: new Date()
     }
   ]);
   const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -33,10 +35,9 @@ export const ArtieChat = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return;
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       text: inputValue,
@@ -46,34 +47,97 @@ export const ArtieChat = () => {
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue("");
+    setIsLoading(true);
 
-    // Simulate Artie's response
-    setTimeout(() => {
-      const artieResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: getArtieResponse(inputValue),
+    try {
+      const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/artie-chat`;
+      
+      const response = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          messages: messages
+            .filter(m => m.sender === 'user' || m.sender === 'artie')
+            .slice(-10) // Keep last 10 messages for context
+            .map(m => ({
+              role: m.sender === 'user' ? 'user' : 'assistant',
+              content: m.text
+            }))
+            .concat([{ role: 'user', content: inputValue }])
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from Artie');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = '';
+      let textBuffer = '';
+
+      // Create initial assistant message
+      const assistantMessageId = (Date.now() + 1).toString();
+      setMessages(prev => [...prev, {
+        id: assistantMessageId,
+        text: '',
         sender: 'artie',
         timestamp: new Date()
-      };
-      setMessages(prev => [...prev, artieResponse]);
-    }, 1000);
-  };
+      }]);
 
-  const getArtieResponse = (input: string): string => {
-    const lowerInput = input.toLowerCase();
-    
-    if (lowerInput.includes('credit')) {
-      return "Credits are used for AI operations. Analysis costs 1 credit, prompt refinement costs 2 credits, and image generation costs 3 credits. You can purchase more credits from the Settings page.";
-    } else if (lowerInput.includes('analyze') || lowerInput.includes('analysis')) {
-      return "To analyze an image, go to the Studio page, upload your image, and click 'Analyze Image'. The AI will provide detailed analysis of composition, lighting, colors, and more!";
-    } else if (lowerInput.includes('generate')) {
-      return "After analyzing an image or creating a prompt, you can generate new images by clicking the 'Generate Image' button. You can customize quality, size, and background settings.";
-    } else if (lowerInput.includes('blend')) {
-      return "The Blend feature allows you to combine 2-4 images into one cohesive composition. Upload your images and optionally add a description to guide the blending process.";
-    } else if (lowerInput.includes('upscale')) {
-      return "Upscale enhances your image resolution up to 4K using AI. Simply upload an image, select your scale factor, and the AI will enhance detail and clarity.";
-    } else {
-      return "I can help you with image analysis, generation, blending, upscaling, and more. What would you like to know about?";
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          textBuffer += decoder.decode(value, { stream: true });
+          
+          let newlineIndex: number;
+          while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+            let line = textBuffer.slice(0, newlineIndex);
+            textBuffer = textBuffer.slice(newlineIndex + 1);
+
+            if (line.endsWith('\r')) line = line.slice(0, -1);
+            if (line.startsWith(':') || line.trim() === '') continue;
+            if (!line.startsWith('data: ')) continue;
+
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === '[DONE]') break;
+
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+              if (content) {
+                accumulatedText += content;
+                setMessages(prev => 
+                  prev.map(m => 
+                    m.id === assistantMessageId 
+                      ? { ...m, text: accumulatedText }
+                      : m
+                  )
+                );
+              }
+            } catch (e) {
+              // Ignore parse errors for incomplete chunks
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error getting Artie response:', error);
+      toast({
+        title: "Connection Error",
+        description: "Couldn't reach Artie. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Remove the failed message attempt
+      setMessages(prev => prev.filter(m => m.id !== (Date.now() + 1).toString()));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -95,7 +159,7 @@ export const ArtieChat = () => {
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <MessageCircle className="h-5 w-5" />
+            <MessageCircle className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h3 className="font-semibold">Artie</h3>
@@ -126,10 +190,18 @@ export const ArtieChat = () => {
                     : 'bg-muted'
                 }`}
               >
-                <p className="text-sm leading-relaxed">{message.text}</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
               </div>
             </div>
           ))}
+          {isLoading && (
+            <div className="flex justify-start animate-fade-in">
+              <div className="bg-muted rounded-lg px-4 py-2 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">Artie is thinking...</span>
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
@@ -148,9 +220,18 @@ export const ArtieChat = () => {
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Ask Artie anything..."
             className="flex-1"
+            disabled={isLoading}
           />
-          <Button type="submit" size="icon" disabled={!inputValue.trim()}>
-            <Send className="h-4 w-4" />
+          <Button 
+            type="submit" 
+            size="icon" 
+            disabled={!inputValue.trim() || isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
         </form>
       </div>

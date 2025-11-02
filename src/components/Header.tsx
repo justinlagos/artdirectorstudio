@@ -6,7 +6,7 @@ import { UserMenu } from "./UserMenu";
 import { CreditBalance } from "./CreditBalance";
 import { useCredits } from "@/hooks/useCredits";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { Menu, Sparkles, Home, BarChart3, Layers, Maximize2, ImageIcon, Coins, Wrench } from "lucide-react";
+import { Menu, Sparkles, Home, BarChart3, Layers, Maximize2, ImageIcon, Coins, Wrench, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -43,71 +43,76 @@ export const Header = () => {
               <Link to="/">Studio</Link>
             </Button>
             
-            {/* Tools Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  Tools
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 bg-background/95 backdrop-blur-xl z-50">
-                <ToolDialog
-                  trigger={
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                      <Layers className="mr-2 h-4 w-4" />
-                      <div>
-                        <p className="font-medium">Blend</p>
-                        <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
-                      </div>
-                    </DropdownMenuItem>
-                  }
-                  title="Blend Images"
-                  description="Seamlessly combine two images with customizable blend modes"
-                  toolType="blend"
-                />
-                <ToolDialog
-                  trigger={
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                      <Maximize2 className="mr-2 h-4 w-4" />
-                      <div>
-                        <p className="font-medium">Upscale</p>
-                        <p className="text-xs text-muted-foreground">Enhance resolution</p>
-                      </div>
-                    </DropdownMenuItem>
-                  }
-                  title="Upscale Image"
-                  description="Enhance image resolution with AI-powered upscaling"
-                  toolType="upscale"
-                />
-                <ToolDialog
-                  trigger={
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                      <ImageIcon className="mr-2 h-4 w-4" />
-                      <div>
-                        <p className="font-medium">Batch</p>
-                        <p className="text-xs text-muted-foreground">Process multiple images</p>
-                      </div>
-                    </DropdownMenuItem>
-                  }
-                  title="Batch Processing"
-                  description="Process multiple images at once with consistent operations"
-                  toolType="batch"
-                />
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    Tools
+                    <ChevronDown className="h-3 w-3 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56 bg-background/95 backdrop-blur-xl z-50">
+                  <ToolDialog
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <Layers className="mr-2 h-4 w-4" />
+                        <div>
+                          <p className="font-medium">Blend</p>
+                          <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
+                        </div>
+                      </DropdownMenuItem>
+                    }
+                    title="Blend Images"
+                    description="Seamlessly combine two images with customizable blend modes"
+                    toolType="blend"
+                  />
+                  <ToolDialog
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <Maximize2 className="mr-2 h-4 w-4" />
+                        <div>
+                          <p className="font-medium">Upscale</p>
+                          <p className="text-xs text-muted-foreground">Enhance resolution</p>
+                        </div>
+                      </DropdownMenuItem>
+                    }
+                    title="Upscale Image"
+                    description="Enhance image resolution with AI-powered upscaling"
+                    toolType="upscale"
+                  />
+                  <ToolDialog
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <ImageIcon className="mr-2 h-4 w-4" />
+                        <div>
+                          <p className="font-medium">Batch</p>
+                          <p className="text-xs text-muted-foreground">Process multiple images</p>
+                        </div>
+                      </DropdownMenuItem>
+                    }
+                    title="Batch Processing"
+                    description="Process multiple images at once with consistent operations"
+                    toolType="batch"
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             <Button variant="ghost" size="sm" asChild>
               <Link to="/inspire">Inspire</Link>
             </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/analytics">Analytics</Link>
-            </Button>
+            
+            {user && (
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/analytics">Analytics</Link>
+              </Button>
+            )}
           </nav>
         </div>
 
         {/* Right side controls */}
         <div className="flex items-center gap-2">
-          {user && (
+          {user ? (
             <>
               {/* Credits - Compact on mobile */}
               <div className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] justify-center">
@@ -123,17 +128,16 @@ export const Header = () => {
               >
                 Buy Credits
               </Button>
+              <ThemeToggle />
+              <UserMenu />
             </>
-          )}
-          
-          <ThemeToggle />
-          
-          {user ? (
-            <UserMenu />
           ) : (
-            <Button onClick={() => navigate("/auth")} size="sm" className="hidden sm:flex">
-              Sign In
-            </Button>
+            <>
+              <ThemeToggle />
+              <Button onClick={() => navigate("/auth")} size="sm">
+                Sign In
+              </Button>
+            </>
           )}
 
           {/* Mobile Menu */}
