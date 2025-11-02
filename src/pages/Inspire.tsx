@@ -150,11 +150,11 @@ const Inspire = () => {
             </p>
             {user ? (
               <Button size="lg" onClick={() => navigate("/")} className="mt-4">
-                Start Creating
+                Open Studio
               </Button>
             ) : (
               <Button size="lg" onClick={() => navigate("/auth")} className="mt-4">
-                Sign Up to Create
+                Start Creating
               </Button>
             )}
           </div>

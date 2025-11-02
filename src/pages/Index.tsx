@@ -359,8 +359,8 @@ const Index = () => {
       <section id="hero" className="relative overflow-hidden border-b border-border/40 bg-gradient-to-b from-background via-background to-surface-1/30">
         <div className="container mx-auto px-4 py-20 md:py-32">
           <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
-            <h1 className="text-5xl md:text-7xl font-display font-bold leading-tight">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white" style={{ letterSpacing: '0.02em' }}>
+            <h1 className="text-5xl md:text-7xl font-display font-bold leading-tight tracking-tight">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white">
                 ArtDirector Studio
               </span>
             </h1>
@@ -414,21 +414,41 @@ const Index = () => {
                 {
                   title: "Analyze",
                   description: "Upload your image and let AI understand its composition, style, and elements",
-                  icon: "🔍",
+                  icon: (
+                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8"/>
+                      <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                  ),
                 },
                 {
                   title: "Generate",
                   description: "Create new visuals based on your prompt and refined parameters",
-                  icon: "✨",
+                  icon: (
+                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                      <path d="M5 3v4"/>
+                      <path d="M19 17v4"/>
+                      <path d="M3 5h4"/>
+                      <path d="M17 19h4"/>
+                    </svg>
+                  ),
                 },
                 {
                   title: "Refine",
                   description: "Iterate and enhance with precision controls until it's perfect",
-                  icon: "🎨",
+                  icon: (
+                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                      <path d="M2 2l7.586 7.586"/>
+                      <circle cx="11" cy="11" r="2"/>
+                    </svg>
+                  ),
                 },
               ].map((step, index) => (
                 <div key={index} className="glass rounded-2xl p-8 text-center hover-lift transition-all duration-300">
-                  <div className="text-5xl mb-4">{step.icon}</div>
+                  <div className="flex items-center justify-center mb-4 text-foreground">{step.icon}</div>
                   <h3 className="text-2xl font-display font-semibold mb-3">{step.title}</h3>
                   <p className="text-muted-foreground">{step.description}</p>
                 </div>

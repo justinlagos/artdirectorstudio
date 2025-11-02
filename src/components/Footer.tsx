@@ -7,8 +7,8 @@ import { toast } from "sonner";
 export const Footer = () => {
   return (
     <footer className="mt-auto border-t border-border/40 bg-gradient-to-b from-background via-surface-1/50 to-surface-2">
-      <div className="container py-20">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">
+      <div className="container py-8 md:py-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {/* Platform */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-6">
@@ -117,7 +117,7 @@ export const Footer = () => {
         </div>
 
         {/* Bottom section */}
-        <div className="mt-16 pt-8 border-t border-border/40 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="mt-8 md:mt-10 pt-6 border-t border-border/40 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} ArtDirector Studio. All rights reserved.
           </p>

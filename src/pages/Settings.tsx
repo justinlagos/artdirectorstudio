@@ -306,12 +306,13 @@ const Settings = () => {
                         {transactions.map((tx) => (
                           <div key={tx.id} className="flex justify-between p-3 rounded-lg bg-muted/30">
                             <div>
-                              <p className="font-medium">{tx.description || tx.type}</p>
+                              <p className="font-medium capitalize">{tx.action || 'Transaction'}</p>
                               <p className="text-xs text-muted-foreground">
-                                {new Date(tx.created_at).toLocaleDateString()}
+                                {new Date(tx.timestamp).toLocaleDateString()} • {tx.provider}
                               </p>
+                              {tx.notes && <p className="text-xs text-muted-foreground mt-1">{tx.notes}</p>}
                             </div>
-                            <p className={`font-semibold ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <p className={`font-semibold ${tx.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                               {tx.amount > 0 ? '+' : ''}{tx.amount}
                             </p>
                           </div>
