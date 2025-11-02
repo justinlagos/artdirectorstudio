@@ -13,8 +13,13 @@ interface ImageBlendDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface ImageFile {
+  file: File;
+  preview: string;
+}
+
 export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) => {
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("Blend these images seamlessly together");
   const [isBlending, setIsBlending] = useState(false);
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
@@ -34,14 +39,18 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         return;
       }
 
-      // Use URL.createObjectURL instead of base64 for better mobile performance
-      const objectUrl = URL.createObjectURL(file);
-      setImages(prev => [...prev, objectUrl]);
+      // Use URL.createObjectURL for preview (better mobile performance)
+      const preview = URL.createObjectURL(file);
+      setImages(prev => [...prev, { file, preview }]);
     });
   };
 
   const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+    setImages(prev => {
+      const img = prev[index];
+      if (img) URL.revokeObjectURL(img.preview);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleBlend = async () => {
@@ -93,8 +102,18 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         return;
       }
 
+      // Convert files to base64 for edge function
+      const base64Images = await Promise.all(
+        images.map(img => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(img.file);
+        }))
+      );
+
       const { data, error } = await supabase.functions.invoke("blend-images", {
-        body: { images, instruction },
+        body: { images: base64Images, instruction },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -134,11 +153,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
   const handleClose = () => {
     // Clean up object URLs to prevent memory leaks
-    images.forEach(url => {
-      if (url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
-    });
+    images.forEach(img => URL.revokeObjectURL(img.preview));
     setImages([]);
     setBlendedImage(null);
     setInstruction("Blend these images seamlessly together");
@@ -148,7 +163,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto"
+      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Blend className="w-5 h-5" />
@@ -190,14 +205,14 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
               {images.map((img, index) => (
                 <div key={index} className="relative group">
                   <img 
-                    src={img} 
+                    src={img.preview} 
                     alt={`Image ${index + 1}`} 
                     className="w-full h-40 object-cover rounded-lg"
                   />
                   <Button
                     variant="destructive"
                     size="sm"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity min-w-[44px] min-h-[44px]"
                     onClick={() => removeImage(index)}
                     disabled={isBlending}
                   >

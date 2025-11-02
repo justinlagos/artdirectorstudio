@@ -13,8 +13,13 @@ interface ImageUpscaleDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface SourceImage {
+  file: File;
+  preview: string;
+}
+
 export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogProps) => {
-  const [sourceImage, setSourceImage] = useState<string | null>(null);
+  const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
@@ -29,9 +34,9 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       return;
     }
 
-    // Use URL.createObjectURL instead of base64 for better mobile performance
-    const objectUrl = URL.createObjectURL(file);
-    setSourceImage(objectUrl);
+    // Use URL.createObjectURL for preview (better mobile performance)
+    const preview = URL.createObjectURL(file);
+    setSourceImage({ file, preview });
     setUpscaledImage(null);
   };
 
@@ -84,8 +89,16 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         return;
       }
 
+      // Convert file to base64 for edge function
+      const base64Image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(sourceImage.file);
+      });
+
       const { data, error } = await supabase.functions.invoke("upscale-image", {
-        body: { image: sourceImage, targetSize },
+        body: { image: base64Image, targetSize },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -125,8 +138,8 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
   const handleClose = () => {
     // Clean up object URL to prevent memory leaks
-    if (sourceImage && sourceImage.startsWith('blob:')) {
-      URL.revokeObjectURL(sourceImage);
+    if (sourceImage) {
+      URL.revokeObjectURL(sourceImage.preview);
     }
     setSourceImage(null);
     setUpscaledImage(null);
@@ -137,7 +150,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto"
+      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Maximize2 className="w-5 h-5" />
@@ -178,7 +191,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
               <Label>Source Image</Label>
               <div className="relative rounded-lg overflow-hidden bg-muted">
                 <img 
-                  src={sourceImage} 
+                  src={sourceImage.preview} 
                   alt="Source image" 
                   className="w-full h-auto"
                 />
@@ -226,7 +239,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
                 <div className="space-y-2">
                   <Label>Original</Label>
                   <img 
-                    src={sourceImage!} 
+                    src={sourceImage!.preview} 
                     alt="Original" 
                     className="w-full h-auto rounded-lg"
                   />

@@ -209,7 +209,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col"
+      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Layers className="w-5 h-5" />
