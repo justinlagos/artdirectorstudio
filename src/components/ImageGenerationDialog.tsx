@@ -1,13 +1,15 @@
 import { useState } from "react";
+import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Download, Wand2, ChevronDown, Copy } from "lucide-react";
+import { Download, Wand2, ChevronDown, Copy, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ImageGenerationDialogProps {
   open: boolean;
@@ -22,13 +24,20 @@ export interface GenerationOptions {
   background: 'transparent' | 'opaque' | 'auto';
 }
 
+const MAX_PROMPT_LENGTH = 2000;
+
 export const ImageGenerationDialog = ({ 
   open, 
   onOpenChange, 
   initialPrompt,
   onGenerate 
 }: ImageGenerationDialogProps) => {
-  const [prompt, setPrompt] = useState(initialPrompt);
+  // Truncate initial prompt if it's too long
+  const truncatedInitialPrompt = initialPrompt.length > MAX_PROMPT_LENGTH 
+    ? initialPrompt.substring(0, MAX_PROMPT_LENGTH - 3) + '...'
+    : initialPrompt;
+    
+  const [prompt, setPrompt] = useState(truncatedInitialPrompt);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -42,6 +51,11 @@ export const ImageGenerationDialog = ({
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error("Please enter a prompt");
+      return;
+    }
+
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      toast.error(`Prompt is too long. Maximum ${MAX_PROMPT_LENGTH} characters allowed.`);
       return;
     }
 
@@ -104,10 +118,24 @@ export const ImageGenerationDialog = ({
 
   const handleClose = () => {
     setGeneratedImage(null);
-    setPrompt(initialPrompt);
+    setPrompt(truncatedInitialPrompt);
     setProgress(0);
     onOpenChange(false);
   };
+
+  // Update prompt when initialPrompt changes and dialog opens
+  React.useEffect(() => {
+    if (open) {
+      const newTruncatedPrompt = initialPrompt.length > MAX_PROMPT_LENGTH 
+        ? initialPrompt.substring(0, MAX_PROMPT_LENGTH - 3) + '...'
+        : initialPrompt;
+      setPrompt(newTruncatedPrompt);
+      
+      if (initialPrompt.length > MAX_PROMPT_LENGTH) {
+        toast.info(`Prompt automatically shortened to ${MAX_PROMPT_LENGTH} characters`);
+      }
+    }
+  }, [open, initialPrompt]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -123,10 +151,30 @@ export const ImageGenerationDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Character Limit Warning */}
+          {prompt.length > MAX_PROMPT_LENGTH * 0.9 && (
+            <Alert variant={prompt.length > MAX_PROMPT_LENGTH ? "destructive" : "default"}>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {prompt.length > MAX_PROMPT_LENGTH 
+                  ? `Prompt exceeds maximum length by ${prompt.length - MAX_PROMPT_LENGTH} characters. Please shorten it.`
+                  : `Approaching character limit: ${prompt.length}/${MAX_PROMPT_LENGTH}`
+                }
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Prompt Input with AI Enhancement */}
           <EnhancedPromptEditor
             value={prompt}
-            onChange={setPrompt}
+            onChange={(newValue) => {
+              // Enforce max length
+              if (newValue.length <= MAX_PROMPT_LENGTH) {
+                setPrompt(newValue);
+              } else {
+                toast.error(`Maximum ${MAX_PROMPT_LENGTH} characters allowed`);
+              }
+            }}
             label="Image Prompt"
             placeholder="Describe the image you want to generate..."
             disabled={isGenerating}
@@ -246,7 +294,7 @@ export const ImageGenerationDialog = ({
           {!generatedImage && (
             <Button
               onClick={handleGenerate}
-              disabled={isGenerating || !prompt.trim()}
+              disabled={isGenerating || !prompt.trim() || prompt.length > MAX_PROMPT_LENGTH}
               className="w-full"
               size="lg"
             >

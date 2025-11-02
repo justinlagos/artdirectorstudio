@@ -93,6 +93,7 @@ export const EnhancedPromptEditor = ({
         placeholder={placeholder}
         className="min-h-[120px] resize-none"
         disabled={disabled || isImproving}
+        maxLength={2000}
       />
       {isImproving && (
         <p className="text-xs text-muted-foreground">
@@ -100,7 +101,7 @@ export const EnhancedPromptEditor = ({
         </p>
       )}
       <p className="text-xs text-muted-foreground">
-        {value.length} characters
+        {value.length} characters {value.length > 1800 && `(max 2000)`}
       </p>
     </div>
   );
