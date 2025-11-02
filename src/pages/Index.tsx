@@ -354,9 +354,25 @@ const Index = () => {
       <Tutorial />
       <Header />
       
+      {/* Hero Section */}
+      <section className="relative overflow-hidden border-b border-border/40 bg-gradient-to-b from-background via-background to-surface-1/30">
+        <div className="container mx-auto px-4 py-20 md:py-32">
+          <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
+            <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tight leading-tight">
+              Transform Vision into
+              <span className="block text-primary mt-2">Visual Reality</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed max-w-2xl mx-auto">
+              AI-powered image analysis and generation for creative professionals.
+              Analyze, refine, and generate stunning visuals with precision.
+            </p>
+          </div>
+        </div>
+      </section>
+      
       <main className="flex-1 container mx-auto px-4 py-16 max-w-7xl">
         <div className="space-y-16 animate-fade-in">
-          <UploadSection 
+          <UploadSection
             onFileSelect={handleFileSelect}
             previewUrl={previewUrl}
             onAnalyze={handleAnalyze}

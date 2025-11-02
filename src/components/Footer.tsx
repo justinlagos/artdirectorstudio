@@ -10,7 +10,7 @@ export const Footer = () => {
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-6">
               <Sparkles className="h-5 w-5 text-primary" />
-              <h3 className="font-display font-semibold text-lg">Platform</h3>
+              <h3 className="font-display font-semibold text-lg">ArtDirector Studio</h3>
             </div>
             <nav className="flex flex-col space-y-3">
               <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">

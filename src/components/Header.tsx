@@ -33,7 +33,7 @@ export const Header = () => {
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
             <Sparkles className="h-6 w-6" />
-            <span className="hidden xs:inline font-display font-bold text-lg">ArtDirector</span>
+            <span className="hidden xs:inline font-display font-bold text-lg">ArtDirector Studio</span>
           </Link>
 
           {/* Desktop Navigation */}
