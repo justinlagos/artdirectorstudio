@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { UploadSection } from "@/components/UploadSection";
 import { LoadingState } from "@/components/LoadingState";
-import { ResultsSection } from "@/components/ResultsSection";
+import { ResultsSection } from "@/components/ResultsSectionEnhanced";
 import { Tutorial } from "@/components/Tutorial";
 import { Footer } from "@/components/Footer";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";

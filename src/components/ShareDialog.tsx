@@ -117,13 +117,27 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between space-x-2">
+          <div className="p-4 rounded-lg bg-muted/30 space-y-3">
+            <div className="flex items-start gap-2">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Share2 className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium">How sharing works</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Generate a unique link to share your work. Toggle "Make Public" to also display it in the Inspire gallery where everyone can discover it.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between space-x-2 p-3 rounded-lg border border-border/50 hover:border-border transition-colors">
             <div className="flex-1">
-              <Label htmlFor="public-toggle" className="text-sm font-medium">
+              <Label htmlFor="public-toggle" className="text-sm font-medium cursor-pointer">
                 Make Public
               </Label>
-              <p className="text-xs text-muted-foreground">
-                {isPublic ? "Anyone can view in gallery" : "Only people with link"}
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isPublic ? "Visible in Inspire gallery" : "Share link only"}
               </p>
             </div>
             <Switch

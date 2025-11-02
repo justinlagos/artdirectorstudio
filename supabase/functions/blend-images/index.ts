@@ -28,11 +28,16 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    // Build the content array with instruction and images
+    // Build enhanced blending instruction for professional results
+    const enhancedInstruction = instruction 
+      ? `Create a professional, cohesive blend with these requirements: ${instruction}. Ensure consistent lighting direction, color grading harmony, realistic perspective alignment, and seamless visual integration.`
+      : "Create a professional, designer-quality blend of these images. Ensure: 1) Consistent lighting and shadows across all elements, 2) Harmonious color grading, 3) Proper perspective and scale alignment, 4) Seamless transitions with no visible seams, 5) Unified artistic style and mood. The result should look like a single, professionally composed image.";
+
+    // Build the content array with enhanced instruction and images
     const content = [
       {
         type: "text",
-        text: instruction || "Blend these images seamlessly together, maintaining the best qualities of each."
+        text: enhancedInstruction
       },
       ...images.map((imageUrl: string) => ({
         type: "image_url",
@@ -47,7 +52,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model: "google/gemini-2.5-pro", // Using Pro model for better quality blending
         messages: [
           {
             role: "user",

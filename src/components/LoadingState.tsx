@@ -18,12 +18,13 @@ export const LoadingState = () => {
         </div>
       </div>
       
-      <div className="text-center space-y-3 max-w-md">
+      <div className="text-center space-y-3 max-w-sm mx-auto px-4">
         <p className="text-lg font-medium animate-pulse-subtle">
           Analyzing visual composition
         </p>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Examining lighting, color harmony, artistic style, and creative intent…
+          Examining lighting, color harmony,<br />
+          artistic style, and creative intent…
         </p>
       </div>
     </div>

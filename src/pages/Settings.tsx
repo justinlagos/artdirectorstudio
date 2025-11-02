@@ -190,26 +190,26 @@ const Settings = () => {
           </div>
 
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="glass-strong">
-              <TabsTrigger value="profile" className="gap-2">
+            <TabsList className="glass-strong overflow-x-auto flex-nowrap w-full justify-start">
+              <TabsTrigger value="profile" className="gap-2 flex-shrink-0">
                 <User className="w-4 h-4" />
-                Profile
+                <span className="hidden sm:inline">Profile</span>
               </TabsTrigger>
-              <TabsTrigger value="security" className="gap-2">
+              <TabsTrigger value="security" className="gap-2 flex-shrink-0">
                 <Shield className="w-4 h-4" />
-                Security
+                <span className="hidden sm:inline">Security</span>
               </TabsTrigger>
-              <TabsTrigger value="billing" className="gap-2">
+              <TabsTrigger value="billing" className="gap-2 flex-shrink-0">
                 <CreditCard className="w-4 h-4" />
-                Billing
+                <span className="hidden sm:inline">Billing</span>
               </TabsTrigger>
-              <TabsTrigger value="preferences" className="gap-2">
+              <TabsTrigger value="preferences" className="gap-2 flex-shrink-0">
                 <Settings2 className="w-4 h-4" />
-                Preferences
+                <span className="hidden sm:inline">Preferences</span>
               </TabsTrigger>
-              <TabsTrigger value="notifications" className="gap-2">
+              <TabsTrigger value="notifications" className="gap-2 flex-shrink-0">
                 <Bell className="w-4 h-4" />
-                Notifications
+                <span className="hidden sm:inline">Notifications</span>
               </TabsTrigger>
             </TabsList>
 

@@ -53,6 +53,14 @@ serve(async (req) => {
     // Parse request body
     const { prompt, quality = 'auto', size = '1024x1024', background = 'auto' } = await req.json();
     
+    // Parse size dimensions
+    let aspectRatio = '1:1'; // Default square
+    if (size === '1536x1024') {
+      aspectRatio = '3:2'; // Landscape
+    } else if (size === '1024x1536') {
+      aspectRatio = '2:3'; // Portrait
+    }
+    
     // Validate prompt
     if (!prompt) {
       return new Response(
@@ -107,7 +115,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: prompt
+            content: `Generate an image with aspect ratio ${aspectRatio}. ${prompt}`
           }
         ],
         modalities: ["image", "text"]
