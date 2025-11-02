@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,6 +32,8 @@ interface InspireItem {
 }
 
 const Inspire = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<InspireItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<InspireItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -144,6 +148,15 @@ const Inspire = () => {
             <p className="text-lg text-muted-foreground leading-relaxed">
               Discover community-shared AI creations and creative direction insights
             </p>
+            {user ? (
+              <Button size="lg" onClick={() => navigate("/")} className="mt-4">
+                Start Creating
+              </Button>
+            ) : (
+              <Button size="lg" onClick={() => navigate("/auth")} className="mt-4">
+                Sign Up to Create
+              </Button>
+            )}
           </div>
 
           {/* Tabs & Search */}
