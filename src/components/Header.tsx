@@ -3,14 +3,16 @@ import { CreditBalance } from "./CreditBalance";
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
-import { Blend, Maximize2, Layers } from "lucide-react";
+import { Blend, Maximize2, Layers, BarChart3, Images } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ImageBlendDialog } from "./ImageBlendDialog";
 import { ImageUpscaleDialog } from "./ImageUpscaleDialog";
 import { BatchProcessDialog } from "./BatchProcessDialog";
 
 export const Header = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [showBlendDialog, setShowBlendDialog] = useState(false);
   const [showUpscaleDialog, setShowUpscaleDialog] = useState(false);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
@@ -23,6 +25,24 @@ export const Header = () => {
             <div className="flex gap-2">
               {user && (
                 <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate("/gallery")}
+                    className="hidden md:flex"
+                  >
+                    <Images className="w-4 h-4 mr-2" />
+                    Gallery
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate("/analytics")}
+                    className="hidden md:flex"
+                  >
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Analytics
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

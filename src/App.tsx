@@ -9,6 +9,9 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import History from "./pages/History";
 import Admin from "./pages/Admin";
+import Gallery from "./pages/Gallery";
+import Analytics from "./pages/Analytics";
+import SharedAsset from "./pages/SharedAsset";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +29,9 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/history" element={<History />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/gallery" element={<Gallery />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/shared/:token" element={<SharedAsset />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

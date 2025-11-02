@@ -143,6 +143,47 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_assets: {
+        Row: {
+          asset_id: string
+          created_at: string
+          id: string
+          is_public: boolean
+          share_token: string
+          updated_at: string
+          user_id: string
+          view_count: number
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          share_token: string
+          updated_at?: string
+          user_id: string
+          view_count?: number
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          share_token?: string
+          updated_at?: string
+          user_id?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_assets_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "generated_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -175,6 +216,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_share_view_count: {
+        Args: { share_token_param: string }
+        Returns: undefined
       }
     }
     Enums: {

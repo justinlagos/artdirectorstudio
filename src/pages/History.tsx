@@ -9,8 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Trash2, Search, Image as ImageIcon, FileCode } from "lucide-react";
+import { FileText, Trash2, Search, Image as ImageIcon, FileCode, Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { ShareDialog } from "@/components/ShareDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type GeneratedAsset = Database['public']['Tables']['generated_assets']['Row'];
@@ -22,6 +23,8 @@ const History = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
+  const [shareAssetId, setShareAssetId] = useState<string | null>(null);
+  const [shareAssetType, setShareAssetType] = useState<string>("");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -208,13 +211,27 @@ const History = () => {
                         {new Date(asset.created_at).toLocaleString()}
                       </p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(asset.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setShareAssetId(asset.id);
+                          setShareAssetType(asset.type);
+                        }}
+                        title="Share"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(asset.id)}
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -264,8 +281,20 @@ const History = () => {
           </div>
         )}
       </main>
-
+      
       <Footer />
+
+      <ShareDialog
+        open={!!shareAssetId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShareAssetId(null);
+            setShareAssetType("");
+          }
+        }}
+        assetId={shareAssetId || ""}
+        assetType={shareAssetType}
+      />
     </div>
   );
 };
