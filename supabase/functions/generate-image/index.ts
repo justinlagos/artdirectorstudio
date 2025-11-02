@@ -52,9 +52,31 @@ serve(async (req) => {
     // Parse request body
     const { prompt, quality = 'auto', size = '1024x1024', background = 'auto' } = await req.json();
     
+    // Validate prompt
     if (!prompt) {
       return new Response(
         JSON.stringify({ error: "Prompt is required" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (typeof prompt !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Prompt must be a string" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (prompt.length < 3) {
+      return new Response(
+        JSON.stringify({ error: "Prompt too short. Minimum 3 characters" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (prompt.length > 2000) {
+      return new Response(
+        JSON.stringify({ error: "Prompt too long. Maximum 2000 characters" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -137,34 +159,69 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Save to database
-    const { data: assetData, error: assetError } = await supabaseAdmin
-      .from('generated_assets')
-      .insert({
-        user_id: userId,
-        type: 'image',
-        prompt: prompt,
-        analysis_data: {
-          base64_image: generatedImageUrl,
-          generation_params: { quality, size, background },
-          generated_at: new Date().toISOString()
-        }
-      })
-      .select()
-      .single();
+    // Upload to storage instead of saving base64 to database
+    let finalImageUrl = generatedImageUrl;
+    let assetData = null;
 
-    if (assetError) {
-      console.error("Database error:", assetError);
-      // Don't fail the request if DB save fails - user still gets the image
-      console.warn("Failed to save to database but returning image anyway");
-    } else {
+    try {
+      // Extract base64 data
+      const base64Data = generatedImageUrl.split(',')[1];
+      const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      
+      // Upload to storage
+      const fileName = `${userId}/${Date.now()}-generated.png`;
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from('generated-images')
+        .upload(fileName, buffer, {
+          contentType: 'image/png',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabaseAdmin.storage
+        .from('generated-images')
+        .getPublicUrl(fileName);
+      finalImageUrl = urlData.publicUrl;
+      console.log("Image uploaded to storage:", finalImageUrl);
+
+      // Save metadata to database
+      const { data: savedAsset, error: assetError } = await supabaseAdmin
+        .from('generated_assets')
+        .insert({
+          user_id: userId,
+          type: 'image',
+          prompt: prompt,
+          image_url: finalImageUrl,
+          analysis_data: {
+            generation_params: { quality, size, background },
+            generated_at: new Date().toISOString()
+          }
+        })
+        .select()
+        .single();
+
+      if (assetError) {
+        console.error("Database save error:", assetError);
+        throw assetError;
+      }
+
+      assetData = savedAsset;
       console.log("Saved to database:", assetData.id);
+    } catch (error) {
+      console.error("Failed to save image:", error);
+      // Return base64 as fallback but log error
+      finalImageUrl = generatedImageUrl;
     }
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        image: generatedImageUrl,
+        image: finalImageUrl,
         assetId: assetData?.id,
         message: "Image generated successfully"
       }),

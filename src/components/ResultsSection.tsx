@@ -42,9 +42,17 @@ export const ResultsSection = ({
     }
   }, []);
 
-  // Save edits to local storage whenever they change
+  // Debounced save to local storage to prevent race conditions
   useEffect(() => {
-    localStorage.setItem('prompt_reconstructor_edits', JSON.stringify(userEdits));
+    const timeoutId = setTimeout(() => {
+      try {
+        localStorage.setItem('prompt_reconstructor_edits', JSON.stringify(userEdits));
+      } catch (e) {
+        console.error('Failed to save edits', e);
+      }
+    }, 500); // Debounce by 500ms
+
+    return () => clearTimeout(timeoutId);
   }, [userEdits]);
 
   const handleEditChange = (field: keyof UserEdits, value: string) => {

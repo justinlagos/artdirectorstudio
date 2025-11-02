@@ -74,13 +74,26 @@ const Index = () => {
   }
 
   const handleFileSelect = (file: File) => {
+    // Revoke previous URL to prevent memory leak
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
     setSelectedFile(file);
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     setResult(null);
   };
 
-  const handleAnalyze = async () => {
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const handleAnalyze = async (retryCount = 0) => {
     if (!selectedFile) return;
 
     setIsAnalyzing(true);
@@ -96,7 +109,7 @@ const Index = () => {
 
       // First deduct credits
       const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "analyze", provider: "lovable_ai" },
+        body: { action: "analyze", provider: "lovable" },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -144,8 +157,16 @@ const Index = () => {
       };
     } catch (error) {
       console.error("Error during analysis:", error);
-      toast.error("An error occurred during analysis.");
+      const errorMsg = error instanceof Error ? error.message : "An error occurred during analysis.";
+      toast.error(errorMsg);
       setIsAnalyzing(false);
+      
+      // Retry logic for network errors
+      if (retryCount < 2 && errorMsg.toLowerCase().includes('network')) {
+        toast.info("Retrying analysis...");
+        setTimeout(() => handleAnalyze(retryCount + 1), 1000);
+        return;
+      }
     }
   };
 
@@ -165,7 +186,7 @@ const Index = () => {
 
       // First deduct credits
       const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "refine", provider: "lovable_ai" },
+        body: { action: "refine", provider: "lovable" },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -208,7 +229,7 @@ const Index = () => {
     }
   };
 
-  const handleGenerateImage = async (prompt: string, options: GenerationOptions): Promise<string | null> => {
+  const handleGenerateImage = async (prompt: string, options: GenerationOptions, retryCount = 0): Promise<string | null> => {
     try {
       // Get session token
       const { data: { session } } = await supabase.auth.getSession();
@@ -279,7 +300,19 @@ const Index = () => {
       return data.image;
     } catch (error) {
       console.error("Error during image generation:", error);
-      toast.error("An error occurred during image generation.");
+      const errorMsg = error instanceof Error ? error.message : "An error occurred during image generation.";
+      toast.error(errorMsg);
+      
+      // Retry logic for network errors
+      if (retryCount < 2 && errorMsg.toLowerCase().includes('network')) {
+        toast.info("Retrying generation...");
+        return new Promise(resolve => {
+          setTimeout(() => {
+            resolve(handleGenerateImage(prompt, options, retryCount + 1));
+          }, 1000);
+        });
+      }
+      
       return null;
     }
   };

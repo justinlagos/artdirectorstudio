@@ -99,9 +99,10 @@ const History = () => {
 
   // Filter assets based on search and type
   const filteredAssets = assets.filter((asset) => {
+    const analysisData = asset.analysis_data as Record<string, any> | null;
     const matchesSearch = searchQuery === "" || 
       asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (asset.analysis_data as any)?.image_overview?.toLowerCase().includes(searchQuery.toLowerCase());
+      analysisData?.image_overview?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesType = filterType === "all" || asset.type === filterType;
     
@@ -249,11 +250,11 @@ const History = () => {
                       </Button>
                     </div>
                   )}
-                  {asset.analysis_data && (
+                   {asset.analysis_data && (
                     <div>
                       <p className="text-sm font-medium mb-1">Analysis:</p>
                       <p className="text-sm text-muted-foreground">
-                        {(asset.analysis_data as any).image_overview || 'No overview available'}
+                        {(asset.analysis_data as Record<string, any>)?.image_overview || 'No overview available'}
                       </p>
                     </div>
                   )}

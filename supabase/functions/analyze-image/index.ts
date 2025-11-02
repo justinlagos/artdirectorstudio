@@ -57,9 +57,26 @@ serve(async (req) => {
 
     const { image } = await req.json();
     
+    // Validate input
     if (!image) {
       return new Response(
         JSON.stringify({ error: "No image provided" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate image format (base64)
+    if (!image.startsWith('data:image/')) {
+      return new Response(
+        JSON.stringify({ error: "Invalid image format. Expected base64 data URL" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate image size (limit to ~10MB base64)
+    if (image.length > 15000000) {
+      return new Response(
+        JSON.stringify({ error: "Image too large. Maximum 15MB" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -201,24 +218,54 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
       );
     }
 
-    // Save to generated_assets in background (don't await)
+    // Upload image to storage
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    supabaseAdmin
+    let imageUrl = null;
+    try {
+      // Extract base64 data
+      const base64Data = image.split(',')[1];
+      const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      
+      // Upload to storage
+      const fileName = `${userId}/${Date.now()}-analysis.png`;
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from('generated-images')
+        .upload(fileName, buffer, {
+          contentType: 'image/png',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+      } else {
+        // Get public URL
+        const { data: urlData } = supabaseAdmin.storage
+          .from('generated-images')
+          .getPublicUrl(fileName);
+        imageUrl = urlData.publicUrl;
+      }
+    } catch (storageError) {
+      console.error("Failed to upload image to storage:", storageError);
+    }
+
+    // Save to generated_assets
+    const { error: assetError } = await supabaseAdmin
       .from('generated_assets')
       .insert({
         user_id: userId,
         type: 'analysis',
         prompt: analysisData.full_regeneration_prompt,
         analysis_data: analysisData.analysis,
-        image_url: image.substring(0, 500) // Store first 500 chars as reference
-      })
-      .then(({ error }) => {
-        if (error) console.error("Failed to save asset:", error);
+        image_url: imageUrl
       });
+
+    if (assetError) {
+      console.error("Failed to save asset:", assetError);
+    }
 
     // Return the comprehensive analysis
     return new Response(

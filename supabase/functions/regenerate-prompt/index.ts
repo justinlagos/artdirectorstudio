@@ -36,6 +36,21 @@ serve(async (req) => {
     }
 
     const { base_analysis, user_edits } = await req.json();
+
+    // Validate input structure
+    if (!base_analysis || typeof base_analysis !== 'object') {
+      return new Response(
+        JSON.stringify({ error: "Invalid base_analysis structure" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!user_edits || typeof user_edits !== 'object') {
+      return new Response(
+        JSON.stringify({ error: "Invalid user_edits structure" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     if (!base_analysis || !user_edits) {
       return new Response(
