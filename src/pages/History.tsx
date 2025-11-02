@@ -5,13 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LoadingState } from "@/components/LoadingState";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Trash2, Search, Image as ImageIcon, FileCode, Share2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { FileText, Trash2, Search, Image as ImageIcon, FileCode, Share2, Copy, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
+import { formatDistanceToNow } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
 type GeneratedAsset = Database['public']['Tables']['generated_assets']['Row'];
@@ -92,6 +94,11 @@ const History = () => {
     }
   };
 
+  const handleCopyPrompt = (prompt: string) => {
+    navigator.clipboard.writeText(prompt);
+    toast.success("Prompt copied to clipboard!");
+  };
+
   if (authLoading || loading) {
     return <LoadingState />;
   }
@@ -112,31 +119,50 @@ const History = () => {
     return matchesSearch && matchesType;
   });
 
+  const getTypeBadge = (type: string) => {
+    const config = {
+      analysis: { label: "Analysis", icon: FileText, variant: "default" as const },
+      image: { label: "Image", icon: ImageIcon, variant: "secondary" as const },
+      prompt: { label: "Prompt", icon: FileCode, variant: "outline" as const }
+    };
+    
+    const { label, icon: Icon, variant } = config[type as keyof typeof config] || config.analysis;
+    
+    return (
+      <Badge variant={variant} className="gap-1.5">
+        <Icon className="h-3 w-3" />
+        {label}
+      </Badge>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       
-      <main className="flex-1 container mx-auto px-4 py-12 max-w-5xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-2">Analysis History</h1>
-          <p className="text-muted-foreground">
+      <main className="flex-1 container mx-auto px-4 py-12 max-w-6xl">
+        <div className="mb-12 animate-fade-in">
+          <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight mb-3">
+            My Projects
+          </h1>
+          <p className="text-lg text-muted-foreground">
             View all your previous image analyses and generated content
           </p>
         </div>
 
         {/* Search and Filter Controls */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        <div className="mb-8 flex flex-col sm:flex-row gap-4 sticky top-[57px] z-40 bg-background/95 backdrop-blur-lg py-4 -mx-4 px-4 rounded-lg border border-border/40">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search prompts and analyses..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-11"
             />
           </div>
           <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full sm:w-[200px] h-11">
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
@@ -164,26 +190,33 @@ const History = () => {
         </div>
 
         {filteredAssets.length === 0 && assets.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-lg text-muted-foreground">
-                No analysis history yet. Upload an image to get started!
+          <Card className="glass-strong">
+            <CardContent className="py-16 text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-muted/30 flex items-center justify-center">
+                <FileText className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h2 className="text-2xl font-semibold mb-3">No projects yet</h2>
+              <p className="text-lg text-muted-foreground mb-6">
+                Upload an image to get started with your first analysis!
               </p>
               <Button 
                 onClick={() => navigate("/")}
-                className="mt-4"
+                size="lg"
+                className="min-w-[180px]"
               >
                 Analyze Image
               </Button>
             </CardContent>
           </Card>
         ) : filteredAssets.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-lg text-muted-foreground">
-                No results found for your search
+          <Card className="glass-strong">
+            <CardContent className="py-16 text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-muted/30 flex items-center justify-center">
+                <Search className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h2 className="text-2xl font-semibold mb-3">No results found</h2>
+              <p className="text-lg text-muted-foreground mb-6">
+                Try adjusting your search or filter criteria
               </p>
               <Button 
                 onClick={() => {
@@ -191,30 +224,33 @@ const History = () => {
                   setFilterType("all");
                 }}
                 variant="outline"
-                className="mt-4"
+                size="lg"
               >
                 Clear Filters
               </Button>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredAssets.map((asset) => (
-              <Card key={asset.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg">
-                        {asset.type === 'analysis' ? 'Image Analysis' : asset.type === 'image' ? 'Image' : 'Prompt'}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {new Date(asset.created_at).toLocaleString()}
-                      </p>
+              <Card key={asset.id} className="glass-strong hover:shadow-strong transition-all duration-300 hover:-translate-y-1 group">
+                <CardContent className="p-6 space-y-4">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 space-y-2">
+                      {getTypeBadge(asset.type)}
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>
+                          {formatDistanceToNow(new Date(asset.created_at), { addSuffix: true })}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-9 w-9"
                         onClick={() => {
                           setShareAssetId(asset.id);
                           setShareAssetType(asset.type);
@@ -226,6 +262,7 @@ const History = () => {
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-9 w-9 text-destructive hover:text-destructive"
                         onClick={() => handleDelete(asset.id)}
                         title="Delete"
                       >
@@ -233,44 +270,51 @@ const History = () => {
                       </Button>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
+
+                  {/* Image */}
                   {asset.image_url && (
-                    <div>
+                    <div className="rounded-xl overflow-hidden border border-border/50 image-zoom-hover">
                       <img 
                         src={asset.image_url} 
-                        alt="Generated image" 
-                        className="w-full max-w-md rounded-lg border border-border"
+                        alt="Generated content" 
+                        className="w-full aspect-video object-cover"
                       />
                     </div>
                   )}
+
+                  {/* Prompt */}
                   {asset.prompt && (
-                    <div>
-                      <p className="text-sm font-medium mb-1">Prompt:</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Prompt</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
                         {asset.prompt}
                       </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => {
-                          navigate("/");
-                          setTimeout(() => {
-                            // Copy prompt to clipboard
-                            navigator.clipboard.writeText(asset.prompt || "");
-                            toast.success("Prompt copied to clipboard!");
-                          }, 100);
-                        }}
-                      >
-                        Load This Prompt
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCopyPrompt(asset.prompt || "")}
+                          className="gap-2"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          Copy Prompt
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate("/")}
+                        >
+                          Use in Studio
+                        </Button>
+                      </div>
                     </div>
                   )}
-                   {asset.analysis_data && (
-                    <div>
-                      <p className="text-sm font-medium mb-1">Analysis:</p>
-                      <p className="text-sm text-muted-foreground">
+
+                  {/* Analysis */}
+                  {asset.analysis_data && (
+                    <div className="space-y-2 bg-muted/30 p-4 rounded-lg">
+                      <p className="text-sm font-medium">Analysis Summary</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
                         {(asset.analysis_data as Record<string, any>)?.image_overview || 'No overview available'}
                       </p>
                     </div>

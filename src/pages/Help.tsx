@@ -110,11 +110,11 @@ const Help = () => {
                     </div>
                     <Accordion type="single" collapsible className="w-full">
                       {category.items.map((item, index) => (
-                        <AccordionItem key={index} value={`item-${index}`}>
-                          <AccordionTrigger className="text-left hover:no-underline">
+                        <AccordionItem key={index} value={`item-${index}`} className="py-2">
+                          <AccordionTrigger className="text-left hover:no-underline text-base font-medium py-4">
                             {item.question}
                           </AccordionTrigger>
-                          <AccordionContent className="text-muted-foreground leading-relaxed">
+                          <AccordionContent className="text-muted-foreground leading-loose text-base pt-2 pb-4">
                             {item.answer}
                           </AccordionContent>
                         </AccordionItem>
