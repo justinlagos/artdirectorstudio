@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card } from "@/components/ui/card";
@@ -61,9 +62,12 @@ const Inspire = () => {
   const { isAdmin } = useAdminCheck();
   const [items, setItems] = useState<InspireItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<InspireItem[]>([]);
+  const [displayedItems, setDisplayedItems] = useState<InspireItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<InspireItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
   
   const [filters, setFilters] = useState<FilterOptions>({
     styles: [],
@@ -80,6 +84,22 @@ const Inspire = () => {
   useEffect(() => {
     applyFiltersAndSearch();
   }, [filters, searchQuery, items]);
+
+  useEffect(() => {
+    // Reset to first page when filtered items change
+    setPage(1);
+    setDisplayedItems(filteredItems.slice(0, ITEMS_PER_PAGE));
+  }, [filteredItems]);
+
+  const loadMore = useCallback(() => {
+    const nextPage = page + 1;
+    const startIndex = 0;
+    const endIndex = nextPage * ITEMS_PER_PAGE;
+    setDisplayedItems(filteredItems.slice(startIndex, endIndex));
+    setPage(nextPage);
+  }, [page, filteredItems]);
+
+  const hasMore = displayedItems.length < filteredItems.length;
 
   const fetchInspireItems = async () => {
     try {
@@ -209,6 +229,12 @@ const Inspire = () => {
     return item.profile.email.split("@")[0];
   };
 
+  const sentinelRef = useInfiniteScroll({
+    hasMore,
+    isLoading: loading,
+    onLoadMore: loadMore,
+  });
+
   const staffPicks = filteredItems.filter(item => item.featured);
   const trending = [...filteredItems].sort((a, b) => {
     // Trending score based on recent activity
@@ -247,31 +273,31 @@ const Inspire = () => {
   return (
     <div className="min-h-screen flex flex-col bg-surface-1">
       <Header />
-      <main className="flex-1 container mx-auto px-6 py-12 max-w-7xl">
-        <div className="space-y-8 animate-fade-in">
+      <main className="flex-1 container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-7xl">
+        <div className="space-y-6 sm:space-y-8 animate-fade-in">
           {/* Hero Section */}
-          <div className="text-center space-y-6 max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
+          <div className="text-center space-y-4 sm:space-y-6 max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
               <Sparkles className="w-4 h-4" />
-              <span className="text-sm font-medium">Inspire Gallery</span>
+              <span className="text-xs sm:text-sm font-medium">Inspire Gallery</span>
             </div>
             
-            <h1 className="text-5xl md:text-6xl font-display font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-display font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent px-4">
               Discover Amazing Creations
             </h1>
             
-            <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
+            <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto px-4">
               Explore curated AI art from our community. Get inspired, remix ideas,
               and create your own masterpieces.
             </p>
 
             {user ? (
-              <Button size="lg" onClick={() => navigate("/")} className="mt-4 gap-2">
+              <Button size="lg" onClick={() => navigate("/")} className="mt-4 gap-2 min-h-[48px] text-base">
                 <Wand2 className="w-5 h-5" />
                 Start Creating
               </Button>
             ) : (
-              <Button size="lg" onClick={() => navigate("/auth")} className="mt-4 gap-2">
+              <Button size="lg" onClick={() => navigate("/auth")} className="mt-4 gap-2 min-h-[48px] text-base">
                 <Sparkles className="w-5 h-5" />
                 Try ArtDirector Free
               </Button>
@@ -279,44 +305,47 @@ const Inspire = () => {
           </div>
 
           {/* Filters & Search */}
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-            <InspireFilters filters={filters} onChange={setFilters} />
-            <div className="w-full md:w-96">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            <div className="w-full">
               <InspireSearch onSearch={setSearchQuery} />
             </div>
+            <InspireFilters filters={filters} onChange={setFilters} />
           </div>
 
           {/* Content Tabs */}
           <Tabs defaultValue="all" className="w-full">
-            <TabsList className="glass-strong mb-6">
-              <TabsTrigger value="all" className="gap-2">
+            <TabsList className="glass-strong mb-6 w-full sm:w-auto overflow-x-auto flex-nowrap">
+              <TabsTrigger value="all" className="gap-1.5 sm:gap-2 min-h-[44px] flex-shrink-0">
                 <Sparkles className="w-4 h-4" />
-                All ({filteredItems.length})
+                <span className="hidden sm:inline">All</span> ({filteredItems.length})
               </TabsTrigger>
               {staffPicks.length > 0 && (
-                <TabsTrigger value="featured" className="gap-2">
+                <TabsTrigger value="featured" className="gap-1.5 sm:gap-2 min-h-[44px] flex-shrink-0">
                   <Star className="w-4 h-4" />
-                  Staff Picks ({staffPicks.length})
+                  <span className="hidden sm:inline">Staff Picks</span> ({staffPicks.length})
                 </TabsTrigger>
               )}
-              <TabsTrigger value="trending" className="gap-2">
+              <TabsTrigger value="trending" className="gap-1.5 sm:gap-2 min-h-[44px] flex-shrink-0">
                 <TrendingUp className="w-4 h-4" />
-                Trending
+                <span className="hidden sm:inline">Trending</span>
               </TabsTrigger>
               {user && similarToYourWork.length > 0 && (
-                <TabsTrigger value="similar" className="gap-2">
+                <TabsTrigger value="similar" className="gap-1.5 sm:gap-2 min-h-[44px] flex-shrink-0">
                   <Wand2 className="w-4 h-4" />
-                  Similar to Your Work
+                  <span className="hidden sm:inline">Similar</span>
                 </TabsTrigger>
               )}
             </TabsList>
 
             <TabsContent value="all" className="mt-0">
               <InspireGrid 
-                items={filteredItems} 
+                items={displayedItems} 
                 onItemClick={setSelectedItem}
                 onRemix={handleRemix}
                 getCreatorName={getCreatorName}
+                sentinelRef={sentinelRef}
+                hasMore={hasMore}
+                isLoading={loading}
               />
             </TabsContent>
 
@@ -357,9 +386,9 @@ const Inspire = () => {
 
       {/* Detail Modal */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           {selectedItem && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Admin Tools */}
               {isAdmin && (
                 <AdminInspireTools
@@ -371,7 +400,7 @@ const Inspire = () => {
               )}
 
               {selectedItem.asset.image_url && (
-                <div className="relative overflow-hidden rounded-2xl">
+                <div className="relative overflow-hidden rounded-xl sm:rounded-2xl">
                   <img
                     src={selectedItem.asset.image_url}
                     alt="Generated content"
@@ -380,16 +409,16 @@ const Inspire = () => {
                 </div>
               )}
               
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* Creator Info */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-semibold text-lg">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-semibold text-base sm:text-lg flex-shrink-0">
                       {getCreatorName(selectedItem)[0].toUpperCase()}
                     </div>
-                    <div>
-                      <p className="font-semibold text-lg">by {getCreatorName(selectedItem)}</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-base sm:text-lg truncate">by {getCreatorName(selectedItem)}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         {new Date(selectedItem.asset.created_at).toLocaleDateString("en-US", { 
                           month: "long", 
                           day: "numeric", 
@@ -400,7 +429,7 @@ const Inspire = () => {
                   </div>
                   
                   {selectedItem.featured && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 flex-shrink-0">
                       <Star className="w-4 h-4 text-primary fill-current" />
                       <span className="text-sm font-medium text-primary">Staff Pick</span>
                     </div>
@@ -408,7 +437,7 @@ const Inspire = () => {
                 </div>
 
                 {/* Stats */}
-                <div className="flex items-center gap-6 text-sm">
+                <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm flex-wrap">
                   <div className="flex items-center gap-2">
                     <Heart className="w-4 h-4 text-muted-foreground" />
                     <span className="font-medium">{selectedItem.like_count}</span>
@@ -428,37 +457,40 @@ const Inspire = () => {
 
                 {/* Prompt */}
                 {selectedItem.asset.prompt && (
-                  <div className="space-y-3 p-6 rounded-xl bg-muted/30 border border-border/50">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-lg">Prompt</h3>
-                      <div className="flex gap-2">
+                  <div className="space-y-3 p-4 sm:p-6 rounded-xl bg-muted/30 border border-border/50">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <h3 className="font-semibold text-base sm:text-lg">Prompt</h3>
+                      <div className="flex gap-2 w-full sm:w-auto">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleCopyPrompt(selectedItem.asset.prompt!)}
+                          className="min-h-[44px] flex-1 sm:flex-initial"
                         >
                           {copiedPrompt ? (
                             <>
-                              <Check className="h-4 w-4 mr-2" />
-                              Copied
+                              <Check className="h-4 w-4 sm:mr-2" />
+                              <span className="hidden sm:inline">Copied</span>
                             </>
                           ) : (
                             <>
-                              <Copy className="h-4 w-4 mr-2" />
-                              Copy
+                              <Copy className="h-4 w-4 sm:mr-2" />
+                              <span className="hidden sm:inline">Copy</span>
                             </>
                           )}
                         </Button>
                         <Button
                           size="sm"
                           onClick={() => handleRemix(selectedItem)}
+                          className="min-h-[44px] flex-1 sm:flex-initial"
                         >
-                          <Wand2 className="h-4 w-4 mr-2" />
-                          Remix in Studio
+                          <Wand2 className="h-4 w-4 sm:mr-2" />
+                          <span className="hidden sm:inline">Remix in Studio</span>
+                          <span className="sm:hidden">Remix</span>
                         </Button>
                       </div>
                     </div>
-                    <p className="text-sm leading-relaxed">{selectedItem.asset.prompt}</p>
+                    <p className="text-xs sm:text-sm leading-relaxed">{selectedItem.asset.prompt}</p>
                   </div>
                 )}
               </div>
@@ -475,9 +507,20 @@ interface InspireGridProps {
   onItemClick: (item: InspireItem) => void;
   onRemix: (item: InspireItem) => void;
   getCreatorName: (item: InspireItem) => string;
+  sentinelRef?: React.RefObject<HTMLDivElement>;
+  hasMore?: boolean;
+  isLoading?: boolean;
 }
 
-const InspireGrid = ({ items, onItemClick, onRemix, getCreatorName }: InspireGridProps) => {
+const InspireGrid = ({ 
+  items, 
+  onItemClick, 
+  onRemix, 
+  getCreatorName, 
+  sentinelRef, 
+  hasMore,
+  isLoading 
+}: InspireGridProps) => {
   if (items.length === 0) {
     return (
       <Card className="p-12 text-center glass">
@@ -489,26 +532,41 @@ const InspireGrid = ({ items, onItemClick, onRemix, getCreatorName }: InspireGri
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {items.map((item) => (
-        <InspireCard
-          key={item.id}
-          id={item.id}
-          imageUrl={item.asset.image_url}
-          prompt={item.asset.prompt}
-          creator={{
-            id: item.user_id,
-            name: getCreatorName(item),
-          }}
-          viewCount={item.view_count}
-          likeCount={item.like_count}
-          bookmarkCount={item.bookmark_count}
-          createdAt={item.asset.created_at}
-          onClick={() => onItemClick(item)}
-          onRemix={() => onRemix(item)}
-        />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        {items.map((item) => (
+          <InspireCard
+            key={item.id}
+            id={item.id}
+            imageUrl={item.asset.image_url}
+            prompt={item.asset.prompt}
+            creator={{
+              id: item.user_id,
+              name: getCreatorName(item),
+            }}
+            viewCount={item.view_count}
+            likeCount={item.like_count}
+            bookmarkCount={item.bookmark_count}
+            createdAt={item.asset.created_at}
+            onClick={() => onItemClick(item)}
+            onRemix={() => onRemix(item)}
+          />
+        ))}
+      </div>
+      
+      {/* Infinite Scroll Sentinel */}
+      {sentinelRef && hasMore && (
+        <div ref={sentinelRef} className="h-20 flex items-center justify-center">
+          {isLoading && (
+            <div className="flex gap-2">
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-64 w-full hidden sm:block" />
+              <Skeleton className="h-64 w-full hidden lg:block" />
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 };
 
