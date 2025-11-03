@@ -80,6 +80,11 @@ serve(async (req) => {
         // If parsing fails, continue with generic message
       }
       
+      // Check for region restriction
+      if (specificMessage?.toLowerCase().includes('not available in your country')) {
+        throw new Error('IMAGE_BLEND_UNAVAILABLE');
+      }
+      
       throw new Error(specificMessage || `Failed to blend images: ${response.statusText}`);
     }
 
