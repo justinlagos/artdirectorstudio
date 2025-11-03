@@ -236,44 +236,56 @@ const Beta = () => {
 
         {/* Testimonials Section */}
         {testimonials.length > 0 && (
-          <div className="max-w-6xl mx-auto pt-20 sm:pt-32">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-display font-bold mb-4">
+          <div className="max-w-7xl mx-auto pt-20 sm:pt-32">
+            <div className="text-center mb-16 space-y-4">
+              <h2 className="text-4xl sm:text-5xl font-display font-bold">
                 Early Creators Love It
               </h2>
-              <p className="text-lg text-muted-foreground">
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                 Join creators who are already leveling up their design skills
               </p>
             </div>
 
-            <div className="relative overflow-hidden">
-              <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide px-4 md:px-0">
-                {testimonials.map((testimonial, index) => (
-                  <Card key={index} className="glass-strong min-w-[300px] md:min-w-[340px] snap-center flex-shrink-0">
-                    <CardContent className="p-6 space-y-4">
-                      <div className="flex items-center gap-3">
-                        {testimonial.avatar_url ? (
-                          <img 
-                            src={testimonial.avatar_url} 
-                            alt={testimonial.name}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-semibold">
-                            {testimonial.name.charAt(0)}
+            <div className="relative">
+              {/* Gradient fade edges */}
+              <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+              <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+              
+              <div className="overflow-x-auto pb-6 scrollbar-hide">
+                <div className="flex gap-6 px-4 md:px-8 min-w-max">
+                  {testimonials.map((testimonial, index) => (
+                    <div 
+                      key={index}
+                      className="group relative w-[380px] flex-shrink-0"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      <Card className="relative h-full glass-strong border-border/50 hover:border-primary/30 transition-all duration-300">
+                        <CardContent className="p-8 space-y-6">
+                          <div className="flex items-start gap-4">
+                            {testimonial.avatar_url ? (
+                              <img 
+                                src={testimonial.avatar_url} 
+                                alt={testimonial.name}
+                                className="w-16 h-16 rounded-full object-cover ring-2 ring-border"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary via-primary/80 to-primary/60 flex items-center justify-center text-primary-foreground text-xl font-bold ring-2 ring-border">
+                                {testimonial.name.charAt(0)}
+                              </div>
+                            )}
+                            <div className="flex-1">
+                              <p className="font-semibold text-lg">{testimonial.name}</p>
+                              <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                            </div>
                           </div>
-                        )}
-                        <div>
-                          <p className="font-semibold">{testimonial.name}</p>
-                          <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                        </div>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed">
-                        "{testimonial.content}"
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
+                          <p className="text-muted-foreground leading-relaxed text-base">
+                            "{testimonial.content}"
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
             

@@ -23,6 +23,7 @@ import PaymentCancelled from "./pages/PaymentCancelled";
 import NotFound from "./pages/NotFound";
 import Beta from "./pages/Beta";
 import { ArtieChat } from "./components/ArtieChat";
+import { ProtectedStudio } from "./components/ProtectedStudio";
 
 const queryClient = new QueryClient();
 
@@ -36,14 +37,14 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<Index />} />
-              <Route path="/beta" element={<Beta />} />
-              <Route path="/history" element={<History />} />
+              <Route path="/" element={<Beta />} />
+              <Route path="/studio" element={<ProtectedStudio><Index /></ProtectedStudio>} />
+              <Route path="/history" element={<ProtectedStudio><History /></ProtectedStudio>} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/inspire" element={<Inspire />} />
               <Route path="/gallery" element={<Inspire />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/analytics" element={<ProtectedStudio><Analytics /></ProtectedStudio>} />
+              <Route path="/settings" element={<ProtectedStudio><Settings /></ProtectedStudio>} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/help" element={<Help />} />
               <Route path="/terms" element={<Terms />} />
@@ -56,7 +57,6 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-            <ArtieChat />
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

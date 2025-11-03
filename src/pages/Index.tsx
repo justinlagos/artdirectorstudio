@@ -37,38 +37,51 @@ const TestimonialsSection = () => {
   return (
     <section id="testimonials" className="py-20 border-t border-border/40 scroll-mt-14">
       <div className="text-center space-y-4 mb-16">
-        <h2 className="text-4xl font-display font-bold tracking-tight">
+        <h2 className="text-4xl sm:text-5xl font-display font-bold tracking-tight">
           Loved by Creatives
         </h2>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           See what our users are saying
         </p>
       </div>
-      <div className="relative overflow-hidden px-4">
-        <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
-          {testimonials.map((testimonial) => (
-            <div 
-              key={testimonial.id} 
-              className="glass rounded-2xl p-8 hover-lift min-w-[320px] md:min-w-[380px] snap-center flex-shrink-0"
-            >
-              <p className="text-muted-foreground mb-6 leading-relaxed">
-                "{testimonial.content}"
-              </p>
-              <div className="flex items-center gap-3">
-                {testimonial.avatar_url && (
-                  <img 
-                    src={testimonial.avatar_url} 
-                    alt={testimonial.name}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                )}
-                <div>
-                  <p className="font-semibold">{testimonial.name}</p>
-                  <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+      <div className="relative">
+        {/* Gradient fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+        
+        <div className="overflow-x-auto pb-6 scrollbar-hide px-4">
+          <div className="flex gap-6 min-w-max">
+            {testimonials.map((testimonial) => (
+              <div 
+                key={testimonial.id}
+                className="group relative w-[380px] flex-shrink-0"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative h-full glass border border-border/50 hover:border-primary/30 rounded-2xl p-8 transition-all duration-300">
+                  <p className="text-muted-foreground mb-6 leading-relaxed text-base">
+                    "{testimonial.content}"
+                  </p>
+                  <div className="flex items-center gap-4">
+                    {testimonial.avatar_url ? (
+                      <img 
+                        src={testimonial.avatar_url} 
+                        alt={testimonial.name}
+                        className="w-14 h-14 rounded-full object-cover ring-2 ring-border"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary via-primary/80 to-primary/60 flex items-center justify-center text-primary-foreground text-lg font-bold ring-2 ring-border">
+                        {testimonial.name.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold text-lg">{testimonial.name}</p>
+                      <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
       <style>{`
