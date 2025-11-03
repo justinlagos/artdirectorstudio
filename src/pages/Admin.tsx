@@ -12,6 +12,7 @@ import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { PricingManagement } from "@/components/admin/PricingManagement";
 import { AdminUserManagement } from "@/components/admin/AdminUserManagement";
 import { SystemHealth } from "@/components/admin/SystemHealth";
+import { AdminBetaManagement } from "@/components/admin/AdminBetaManagement";
 import { Shield } from "lucide-react";
 
 const Admin = () => {
@@ -51,15 +52,20 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-5">
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="beta">Beta</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="health">System Health</TabsTrigger>
+            <TabsTrigger value="health">Health</TabsTrigger>
             <TabsTrigger value="pricing">Pricing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics" className="space-y-6">
             <AdminAnalytics />
+          </TabsContent>
+
+          <TabsContent value="beta">
+            <AdminBetaManagement />
           </TabsContent>
 
           <TabsContent value="users">

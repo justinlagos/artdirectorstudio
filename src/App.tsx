@@ -21,6 +21,7 @@ import SharedAsset from "./pages/SharedAsset";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
 import NotFound from "./pages/NotFound";
+import Beta from "./pages/Beta";
 import { ArtieChat } from "./components/ArtieChat";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={<Index />} />
+              <Route path="/beta" element={<Beta />} />
               <Route path="/history" element={<History />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/inspire" element={<Inspire />} />
