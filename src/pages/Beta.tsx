@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,12 +19,20 @@ interface Testimonial {
 
 const Beta = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+
+  // Redirect authenticated users to studio
+  useEffect(() => {
+    if (user) {
+      navigate("/studio");
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     fetchTestimonials();

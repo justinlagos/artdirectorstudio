@@ -39,12 +39,12 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={<Beta />} />
               <Route path="/studio" element={<ProtectedStudio><Index /></ProtectedStudio>} />
-              <Route path="/history" element={<ProtectedStudio><History /></ProtectedStudio>} />
+              <Route path="/history" element={<History />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/inspire" element={<Inspire />} />
               <Route path="/gallery" element={<Inspire />} />
-              <Route path="/analytics" element={<ProtectedStudio><Analytics /></ProtectedStudio>} />
-              <Route path="/settings" element={<ProtectedStudio><Settings /></ProtectedStudio>} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/help" element={<Help />} />
               <Route path="/terms" element={<Terms />} />

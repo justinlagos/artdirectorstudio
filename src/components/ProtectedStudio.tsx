@@ -14,7 +14,14 @@ export const ProtectedStudio = ({ children }: { children: React.ReactNode }) => 
 
   useEffect(() => {
     const verifyAccess = async () => {
-      // Check if user has access via invite code
+      // If user is authenticated, they have access (existing users)
+      if (user) {
+        setHasAccess(true);
+        setVerifying(false);
+        return;
+      }
+
+      // If not authenticated, check for invite code
       const inviteCode = searchParams.get("invite") || sessionStorage.getItem("invite_code");
       
       if (inviteCode) {
@@ -29,33 +36,28 @@ export const ProtectedStudio = ({ children }: { children: React.ReactNode }) => 
             .single();
 
           if (error || !data) {
-            toast.error("Invalid or expired invite code");
+            toast.error("Invalid or expired invite code. Please sign in if you already have an account.");
             navigate("/");
             return;
           }
 
-          // Store the invite code in session
+          // Store the invite code in session for when they sign up
           sessionStorage.setItem("invite_code", inviteCode);
-          setHasAccess(true);
-          setVerifying(false);
           
-          // If user is logged in, mark invite as used
-          if (user) {
-            await supabase
-              .from("beta_invites")
-              .update({ used_at: new Date().toISOString() })
-              .eq("code", inviteCode);
-          }
+          // Redirect to auth page to sign up/sign in
+          toast.info("Please sign in or create an account to continue");
+          navigate("/auth");
         } catch (error) {
           console.error("Error verifying invite:", error);
           toast.error("Failed to verify access");
           navigate("/");
         }
       } else {
-        // No invite code, redirect to beta landing
-        toast.error("You need an invite to access the studio");
+        // No user and no invite code - redirect to beta landing
         navigate("/");
       }
+      
+      setVerifying(false);
     };
 
     if (!loading) {
