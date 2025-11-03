@@ -303,9 +303,10 @@ const History = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            // Store the prompt in sessionStorage for the studio to pick up
+                            // Store the prompt and return path in sessionStorage
                             if (asset.prompt) {
                               sessionStorage.setItem("remix_prompt", asset.prompt);
+                              sessionStorage.setItem("return_to_history", "true");
                               navigate("/studio");
                               toast.success("Prompt loaded in Studio!");
                             }

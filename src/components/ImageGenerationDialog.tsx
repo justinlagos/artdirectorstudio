@@ -122,6 +122,13 @@ export const ImageGenerationDialog = ({
     setPrompt(truncatedInitialPrompt);
     setProgress(0);
     onOpenChange(false);
+    
+    // Handle navigation based on return path
+    const returnToHistory = sessionStorage.getItem("return_to_history");
+    if (returnToHistory === "true") {
+      sessionStorage.removeItem("return_to_history");
+      window.location.href = "/history";
+    }
   };
 
   // Update prompt when initialPrompt changes and dialog opens

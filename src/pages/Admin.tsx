@@ -18,6 +18,8 @@ import { AdminRevenue } from "@/components/admin/AdminRevenue";
 import { AdminUsagePatterns } from "@/components/admin/AdminUsagePatterns";
 import { AdminActiveUsers } from "@/components/admin/AdminActiveUsers";
 import { EnhancedPricingManagement } from "@/components/admin/EnhancedPricingManagement";
+import { AdminActivityLog } from "@/components/admin/AdminActivityLog";
+import { AdminInspireManagement } from "@/components/admin/AdminInspireManagement";
 import { Shield } from "lucide-react";
 
 const Admin = () => {
@@ -57,14 +59,16 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
+          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="revenue">Revenue</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="active">Active</TabsTrigger>
             <TabsTrigger value="usage">Usage</TabsTrigger>
+            <TabsTrigger value="inspire">Inspire</TabsTrigger>
+            <TabsTrigger value="testimonials">Reviews</TabsTrigger>
             <TabsTrigger value="pricing">Pricing</TabsTrigger>
-            <TabsTrigger value="testimonials">Content</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
             <TabsTrigger value="beta">Beta</TabsTrigger>
           </TabsList>
 
@@ -89,12 +93,20 @@ const Admin = () => {
             <AdminUsagePatterns />
           </TabsContent>
 
-          <TabsContent value="pricing" className="space-y-6">
-            <EnhancedPricingManagement />
+          <TabsContent value="inspire" className="space-y-6">
+            <AdminInspireManagement />
           </TabsContent>
 
           <TabsContent value="testimonials" className="space-y-6">
             <AdminTestimonials />
+          </TabsContent>
+
+          <TabsContent value="pricing" className="space-y-6">
+            <EnhancedPricingManagement />
+          </TabsContent>
+
+          <TabsContent value="activity" className="space-y-6">
+            <AdminActivityLog />
           </TabsContent>
 
           <TabsContent value="beta" className="space-y-6">

@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import History from "./pages/History";
 import Admin from "./pages/Admin";
 import Inspire from "./pages/Inspire";
@@ -39,6 +40,7 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/" element={<MainLanding />} />
               <Route path="/beta" element={<Beta />} />
               <Route path="/welcome" element={<Welcome />} />

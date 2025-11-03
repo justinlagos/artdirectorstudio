@@ -16,6 +16,7 @@ import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGene
 // Testimonials component
 const TestimonialsSection = () => {
   const [testimonials, setTestimonials] = useState<any[]>([]);
+  const [showHint, setShowHint] = useState(true);
 
   useEffect(() => {
     const fetchTestimonials = async () => {
@@ -30,7 +31,18 @@ const TestimonialsSection = () => {
     };
 
     fetchTestimonials();
+
+    // Hide hint after first interaction
+    const hasSeenHint = sessionStorage.getItem('testimonials_hint_seen');
+    if (hasSeenHint) setShowHint(false);
   }, []);
+
+  const handleInteraction = () => {
+    if (showHint) {
+      setShowHint(false);
+      sessionStorage.setItem('testimonials_hint_seen', 'true');
+    }
+  };
 
   if (testimonials.length === 0) return null;
 
@@ -43,13 +55,22 @@ const TestimonialsSection = () => {
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           See what our users are saying
         </p>
+        {showHint && (
+          <p className="text-sm text-muted-foreground/70 animate-fade-in">
+            Drag or swipe to see more →
+          </p>
+        )}
       </div>
       <div className="relative">
         {/* Gradient fade edges */}
         <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
         <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
         
-        <div className="overflow-x-auto pb-6 scrollbar-hide px-4">
+        <div 
+          className="overflow-x-auto pb-6 scrollbar-hide px-4 scroll-smooth"
+          onScroll={handleInteraction}
+          onTouchStart={handleInteraction}
+        >
           <div className="flex gap-6 min-w-max">
             {testimonials.map((testimonial) => (
               <div 
@@ -82,6 +103,16 @@ const TestimonialsSection = () => {
               </div>
             ))}
           </div>
+        </div>
+        
+        {/* Progress indicators */}
+        <div className="flex justify-center gap-2 mt-6">
+          {testimonials.map((_, index) => (
+            <div 
+              key={index}
+              className="w-2 h-2 rounded-full bg-muted-foreground/30"
+            />
+          ))}
         </div>
       </div>
       <style>{`

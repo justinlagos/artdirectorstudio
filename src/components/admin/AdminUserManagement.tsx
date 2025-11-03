@@ -24,6 +24,7 @@ export const AdminUserManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [creditAmount, setCreditAmount] = useState(0);
+  const [creditDescription, setCreditDescription] = useState("");
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -69,7 +70,8 @@ export const AdminUserManagement = () => {
     try {
       const { error } = await supabase.rpc('adjust_user_credits', {
         target_user_id: selectedUser.id,
-        amount: creditAmount
+        amount: creditAmount,
+        description_text: creditDescription || null
       });
 
       if (error) throw error;
@@ -77,6 +79,7 @@ export const AdminUserManagement = () => {
       toast.success(`Credits ${creditAmount > 0 ? 'added' : 'deducted'} successfully`);
       setAdjustDialogOpen(false);
       setCreditAmount(0);
+      setCreditDescription("");
       fetchUsers();
     } catch (error: any) {
       toast.error(error.message || "Failed to adjust credits");
@@ -86,7 +89,7 @@ export const AdminUserManagement = () => {
   const handleResetPassword = async (userId: string, email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`
+        redirectTo: `${window.location.origin}/reset-password`
       });
 
       if (error) throw error;
@@ -198,11 +201,25 @@ export const AdminUserManagement = () => {
                 placeholder="e.g. 50 or -10"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (optional)</Label>
+              <Input
+                id="description"
+                type="text"
+                value={creditDescription}
+                onChange={(e) => setCreditDescription(e.target.value)}
+                placeholder="e.g. Bonus credits, refund, etc."
+              />
+            </div>
             <div className="flex gap-2">
               <Button onClick={handleAdjustCredits} disabled={creditAmount === 0}>
                 Apply Changes
               </Button>
-              <Button variant="outline" onClick={() => setAdjustDialogOpen(false)}>
+              <Button variant="outline" onClick={() => {
+                setAdjustDialogOpen(false);
+                setCreditAmount(0);
+                setCreditDescription("");
+              }}>
                 Cancel
               </Button>
             </div>
