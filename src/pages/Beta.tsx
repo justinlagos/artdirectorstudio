@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sparkles, Wand2, TrendingUp, ArrowRight, Check } from "lucide-react";
 import { toast } from "sonner";
 
@@ -105,21 +106,18 @@ const Beta = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       {/* Header */}
-      <header className="container mx-auto px-4 sm:px-6 py-6">
-        <nav className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-8 h-8 text-primary" />
-            <span className="text-2xl font-display font-bold">ArtDirector Studio</span>
-          </div>
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/auth")}
-            className="gap-2"
-          >
-            Sign In
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-        </nav>
+      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 sm:px-6 py-3">
+          <nav className="flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2 group">
+              <Sparkles className="h-6 w-6 transition-all duration-200 stroke-foreground group-hover:stroke-transparent group-hover:fill-primary" />
+              <span className="text-xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white">
+                ArtDirector Studio
+              </span>
+            </Link>
+            <ThemeToggle />
+          </nav>
+        </div>
       </header>
 
       {/* Hero Section */}
@@ -248,26 +246,46 @@ const Beta = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {testimonials.map((testimonial, index) => (
-                <Card key={index} className="glass-strong">
-                  <CardContent className="p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-semibold">
-                        {testimonial.name.charAt(0)}
+            <div className="relative overflow-hidden">
+              <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide px-4 md:px-0">
+                {testimonials.map((testimonial, index) => (
+                  <Card key={index} className="glass-strong min-w-[300px] md:min-w-[340px] snap-center flex-shrink-0">
+                    <CardContent className="p-6 space-y-4">
+                      <div className="flex items-center gap-3">
+                        {testimonial.avatar_url ? (
+                          <img 
+                            src={testimonial.avatar_url} 
+                            alt={testimonial.name}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-semibold">
+                            {testimonial.name.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-semibold">{testimonial.name}</p>
+                          <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold">{testimonial.name}</p>
-                        <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                      </div>
-                    </div>
-                    <p className="text-muted-foreground leading-relaxed">
-                      "{testimonial.content}"
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+                      <p className="text-muted-foreground leading-relaxed">
+                        "{testimonial.content}"
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
+            
+            <style>{`
+              .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+              }
+              .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+              }
+            `}</style>
           </div>
         )}
 
