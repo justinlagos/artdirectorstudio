@@ -63,73 +63,25 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     setProgress(0);
     setBlendedImage(null);
 
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 2000);
-
     try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsBlending(false);
-        clearInterval(progressInterval);
-        return;
-      }
-
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "blend", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 2 credits to blend images.");
-        } else {
-          toast.error("Failed to process credit deduction.");
-        }
-        setIsBlending(false);
-        clearInterval(progressInterval);
-        return;
-      }
-
-      // Convert files to base64 for edge function
-      const base64Images = await Promise.all(
-        images.map(img => new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(img.file);
-        }))
+      const { blendImages } = await import("@/lib/services/toolsService");
+      
+      const result = await blendImages(
+        images.map(img => img.file),
+        instruction,
+        (progress) => setProgress(progress)
       );
 
-      const { data, error } = await supabase.functions.invoke("blend-images", {
-        body: { images: base64Images, instruction },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+      if (!result.success) {
+        toast.error(result.error || "Failed to blend images");
+        return;
+      }
 
-      clearInterval(progressInterval);
-      setProgress(100);
-
-      if (error) throw error;
-
-      if (data?.image) {
-        setBlendedImage(data.image);
-        toast.success(`Images blended successfully! ${deductData.remaining_balance} credits remaining.`);
+      if (result.imageUrl) {
+        setBlendedImage(result.imageUrl);
+        toast.success("Images blended successfully!");
       }
     } catch (error) {
-      clearInterval(progressInterval);
       console.error("Blend error:", error);
       toast.error("Failed to blend images. Please try again.");
     } finally {

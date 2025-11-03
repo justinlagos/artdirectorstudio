@@ -220,80 +220,48 @@ const Index = () => {
     setResult(null);
   };
 
-  const handleAnalyze = async (retryCount = 0) => {
+  const handleAnalyze = async () => {
     if (!selectedFile) return;
 
     setIsAnalyzing(true);
     
     try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsAnalyzing(false);
-        return;
-      }
-
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "analyze", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. Please purchase more credits.");
-        } else {
-          toast.error("Failed to process payment. Please try again.");
-        }
-        setIsAnalyzing(false);
-        return;
-      }
-
       // Convert file to base64
       const reader = new FileReader();
       reader.readAsDataURL(selectedFile);
       
-      reader.onload = async () => {
-        const base64Image = reader.result as string;
-        
-        const { data, error } = await supabase.functions.invoke("analyze-image", {
-          body: { image: base64Image },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
+      await new Promise<void>((resolve, reject) => {
+        reader.onload = async () => {
+          try {
+            const base64Image = reader.result as string;
+            const { analyzeImage } = await import("@/lib/services/generationService");
+            
+            const result = await analyzeImage(base64Image);
 
-        if (error) {
-          console.error("Analysis error:", error);
-          toast.error("Failed to analyze image. Please try again.");
-          setIsAnalyzing(false);
-          return;
-        }
+            if (!result.success) {
+              toast.error(result.error || "Failed to analyze image");
+              setIsAnalyzing(false);
+              return;
+            }
 
-        setResult(data as AnalysisResult);
-        setIsAnalyzing(false);
-        toast.success(`Image analyzed! ${deductData.remaining_balance} credits remaining.`);
-      };
+            setResult(result.data);
+            toast.success("Image analyzed successfully!");
+            resolve();
+          } catch (error) {
+            reject(error);
+          } finally {
+            setIsAnalyzing(false);
+          }
+        };
 
-      reader.onerror = () => {
-        toast.error("Failed to read image file.");
-        setIsAnalyzing(false);
-      };
+        reader.onerror = () => {
+          reject(new Error("Failed to read image file"));
+        };
+      });
     } catch (error) {
       console.error("Error during analysis:", error);
-      const errorMsg = error instanceof Error ? error.message : "An error occurred during analysis.";
-      toast.error(errorMsg);
+      toast.error("An error occurred during analysis.");
       setIsAnalyzing(false);
-      
-      // Retry logic for network errors
-      if (retryCount < 2 && errorMsg.toLowerCase().includes('network')) {
-        toast.info("Retrying analysis...");
-        setTimeout(() => handleAnalyze(retryCount + 1), 1000);
-        return;
-      }
     }
   };
 
@@ -356,90 +324,35 @@ const Index = () => {
     }
   };
 
-  const handleGenerateImage = async (prompt: string, options: GenerationOptions, retryCount = 0): Promise<string | null> => {
+  const handleGenerateImage = async (prompt: string, options: GenerationOptions): Promise<string | null> => {
     try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
+      const { generateImage } = await import("@/lib/services/generationService");
+      
+      const result = await generateImage(prompt, options);
+
+      if (!result.success) {
+        toast.error(result.error || "Failed to generate image");
         return null;
       }
 
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "generate", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 3 credits to generate an image.");
-        } else {
-          toast.error("Failed to process payment. Please try again.");
-        }
-        return null;
-      }
-
-      // Call generate-image edge function
-      const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: { 
-          prompt,
-          quality: options.quality,
-          size: options.size,
-          background: options.background
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) {
-        console.error("Generation error:", error);
+      if (result.imageUrl) {
+        // Add to generated images list
+        const newImage: GeneratedImage = {
+          id: result.assetId || crypto.randomUUID(),
+          imageUrl: result.imageUrl,
+          prompt: prompt,
+          timestamp: new Date()
+        };
         
-        if (error.message?.includes("Rate limit")) {
-          toast.error("Too many requests. Please wait a moment and try again.");
-        } else if (error.message?.includes("credits exhausted")) {
-          toast.error("AI service temporarily unavailable. Please try again later.");
-        } else {
-          toast.error("Failed to generate image. Please try again.");
-        }
-        return null;
+        setGeneratedImages(prev => [newImage, ...prev]);
+        toast.success("Image generated successfully!");
+        return result.imageUrl;
       }
 
-      if (!data?.image) {
-        toast.error("Failed to generate image. Please try again.");
-        return null;
-      }
-
-      // Add to generated images list
-      const newImage: GeneratedImage = {
-        id: data.assetId || crypto.randomUUID(),
-        imageUrl: data.image,
-        prompt: prompt,
-        timestamp: new Date()
-      };
-      
-      setGeneratedImages(prev => [newImage, ...prev]);
-      toast.success(`Image generated! ${deductData.remaining_balance} credits remaining.`);
-      
-      return data.image;
+      return null;
     } catch (error) {
       console.error("Error during image generation:", error);
-      const errorMsg = error instanceof Error ? error.message : "An error occurred during image generation.";
-      toast.error(errorMsg);
-      
-      // Retry logic for network errors
-      if (retryCount < 2 && errorMsg.toLowerCase().includes('network')) {
-        toast.info("Retrying generation...");
-        return new Promise(resolve => {
-          setTimeout(() => {
-            resolve(handleGenerateImage(prompt, options, retryCount + 1));
-          }, 1000);
-        });
-      }
-      
+      toast.error("An error occurred during image generation.");
       return null;
     }
   };

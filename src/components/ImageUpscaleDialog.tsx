@@ -50,71 +50,25 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setProgress(0);
     setUpscaledImage(null);
 
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 2000);
-
     try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsUpscaling(false);
-        clearInterval(progressInterval);
+      const { upscaleImage } = await import("@/lib/services/toolsService");
+      
+      const result = await upscaleImage(
+        sourceImage.file,
+        targetSize,
+        (progress) => setProgress(progress)
+      );
+
+      if (!result.success) {
+        toast.error(result.error || "Failed to upscale image");
         return;
       }
 
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "upscale", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 2 credits to upscale an image.");
-        } else {
-          toast.error("Failed to process credit deduction.");
-        }
-        setIsUpscaling(false);
-        clearInterval(progressInterval);
-        return;
-      }
-
-      // Convert file to base64 for edge function
-      const base64Image = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(sourceImage.file);
-      });
-
-      const { data, error } = await supabase.functions.invoke("upscale-image", {
-        body: { image: base64Image, targetSize },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      clearInterval(progressInterval);
-      setProgress(100);
-
-      if (error) throw error;
-
-      if (data?.image) {
-        setUpscaledImage(data.image);
-        toast.success(`Image upscaled successfully! ${deductData.remaining_balance} credits remaining.`);
+      if (result.imageUrl) {
+        setUpscaledImage(result.imageUrl);
+        toast.success("Image upscaled successfully!");
       }
     } catch (error) {
-      clearInterval(progressInterval);
       console.error("Upscale error:", error);
       toast.error("Failed to upscale image. Please try again.");
     } finally {

@@ -70,89 +70,45 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     setCurrentProgress(0);
 
     try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsProcessing(false);
-        return;
-      }
+      const { batchAnalyzeImages } = await import("@/lib/services/toolsService");
+      
+      const result = await batchAnalyzeImages(
+        images.map(img => img.file),
+        (current, total) => {
+          setCurrentProgress((current / total) * 100);
+          
+          // Update individual image status
+          setImages(prev => 
+            prev.map((img, idx) => {
+              if (idx < current) {
+                return { ...img, status: 'completed' as const };
+              } else if (idx === current) {
+                return { ...img, status: 'processing' as const };
+              }
+              return img;
+            })
+          );
+        }
+      );
 
-      const totalImages = images.length;
-      let completedCount = 0;
-
-      // Process each image sequentially
-      for (let i = 0; i < images.length; i++) {
-        const image = images[i];
-        
-        setImages(prev => 
-          prev.map(img => 
-            img.id === image.id ? { ...img, status: 'processing' as const } : img
+      // Update final results
+      result.results.forEach((res, idx) => {
+        setImages(prev =>
+          prev.map((img, i) =>
+            i === idx
+              ? {
+                  ...img,
+                  status: res.success ? 'completed' as const : 'error' as const,
+                  result: res.data?.full_regeneration_prompt,
+                  error: res.error
+                }
+              : img
           )
         );
+      });
 
-        try {
-          // Deduct credits for this analysis
-          const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-            body: { action: "analyze", provider: "lovable" },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
-
-          if (deductError || !deductData?.success) {
-            throw new Error("Insufficient credits");
-          }
-
-          // Convert file to base64
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(image.file);
-          });
-
-          // Analyze the image
-          const { data, error } = await supabase.functions.invoke("analyze-image", {
-            body: { image: base64 },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
-
-          if (error) throw error;
-
-          setImages(prev =>
-            prev.map(img =>
-              img.id === image.id
-                ? { ...img, status: 'completed' as const, result: data.full_regeneration_prompt }
-                : img
-            )
-          );
-
-          completedCount++;
-          setCurrentProgress((completedCount / totalImages) * 100);
-        } catch (error) {
-          console.error(`Error processing image ${image.file.name}:`, error);
-          setImages(prev =>
-            prev.map(img =>
-              img.id === image.id
-                ? { ...img, status: 'error' as const, error: error instanceof Error ? error.message : 'Failed to analyze' }
-                : img
-            )
-          );
-          completedCount++;
-          setCurrentProgress((completedCount / totalImages) * 100);
-        }
-
-        // Small delay between requests to avoid rate limiting
-        if (i < images.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-
-      const successCount = images.filter(img => img.status === 'completed').length;
-      toast.success(`Batch processing complete! ${successCount}/${totalImages} images analyzed`);
+      const successCount = result.results.filter(r => r.success).length;
+      toast.success(`Batch processing complete! ${successCount}/${result.results.length} images analyzed`);
     } catch (error) {
       console.error("Batch process error:", error);
       toast.error("Batch processing failed. Please try again.");
