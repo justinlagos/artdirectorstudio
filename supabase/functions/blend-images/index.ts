@@ -82,7 +82,15 @@ serve(async (req) => {
       
       // Check for region restriction
       if (specificMessage?.toLowerCase().includes('not available in your country')) {
-        throw new Error('IMAGE_BLEND_UNAVAILABLE');
+        return new Response(
+          JSON.stringify({ 
+            error: "Image blending is currently unavailable in your region. This feature uses AI image generation which has geographic restrictions." 
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
       
       throw new Error(specificMessage || `Failed to blend images: ${response.statusText}`);

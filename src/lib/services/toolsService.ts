@@ -109,14 +109,6 @@ export async function blendImages(
       if (error) {
         lastError = error;
         
-        // Check for region restriction error
-        if (error?.message?.includes('IMAGE_BLEND_UNAVAILABLE')) {
-          return { 
-            success: false, 
-            error: "Image blending is currently unavailable in your region. This feature uses AI image generation which has geographic restrictions." 
-          };
-        }
-        
         if (isRetryableError(error) && attempt < maxRetries) {
           const delay = getBackoffDelay(attempt, retryDelay);
           toast.info(`Retrying blend operation... (${attempt + 1}/${maxRetries})`);
@@ -140,14 +132,6 @@ export async function blendImages(
     } catch (error) {
       lastError = error;
       console.error(`Blend attempt ${attempt + 1} failed:`, error);
-      
-      // Check for region restriction error
-      if (error instanceof Error && error.message?.includes('IMAGE_BLEND_UNAVAILABLE')) {
-        return { 
-          success: false, 
-          error: "Image blending is currently unavailable in your region. This feature uses AI image generation which has geographic restrictions." 
-        };
-      }
       
       if (isRetryableError(error) && attempt < maxRetries) {
         const delay = getBackoffDelay(attempt, retryDelay);
