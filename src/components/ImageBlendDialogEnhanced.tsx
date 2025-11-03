@@ -165,6 +165,7 @@ Requirements:
     } catch (error) {
       clearInterval(progressInterval);
       console.error("Blend error:", error);
+      console.error("Full error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
       
       const errorMessage = error instanceof Error ? error.message : "Failed to blend images";
       const isGeolocationError = errorMessage.includes("not available in your country") || 
@@ -173,7 +174,7 @@ Requirements:
       toast.error(
         isGeolocationError 
           ? "Image blending is not available in your region due to AI service restrictions. Please try again later or from a different location."
-          : errorMessage
+          : `Blend failed: ${errorMessage}`
       );
     } finally {
       setIsBlending(false);

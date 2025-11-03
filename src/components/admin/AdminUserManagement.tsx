@@ -65,24 +65,37 @@ export const AdminUserManagement = () => {
   };
 
   const handleAdjustCredits = async () => {
-    if (!selectedUser || creditAmount === 0) return;
+    if (!selectedUser || creditAmount === 0) {
+      toast.error("Please enter a valid credit amount");
+      return;
+    }
 
     try {
+      console.log("Adjusting credits:", {
+        user: selectedUser.email,
+        amount: creditAmount,
+        description: creditDescription
+      });
+
       const { error } = await supabase.rpc('adjust_user_credits', {
         target_user_id: selectedUser.id,
         amount: creditAmount,
         description_text: creditDescription || null
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("RPC error:", error);
+        throw error;
+      }
 
-      toast.success(`Credits ${creditAmount > 0 ? 'added' : 'deducted'} successfully`);
+      toast.success(`Successfully ${creditAmount > 0 ? 'added' : 'deducted'} ${Math.abs(creditAmount)} credits for ${selectedUser.email}`);
       setAdjustDialogOpen(false);
       setCreditAmount(0);
       setCreditDescription("");
       fetchUsers();
     } catch (error: any) {
-      toast.error(error.message || "Failed to adjust credits");
+      console.error("Failed to adjust credits:", error);
+      toast.error(`Failed to adjust credits: ${error.message || 'Unknown error'}`);
     }
   };
 

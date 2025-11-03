@@ -106,6 +106,8 @@ const Inspire = () => {
 
   const fetchInspireItems = async () => {
     try {
+      console.log("Fetching inspire items, user:", user ? user.email : "signed out");
+      
       const { data, error } = await supabase
         .from("shared_assets")
         .select(`
@@ -134,16 +136,24 @@ const Inspire = () => {
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase query error:", error);
+        throw error;
+      }
+
+      console.log("Received data:", data?.length || 0, "items");
 
       const validItems = (data as unknown as InspireItem[]).filter(
         item => item.asset !== null && item.asset.image_url
       );
       
+      console.log("Valid items after filtering:", validItems.length);
+      
       setItems(validItems);
       setFilteredItems(validItems);
     } catch (error) {
       console.error("Error fetching inspire items:", error);
+      console.error("Full error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
       toast.error("Failed to load inspire gallery");
     } finally {
       setLoading(false);
@@ -317,7 +327,7 @@ const Inspire = () => {
 
           {/* Content Tabs */}
           <Tabs defaultValue="all" className="w-full">
-            <TabsList className="glass-strong mb-6 w-full sm:w-auto overflow-x-auto flex-nowrap">
+            <TabsList className="glass-strong mb-6 w-full sm:w-auto flex-wrap">
               <TabsTrigger value="all" className="gap-1.5 sm:gap-2 min-h-[44px] flex-shrink-0">
                 <Sparkles className="w-4 h-4" />
                 <span className="hidden sm:inline">All</span> ({filteredItems.length})

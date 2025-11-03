@@ -76,10 +76,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    sessionStorage.removeItem("invite_code");
-    // Gracefully navigate to soft landing page
-    navigate("/welcome");
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Sign out error:", error);
+    } finally {
+      // Always clear local state and navigate, even if API call fails
+      setUser(null);
+      setSession(null);
+      sessionStorage.removeItem("invite_code");
+      localStorage.clear();
+      navigate("/welcome");
+    }
   };
 
   return (

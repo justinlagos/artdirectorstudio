@@ -74,11 +74,14 @@ export async function blendImages(
       });
 
       if (deductError || !deductData?.success) {
+        console.error("Credit deduction failed:", deductError);
         const errorMsg = deductError?.message?.includes("Insufficient credits")
           ? "Insufficient credits. You need 2 credits to blend images."
-          : "Failed to process credit deduction.";
+          : `Failed to process credit deduction: ${deductError?.message || 'Unknown error'}`;
         return { success: false, error: errorMsg };
       }
+
+      console.log("Credits deducted successfully, remaining:", deductData.remaining_balance);
 
       onProgress?.(30);
 
@@ -108,6 +111,8 @@ export async function blendImages(
 
       if (error) {
         lastError = error;
+        console.error("Blend API error:", error);
+        console.error("Error details:", JSON.stringify(error, null, 2));
         
         if (isRetryableError(error) && attempt < maxRetries) {
           const delay = getBackoffDelay(attempt, retryDelay);
@@ -118,6 +123,8 @@ export async function blendImages(
 
         throw error;
       }
+
+      console.log("Blend successful, received data:", data);
 
       onProgress?.(100);
 
@@ -132,6 +139,7 @@ export async function blendImages(
     } catch (error) {
       lastError = error;
       console.error(`Blend attempt ${attempt + 1} failed:`, error);
+      console.error("Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
       
       if (isRetryableError(error) && attempt < maxRetries) {
         const delay = getBackoffDelay(attempt, retryDelay);
@@ -181,11 +189,14 @@ export async function upscaleImage(
       });
 
       if (deductError || !deductData?.success) {
+        console.error("Credit deduction failed for upscale:", deductError);
         const errorMsg = deductError?.message?.includes("Insufficient credits")
           ? "Insufficient credits. You need 2 credits to upscale an image."
-          : "Failed to process credit deduction.";
+          : `Failed to process credit deduction: ${deductError?.message || 'Unknown error'}`;
         return { success: false, error: errorMsg };
       }
+
+      console.log("Upscale credits deducted, remaining:", deductData.remaining_balance);
 
       onProgress?.(30);
 
@@ -295,13 +306,16 @@ export async function batchAnalyzeImages(
       });
 
       if (deductError || !deductData?.success) {
+        console.error(`Credit deduction failed for ${file.name}:`, deductError);
         results.push({
           success: false,
-          error: "Insufficient credits",
+          error: deductError?.message || "Insufficient credits",
           fileName: file.name
         });
         continue;
       }
+
+      console.log(`Analyzing ${file.name}, credits remaining:`, deductData.remaining_balance);
 
       // Convert to base64
       const base64Image = await fileToBase64(file);

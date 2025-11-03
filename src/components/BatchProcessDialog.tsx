@@ -117,7 +117,9 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
       toast.success(`Batch processing complete! ${successCount}/${result.results.length} images analyzed`);
     } catch (error) {
       console.error("Batch process error:", error);
-      toast.error("Batch processing failed. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("Full error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+      toast.error(`Batch processing failed: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
