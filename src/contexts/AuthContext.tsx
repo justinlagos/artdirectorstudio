@@ -52,6 +52,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     
     if (!error) {
+      // Mark beta entry as complete once user signs up
+      localStorage.setItem("beta_entry_complete", "true");
       navigate("/studio");
     }
     
@@ -65,6 +67,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     
     if (!error) {
+      // Mark beta entry as complete once user logs in
+      localStorage.setItem("beta_entry_complete", "true");
       navigate("/studio");
     }
     

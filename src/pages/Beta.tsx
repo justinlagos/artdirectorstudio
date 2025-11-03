@@ -31,6 +31,12 @@ const Beta = () => {
   useEffect(() => {
     if (user) {
       navigate("/studio");
+    } else {
+      // If user is not authenticated but has completed beta entry, redirect to welcome
+      const betaEntryComplete = localStorage.getItem("beta_entry_complete");
+      if (betaEntryComplete === "true") {
+        navigate("/welcome");
+      }
     }
   }, [user, navigate]);
 
@@ -118,12 +124,21 @@ const Beta = () => {
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 sm:px-6 py-3">
           <nav className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2 group">
-              <Sparkles className="h-6 w-6 transition-all duration-200 stroke-foreground group-hover:stroke-transparent group-hover:fill-primary" />
-              <span className="text-xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white">
+            <button
+              onClick={() => {
+                const betaEntryComplete = localStorage.getItem("beta_entry_complete");
+                if (betaEntryComplete === "true") {
+                  navigate("/welcome");
+                }
+                // If not complete, stay on beta landing (no navigation)
+              }}
+              className="flex items-center gap-2 group cursor-pointer"
+            >
+              <Sparkles className="h-6 w-6 transition-all duration-300 stroke-foreground group-hover:stroke-transparent group-hover:fill-primary" />
+              <span className="text-xl font-display font-bold bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent transition-all duration-300 group-hover:from-primary group-hover:via-primary group-hover:to-primary/60">
                 ArtDirector Studio
               </span>
-            </Link>
+            </button>
             <ThemeToggle />
           </nav>
         </div>

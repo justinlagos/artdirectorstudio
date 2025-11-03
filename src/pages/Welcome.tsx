@@ -21,16 +21,23 @@ export default function Welcome() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleLogoClick = () => {
+    // Logo always goes to welcome page when signed out
+    navigate("/welcome");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-6">
           <button
-            onClick={() => handleNavigation("/")}
+            onClick={handleLogoClick}
             className="flex items-center space-x-2 group"
           >
-            <div className="text-xl font-display font-semibold tracking-tight transition-all duration-300 group-hover:bg-gradient-to-r group-hover:from-foreground group-hover:to-muted-foreground group-hover:bg-clip-text group-hover:text-transparent">
+            <Sparkles className="h-6 w-6 transition-all duration-300 stroke-foreground group-hover:stroke-transparent group-hover:fill-primary" />
+            <div className="text-xl font-display font-semibold tracking-tight bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent transition-all duration-300 group-hover:from-primary group-hover:via-primary group-hover:to-primary/60">
               ArtDirector Studio
             </div>
           </button>
@@ -120,9 +127,9 @@ export default function Welcome() {
               <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
 
-            {/* Join Beta */}
+            {/* Explore Community */}
             <button
-              onClick={() => handleNavigation("/")}
+              onClick={() => handleNavigation("/contact")}
               className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-8 text-left transition-all duration-300 hover:shadow-strong hover:-translate-y-1 hover:border-foreground/20"
             >
               <div className="relative z-10 space-y-4">
@@ -131,10 +138,10 @@ export default function Welcome() {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-xl font-display font-semibold">
-                    Join Beta Community
+                    Get in Touch
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Get early access to new features and tools
+                    Questions? Feedback? We'd love to hear from you
                   </p>
                 </div>
               </div>
