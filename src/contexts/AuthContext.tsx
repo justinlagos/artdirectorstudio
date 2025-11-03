@@ -73,8 +73,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    sessionStorage.removeItem("invite_code"); // Clear invite code on logout
-    navigate("/");
+    sessionStorage.removeItem("invite_code");
+    // Gracefully navigate to soft landing page
+    navigate("/welcome");
   };
 
   return (
