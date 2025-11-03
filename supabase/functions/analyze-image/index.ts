@@ -91,6 +91,87 @@ serve(async (req) => {
       );
     }
 
+    console.log("Detecting image type...");
+    
+    // First, detect the image type
+    const typeDetectionResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert image classifier. Analyze the image and determine its primary category.'
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Classify this image into ONE of these categories:
+- portrait: Images primarily featuring people, faces, or human subjects
+- product: Commercial product photography, items for sale, packaged goods
+- environment: Landscapes, cityscapes, architectural shots, natural scenes
+- graphic: Graphic design, logos, typography, posters, illustrations, digital art
+- abstract: Abstract art, patterns, non-representational imagery
+
+Respond with ONLY the category name and a confidence score (0-1).
+Format: category|confidence
+Example: portrait|0.95`
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: image
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 50
+      })
+    });
+
+    let imageType = 'unknown';
+    let confidence = 0;
+
+    if (typeDetectionResponse.ok) {
+      const typeData = await typeDetectionResponse.json();
+      const typeResult = typeData.choices?.[0]?.message?.content?.trim() || 'unknown|0';
+      const [detectedType, confidenceStr] = typeResult.split('|');
+      confidence = parseFloat(confidenceStr) || 0;
+      imageType = confidence >= 0.6 ? detectedType : 'unknown';
+      console.log(`Detected image type: ${imageType} (confidence: ${confidence})`);
+    } else {
+      console.error('Type detection failed, using default');
+    }
+    
+    // Build context-aware system prompt
+    let contextPrompt = '';
+    switch(imageType) {
+      case 'portrait':
+        contextPrompt = '\n\nIMPORTANT CONTEXT: This is a portrait image. Focus on facial features, expressions, lighting on skin tones, pose, and human elements. Avoid describing products or environments unless they\'re secondary context.';
+        break;
+      case 'product':
+        contextPrompt = '\n\nIMPORTANT CONTEXT: This is a product image. Focus on the product itself, materials, textures, lighting setup, presentation style, and commercial appeal. Describe the product accurately without unnecessary human references.';
+        break;
+      case 'environment':
+        contextPrompt = '\n\nIMPORTANT CONTEXT: This is an environment/landscape image. Focus on the scene, atmosphere, natural or architectural elements, lighting conditions, weather, and spatial composition. Minimize human subject details unless they\'re integral to the scene.';
+        break;
+      case 'graphic':
+        contextPrompt = '\n\nIMPORTANT CONTEXT: This is a graphic design image. Focus on typography, layout, color schemes, design elements, visual hierarchy, and artistic style. Avoid photographic analysis unless it\'s part of the design.';
+        break;
+      case 'abstract':
+        contextPrompt = '\n\nIMPORTANT CONTEXT: This is an abstract or artistic image. Focus on colors, patterns, textures, movement, composition, and emotional tone. Avoid literal subject descriptions.';
+        break;
+      default:
+        contextPrompt = '\n\nAnalyze this image comprehensively, adapting your description to what you observe.';
+    }
+
     console.log("Calling Lovable AI for image analysis...");
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -104,7 +185,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a professional image analysis AI that creates comprehensive creative briefs for image reconstruction.
+            content: `You are a professional image analysis AI that creates comprehensive creative briefs for image reconstruction.${contextPrompt}
 
 Analyze the uploaded image in extreme detail across 12 professional categories. Be specific, technical, and actionable.
 
@@ -268,9 +349,15 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
       console.error("Failed to save asset:", assetError);
     }
 
-    // Return the comprehensive analysis
+    // Return the comprehensive analysis with image type
+    const responseData = {
+      ...analysisData,
+      image_type: imageType,
+      detection_confidence: confidence
+    };
+
     return new Response(
-      JSON.stringify(analysisData),
+      JSON.stringify(responseData),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }

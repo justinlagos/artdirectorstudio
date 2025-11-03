@@ -115,6 +115,8 @@ export interface Analysis {
 export interface AnalysisResult {
   full_regeneration_prompt: string;
   analysis: Analysis;
+  image_type?: string;
+  detection_confidence?: number;
 }
 
 export interface UserEdits {
