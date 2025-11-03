@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -50,7 +51,17 @@ export const ArtieChat = () => {
     setIsLoading(true);
 
     try {
-      const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/artie-chat`;
+      // Get authenticated session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to use Artie.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
       
       // Build context-aware message if context provided
       let contextualInput = inputValue;
@@ -70,13 +81,8 @@ export const ArtieChat = () => {
         }
       }
       
-      const response = await fetch(CHAT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
+      const { data: chatData, error: chatError } = await supabase.functions.invoke('artie-chat', {
+        body: {
           messages: messages
             .filter(m => m.sender === 'user' || m.sender === 'artie')
             .slice(-10)
@@ -85,130 +91,25 @@ export const ArtieChat = () => {
               content: m.text
             }))
             .concat([{ role: 'user', content: contextualInput }])
-        }),
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to get response from Artie');
+      if (chatError) {
+        throw new Error(chatError.message || 'Failed to get response from Artie');
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedText = '';
-      let textBuffer = '';
-      let toolCalls: any[] = [];
-
-      const assistantMessageId = (Date.now() + 1).toString();
-      setMessages(prev => [...prev, {
-        id: assistantMessageId,
-        text: '',
-        sender: 'artie',
-        timestamp: new Date()
-      }]);
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          textBuffer += decoder.decode(value, { stream: true });
-          
-          let newlineIndex: number;
-          while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
-            let line = textBuffer.slice(0, newlineIndex);
-            textBuffer = textBuffer.slice(newlineIndex + 1);
-
-            if (line.endsWith('\r')) line = line.slice(0, -1);
-            if (line.startsWith(':') || line.trim() === '') continue;
-            if (!line.startsWith('data: ')) continue;
-
-            const jsonStr = line.slice(6).trim();
-            if (jsonStr === '[DONE]') break;
-
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const delta = parsed.choices?.[0]?.delta;
-              
-              if (delta?.content) {
-                accumulatedText += delta.content;
-                setMessages(prev => 
-                  prev.map(m => 
-                    m.id === assistantMessageId 
-                      ? { ...m, text: accumulatedText }
-                      : m
-                  )
-                );
-              }
-
-              if (delta?.tool_calls) {
-                delta.tool_calls.forEach((tc: any) => {
-                  if (!toolCalls[tc.index]) {
-                    toolCalls[tc.index] = {
-                      id: tc.id,
-                      type: tc.type,
-                      function: { name: tc.function?.name || '', arguments: '' }
-                    };
-                  }
-                  if (tc.function?.arguments) {
-                    toolCalls[tc.index].function.arguments += tc.function.arguments;
-                  }
-                });
-              }
-            } catch (e) {
-              // Ignore parse errors
-            }
-          }
-        }
-
-        if (toolCalls.length > 0) {
-          for (const toolCall of toolCalls) {
-            if (toolCall.function.name === 'generate_image') {
-              const args = JSON.parse(toolCall.function.arguments);
-              accumulatedText += '\n\n(Generating image...)';
-              setMessages(prev => 
-                prev.map(m => 
-                  m.id === assistantMessageId 
-                    ? { ...m, text: accumulatedText }
-                    : m
-                )
-              );
-
-              try {
-                const genResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                  },
-                  body: JSON.stringify({ prompt: args.prompt })
-                });
-
-                const genData = await genResponse.json();
-                if (genData.imageUrl) {
-                  accumulatedText = accumulatedText.replace('(Generating image...)', '');
-                  accumulatedText += `\n\n[Generated Image]\n${genData.imageUrl}`;
-                  setMessages(prev => 
-                    prev.map(m => 
-                      m.id === assistantMessageId 
-                        ? { ...m, text: accumulatedText }
-                        : m
-                    )
-                  );
-                }
-              } catch (imgError) {
-                console.error('Image generation error:', imgError);
-                accumulatedText = accumulatedText.replace('(Generating image...)', '(Image generation failed)');
-                setMessages(prev => 
-                  prev.map(m => 
-                    m.id === assistantMessageId 
-                      ? { ...m, text: accumulatedText }
-                        : m
-                  )
-                );
-              }
-            }
-          }
-        }
+      // Handle streaming response from edge function
+      if (chatData?.response) {
+        const assistantMessageId = (Date.now() + 1).toString();
+        setMessages(prev => [...prev, {
+          id: assistantMessageId,
+          text: chatData.response,
+          sender: 'artie',
+          timestamp: new Date()
+        }]);
       }
     } catch (error) {
       console.error('Error getting Artie response:', error);
