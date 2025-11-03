@@ -302,7 +302,14 @@ const History = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate("/")}
+                          onClick={() => {
+                            // Store the prompt in sessionStorage for the studio to pick up
+                            if (asset.prompt) {
+                              sessionStorage.setItem("remix_prompt", asset.prompt);
+                              navigate("/studio");
+                              toast.success("Prompt loaded in Studio!");
+                            }
+                          }}
                         >
                           Use in Studio
                         </Button>
