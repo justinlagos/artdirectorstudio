@@ -66,6 +66,22 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Blend API error:', response.status, errorText);
+      
+      // Try to parse error details for better user feedback
+      try {
+        const errorData = JSON.parse(errorText);
+        const providerError = errorData?.error?.metadata?.raw;
+        if (providerError) {
+          const parsedProviderError = JSON.parse(providerError);
+          const specificMessage = parsedProviderError?.error?.message;
+          if (specificMessage) {
+            throw new Error(specificMessage);
+          }
+        }
+      } catch (parseError) {
+        // If parsing fails, use generic message
+      }
+      
       throw new Error(`Failed to blend images: ${response.statusText}`);
     }
 

@@ -147,7 +147,10 @@ Requirements:
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (error) throw error;
+      if (error) {
+        const errorMessage = error.message || data?.error || "Failed to blend images";
+        throw new Error(errorMessage);
+      }
 
       if (data?.image) {
         setBlendedImage(data.image);
@@ -156,7 +159,16 @@ Requirements:
     } catch (error) {
       clearInterval(progressInterval);
       console.error("Blend error:", error);
-      toast.error("Failed to blend images. Please try again.");
+      
+      const errorMessage = error instanceof Error ? error.message : "Failed to blend images";
+      const isGeolocationError = errorMessage.includes("not available in your country") || 
+                                  errorMessage.includes("FAILED_PRECONDITION");
+      
+      toast.error(
+        isGeolocationError 
+          ? "Image blending is not available in your region due to AI service restrictions. Please try again later or from a different location."
+          : errorMessage
+      );
     } finally {
       setIsBlending(false);
       setTimeout(() => setProgress(0), 1000);
