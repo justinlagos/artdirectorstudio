@@ -109,7 +109,7 @@ const Beta = () => {
         <nav className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="w-8 h-8 text-primary" />
-            <span className="text-2xl font-display font-bold">TryArtie</span>
+            <span className="text-2xl font-display font-bold">ArtDirector Studio</span>
           </div>
           <Button
             variant="ghost"
@@ -179,7 +179,7 @@ const Beta = () => {
                     htmlFor="consent"
                     className="text-sm text-muted-foreground cursor-pointer"
                   >
-                    I agree to receive beta access emails and occasional updates about TryArtie
+                    I agree to receive beta access emails and occasional updates about ArtDirector Studio
                   </label>
                 </div>
 
@@ -293,7 +293,7 @@ const Beta = () => {
       {/* Footer */}
       <footer className="container mx-auto px-4 sm:px-6 py-12 border-t border-border/50">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <p>© 2025 TryArtie. All rights reserved.</p>
+          <p>© 2025 ArtDirector Studio. All rights reserved.</p>
           <div className="flex gap-6">
             <button onClick={() => navigate("/privacy")} className="hover:text-foreground transition-colors">
               Privacy

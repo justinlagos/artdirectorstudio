@@ -47,6 +47,25 @@ export const AdminBetaManagement = () => {
   const [sendingInvite, setSendingInvite] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const getDefaultMessage = (name: string | null) => {
+    const firstName = name?.split(" ")[0] || "";
+    const salutation = firstName ? `Hi ${firstName},` : "Hi there,";
+    
+    return `${salutation}
+
+You're invited to join ArtDirector Studio, a creative platform where designers upload any image, get a full art-director-level analysis, and instantly generate new variations with precision.
+
+As one of our early beta users, you'll get:
+• Exclusive early access to all creative tools
+• Bonus starter credits
+• Priority feedback channel with the ArtDirector team
+
+Thanks for helping shape the future of creative intelligence.
+
+See you inside,
+The ArtDirector Studio Team`;
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -282,7 +301,10 @@ export const AdminBetaManagement = () => {
                               <Button
                                 size="sm"
                                 variant="default"
-                                onClick={() => setSelectedEntry(entry)}
+                                onClick={() => {
+                                  setSelectedEntry(entry);
+                                  setCustomMessage(getDefaultMessage(entry.name));
+                                }}
                               >
                                 <Send className="w-4 h-4 mr-1" />
                                 Invite
