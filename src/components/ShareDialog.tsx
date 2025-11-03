@@ -105,13 +105,13 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md p-4 sm:p-6 max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-lg">
             <Share2 className="h-5 w-5" />
             Share {assetType}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Create a shareable link for this {assetType.toLowerCase()}
           </DialogDescription>
         </DialogHeader>
@@ -148,7 +148,7 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
           </div>
 
           {!shareUrl ? (
-            <Button onClick={handleCreateShare} disabled={isSharing} className="w-full">
+            <Button onClick={handleCreateShare} disabled={isSharing} className="w-full min-h-[44px]">
               {isSharing ? "Creating..." : "Create Share Link"}
             </Button>
           ) : (
@@ -160,12 +160,13 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
                     id="share-url"
                     value={shareUrl}
                     readOnly
-                    className="flex-1"
+                    className="flex-1 min-h-[44px]"
                   />
                   <Button
                     size="icon"
                     variant="outline"
                     onClick={handleCopyLink}
+                    className="min-w-[44px] min-h-[44px]"
                   >
                     {copied ? (
                       <Check className="h-4 w-4" />
@@ -187,7 +188,7 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
                 onClick={handleCreateShare}
                 disabled={isSharing}
                 variant="outline"
-                className="w-full"
+                className="w-full min-h-[44px]"
               >
                 {isSharing ? "Updating..." : "Update Share Settings"}
               </Button>

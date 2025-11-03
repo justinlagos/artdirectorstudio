@@ -140,13 +140,13 @@ export const ImageGenerationDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <Wand2 className="w-5 h-5" />
             Generate AI Image
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Generate a new image from your prompt. Cost: <span className="font-semibold text-foreground">3 credits</span>
           </DialogDescription>
         </DialogHeader>
@@ -190,7 +190,7 @@ export const ImageGenerationDialog = ({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-4 pt-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="quality">Quality</Label>
                   <Select
@@ -198,7 +198,7 @@ export const ImageGenerationDialog = ({
                     onValueChange={(value) => setOptions(prev => ({ ...prev, quality: value as any }))}
                     disabled={isGenerating}
                   >
-                    <SelectTrigger id="quality">
+                    <SelectTrigger id="quality" className="min-h-[44px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -210,68 +210,51 @@ export const ImageGenerationDialog = ({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="size">Aspect Ratio</Label>
                   <div className="grid grid-cols-3 gap-2">
                     <Button
                       type="button"
                       variant={options.size === "1024x1024" ? "default" : "outline"}
-                      className="flex flex-col items-center gap-2 h-auto py-3"
+                      className="flex flex-col items-center gap-2 h-auto py-3 min-h-[60px]"
                       onClick={() => setOptions(prev => ({ ...prev, size: "1024x1024" }))}
                       disabled={isGenerating}
                     >
                       <Square className="w-5 h-5" />
                       <div className="text-xs">
                         <div className="font-semibold">Square</div>
-                        <div className="text-muted-foreground">1024×1024</div>
+                        <div className="text-muted-foreground hidden sm:block">1024×1024</div>
                       </div>
                     </Button>
                     <Button
                       type="button"
                       variant={options.size === "1536x1024" ? "default" : "outline"}
-                      className="flex flex-col items-center gap-2 h-auto py-3"
+                      className="flex flex-col items-center gap-2 h-auto py-3 min-h-[60px]"
                       onClick={() => setOptions(prev => ({ ...prev, size: "1536x1024" }))}
                       disabled={isGenerating}
                     >
                       <RectangleHorizontal className="w-5 h-5" />
                       <div className="text-xs">
                         <div className="font-semibold">Landscape</div>
-                        <div className="text-muted-foreground">1536×1024</div>
+                        <div className="text-muted-foreground hidden sm:block">1536×1024</div>
                       </div>
                     </Button>
                     <Button
                       type="button"
                       variant={options.size === "1024x1536" ? "default" : "outline"}
-                      className="flex flex-col items-center gap-2 h-auto py-3"
+                      className="flex flex-col items-center gap-2 h-auto py-3 min-h-[60px]"
                       onClick={() => setOptions(prev => ({ ...prev, size: "1024x1536" }))}
                       disabled={isGenerating}
                     >
                       <RectangleVertical className="w-5 h-5" />
                       <div className="text-xs">
                         <div className="font-semibold">Portrait</div>
-                        <div className="text-muted-foreground">1024×1536</div>
+                        <div className="text-muted-foreground hidden sm:block">1024×1536</div>
                       </div>
                     </Button>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="background">Background</Label>
-                  <Select
-                    value={options.background}
-                    onValueChange={(value) => setOptions(prev => ({ ...prev, background: value as any }))}
-                    disabled={isGenerating}
-                  >
-                    <SelectTrigger id="background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">Auto</SelectItem>
-                      <SelectItem value="opaque">Opaque</SelectItem>
-                      <SelectItem value="transparent">Transparent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -297,10 +280,10 @@ export const ImageGenerationDialog = ({
                 />
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   onClick={handleDownload}
-                  className="flex-1"
+                  className="flex-1 min-h-[44px]"
                   variant="secondary"
                 >
                   <Download className="w-4 h-4 mr-2" />
@@ -308,7 +291,7 @@ export const ImageGenerationDialog = ({
                 </Button>
                 <Button
                   onClick={handleRegenerate}
-                  className="flex-1"
+                  className="flex-1 min-h-[44px]"
                   disabled={isGenerating}
                 >
                   <Wand2 className="w-4 h-4 mr-2" />
@@ -323,11 +306,12 @@ export const ImageGenerationDialog = ({
             <Button
               onClick={handleGenerate}
               disabled={isGenerating || !prompt.trim() || prompt.length > MAX_PROMPT_LENGTH}
-              className="w-full"
+              className="w-full min-h-[48px] text-base"
               size="lg"
             >
               <Wand2 className="w-4 h-4 mr-2" />
-              {isGenerating ? "Generating..." : "Generate Image (3 Credits)"}
+              <span className="hidden sm:inline">{isGenerating ? "Generating..." : "Generate Image (3 Credits)"}</span>
+              <span className="sm:hidden">{isGenerating ? "Generating..." : "Generate (3 Credits)"}</span>
             </Button>
           )}
         </div>
