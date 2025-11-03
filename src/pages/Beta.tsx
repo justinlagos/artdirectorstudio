@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sparkles, Wand2, TrendingUp, ArrowRight, Check } from "lucide-react";
 import { toast } from "sonner";
+import { Helmet } from "react-helmet";
 
 interface Testimonial {
   name: string;
@@ -20,6 +22,7 @@ interface Testimonial {
 const Beta = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [consent, setConsent] = useState(false);
@@ -27,18 +30,22 @@ const Beta = () => {
   const [submitted, setSubmitted] = useState(false);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
 
-  // Redirect authenticated users to studio
+  // Redirect logic for beta page
   useEffect(() => {
+    // If user is authenticated, always go to studio
     if (user) {
       navigate("/studio");
-    } else {
-      // If user is not authenticated but has completed beta entry, redirect to welcome
-      const betaEntryComplete = localStorage.getItem("beta_entry_complete");
-      if (betaEntryComplete === "true") {
-        navigate("/welcome");
-      }
+      return;
     }
-  }, [user, navigate]);
+
+    // If beta entry is complete and no invite code, redirect to main landing
+    const betaEntryComplete = localStorage.getItem("beta_entry_complete");
+    const inviteCode = searchParams.get("invite");
+    
+    if (betaEntryComplete === "true" && !inviteCode) {
+      navigate("/");
+    }
+  }, [user, navigate, searchParams]);
 
   useEffect(() => {
     fetchTestimonials();
@@ -120,17 +127,19 @@ const Beta = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+      {/* SEO: noindex for beta page */}
+      <Helmet>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 sm:px-6 py-3">
           <nav className="flex items-center justify-between">
             <button
               onClick={() => {
-                const betaEntryComplete = localStorage.getItem("beta_entry_complete");
-                if (betaEntryComplete === "true") {
-                  navigate("/welcome");
-                }
-                // If not complete, stay on beta landing (no navigation)
+                navigate("/");
+                window.scrollTo({ top: 0, behavior: "smooth" });
               }}
               className="flex items-center gap-2 group cursor-pointer"
             >
@@ -138,6 +147,7 @@ const Beta = () => {
               <span className="text-xl font-display font-bold bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent transition-all duration-300 group-hover:from-primary group-hover:via-primary group-hover:to-primary/60">
                 ArtDirector Studio
               </span>
+              <Badge variant="secondary" className="ml-2 text-xs">Beta</Badge>
             </button>
             <ThemeToggle />
           </nav>
@@ -155,17 +165,12 @@ const Beta = () => {
 
           {/* Main Heading */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight">
-            Learn and create
-            <br />
-            <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              at the same time
-            </span>
+            Join the <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Beta Program</span>
           </h1>
 
           {/* Subheading */}
           <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Upload any image, get an art-director level breakdown, tweak the brief, 
-            and generate new visuals instantly. Remix examples from Inspire or start fresh.
+            Get exclusive early access to ArtDirector Studio and shape the future of creative intelligence
           </p>
 
           {/* Waitlist Form */}

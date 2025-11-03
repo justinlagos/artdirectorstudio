@@ -23,6 +23,7 @@ import PaymentCancelled from "./pages/PaymentCancelled";
 import NotFound from "./pages/NotFound";
 import Beta from "./pages/Beta";
 import Welcome from "./pages/Welcome";
+import MainLanding from "./pages/MainLanding";
 import { ArtieChat } from "./components/ArtieChat";
 import { ProtectedStudio } from "./components/ProtectedStudio";
 
@@ -38,7 +39,8 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<Beta />} />
+              <Route path="/" element={<MainLanding />} />
+              <Route path="/beta" element={<Beta />} />
               <Route path="/welcome" element={<Welcome />} />
               <Route path="/studio" element={<ProtectedStudio><Index /></ProtectedStudio>} />
               <Route path="/history" element={<History />} />
