@@ -5,6 +5,7 @@ import { Sparkles, Lightbulb, Users, Wand2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Footer } from "@/components/Footer";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LAYOUT, PADDING } from "@/lib/utils/layoutConstants";
 
 export default function MainLanding() {
   const navigate = useNavigate();
@@ -86,8 +87,8 @@ export default function MainLanding() {
 
       {/* Hero Section */}
       <main className="flex-1">
-        <section className="container px-6 py-24 md:py-32 lg:py-40">
-          <div className="max-w-5xl mx-auto text-center space-y-12 animate-fade-in">
+        <section className={`container ${PADDING.responsive} py-24 md:py-32 lg:py-40`}>
+          <div className={`${LAYOUT.hero} mx-auto text-center ${PADDING.sectionInner} animate-fade-in`}>
             {/* Icon */}
             <div className="inline-flex items-center justify-center p-4 rounded-full bg-surface-2 border border-border/50 animate-scale-in">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-surface-3 to-muted flex items-center justify-center">
@@ -129,8 +130,8 @@ export default function MainLanding() {
         </section>
 
         {/* Features Section */}
-        <section className="container px-6 py-24 border-t border-border/40">
-          <div className="max-w-6xl mx-auto">
+        <section className={`container ${PADDING.responsive} ${PADDING.section} border-t border-border/40`}>
+          <div className={`${LAYOUT.gallery} mx-auto`}>
             <div className="text-center space-y-4 mb-16">
               <h2 className="text-3xl md:text-4xl font-display font-semibold tracking-tight">
                 Built for Creative Professionals
@@ -199,8 +200,8 @@ export default function MainLanding() {
         </section>
 
         {/* CTA Section */}
-        <section className="container px-6 py-24 border-t border-border/40">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
+        <section className={`container ${PADDING.responsive} ${PADDING.section} border-t border-border/40`}>
+          <div className={`${LAYOUT.contentWide} mx-auto text-center ${PADDING.sectionInner}`}>
             <div className="space-y-4">
               <h2 className="text-3xl md:text-4xl font-display font-semibold tracking-tight">
                 Ready to transform your creative process?

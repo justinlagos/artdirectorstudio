@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,12 @@ interface BatchImage {
 }
 
 export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogProps) => {
+  const { captureOrigin, returnToOrigin } = useNavigationContext();
   const [images, setImages] = useState<BatchImage[]>([]);
+
+  useEffect(() => {
+    if (open) captureOrigin();
+  }, [open, captureOrigin]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(0);
 
@@ -147,6 +153,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     images.forEach(img => URL.revokeObjectURL(img.preview));
     setImages([]);
     setCurrentProgress(0);
+    returnToOrigin();
     onOpenChange(false);
   };
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { LAYOUT, PADDING } from "@/lib/utils/layoutConstants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -182,7 +183,7 @@ const Settings = () => {
   return (
     <div className="min-h-screen flex flex-col bg-surface-1">
       <Header />
-      <main className="flex-1 container mx-auto px-4 sm:px-6 py-6 sm:py-12 max-w-6xl">
+      <main className={`flex-1 container mx-auto ${PADDING.responsive} py-6 sm:py-12 ${LAYOUT.dashboard}`}>
         <div className="space-y-6 sm:space-y-8 animate-fade-in">
           <div>
             <h1 className="text-2xl sm:text-4xl font-display font-bold tracking-tight mb-2">Settings</h1>

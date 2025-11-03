@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,11 +20,16 @@ interface ImageFile {
 }
 
 export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) => {
+  const { captureOrigin, returnToOrigin } = useNavigationContext();
   const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("Blend these images seamlessly together");
   const [isBlending, setIsBlending] = useState(false);
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (open) captureOrigin();
+  }, [open, captureOrigin]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -110,6 +116,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     setBlendedImage(null);
     setInstruction("Blend these images seamlessly together");
     setProgress(0);
+    returnToOrigin();
     onOpenChange(false);
   };
 

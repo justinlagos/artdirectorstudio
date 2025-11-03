@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,12 @@ interface SourceImage {
 }
 
 export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogProps) => {
+  const { captureOrigin, returnToOrigin } = useNavigationContext();
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
+
+  useEffect(() => {
+    if (open) captureOrigin();
+  }, [open, captureOrigin]);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
@@ -99,6 +105,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setUpscaledImage(null);
     setTargetSize('1536x1536');
     setProgress(0);
+    returnToOrigin();
     onOpenChange(false);
   };
 

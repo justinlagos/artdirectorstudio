@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LoadingState } from "@/components/LoadingState";
+import { LAYOUT, PADDING } from "@/lib/utils/layoutConstants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
@@ -47,7 +48,7 @@ const Admin = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       
-      <main className="flex-1 container mx-auto px-4 py-12 max-w-7xl">
+      <main className={`flex-1 container mx-auto ${PADDING.responsive} py-12 ${LAYOUT.dashboard}`}>
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Shield className="w-8 h-8" />

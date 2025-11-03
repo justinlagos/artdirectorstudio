@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
+import { LAYOUT, PADDING } from "@/lib/utils/layoutConstants";
 
 // Testimonials component
 const TestimonialsSection = () => {
@@ -47,7 +48,8 @@ const TestimonialsSection = () => {
   if (testimonials.length === 0) return null;
 
   return (
-    <section id="testimonials" className="py-20 border-t border-border/40 scroll-mt-14">
+    <section id="testimonials" className={`${PADDING.section} border-t border-border/40 scroll-mt-14`}>
+      <div className={`container mx-auto ${PADDING.responsive} ${LAYOUT.gallery}`}>
       <div className="text-center space-y-4 mb-16">
         <h2 className="text-4xl sm:text-5xl font-display font-bold tracking-tight">
           Loved by Creatives
@@ -124,6 +126,7 @@ const TestimonialsSection = () => {
           scrollbar-width: none;
         }
       `}</style>
+      </div>
     </section>
   );
 };
@@ -399,8 +402,8 @@ const Index = () => {
       
       {/* Hero Section */}
       <section id="hero" className="relative overflow-hidden border-b border-border/40 bg-gradient-to-b from-background via-background to-surface-1/30">
-        <div className="container mx-auto px-4 py-20 md:py-32">
-          <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
+        <div className={`container mx-auto ${PADDING.responsive} py-20 md:py-32`}>
+          <div className={`${LAYOUT.contentWide} mx-auto text-center ${PADDING.sectionInner} animate-fade-in`}>
             <h1 className="text-5xl md:text-7xl font-display font-bold leading-tight tracking-tight">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white">
                 ArtDirector Studio
@@ -413,7 +416,7 @@ const Index = () => {
         </div>
       </section>
       
-      <main id="studio" className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
+      <main id="studio" className={`flex-1 container mx-auto ${PADDING.responsive} py-8 ${LAYOUT.contentWide}`}>
         <div className="space-y-16 animate-fade-in">
           <UploadSection
             onFileSelect={handleFileSelect}
@@ -452,8 +455,8 @@ const Index = () => {
           )}
 
           {/* How It Works Section */}
-          <section id="how-it-works" className="py-20 border-t border-border/40 scroll-mt-14">
-            <div className="text-center space-y-4 mb-16">
+          <section id="how-it-works" className={`${PADDING.section} border-t border-border/40 scroll-mt-14`}>
+            <div className={`text-center ${PADDING.sectionInner} mb-16`}>
               <h2 className="text-4xl font-display font-bold tracking-tight">
                 How It Works
               </h2>
@@ -512,10 +515,10 @@ const Index = () => {
           <TestimonialsSection />
 
           {/* Trust Section */}
-          <section id="trust" className="py-20 border-t border-border/40 scroll-mt-14">
+          <section id="trust" className={`${PADDING.section} border-t border-border/40 scroll-mt-14`}>
             <div className="glass rounded-2xl overflow-hidden">
-              <div className="p-12 md:p-16">
-                <div className="max-w-3xl mx-auto text-center space-y-6">
+              <div className={`p-12 md:p-16 ${LAYOUT.content} mx-auto`}>
+                <div className={`text-center ${PADDING.sectionInner}`}>
                   <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight">
                     Built for Creators, Privacy First
                   </h2>
