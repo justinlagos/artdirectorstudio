@@ -19,6 +19,7 @@ import { Separator } from "./ui/separator";
 import { ImageBlendDialogEnhanced } from "./ImageBlendDialogEnhanced";
 import { ImageUpscaleDialog } from "./ImageUpscaleDialog";
 import { BatchProcessDialog } from "./BatchProcessDialog";
+import { CreditPurchaseDialog } from "./CreditPurchaseDialog";
 
 export const Header = () => {
   const navigate = useNavigate();
@@ -28,9 +29,10 @@ export const Header = () => {
   const [showBlendDialog, setShowBlendDialog] = useState(false);
   const [showUpscaleDialog, setShowUpscaleDialog] = useState(false);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
+  const [showCreditPurchaseDialog, setShowCreditPurchaseDialog] = useState(false);
 
   const handleBuyCredits = () => {
-    navigate("/settings");
+    setShowCreditPurchaseDialog(true);
   };
 
   return (
@@ -258,6 +260,7 @@ export const Header = () => {
       <ImageBlendDialogEnhanced open={showBlendDialog} onOpenChange={setShowBlendDialog} />
       <ImageUpscaleDialog open={showUpscaleDialog} onOpenChange={setShowUpscaleDialog} />
       <BatchProcessDialog open={showBatchDialog} onOpenChange={setShowBatchDialog} />
+      <CreditPurchaseDialog open={showCreditPurchaseDialog} onOpenChange={setShowCreditPurchaseDialog} />
     </header>
   );
 };
