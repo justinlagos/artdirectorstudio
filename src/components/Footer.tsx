@@ -4,10 +4,17 @@ import { ToolDialog } from "./ToolDialog";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useState } from "react";
+import { ImageBlendDialogEnhanced } from "./ImageBlendDialogEnhanced";
+import { ImageUpscaleDialog } from "./ImageUpscaleDialog";
+import { BatchProcessDialog } from "./BatchProcessDialog";
 
 export const Footer = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [isBlendDialogOpen, setIsBlendDialogOpen] = useState(false);
+  const [isUpscaleDialogOpen, setIsUpscaleDialogOpen] = useState(false);
+  const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
 
   const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault();
@@ -60,39 +67,30 @@ export const Footer = () => {
                 <h3 className="font-display font-semibold text-lg">Tools</h3>
               </div>
               <nav className="flex flex-col space-y-3">
-                <ToolDialog
-                  trigger={
-                    <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
-                      <Layers className="h-4 w-4" />
-                      Blend
-                    </Button>
-                  }
-                  title="Blend Images"
-                  description="Seamlessly combine two images with customizable blend modes"
-                  toolType="blend"
-                />
-                <ToolDialog
-                  trigger={
-                    <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
-                      <Maximize2 className="h-4 w-4" />
-                      Upscale
-                    </Button>
-                  }
-                  title="Upscale Image"
-                  description="Enhance image resolution with AI-powered upscaling"
-                  toolType="upscale"
-                />
-                <ToolDialog
-                  trigger={
-                    <Button variant="ghost" className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2">
-                      <ImageIcon className="h-4 w-4" />
-                      Batch
-                    </Button>
-                  }
-                  title="Batch Processing"
-                  description="Process multiple images at once with consistent operations"
-                  toolType="batch"
-                />
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setIsBlendDialogOpen(true)}
+                  className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2"
+                >
+                  <Layers className="h-4 w-4" />
+                  Blend
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setIsUpscaleDialogOpen(true)}
+                  className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                  Upscale
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setIsBatchDialogOpen(true)}
+                  className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  Batch
+                </Button>
               </nav>
             </div>
           )}
@@ -148,10 +146,15 @@ export const Footer = () => {
             © {new Date().getFullYear()} ArtDirector Studio. All rights reserved.
           </p>
           <p className="text-sm text-muted-foreground">
-            Built with AI precision.
-          </p>
-        </div>
+          Built with AI precision.
+        </p>
       </div>
-    </footer>
+    </div>
+    
+    {/* Tool Dialogs */}
+    <ImageBlendDialogEnhanced open={isBlendDialogOpen} onOpenChange={setIsBlendDialogOpen} />
+    <ImageUpscaleDialog open={isUpscaleDialogOpen} onOpenChange={setIsUpscaleDialogOpen} />
+    <BatchProcessDialog open={isBatchDialogOpen} onOpenChange={setIsBatchDialogOpen} />
+  </footer>
   );
 };

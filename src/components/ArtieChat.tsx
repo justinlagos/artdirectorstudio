@@ -35,7 +35,7 @@ export const ArtieChat = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async () => {
+  const handleSend = async (contextData?: { prompt?: string; analysis?: any; credits?: number }) => {
     if (!inputValue.trim() || isLoading) return;
 
     const userMessage: Message = {
@@ -52,6 +52,24 @@ export const ArtieChat = () => {
     try {
       const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/artie-chat`;
       
+      // Build context-aware message if context provided
+      let contextualInput = inputValue;
+      if (contextData) {
+        const contextParts = [];
+        if (contextData.prompt) {
+          contextParts.push(`Current prompt: "${contextData.prompt.slice(0, 200)}..."`);
+        }
+        if (contextData.analysis) {
+          contextParts.push(`Image overview: ${contextData.analysis.image_overview?.slice(0, 150)}`);
+        }
+        if (contextData.credits !== undefined) {
+          contextParts.push(`User has ${contextData.credits} credits remaining`);
+        }
+        if (contextParts.length > 0) {
+          contextualInput = `Context: ${contextParts.join(' | ')}\n\nUser question: ${inputValue}`;
+        }
+      }
+      
       const response = await fetch(CHAT_URL, {
         method: 'POST',
         headers: {
@@ -66,7 +84,7 @@ export const ArtieChat = () => {
               role: m.sender === 'user' ? 'user' : 'assistant',
               content: m.text
             }))
-            .concat([{ role: 'user', content: inputValue }])
+            .concat([{ role: 'user', content: contextualInput }])
         }),
       });
 

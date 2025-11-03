@@ -43,6 +43,8 @@ export const ResultsSection = ({
 }: ResultsSectionProps) => {
   const [userEdits, setUserEdits] = useState<UserEdits>({});
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
+  const [livePreviewPrompt, setLivePreviewPrompt] = useState(result.full_regeneration_prompt);
+  const [modifiedCount, setModifiedCount] = useState(0);
 
   // Load edits from local storage on mount
   useEffect(() => {
@@ -68,6 +70,51 @@ export const ResultsSection = ({
 
     return () => clearTimeout(timeoutId);
   }, [userEdits]);
+
+  // Live preview with debounced regeneration (2s delay)
+  useEffect(() => {
+    if (Object.keys(userEdits).length === 0) {
+      setLivePreviewPrompt(result.full_regeneration_prompt);
+      setModifiedCount(0);
+      return;
+    }
+
+    const count = Object.keys(userEdits).filter(key => userEdits[key as keyof UserEdits]).length;
+    setModifiedCount(count);
+
+    const timeoutId = setTimeout(() => {
+      // Generate live preview by merging edits into prompt
+      let preview = result.full_regeneration_prompt;
+      
+      // Replace values contextually in the prompt
+      Object.entries(userEdits).forEach(([key, value]) => {
+        if (value) {
+          // Simple replacement - in production, you'd call the API
+          const fieldNames: Record<string, string> = {
+            subject_gender: 'gender',
+            subject_ethnicity: 'ethnicity',
+            camera_type: 'camera',
+            lighting_type: 'lighting',
+            dominant_color_1: 'primary color',
+            dominant_color_2: 'secondary color',
+            art_style: 'style',
+            background_type: 'background',
+            intended_platform: 'platform'
+          };
+          
+          const fieldName = fieldNames[key] || key;
+          preview = preview.replace(
+            new RegExp(`${fieldName}[^,.\n]*`, 'gi'),
+            `${fieldName}: ${value}`
+          );
+        }
+      });
+      
+      setLivePreviewPrompt(preview);
+    }, 2000);
+
+    return () => clearTimeout(timeoutId);
+  }, [userEdits, result.full_regeneration_prompt]);
 
   const handleEditChange = (field: keyof UserEdits, value: string) => {
     setUserEdits(prev => ({
@@ -384,12 +431,17 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         </div>
         
         <div className="relative group">
+          {modifiedCount > 0 && (
+            <div className="absolute -top-2 right-4 z-10 px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full shadow-md animate-fade-in">
+              {modifiedCount} parameter{modifiedCount !== 1 ? 's' : ''} modified
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="relative bg-surface-1 rounded-2xl p-8 shadow-subtle ring-1 ring-border/50 hover:shadow-medium hover:ring-border transition-all duration-300">
             <Textarea
-              value={result.full_regeneration_prompt}
+              value={livePreviewPrompt}
               readOnly
-              className="min-h-[180px] resize-none bg-transparent border-0 focus-visible:ring-0 text-base leading-relaxed"
+              className="min-h-[180px] resize-none bg-transparent border-0 focus-visible:ring-0 text-base leading-relaxed transition-all duration-300"
             />
           </div>
         </div>

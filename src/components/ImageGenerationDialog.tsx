@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Download, Wand2, ChevronDown, Copy, AlertCircle } from "lucide-react";
+import { Download, Wand2, ChevronDown, Copy, AlertCircle, Square, RectangleHorizontal, RectangleVertical } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 interface ImageGenerationDialogProps {
   open: boolean;
@@ -210,21 +211,48 @@ export const ImageGenerationDialog = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="size">Size</Label>
-                  <Select
-                    value={options.size}
-                    onValueChange={(value) => setOptions(prev => ({ ...prev, size: value as any }))}
-                    disabled={isGenerating}
-                  >
-                    <SelectTrigger id="size">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1024x1024">Square (1024×1024)</SelectItem>
-                      <SelectItem value="1536x1024">Landscape (1536×1024)</SelectItem>
-                      <SelectItem value="1024x1536">Portrait (1024×1536)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="size">Aspect Ratio</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      type="button"
+                      variant={options.size === "1024x1024" ? "default" : "outline"}
+                      className="flex flex-col items-center gap-2 h-auto py-3"
+                      onClick={() => setOptions(prev => ({ ...prev, size: "1024x1024" }))}
+                      disabled={isGenerating}
+                    >
+                      <Square className="w-5 h-5" />
+                      <div className="text-xs">
+                        <div className="font-semibold">Square</div>
+                        <div className="text-muted-foreground">1024×1024</div>
+                      </div>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={options.size === "1536x1024" ? "default" : "outline"}
+                      className="flex flex-col items-center gap-2 h-auto py-3"
+                      onClick={() => setOptions(prev => ({ ...prev, size: "1536x1024" }))}
+                      disabled={isGenerating}
+                    >
+                      <RectangleHorizontal className="w-5 h-5" />
+                      <div className="text-xs">
+                        <div className="font-semibold">Landscape</div>
+                        <div className="text-muted-foreground">1536×1024</div>
+                      </div>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={options.size === "1024x1536" ? "default" : "outline"}
+                      className="flex flex-col items-center gap-2 h-auto py-3"
+                      onClick={() => setOptions(prev => ({ ...prev, size: "1024x1536" }))}
+                      disabled={isGenerating}
+                    >
+                      <RectangleVertical className="w-5 h-5" />
+                      <div className="text-xs">
+                        <div className="font-semibold">Portrait</div>
+                        <div className="text-muted-foreground">1024×1536</div>
+                      </div>
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">

@@ -1,7 +1,7 @@
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Info } from "lucide-react";
+import { Info, Palette } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AnalysisSelectProps {
@@ -69,19 +69,44 @@ export const AnalysisSelect = ({
         </div>
       ) : (
         <Select value={value} onValueChange={handleValueChange}>
-          <SelectTrigger className="h-9 text-sm">
+          <SelectTrigger className="h-9 text-sm bg-surface-1 ring-1 ring-border/30 focus:ring-primary/30 transition-all">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
-          <SelectContent>
-            {options.map((option) => (
-              <SelectItem key={option} value={option}>
-                {option}
-              </SelectItem>
-            ))}
+          <SelectContent className="max-h-[300px] bg-background/95 backdrop-blur-sm z-[100]">
+            <SelectGroup>
+              <SelectLabel className="text-xs font-semibold text-muted-foreground">Recommended</SelectLabel>
+              {options.slice(0, 5).map((option) => (
+                <SelectItem key={option} value={option} className="cursor-pointer">
+                  {label.toLowerCase().includes('color') && (
+                    <Palette className="inline-block w-3 h-3 mr-2 opacity-50" />
+                  )}
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+            {options.length > 5 && (
+              <>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel className="text-xs font-semibold text-muted-foreground">More Options</SelectLabel>
+                  {options.slice(5).map((option) => (
+                    <SelectItem key={option} value={option} className="cursor-pointer">
+                      {label.toLowerCase().includes('color') && (
+                        <Palette className="inline-block w-3 h-3 mr-2 opacity-50" />
+                      )}
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </>
+            )}
             {allowCustom && (
-              <SelectItem value="_custom">
-                <span className="italic">Custom...</span>
-              </SelectItem>
+              <>
+                <SelectSeparator />
+                <SelectItem value="_custom" className="cursor-pointer font-medium">
+                  ✏️ Enter Custom...
+                </SelectItem>
+              </>
             )}
           </SelectContent>
         </Select>
