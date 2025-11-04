@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,6 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Copy, Check, Share2, Eye } from "lucide-react";
-import { useNavigationContext } from "@/hooks/useNavigationContext";
 
 interface ShareDialogProps {
   open: boolean;
@@ -17,21 +16,11 @@ interface ShareDialogProps {
 }
 
 export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDialogProps) => {
-  const { captureOrigin, returnToOrigin } = useNavigationContext();
   const [isPublic, setIsPublic] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [isSharing, setIsSharing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareData, setShareData] = useState<{ id: string; view_count: number } | null>(null);
-
-  useEffect(() => {
-    if (open) captureOrigin();
-  }, [open, captureOrigin]);
-
-  const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen) returnToOrigin();
-    onOpenChange(newOpen);
-  };
 
   const generateShareToken = () => {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -115,14 +104,14 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md p-4 sm:p-6 max-h-[90dvh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
+          <DialogTitle className="flex items-center gap-2">
             <Share2 className="h-5 w-5" />
             Share {assetType}
           </DialogTitle>
-          <DialogDescription className="text-sm">
+          <DialogDescription>
             Create a shareable link for this {assetType.toLowerCase()}
           </DialogDescription>
         </DialogHeader>
@@ -159,7 +148,7 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
           </div>
 
           {!shareUrl ? (
-            <Button onClick={handleCreateShare} disabled={isSharing} className="w-full min-h-[44px]">
+            <Button onClick={handleCreateShare} disabled={isSharing} className="w-full">
               {isSharing ? "Creating..." : "Create Share Link"}
             </Button>
           ) : (
@@ -171,13 +160,12 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
                     id="share-url"
                     value={shareUrl}
                     readOnly
-                    className="flex-1 min-h-[44px]"
+                    className="flex-1"
                   />
                   <Button
                     size="icon"
                     variant="outline"
                     onClick={handleCopyLink}
-                    className="min-w-[44px] min-h-[44px]"
                   >
                     {copied ? (
                       <Check className="h-4 w-4" />
@@ -199,7 +187,7 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
                 onClick={handleCreateShare}
                 disabled={isSharing}
                 variant="outline"
-                className="w-full min-h-[44px]"
+                className="w-full"
               >
                 {isSharing ? "Updating..." : "Update Share Settings"}
               </Button>

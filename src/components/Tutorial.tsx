@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, Sparkles, Download, Wand2 } from "lucide-react";
+import { X, Upload, Sparkles, Download, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -8,8 +8,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 
 const TUTORIAL_STEPS = [
   {
@@ -40,49 +38,18 @@ const TUTORIAL_STEPS = [
 ];
 
 export const Tutorial = () => {
-  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("has_seen_onboarding")
-          .eq("id", user.id)
-          .single();
-
-        if (!error && data && !data.has_seen_onboarding) {
-          setOpen(true);
-        }
-      } catch (error) {
-        console.error("Error checking onboarding status:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkOnboardingStatus();
-  }, [user]);
-
-  const handleClose = async () => {
-    if (user) {
-      try {
-        await supabase
-          .from("profiles")
-          .update({ has_seen_onboarding: true })
-          .eq("id", user.id);
-      } catch (error) {
-        console.error("Error updating onboarding status:", error);
-      }
+    const hasSeenTutorial = localStorage.getItem("artdirector_tutorial_seen");
+    if (!hasSeenTutorial) {
+      setOpen(true);
     }
+  }, []);
+
+  const handleClose = () => {
+    localStorage.setItem("artdirector_tutorial_seen", "true");
     setOpen(false);
     setCurrentStep(0);
   };
@@ -104,10 +71,8 @@ export const Tutorial = () => {
   const step = TUTORIAL_STEPS[currentStep];
   const StepIcon = step.icon;
 
-  if (isLoading) return null;
-
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -144,6 +109,15 @@ export const Tutorial = () => {
             </Button>
           </div>
         </div>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          className="absolute right-2 top-2"
+          onClick={handleClose}
+        >
+          <X className="w-4 h-4" />
+        </Button>
       </DialogContent>
     </Dialog>
   );

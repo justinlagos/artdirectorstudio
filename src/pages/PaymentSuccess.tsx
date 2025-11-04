@@ -31,11 +31,7 @@ const PaymentSuccess = () => {
 
         setCreditsAdded(data.credits_added);
         await refetch();
-        
-        // Only show success toast if not already processed
-        if (!data.already_processed) {
-          toast.success(`${data.credits_added} credits added to your account!`);
-        }
+        toast.success(`${data.credits_added} credits added to your account!`);
       } catch (error) {
         console.error('Error verifying payment:', error);
         toast.error('Payment verification failed. Please contact support.');

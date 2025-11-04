@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { CreativeIntelligenceDashboard } from "@/components/CreativeIntelligenceDashboard";
+import { UserAnalytics } from "@/components/UserAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Analytics = () => {
@@ -38,14 +38,12 @@ const Analytics = () => {
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="space-y-6">
           <div className="space-y-2">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              Creative Intelligence Dashboard
-            </h1>
-            <p className="text-muted-foreground text-lg">
-              Understand and improve your creative habits with actionable insights
+            <h1 className="text-4xl font-bold">Analytics</h1>
+            <p className="text-muted-foreground">
+              Track your usage and activity insights
             </p>
           </div>
-          <CreativeIntelligenceDashboard />
+          <UserAnalytics />
         </div>
       </main>
       <Footer />

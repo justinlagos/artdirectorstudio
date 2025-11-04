@@ -1,29 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-interface LogEntry {
-  op: string;
-  user: string;
-  req: string;
-  phase: string;
-  result: string;
-  ms?: number;
-  err?: string;
-}
-
-function structuredLog(entry: LogEntry): void {
-  const parts = [
-    `[op=${entry.op}]`,
-    `[user=${entry.user}]`,
-    `[req=${entry.req}]`,
-    `[phase=${entry.phase}]`,
-    `[result=${entry.result}]`,
-  ];
-  if (entry.ms !== undefined) parts.push(`[ms=${entry.ms}]`);
-  if (entry.err) parts.push(`[err=${entry.err.substring(0, 200)}]`);
-  console.log(parts.join(' '));
-}
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -31,14 +8,9 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  const startTime = Date.now();
-  
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
-
-  let userId = 'unknown';
-  let requestId = 'unknown';
 
   try {
     const authHeader = req.headers.get('Authorization');
@@ -62,7 +34,7 @@ serve(async (req) => {
 
     // Decode the payload (second part of JWT)
     const payload = JSON.parse(atob(parts[1]));
-    userId = payload.sub;
+    const userId = payload.sub;
     
     if (!userId) {
       console.error("No user ID in JWT");
@@ -84,17 +56,12 @@ serve(async (req) => {
       }
     );
 
-    const body = await req.json();
-    const { image, request_id } = body;
-    requestId = request_id || crypto.randomUUID();
-    
-    structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'preflight', result: 'ok', ms: Date.now() - startTime });
+    const { image } = await req.json();
     
     // Validate input
     if (!image) {
-      structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'preflight', result: 'err', ms: Date.now() - startTime, err: 'INVALID_INPUT: No image provided' });
       return new Response(
-        JSON.stringify({ error: "INVALID_INPUT: No image provided" }),
+        JSON.stringify({ error: "No image provided" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -124,88 +91,6 @@ serve(async (req) => {
       );
     }
 
-    console.log("Detecting image type...");
-    
-    // First, detect the image type
-    const typeDetectionResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert image classifier. Analyze the image and determine its primary category.'
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Classify this image into ONE of these categories:
-- portrait: Images primarily featuring people, faces, or human subjects
-- product: Commercial product photography, items for sale, packaged goods
-- environment: Landscapes, cityscapes, architectural shots, natural scenes
-- graphic: Graphic design, logos, typography, posters, illustrations, digital art
-- abstract: Abstract art, patterns, non-representational imagery
-
-Respond with ONLY the category name and a confidence score (0-1).
-Format: category|confidence
-Example: portrait|0.95`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: image
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 50
-      })
-    });
-
-    let imageType = 'unknown';
-    let confidence = 0;
-
-    if (typeDetectionResponse.ok) {
-      const typeData = await typeDetectionResponse.json();
-      const typeResult = typeData.choices?.[0]?.message?.content?.trim() || 'unknown|0';
-      const [detectedType, confidenceStr] = typeResult.split('|');
-      confidence = parseFloat(confidenceStr) || 0;
-      imageType = confidence >= 0.6 ? detectedType : 'unknown';
-      console.log(`Detected image type: ${imageType} (confidence: ${confidence})`);
-    } else {
-      console.error('Type detection failed, using default');
-    }
-    
-    // Build context-aware system prompt
-    let contextPrompt = '';
-    switch(imageType) {
-      case 'portrait':
-        contextPrompt = '\n\nIMPORTANT CONTEXT: This is a portrait image. Focus on facial features, expressions, lighting on skin tones, pose, and human elements. Avoid describing products or environments unless they\'re secondary context.';
-        break;
-      case 'product':
-        contextPrompt = '\n\nIMPORTANT CONTEXT: This is a product image. Focus on the product itself, materials, textures, lighting setup, presentation style, and commercial appeal. Describe the product accurately without unnecessary human references.';
-        break;
-      case 'environment':
-        contextPrompt = '\n\nIMPORTANT CONTEXT: This is an environment/landscape image. Focus on the scene, atmosphere, natural or architectural elements, lighting conditions, weather, and spatial composition. Minimize human subject details unless they\'re integral to the scene.';
-        break;
-      case 'graphic':
-        contextPrompt = '\n\nIMPORTANT CONTEXT: This is a graphic design image. Focus on typography, layout, color schemes, design elements, visual hierarchy, and artistic style. Avoid photographic analysis unless it\'s part of the design.';
-        break;
-      case 'abstract':
-        contextPrompt = '\n\nIMPORTANT CONTEXT: This is an abstract or artistic image. Focus on colors, patterns, textures, movement, composition, and emotional tone. Avoid literal subject descriptions.';
-        break;
-      default:
-        contextPrompt = '\n\nAnalyze this image comprehensively, adapting your description to what you observe.';
-    }
-
-    structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'model', result: 'ok', ms: Date.now() - startTime });
     console.log("Calling Lovable AI for image analysis...");
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -219,7 +104,7 @@ Example: portrait|0.95`
         messages: [
           {
             role: 'system',
-            content: `You are a professional image analysis AI that creates comprehensive creative briefs for image reconstruction.${contextPrompt}
+            content: `You are a professional image analysis AI that creates comprehensive creative briefs for image reconstruction.
 
 Analyze the uploaded image in extreme detail across 12 professional categories. Be specific, technical, and actionable.
 
@@ -263,26 +148,24 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
 
     if (!response.ok) {
       const errorText = await response.text();
-      const errorCode = response.status === 429 ? 'TIMEOUT' : response.status === 402 ? 'INSUFFICIENT_CREDITS' : 'MODEL_EMPTY';
-      structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'model', result: 'err', ms: Date.now() - startTime, err: `${errorCode}: ${errorText.substring(0, 100)}` });
       console.error("Lovable AI error:", response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "TIMEOUT: Rate limit exceeded. Please try again later." }),
+          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "INSUFFICIENT_CREDITS: AI credits exhausted. Please add credits to your workspace." }),
+          JSON.stringify({ error: "AI credits exhausted. Please add credits to your workspace." }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
       return new Response(
-        JSON.stringify({ error: "MODEL_EMPTY: AI analysis failed" }),
+        JSON.stringify({ error: "AI analysis failed" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -385,28 +268,18 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
       console.error("Failed to save asset:", assetError);
     }
 
-    // Return the comprehensive analysis with image type
-    const responseData = {
-      ...analysisData,
-      image_type: imageType,
-      detection_confidence: confidence
-    };
-
-    structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'commit', result: 'ok', ms: Date.now() - startTime });
-
+    // Return the comprehensive analysis
     return new Response(
-      JSON.stringify(responseData),
+      JSON.stringify(analysisData),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
 
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : "Unknown error";
-    structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'commit', result: 'err', ms: Date.now() - startTime, err: errorMsg });
     console.error("Error in analyze-image function:", error);
     return new Response(
-      JSON.stringify({ error: errorMsg }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

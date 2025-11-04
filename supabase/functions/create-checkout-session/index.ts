@@ -35,7 +35,7 @@ serve(async (req) => {
       throw new Error('User not authenticated or email not available');
     }
 
-    const { packageName } = await req.json();
+    const { packageName, credits } = await req.json();
     const priceId = PRICE_IDS[packageName];
 
     if (!priceId) {
@@ -43,7 +43,7 @@ serve(async (req) => {
     }
 
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-      apiVersion: '2025-08-27.basil',
+      apiVersion: '2024-11-20.acacia',
     });
 
     const origin = req.headers.get('origin') || 'http://localhost:8080';
@@ -70,6 +70,7 @@ serve(async (req) => {
       cancel_url: `${origin}/payment-cancelled`,
       metadata: {
         user_id: user.id,
+        credits: credits.toString(),
         package_name: packageName,
       },
     });

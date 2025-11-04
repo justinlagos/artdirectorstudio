@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { LAYOUT, PADDING } from "@/lib/utils/layoutConstants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -183,47 +182,47 @@ const Settings = () => {
   return (
     <div className="min-h-screen flex flex-col bg-surface-1">
       <Header />
-      <main className={`flex-1 container mx-auto ${PADDING.responsive} py-6 sm:py-12 ${LAYOUT.dashboard}`}>
-        <div className="space-y-6 sm:space-y-8 animate-fade-in">
+      <main className="flex-1 container mx-auto px-6 py-12 max-w-6xl">
+        <div className="space-y-8 animate-fade-in">
           <div>
-            <h1 className="text-2xl sm:text-4xl font-display font-bold tracking-tight mb-2">Settings</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">Manage your account preferences and settings</p>
+            <h1 className="text-4xl font-display font-bold tracking-tight mb-2">Settings</h1>
+            <p className="text-muted-foreground">Manage your account preferences and settings</p>
           </div>
 
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="glass-strong overflow-x-auto flex-nowrap w-full justify-start gap-1 h-auto p-1">
-              <TabsTrigger value="profile" className="gap-2 flex-shrink-0 min-h-[44px] px-3 sm:px-4">
+            <TabsList className="glass-strong overflow-x-auto flex-nowrap w-full justify-start">
+              <TabsTrigger value="profile" className="gap-2 flex-shrink-0">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">Profile</span>
               </TabsTrigger>
-              <TabsTrigger value="security" className="gap-2 flex-shrink-0 min-h-[44px] px-3 sm:px-4">
+              <TabsTrigger value="security" className="gap-2 flex-shrink-0">
                 <Shield className="w-4 h-4" />
                 <span className="hidden sm:inline">Security</span>
               </TabsTrigger>
-              <TabsTrigger value="billing" className="gap-2 flex-shrink-0 min-h-[44px] px-3 sm:px-4">
+              <TabsTrigger value="billing" className="gap-2 flex-shrink-0">
                 <CreditCard className="w-4 h-4" />
                 <span className="hidden sm:inline">Billing</span>
               </TabsTrigger>
-              <TabsTrigger value="preferences" className="gap-2 flex-shrink-0 min-h-[44px] px-3 sm:px-4">
+              <TabsTrigger value="preferences" className="gap-2 flex-shrink-0">
                 <Settings2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Preferences</span>
               </TabsTrigger>
-              <TabsTrigger value="notifications" className="gap-2 flex-shrink-0 min-h-[44px] px-3 sm:px-4">
+              <TabsTrigger value="notifications" className="gap-2 flex-shrink-0">
                 <Bell className="w-4 h-4" />
                 <span className="hidden sm:inline">Notifications</span>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="profile" className="mt-4 sm:mt-6">
+            <TabsContent value="profile" className="mt-6">
               <Card className="glass">
                 <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Profile Information</CardTitle>
-                  <CardDescription className="text-sm">Update your personal information and profile details</CardDescription>
+                  <CardTitle>Profile Information</CardTitle>
+                  <CardDescription>Update your personal information and profile details</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 sm:space-y-6">
+                <CardContent className="space-y-6">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={user?.email || ""} disabled className="min-h-[44px]" />
+                    <Input id="email" type="email" value={user?.email || ""} disabled />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
@@ -232,7 +231,6 @@ const Settings = () => {
                       placeholder="Enter username" 
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      className="min-h-[44px]"
                     />
                   </div>
                   <div className="space-y-2">
@@ -242,23 +240,22 @@ const Settings = () => {
                       placeholder="Tell us about yourself" 
                       value={bio}
                       onChange={(e) => setBio(e.target.value)}
-                      className="min-h-[44px]"
                     />
                   </div>
-                  <Button onClick={handleSaveProfile} disabled={isLoading} className="min-h-[44px] w-full sm:w-auto">
+                  <Button onClick={handleSaveProfile} disabled={isLoading}>
                     {isLoading ? "Saving..." : "Save Changes"}
                   </Button>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="security" className="mt-4 sm:mt-6">
+            <TabsContent value="security" className="mt-6">
               <Card className="glass">
                 <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Account & Security</CardTitle>
-                  <CardDescription className="text-sm">Manage your password and security settings</CardDescription>
+                  <CardTitle>Account & Security</CardTitle>
+                  <CardDescription>Manage your password and security settings</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 sm:space-y-6">
+                <CardContent className="space-y-6">
                   <div className="space-y-2">
                     <Label htmlFor="current-password">Current Password</Label>
                     <Input 
@@ -267,7 +264,6 @@ const Settings = () => {
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="Enter current password"
-                      className="min-h-[44px]"
                     />
                   </div>
                   <div className="space-y-2">
@@ -278,27 +274,26 @@ const Settings = () => {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Enter new password (min 6 characters)"
-                      className="min-h-[44px]"
                     />
                   </div>
-                  <Button onClick={handleChangePassword} disabled={isLoading} className="min-h-[44px] w-full sm:w-auto">
+                  <Button onClick={handleChangePassword} disabled={isLoading}>
                     {isLoading ? "Updating..." : "Update Password"}
                   </Button>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="billing" className="mt-4 sm:mt-6" onFocus={loadTransactions}>
+            <TabsContent value="billing" className="mt-6" onFocus={loadTransactions}>
               <Card className="glass">
                 <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Credits & Billing</CardTitle>
-                  <CardDescription className="text-sm">Manage your credits and payment information</CardDescription>
+                  <CardTitle>Credits & Billing</CardTitle>
+                  <CardDescription>Manage your credits and payment information</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 sm:space-y-6">
-                  <div className="p-4 sm:p-6 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                <CardContent className="space-y-6">
+                  <div className="p-6 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
                     <p className="text-sm text-muted-foreground mb-2">Current Balance</p>
-                    <p className="text-3xl sm:text-4xl font-bold">{balance ?? 0} Credits</p>
-                    <Button className="mt-4 min-h-[44px] w-full sm:w-auto" onClick={() => setPurchaseDialogOpen(true)}>
+                    <p className="text-4xl font-bold">{balance ?? 0} Credits</p>
+                    <Button className="mt-4" onClick={() => setPurchaseDialogOpen(true)}>
                       Purchase Credits
                     </Button>
                   </div>
@@ -331,11 +326,11 @@ const Settings = () => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="preferences" className="mt-4 sm:mt-6">
+            <TabsContent value="preferences" className="mt-6">
               <Card className="glass">
                 <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Preferences</CardTitle>
-                  <CardDescription className="text-sm">Customize your platform experience</CardDescription>
+                  <CardTitle>Preferences</CardTitle>
+                  <CardDescription>Customize your platform experience</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
@@ -360,15 +355,44 @@ const Settings = () => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="notifications" className="mt-4 sm:mt-6">
+            <TabsContent value="notifications" className="mt-6">
               <Card className="glass">
                 <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Notifications</CardTitle>
-                  <CardDescription className="text-sm">Manage how you receive notifications</CardDescription>
+                  <CardTitle>Notifications</CardTitle>
+                  <CardDescription>Manage how you receive notifications</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 sm:space-y-6">
-...
-                  <Button onClick={handleSaveNotifications} disabled={isLoading} className="min-h-[44px] w-full sm:w-auto">
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+                    <div className="space-y-0.5">
+                      <Label>Credit Alerts</Label>
+                      <p className="text-sm text-muted-foreground">Get notified when credits are low</p>
+                    </div>
+                    <Switch 
+                      checked={creditAlerts}
+                      onCheckedChange={setCreditAlerts}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+                    <div className="space-y-0.5">
+                      <Label>New Features</Label>
+                      <p className="text-sm text-muted-foreground">Updates about new platform features</p>
+                    </div>
+                    <Switch 
+                      checked={newFeatures}
+                      onCheckedChange={setNewFeatures}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+                    <div className="space-y-0.5">
+                      <Label>Gallery Updates</Label>
+                      <p className="text-sm text-muted-foreground">Notifications about inspire gallery</p>
+                    </div>
+                    <Switch 
+                      checked={galleryUpdates}
+                      onCheckedChange={setGalleryUpdates}
+                    />
+                  </div>
+                  <Button onClick={handleSaveNotifications} disabled={isLoading}>
                     {isLoading ? "Saving..." : "Save Preferences"}
                   </Button>
                 </CardContent>

@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { LAYOUT, PADDING, GRID } from "@/lib/utils/layoutConstants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,7 +29,6 @@ interface GalleryItem {
 }
 
 const Gallery = () => {
-  const { captureOrigin } = useNavigationContext();
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<GalleryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -110,7 +107,7 @@ const Gallery = () => {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
-        <main className={`flex-1 container mx-auto ${PADDING.responsive} py-8 ${LAYOUT.gallery}`}>
+        <main className="flex-1 container mx-auto px-4 py-8">
           <div className="space-y-6">
             <Skeleton className="h-12 w-full max-w-md" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -128,7 +125,7 @@ const Gallery = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className={`flex-1 container mx-auto ${PADDING.responsive} py-8 ${LAYOUT.gallery}`}>
+      <main className="flex-1 container mx-auto px-4 py-8">
         <div className="space-y-6">
           {/* Header */}
           <div className="space-y-2">
@@ -198,7 +195,7 @@ const Gallery = () => {
       <Footer />
 
       {/* Detail Dialog */}
-      <Dialog open={!!selectedItem} onOpenChange={() => { setSelectedItem(null); captureOrigin(); }}>
+      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
         <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto">
           {selectedItem && (
             <div className="space-y-4">
