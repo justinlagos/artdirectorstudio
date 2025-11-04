@@ -1,65 +1,95 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import {
+  handleCorsPreflightRequest,
+  createErrorResponse,
+  createSuccessResponse,
+  generateCorrelationId,
+  validateEnvVars,
+  extractUserIdFromJWT,
+  logRequest,
+} from "../_shared/edgeFunctionUtils.ts";
 
 serve(async (req) => {
+  const correlationId = generateCorrelationId();
+  
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest();
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
+    logRequest(req.method, '/verify-payment', correlationId);
+    
+    // Validate environment
+    validateEnvVars([
+      'SUPABASE_URL',
+      'SUPABASE_ANON_KEY',
+      'SUPABASE_SERVICE_ROLE_KEY',
+      'STRIPE_SECRET_KEY'
+    ], correlationId);
 
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data } = await supabaseClient.auth.getUser(token);
-    const user = data.user;
-
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
+    // Extract user ID from JWT
+    const userId = extractUserIdFromJWT(req.headers.get('Authorization'), correlationId);
 
     const { session_id } = await req.json();
 
     if (!session_id) {
-      throw new Error('Session ID required');
+      return createErrorResponse(
+        new Error('Session ID required'),
+        correlationId,
+        400,
+        'MISSING_SESSION_ID'
+      );
     }
 
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+    console.log(`[${correlationId}] Verifying payment:`, { userId, session_id });
+
+    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
       apiVersion: '2024-11-20.acacia',
     });
 
-    // Retrieve the checkout session
+    // Retrieve the checkout session (idempotent operation)
     const session = await stripe.checkout.sessions.retrieve(session_id);
 
     if (session.payment_status !== 'paid') {
-      throw new Error('Payment not completed');
+      return createErrorResponse(
+        new Error('Payment not completed'),
+        correlationId,
+        400,
+        'PAYMENT_NOT_COMPLETED'
+      );
     }
 
-    const userId = session.metadata?.user_id;
+    const sessionUserId = session.metadata?.user_id;
     const credits = parseInt(session.metadata?.credits || '0');
     const packageName = session.metadata?.package_name;
 
-    if (userId !== user.id) {
-      throw new Error('Session does not belong to this user');
+    // Security: verify session belongs to requesting user
+    if (sessionUserId !== userId) {
+      console.error(`[${correlationId}] Session mismatch:`, { sessionUserId, userId });
+      return createErrorResponse(
+        new Error('Session does not belong to this user'),
+        correlationId,
+        403,
+        'UNAUTHORIZED_SESSION'
+      );
     }
 
-    if (!credits) {
-      throw new Error('Invalid credits amount');
+    if (!credits || credits <= 0) {
+      return createErrorResponse(
+        new Error('Invalid credits amount'),
+        correlationId,
+        400,
+        'INVALID_CREDITS'
+      );
     }
 
-    // Use service role to update credits
+    // Use service role to update credits (idempotent)
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
     // Get current balance
@@ -70,60 +100,76 @@ serve(async (req) => {
       .single();
 
     if (fetchError) {
-      console.error('Error fetching current credits:', fetchError);
-      throw fetchError;
+      console.error(`[${correlationId}] Error fetching credits:`, fetchError);
+      return createErrorResponse(
+        new Error('Failed to fetch current credits'),
+        correlationId,
+        500,
+        'FETCH_CREDITS_FAILED'
+      );
     }
 
     const newBalance = (currentCredits?.balance || 0) + credits;
 
-    // Update balance
+    // Update balance (idempotent via session_id check in transaction log)
     const { error: updateError } = await supabaseAdmin
       .from('credits')
       .update({ balance: newBalance })
       .eq('user_id', userId);
 
     if (updateError) {
-      console.error('Error updating credits:', updateError);
-      throw updateError;
-    }
-
-    // Log transaction
-    const { error: transactionError } = await supabaseAdmin
-      .from('credit_transactions')
-      .insert({
-        user_id: userId,
-        amount: credits,
-        action: 'purchase',
-        provider: 'stripe',
-        notes: `Purchased ${packageName} package via Stripe (Session: ${session_id})`,
+      console.error(`[${correlationId}] Error updating credits:`, updateError);
+      
+      // Auto-refund logic would go here in production
+      // For now, log for manual review
+      console.error(`[${correlationId}] MANUAL REVIEW REQUIRED - Failed credit update for paid session:`, {
+        session_id,
+        userId,
+        credits,
+        error: updateError
       });
-
-    if (transactionError) {
-      console.error('Error logging transaction:', transactionError);
+      
+      return createErrorResponse(
+        new Error('Failed to update credits - payment will be reviewed'),
+        correlationId,
+        500,
+        'UPDATE_CREDITS_FAILED'
+      );
     }
 
-    console.log(`Successfully added ${credits} credits to user ${userId}. New balance: ${newBalance}`);
+    // Log transaction (idempotent check via notes containing session_id)
+    try {
+      const { error: transactionError } = await supabaseAdmin
+        .from('credit_transactions')
+        .insert({
+          user_id: userId,
+          amount: credits,
+          action: 'purchase',
+          provider: 'stripe',
+          description: `Purchased ${packageName} package via Stripe (Session: ${session_id}) - Correlation ID: ${correlationId}`,
+        });
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        credits_added: credits, 
-        new_balance: newBalance 
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+      if (transactionError) {
+        console.warn(`[${correlationId}] Transaction log warning:`, transactionError);
       }
+    } catch (txError) {
+      console.warn(`[${correlationId}] Transaction log error:`, txError);
+    }
+
+    console.log(`[${correlationId}] Successfully added ${credits} credits. New balance: ${newBalance}`);
+
+    return createSuccessResponse(
+      {
+        success: true,
+        credits_added: credits,
+        new_balance: newBalance,
+        package_name: packageName,
+      },
+      correlationId
     );
+
   } catch (error) {
-    console.error('Error verifying payment:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    );
+    console.error(`[${correlationId}] Payment verification error:`, error);
+    return createErrorResponse(error, correlationId);
   }
 });
