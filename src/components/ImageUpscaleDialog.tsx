@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Download, Maximize2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
+import { handleUpscale } from "@/lib/tools/upscaleHandler";
+import { CreditConfirmDialog } from "@/components/tools/CreditConfirmDialog";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -30,6 +31,8 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [showCreditConfirm, setShowCreditConfirm] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -46,7 +49,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setUpscaledImage(null);
   };
 
-  const handleUpscale = async () => {
+  const executeUpscale = useCallback(async () => {
     if (!sourceImage) {
       toast.error("Please upload an image first");
       return;
@@ -56,14 +59,16 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setProgress(0);
     setUpscaledImage(null);
 
+    const reqId = crypto.randomUUID();
+    setRequestId(reqId);
+
     try {
-      const { upscaleImage } = await import("@/lib/services/toolsService");
-      
-      const result = await upscaleImage(
-        sourceImage.file,
+      const result = await handleUpscale({
+        image: sourceImage.file,
         targetSize,
-        (progress) => setProgress(progress)
-      );
+        onProgress: setProgress,
+        requestId: reqId,
+      });
 
       if (!result.success) {
         toast.error(result.error || "Failed to upscale image");
@@ -72,15 +77,24 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
       if (result.imageUrl) {
         setUpscaledImage(result.imageUrl);
-        toast.success("Image upscaled successfully!");
+        toast.success("All done. Your result is ready.");
       }
     } catch (error) {
       console.error("Upscale error:", error);
-      toast.error("Failed to upscale image. Please try again.");
+      toast.error("This didn't complete. Try again or adjust inputs.");
     } finally {
       setIsUpscaling(false);
       setTimeout(() => setProgress(0), 1000);
     }
+  }, [sourceImage, targetSize]);
+
+  const handleUpscaleClick = () => {
+    setShowCreditConfirm(true);
+  };
+
+  const handleConfirmUpscale = () => {
+    setShowCreditConfirm(false);
+    executeUpscale();
   };
 
   const handleDownload = () => {
@@ -188,7 +202,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
             <div className="space-y-2">
               <Progress value={progress} className="w-full" />
               <p className="text-sm text-muted-foreground text-center">
-                Upscaling image... (~20-40 seconds)
+                {progress < 30 ? "Preparing assets…" : progress < 80 ? "Generating…" : "Finishing up…"}
               </p>
             </div>
           )}
@@ -241,7 +255,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           {/* Upscale Button */}
           {sourceImage && !upscaledImage && (
             <Button
-              onClick={handleUpscale}
+              onClick={handleUpscaleClick}
               disabled={isUpscaling}
               className="w-full"
               size="lg"
@@ -252,6 +266,14 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           )}
         </div>
       </DialogContent>
+      
+      <CreditConfirmDialog
+        open={showCreditConfirm}
+        onOpenChange={setShowCreditConfirm}
+        credits={2}
+        action="upscale"
+        onConfirm={handleConfirmUpscale}
+      />
     </Dialog>
   );
 };

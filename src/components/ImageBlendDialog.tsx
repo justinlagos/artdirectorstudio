@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Download, Blend, X, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
+import { handleBlend } from "@/lib/tools/blendHandler";
+import { CreditConfirmDialog } from "@/components/tools/CreditConfirmDialog";
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -26,6 +27,8 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
   const [isBlending, setIsBlending] = useState(false);
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [showCreditConfirm, setShowCreditConfirm] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) captureOrigin();
@@ -59,7 +62,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     });
   };
 
-  const handleBlend = async () => {
+  const executeBlend = useCallback(async () => {
     if (images.length < 2) {
       toast.error("Please upload at least 2 images to blend");
       return;
@@ -69,14 +72,16 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     setProgress(0);
     setBlendedImage(null);
 
+    const reqId = crypto.randomUUID();
+    setRequestId(reqId);
+
     try {
-      const { blendImages } = await import("@/lib/services/toolsService");
-      
-      const result = await blendImages(
-        images.map(img => img.file),
+      const result = await handleBlend({
+        images: images.map(img => img.file),
         instruction,
-        (progress) => setProgress(progress)
-      );
+        onProgress: setProgress,
+        requestId: reqId,
+      });
 
       if (!result.success) {
         toast.error(result.error || "Failed to blend images");
@@ -85,15 +90,24 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
       if (result.imageUrl) {
         setBlendedImage(result.imageUrl);
-        toast.success("Images blended successfully!");
+        toast.success("All done. Your result is ready.");
       }
     } catch (error) {
       console.error("Blend error:", error);
-      toast.error("Failed to blend images. Please try again.");
+      toast.error("This didn't complete. Try again or adjust inputs.");
     } finally {
       setIsBlending(false);
       setTimeout(() => setProgress(0), 1000);
     }
+  }, [images, instruction]);
+
+  const handleBlendClick = () => {
+    setShowCreditConfirm(true);
+  };
+
+  const handleConfirmBlend = () => {
+    setShowCreditConfirm(false);
+    executeBlend();
   };
 
   const handleDownload = () => {
@@ -202,7 +216,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
             <div className="space-y-2">
               <Progress value={progress} className="w-full" />
               <p className="text-sm text-muted-foreground text-center">
-                Blending images... (~20-40 seconds)
+                {progress < 30 ? "Preparing assets…" : progress < 80 ? "Generating…" : "Finishing up…"}
               </p>
             </div>
           )}
@@ -245,7 +259,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           {/* Blend Button */}
           {images.length >= 2 && !blendedImage && (
             <Button
-              onClick={handleBlend}
+              onClick={handleBlendClick}
               disabled={isBlending}
               className="w-full"
               size="lg"
@@ -256,6 +270,14 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           )}
         </div>
       </DialogContent>
+      
+      <CreditConfirmDialog
+        open={showCreditConfirm}
+        onOpenChange={setShowCreditConfirm}
+        credits={2}
+        action="blend"
+        onConfirm={handleConfirmBlend}
+      />
     </Dialog>
   );
 };

@@ -25,9 +25,10 @@ serve(async (req) => {
     // Validate required environment variables
     validateEnvVars(['LOVABLE_API_KEY'], correlationId);
 
-    const { image, targetSize } = await req.json();
+    const { image, targetSize, request_id } = await req.json();
+    const requestId = request_id || correlationId;
     
-    console.log(`[${correlationId}] Upscaling image to size:`, targetSize);
+    console.log(`[${correlationId}] [RequestID:${requestId}] Upscaling image to size:`, targetSize);
 
     // Validate input
     if (!image) {
@@ -56,6 +57,7 @@ serve(async (req) => {
             Authorization: `Bearer ${LOVABLE_API_KEY}`,
             "Content-Type": "application/json",
             "X-Correlation-ID": correlationId,
+            "X-Request-ID": requestId,
           },
           body: JSON.stringify({
             model: "google/gemini-2.5-flash-image-preview",

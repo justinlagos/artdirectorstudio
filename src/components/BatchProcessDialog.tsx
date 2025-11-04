@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Download, Layers, Upload, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { handleBatch } from "@/lib/tools/batchHandler";
+import { CreditConfirmDialog } from "@/components/tools/CreditConfirmDialog";
 
 interface BatchProcessDialogProps {
   open: boolean;
@@ -32,6 +33,8 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
   }, [open, captureOrigin]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(0);
+  const [showCreditConfirm, setShowCreditConfirm] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -66,7 +69,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     });
   };
 
-  const handleBatchProcess = async () => {
+  const executeBatchProcess = useCallback(async () => {
     if (images.length === 0) {
       toast.error("Please upload at least one image");
       return;
@@ -75,12 +78,13 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     setIsProcessing(true);
     setCurrentProgress(0);
 
+    const reqId = crypto.randomUUID();
+    setRequestId(reqId);
+
     try {
-      const { batchAnalyzeImages } = await import("@/lib/services/toolsService");
-      
-      const result = await batchAnalyzeImages(
-        images.map(img => img.file),
-        (current, total) => {
+      const result = await handleBatch({
+        images: images.map(img => img.file),
+        onProgress: (current, total) => {
           setCurrentProgress((current / total) * 100);
           
           // Update individual image status
@@ -94,8 +98,9 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
               return img;
             })
           );
-        }
-      );
+        },
+        requestId: reqId,
+      });
 
       // Update final results
       result.results.forEach((res, idx) => {
@@ -114,15 +119,22 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
       });
 
       const successCount = result.results.filter(r => r.success).length;
-      toast.success(`Batch processing complete! ${successCount}/${result.results.length} images analyzed`);
+      toast.success(`All done. ${successCount}/${result.results.length} images analyzed.`);
     } catch (error) {
       console.error("Batch process error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error("Full error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-      toast.error(`Batch processing failed: ${errorMessage}`);
+      toast.error("This didn't complete. Try again or adjust inputs.");
     } finally {
       setIsProcessing(false);
     }
+  }, [images]);
+
+  const handleBatchProcess = () => {
+    setShowCreditConfirm(true);
+  };
+
+  const handleConfirmBatch = () => {
+    setShowCreditConfirm(false);
+    executeBatchProcess();
   };
 
   const handleDownloadAll = () => {
@@ -215,7 +227,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
             <div className="space-y-2">
               <Progress value={currentProgress} className="w-full" />
               <p className="text-sm text-muted-foreground text-center">
-                Processing images... {Math.round(currentProgress)}%
+                {currentProgress < 30 ? "Preparing assets…" : currentProgress < 80 ? "Processing…" : "Finishing up…"}
               </p>
             </div>
           )}
@@ -284,6 +296,14 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
           </div>
         </div>
       </DialogContent>
+      
+      <CreditConfirmDialog
+        open={showCreditConfirm}
+        onOpenChange={setShowCreditConfirm}
+        credits={images.length}
+        action="batch process"
+        onConfirm={handleConfirmBatch}
+      />
     </Dialog>
   );
 };

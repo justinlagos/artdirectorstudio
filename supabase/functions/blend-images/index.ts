@@ -26,9 +26,10 @@ serve(async (req) => {
     // Validate required environment variables
     validateEnvVars(['LOVABLE_API_KEY'], correlationId);
 
-    const { images, instruction } = await req.json();
+    const { images, instruction, request_id } = await req.json();
+    const requestId = request_id || correlationId;
     
-    console.log(`[${correlationId}] Blending ${images?.length} images with instruction:`, instruction);
+    console.log(`[${correlationId}] [RequestID:${requestId}] Blending ${images?.length} images with instruction:`, instruction);
 
     // Validate input
     if (!images || !Array.isArray(images) || images.length < 2) {
@@ -75,6 +76,7 @@ serve(async (req) => {
             Authorization: `Bearer ${LOVABLE_API_KEY}`,
             "Content-Type": "application/json",
             "X-Correlation-ID": correlationId,
+            "X-Request-ID": requestId,
           },
           body: JSON.stringify({
             model: "google/gemini-2.5-flash-image-preview",
