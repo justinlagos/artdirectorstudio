@@ -164,6 +164,18 @@ export interface UserEdits {
   art_style?: string;
   background_type?: string;
   intended_platform?: string;
+  // New fields for enhanced UX
+  subject_description?: string;
+  design_style?: string;
+  color_palette?: string;
+  camera_composition?: string;
+  artistic_medium?: string;
+  art_direction_influence?: string;
+  texture_material?: string;
+  mood_emotion?: string;
+  background_environment?: string;
+  image_overview?: string;
+  intended_use?: string;
 }
 
 export interface GeneratedImage {
