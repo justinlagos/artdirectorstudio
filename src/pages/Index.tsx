@@ -11,7 +11,7 @@ import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { GenerationOptions } from "@/components/ImageGenerationDialog";
+import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
 
 export interface Analysis {
   image_overview: string;
@@ -60,6 +60,22 @@ const Index = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+  const [remixedPrompt, setRemixedPrompt] = useState<string | null>(null);
+  const [showRemixDialog, setShowRemixDialog] = useState(false);
+
+  // Check for remixed prompt from Inspire on mount
+  useEffect(() => {
+    const remixPrompt = sessionStorage.getItem("remix_prompt");
+    if (remixPrompt) {
+      setRemixedPrompt(remixPrompt);
+      setShowRemixDialog(true);
+      sessionStorage.removeItem("remix_prompt");
+      // Show a toast to let user know the prompt is loaded
+      toast.success("Prompt loaded from Inspire! Ready to create.", {
+        duration: 4000,
+      });
+    }
+  }, []);
 
   // Landing page is now public - no redirect needed
 
@@ -392,6 +408,16 @@ const Index = () => {
               onGenerateImage={handleGenerateImage}
               generatedImages={generatedImages}
               onDeleteImage={handleDeleteImage}
+            />
+          )}
+          
+          {/* Remix Dialog - Opens directly from Inspire */}
+          {showRemixDialog && remixedPrompt && (
+            <ImageGenerationDialog
+              open={showRemixDialog}
+              onOpenChange={setShowRemixDialog}
+              initialPrompt={remixedPrompt}
+              onGenerate={handleGenerateImage}
             />
           )}
 

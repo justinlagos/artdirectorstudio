@@ -14,6 +14,64 @@ export type Database = {
   }
   public: {
     Tables: {
+      asset_bookmarks: {
+        Row: {
+          created_at: string | null
+          id: string
+          shared_asset_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          shared_asset_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          shared_asset_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_bookmarks_shared_asset_id_fkey"
+            columns: ["shared_asset_id"]
+            isOneToOne: false
+            referencedRelation: "shared_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_likes: {
+        Row: {
+          created_at: string | null
+          id: string
+          shared_asset_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          shared_asset_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          shared_asset_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_likes_shared_asset_id_fkey"
+            columns: ["shared_asset_id"]
+            isOneToOne: false
+            referencedRelation: "shared_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_transactions: {
         Row: {
           action: Database["public"]["Enums"]["credit_action"]
@@ -152,30 +210,42 @@ export type Database = {
       shared_assets: {
         Row: {
           asset_id: string
+          bookmark_count: number | null
           created_at: string
+          featured: boolean | null
           id: string
           is_public: boolean
+          like_count: number | null
           share_token: string
+          tags: Json | null
           updated_at: string
           user_id: string
           view_count: number
         }
         Insert: {
           asset_id: string
+          bookmark_count?: number | null
           created_at?: string
+          featured?: boolean | null
           id?: string
           is_public?: boolean
+          like_count?: number | null
           share_token: string
+          tags?: Json | null
           updated_at?: string
           user_id: string
           view_count?: number
         }
         Update: {
           asset_id?: string
+          bookmark_count?: number | null
           created_at?: string
+          featured?: boolean | null
           id?: string
           is_public?: boolean
+          like_count?: number | null
           share_token?: string
+          tags?: Json | null
           updated_at?: string
           user_id?: string
           view_count?: number
@@ -196,6 +266,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_follows: {
+        Row: {
+          created_at: string | null
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          follower_id?: string
+          following_id?: string
+          id?: string
+        }
+        Relationships: []
       }
       user_preferences: {
         Row: {
@@ -253,6 +344,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      adjust_user_credits: {
+        Args: { amount: number; target_user_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

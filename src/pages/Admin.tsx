@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { PricingManagement } from "@/components/admin/PricingManagement";
+import { AdminUserManagement } from "@/components/admin/AdminUserManagement";
+import { SystemHealth } from "@/components/admin/SystemHealth";
 import { Shield } from "lucide-react";
 
 const Admin = () => {
@@ -49,13 +51,23 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList>
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="pricing">Pricing Management</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="health">System Health</TabsTrigger>
+            <TabsTrigger value="pricing">Pricing</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="analytics">
+          <TabsContent value="analytics" className="space-y-6">
             <AdminAnalytics />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <AdminUserManagement />
+          </TabsContent>
+
+          <TabsContent value="health">
+            <SystemHealth />
           </TabsContent>
 
           <TabsContent value="pricing">
