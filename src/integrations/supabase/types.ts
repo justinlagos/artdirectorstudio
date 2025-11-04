@@ -161,6 +161,7 @@ export type Database = {
           id: string
           notes: string | null
           provider: Database["public"]["Enums"]["credit_provider"]
+          request_id: string | null
           timestamp: string
           user_id: string
         }
@@ -172,6 +173,7 @@ export type Database = {
           id?: string
           notes?: string | null
           provider: Database["public"]["Enums"]["credit_provider"]
+          request_id?: string | null
           timestamp?: string
           user_id: string
         }
@@ -183,6 +185,7 @@ export type Database = {
           id?: string
           notes?: string | null
           provider?: Database["public"]["Enums"]["credit_provider"]
+          request_id?: string | null
           timestamp?: string
           user_id?: string
         }
@@ -293,6 +296,51 @@ export type Database = {
           status?: string
           subscribed_at?: string
           unsubscribed_at?: string | null
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount_cents: number
+          completed_at: string | null
+          created_at: string
+          credits_purchased: number
+          currency: string | null
+          id: string
+          metadata: Json | null
+          package_name: string | null
+          status: string
+          stripe_event_id: string | null
+          stripe_payment_intent: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          completed_at?: string | null
+          created_at?: string
+          credits_purchased: number
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          package_name?: string | null
+          status?: string
+          stripe_event_id?: string | null
+          stripe_payment_intent?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number
+          completed_at?: string | null
+          created_at?: string
+          credits_purchased?: number
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          package_name?: string | null
+          status?: string
+          stripe_event_id?: string | null
+          stripe_payment_intent?: string | null
+          user_id?: string
         }
         Relationships: []
       }
