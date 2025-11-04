@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, Maximize2, Upload } from "lucide-react";
-import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { handleUpscale } from "@/lib/tools/upscaleHandler";
 import { CreditConfirmDialog } from "@/components/tools/CreditConfirmDialog";
+import { showErrorToast, showSuccessToast, showRequestToast } from "@/lib/utils/toastManager";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -39,7 +39,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
+      showErrorToast("upscale-file-type", "Please upload an image file");
       return;
     }
 
@@ -51,7 +51,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
   const executeUpscale = useCallback(async () => {
     if (!sourceImage) {
-      toast.error("Please upload an image first");
+      showErrorToast("upscale-no-image", "Please upload an image first");
       return;
     }
 
@@ -71,17 +71,28 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       });
 
       if (!result.success) {
-        toast.error(result.error || "Failed to upscale image");
+        showRequestToast(reqId, {
+          variant: "destructive",
+          title: "Error",
+          description: result.error || "Failed to upscale image",
+        });
         return;
       }
 
       if (result.imageUrl) {
         setUpscaledImage(result.imageUrl);
-        toast.success("All done. Your result is ready.");
+        showRequestToast(reqId, {
+          title: "Success",
+          description: "All done. Your result is ready.",
+        });
       }
     } catch (error) {
       console.error("Upscale error:", error);
-      toast.error("This didn't complete. Try again or adjust inputs.");
+      showRequestToast(reqId, {
+        variant: "destructive",
+        title: "Error",
+        description: "This didn't complete. Try again or adjust inputs.",
+      });
     } finally {
       setIsUpscaling(false);
       setTimeout(() => setProgress(0), 1000);
@@ -107,7 +118,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     link.click();
     document.body.removeChild(link);
     
-    toast.success("Image downloaded!");
+    showSuccessToast("image-download", "Image downloaded!");
   };
 
   const handleClose = () => {

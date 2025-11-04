@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Download, Blend, X, Upload } from "lucide-react";
-import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { handleBlend } from "@/lib/tools/blendHandler";
 import { CreditConfirmDialog } from "@/components/tools/CreditConfirmDialog";
+import { showErrorToast, showSuccessToast, showRequestToast } from "@/lib/utils/toastManager";
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -38,13 +38,13 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     const files = Array.from(e.target.files || []);
     
     if (images.length + files.length > 4) {
-      toast.error("Maximum 4 images allowed");
+      showErrorToast("blend-max-images", "Maximum 4 images allowed");
       return;
     }
 
     files.forEach(file => {
       if (!file.type.startsWith("image/")) {
-        toast.error("Please upload image files only");
+        showErrorToast("blend-file-type", "Please upload image files only");
         return;
       }
 
@@ -64,7 +64,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
   const executeBlend = useCallback(async () => {
     if (images.length < 2) {
-      toast.error("Please upload at least 2 images to blend");
+      showErrorToast("blend-min-images", "Please upload at least 2 images to blend");
       return;
     }
 
@@ -84,17 +84,28 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       });
 
       if (!result.success) {
-        toast.error(result.error || "Failed to blend images");
+        showRequestToast(reqId, {
+          variant: "destructive",
+          title: "Error",
+          description: result.error || "Failed to blend images",
+        });
         return;
       }
 
       if (result.imageUrl) {
         setBlendedImage(result.imageUrl);
-        toast.success("All done. Your result is ready.");
+        showRequestToast(reqId, {
+          title: "Success",
+          description: "All done. Your result is ready.",
+        });
       }
     } catch (error) {
       console.error("Blend error:", error);
-      toast.error("This didn't complete. Try again or adjust inputs.");
+      showRequestToast(reqId, {
+        variant: "destructive",
+        title: "Error",
+        description: "This didn't complete. Try again or adjust inputs.",
+      });
     } finally {
       setIsBlending(false);
       setTimeout(() => setProgress(0), 1000);
@@ -120,7 +131,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     link.click();
     document.body.removeChild(link);
     
-    toast.success("Image downloaded!");
+    showSuccessToast("image-download", "Image downloaded!");
   };
 
   const handleClose = () => {

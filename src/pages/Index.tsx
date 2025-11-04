@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
 import { LAYOUT, PADDING } from "@/lib/utils/layoutConstants";
+import { showErrorToast, showSuccessToast } from "@/lib/utils/toastManager";
 
 // Testimonials component
 const TestimonialsSection = () => {
@@ -227,7 +228,7 @@ const Index = () => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k' && result) {
         e.preventDefault();
         navigator.clipboard.writeText(result.full_regeneration_prompt);
-        toast.success("Prompt copied!");
+        showSuccessToast("prompt-copy", "Prompt copied!");
       }
     };
 
@@ -260,7 +261,7 @@ const Index = () => {
     // Preflight credit check
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      toast.error("Please sign in to analyze images");
+      showErrorToast("analyze-auth", "Please sign in to analyze images");
       return;
     }
 
@@ -272,22 +273,13 @@ const Index = () => {
       .single();
 
     if (creditError || !creditData) {
-      toast.error("Unable to check credit balance. Please try again.");
+      showErrorToast("analyze-credit-check", "Unable to check credit balance. Please try again.");
       return;
     }
 
     const ANALYSIS_COST = 1;
     if (creditData.balance < ANALYSIS_COST) {
-      toast.error(
-        "Insufficient credits",
-        {
-          description: "You need at least 1 credit to analyze images",
-          action: {
-            label: "Buy Credits",
-            onClick: () => navigate("/")
-          }
-        }
-      );
+      showErrorToast("analyze-insufficient", "Insufficient credits. You need at least 1 credit to analyze images.");
       return;
     }
 
@@ -304,9 +296,9 @@ const Index = () => {
 
       if (deductError || !deductData?.success) {
         if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. Please purchase more credits.");
+          showErrorToast("analyze-deduct", "Insufficient credits. Please purchase more credits.");
         } else {
-          toast.error("Failed to process payment. Please try again.");
+          showErrorToast("analyze-payment", "Failed to process payment. Please try again.");
         }
         setIsAnalyzing(false);
         return;
@@ -325,13 +317,13 @@ const Index = () => {
             const result = await analyzeImage(base64Image);
 
             if (!result.success) {
-              toast.error(result.error || "Failed to analyze image");
+              showErrorToast("analyze-result", result.error || "Failed to analyze image");
               setIsAnalyzing(false);
               return;
             }
 
             setResult(result.data);
-            toast.success("Image analyzed successfully!");
+            showSuccessToast("analyze-success", "Image analyzed successfully!");
             resolve();
           } catch (error) {
             reject(error);
@@ -346,7 +338,7 @@ const Index = () => {
       });
     } catch (error) {
       console.error("Error during analysis:", error);
-      toast.error("An error occurred during analysis.");
+      showErrorToast("analyze-error", "An error occurred during analysis.");
       setIsAnalyzing(false);
     }
   };
