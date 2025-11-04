@@ -300,7 +300,7 @@ const Index = () => {
     try {
       // Deduct credits first
       const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "analysis", provider: "lovable" },
+        body: { action: "analyze", provider: "lovable" },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -483,7 +483,7 @@ const Index = () => {
           
           {selectedFile && !isAnalyzing && !result && (
             <div className="flex justify-center">
-              <CreditCostIndicator cost={1} action="analysis" />
+              <CreditCostIndicator cost={1} action="analyze" />
             </div>
           )}
           
