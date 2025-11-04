@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { reserveCredits, commitCredits, refundCredits } from "@/lib/credits";
 
 export interface UpscaleHandlerParams {
   image: File;
@@ -38,6 +39,10 @@ export async function handleUpscale({
     if (!image) {
       throw new Error("Image is required for upscaling");
     }
+
+    // Reserve credits before operation
+    console.log(`[Upscale:${requestId}] Reserving ${CREDIT_COST} credits`);
+    await reserveCredits(CREDIT_COST, "upscale", "lovable", requestId);
 
     onProgress?.(10);
 
@@ -91,6 +96,10 @@ export async function handleUpscale({
 
       onProgress?.(100);
 
+      // Commit credits after successful operation
+      console.log(`[Upscale:${requestId}] Committing credits`);
+      await commitCredits(requestId);
+
       const duration = Date.now() - startTime;
       console.log(`[Upscale:${requestId}] Success in ${duration}ms`);
 
@@ -115,6 +124,16 @@ export async function handleUpscale({
       error: errorMessage,
       timestamp: new Date().toISOString(),
     });
+
+    // Refund credits if operation failed
+    if (!errorMessage.includes("Insufficient credits")) {
+      console.log(`[Upscale:${requestId}] Refunding credits due to failure`);
+      try {
+        await refundCredits(requestId, `Upscale operation failed: ${errorMessage}`);
+      } catch (refundError) {
+        console.error(`[Upscale:${requestId}] Failed to refund credits:`, refundError);
+      }
+    }
 
     return {
       success: false,

@@ -157,11 +157,13 @@ export type Database = {
           action: Database["public"]["Enums"]["credit_action"]
           amount: number
           asset_id: string | null
+          completed_at: string | null
           description: string | null
           id: string
           notes: string | null
           provider: Database["public"]["Enums"]["credit_provider"]
           request_id: string | null
+          status: string | null
           timestamp: string
           user_id: string
         }
@@ -169,11 +171,13 @@ export type Database = {
           action: Database["public"]["Enums"]["credit_action"]
           amount: number
           asset_id?: string | null
+          completed_at?: string | null
           description?: string | null
           id?: string
           notes?: string | null
           provider: Database["public"]["Enums"]["credit_provider"]
           request_id?: string | null
+          status?: string | null
           timestamp?: string
           user_id: string
         }
@@ -181,11 +185,13 @@ export type Database = {
           action?: Database["public"]["Enums"]["credit_action"]
           amount?: number
           asset_id?: string | null
+          completed_at?: string | null
           description?: string | null
           id?: string
           notes?: string | null
           provider?: Database["public"]["Enums"]["credit_provider"]
           request_id?: string | null
+          status?: string | null
           timestamp?: string
           user_id?: string
         }

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { reserveCredits, commitCredits, refundCredits } from "@/lib/credits";
 
 export interface BatchHandlerParams {
   images: File[];
@@ -47,6 +48,11 @@ export async function handleBatch({
     if (images.length > 10) {
       throw new Error("Maximum 10 images allowed for batch processing");
     }
+
+    // Reserve credits for all images upfront
+    const totalCredits = images.length * CREDIT_COST_PER_IMAGE;
+    console.log(`[Batch:${requestId}] Reserving ${totalCredits} credits for ${images.length} images`);
+    await reserveCredits(totalCredits, "batch_analyze", "lovable", requestId);
 
     const results: BatchImageResult[] = [];
 
@@ -123,11 +129,30 @@ export async function handleBatch({
 
     const duration = Date.now() - startTime;
     const successCount = results.filter((r) => r.success).length;
+    const failedCount = images.length - successCount;
+    
     console.log(`[Batch:${requestId}] Completed in ${duration}ms`, {
       total: images.length,
       successful: successCount,
-      failed: images.length - successCount,
+      failed: failedCount,
     });
+
+    // Commit credits for successful images, refund failed ones
+    if (failedCount > 0) {
+      const refundAmount = failedCount * CREDIT_COST_PER_IMAGE;
+      console.log(`[Batch:${requestId}] Refunding ${refundAmount} credits for ${failedCount} failed images`);
+      try {
+        await refundCredits(requestId, `${failedCount} of ${images.length} images failed to process`);
+        // Re-reserve only successful images
+        await reserveCredits(successCount * CREDIT_COST_PER_IMAGE, "batch_analyze", "lovable", `${requestId}-partial`);
+        await commitCredits(`${requestId}-partial`);
+      } catch (error) {
+        console.error(`[Batch:${requestId}] Failed to handle partial refund:`, error);
+      }
+    } else {
+      // All successful, commit full amount
+      await commitCredits(requestId);
+    }
 
     return {
       success: true,
@@ -142,6 +167,16 @@ export async function handleBatch({
       error: errorMessage,
       timestamp: new Date().toISOString(),
     });
+
+    // Refund all credits if batch failed completely
+    if (!errorMessage.includes("Insufficient credits")) {
+      console.log(`[Batch:${requestId}] Refunding all credits due to batch failure`);
+      try {
+        await refundCredits(requestId, `Batch operation failed: ${errorMessage}`);
+      } catch (refundError) {
+        console.error(`[Batch:${requestId}] Failed to refund credits:`, refundError);
+      }
+    }
 
     return {
       success: false,

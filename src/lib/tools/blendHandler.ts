@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { reserveCredits, commitCredits, refundCredits } from "@/lib/credits";
 
 export interface BlendHandlerParams {
   images: File[];
@@ -38,6 +39,10 @@ export async function handleBlend({
     if (!images || images.length < 2 || images.length > 4) {
       throw new Error("Blend requires 2-4 images");
     }
+
+    // Reserve credits before operation
+    console.log(`[Blend:${requestId}] Reserving ${CREDIT_COST} credits`);
+    await reserveCredits(CREDIT_COST, "blend", "lovable", requestId);
 
     onProgress?.(10);
 
@@ -84,6 +89,10 @@ export async function handleBlend({
 
       onProgress?.(100);
 
+      // Commit credits after successful operation
+      console.log(`[Blend:${requestId}] Committing credits`);
+      await commitCredits(requestId);
+
       const duration = Date.now() - startTime;
       console.log(`[Blend:${requestId}] Success in ${duration}ms`);
 
@@ -108,6 +117,16 @@ export async function handleBlend({
       error: errorMessage,
       timestamp: new Date().toISOString(),
     });
+
+    // Refund credits if operation failed
+    if (!errorMessage.includes("Insufficient credits")) {
+      console.log(`[Blend:${requestId}] Refunding credits due to failure`);
+      try {
+        await refundCredits(requestId, `Blend operation failed: ${errorMessage}`);
+      } catch (refundError) {
+        console.error(`[Blend:${requestId}] Failed to refund credits:`, refundError);
+      }
+    }
 
     return {
       success: false,
