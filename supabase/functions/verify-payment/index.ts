@@ -55,7 +55,7 @@ serve(async (req) => {
     console.log(`[${correlationId}] Verifying payment:`, { userId, session_id });
 
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
-      apiVersion: '2024-11-20.acacia',
+      apiVersion: '2025-08-27.basil',
     });
 
     // Retrieve the checkout session with line items (idempotent operation)

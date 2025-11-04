@@ -38,9 +38,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { action, provider } = await req.json();
+    const { action, provider, request_id } = await req.json();
 
-    console.log(`[${correlationId}] Deducting credits for:`, { userId, action, provider });
+    console.log(`[${correlationId}] Deducting credits for:`, { userId, action, provider, request_id });
 
     // Validate input
     if (!action || !provider) {
@@ -71,6 +71,41 @@ serve(async (req) => {
     }
 
     const creditsRequired = pricingData.credits;
+
+    // IDEMPOTENCY CHECK: If request_id provided, check if already processed
+    if (request_id) {
+      const { data: existingTransaction, error: txCheckError } = await supabaseAdmin
+        .from('credit_transactions')
+        .select('id, amount')
+        .eq('user_id', userId)
+        .contains('description', request_id)
+        .maybeSingle();
+
+      if (txCheckError) {
+        console.warn(`[${correlationId}] Error checking existing transaction:`, txCheckError);
+      }
+
+      if (existingTransaction) {
+        console.log(`[${correlationId}] Request ${request_id} already processed. Returning cached result.`);
+        
+        // Get current balance
+        const { data: currentBalance } = await supabaseClient
+          .from('credits')
+          .select('balance')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        return createSuccessResponse(
+          {
+            success: true,
+            credits_deducted: Math.abs(existingTransaction.amount),
+            remaining_balance: currentBalance?.balance || 0,
+            already_processed: true,
+          },
+          correlationId
+        );
+      }
+    }
 
     // Check current balance
     let { data: currentBalance, error: balanceError } = await supabaseClient
@@ -141,6 +176,10 @@ serve(async (req) => {
 
     // Log transaction (best-effort, don't fail if this errors)
     try {
+      const description = request_id 
+        ? `Deducted via ${action} (${provider}) - Request ID: ${request_id} - Correlation ID: ${correlationId}`
+        : `Deducted via ${action} (${provider}) - Correlation ID: ${correlationId}`;
+      
       await supabaseAdmin
         .from('credit_transactions')
         .insert({
@@ -148,7 +187,7 @@ serve(async (req) => {
           amount: -creditsRequired,
           action,
           provider,
-          description: `Deducted via ${action} (${provider}) - Correlation ID: ${correlationId}`,
+          description,
         });
     } catch (txError) {
       console.warn(`[${correlationId}] Transaction log warning:`, txError);
