@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LoadingState } from "@/components/LoadingState";
-import { LAYOUT, PADDING, GRID } from "@/lib/utils/layoutConstants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,7 +140,7 @@ const History = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       
-      <main className={`flex-1 container mx-auto ${PADDING.responsive} py-12 ${LAYOUT.dashboard}`}>
+      <main className="flex-1 container mx-auto px-4 py-12 max-w-6xl">
         <div className="mb-12 animate-fade-in">
           <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight mb-3">
             My Projects
@@ -232,7 +231,7 @@ const History = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className={`grid grid-cols-1 md:grid-cols-2 ${GRID.spacing}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredAssets.map((asset) => (
               <Card key={asset.id} className="glass-strong hover:shadow-strong transition-all duration-300 hover:-translate-y-1 group">
                 <CardContent className="p-6 space-y-4">
@@ -303,15 +302,7 @@ const History = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            // Store the prompt and return path in sessionStorage
-                            if (asset.prompt) {
-                              sessionStorage.setItem("remix_prompt", asset.prompt);
-                              sessionStorage.setItem("return_to_history", "true");
-                              navigate("/studio");
-                              toast.success("Prompt loaded in Studio!");
-                            }
-                          }}
+                          onClick={() => navigate("/")}
                         >
                           Use in Studio
                         </Button>

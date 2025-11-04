@@ -20,7 +20,7 @@ export default function Auth() {
 
   // Redirect if already logged in
   if (user) {
-    navigate("/studio");
+    navigate("/");
     return null;
   }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,6 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Copy, Check, Share2, Eye } from "lucide-react";
-import { useNavigationContext } from "@/hooks/useNavigationContext";
 
 interface ShareDialogProps {
   open: boolean;
@@ -17,21 +16,11 @@ interface ShareDialogProps {
 }
 
 export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDialogProps) => {
-  const { captureOrigin, returnToOrigin } = useNavigationContext();
   const [isPublic, setIsPublic] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [isSharing, setIsSharing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareData, setShareData] = useState<{ id: string; view_count: number } | null>(null);
-
-  useEffect(() => {
-    if (open) captureOrigin();
-  }, [open, captureOrigin]);
-
-  const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen) returnToOrigin();
-    onOpenChange(newOpen);
-  };
 
   const generateShareToken = () => {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -115,7 +104,7 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md p-4 sm:p-6 max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
