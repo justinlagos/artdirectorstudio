@@ -19,6 +19,8 @@ interface SharedAsset {
   bookmark_count: number;
   created_at: string;
   user_email?: string;
+  image_url?: string;
+  prompt?: string;
 }
 
 export const AdminInspireManagement = () => {
@@ -36,7 +38,8 @@ export const AdminInspireManagement = () => {
         .from('shared_assets')
         .select('*')
         .eq('is_public', true)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 
@@ -49,12 +52,26 @@ export const AdminInspireManagement = () => {
 
       const emailMap = new Map(profiles?.map(p => [p.id, p.email]));
 
-      const assetsWithEmails = sharedAssets?.map(a => ({
-        ...a,
-        user_email: emailMap.get(a.user_id)
-      })) || [];
+      // Get asset details (images and prompts)
+      const assetIds = sharedAssets?.map(a => a.asset_id) || [];
+      const { data: generatedAssets } = await supabase
+        .from('generated_assets')
+        .select('id, image_url, prompt')
+        .in('id', assetIds);
 
-      setAssets(assetsWithEmails);
+      const assetMap = new Map(generatedAssets?.map(a => [a.id, a]));
+
+      const assetsWithDetails = sharedAssets?.map(a => {
+        const assetDetails = assetMap.get(a.asset_id);
+        return {
+          ...a,
+          user_email: emailMap.get(a.user_id),
+          image_url: assetDetails?.image_url,
+          prompt: assetDetails?.prompt
+        };
+      }) || [];
+
+      setAssets(assetsWithDetails);
     } catch (error) {
       console.error("Error fetching shared assets:", error);
       toast.error("Failed to load shared assets");
@@ -130,6 +147,8 @@ export const AdminInspireManagement = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[100px]">Image</TableHead>
+                <TableHead>Prompt</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead>Featured</TableHead>
                 <TableHead>Stats</TableHead>
@@ -140,9 +159,34 @@ export const AdminInspireManagement = () => {
             <TableBody>
               {filteredAssets.map((asset) => (
                 <TableRow key={asset.id}>
-                  <TableCell className="font-medium">{asset.user_email || "Unknown"}</TableCell>
                   <TableCell>
-                    {asset.featured && <Badge variant="default">Featured</Badge>}
+                    {asset.image_url ? (
+                      <img 
+                        src={asset.image_url} 
+                        alt="Asset thumbnail"
+                        className="w-20 h-20 object-cover rounded border"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 bg-muted rounded border flex items-center justify-center text-xs text-muted-foreground">
+                        No image
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="max-w-xs">
+                    <p className="text-sm line-clamp-2">
+                      {asset.prompt || "No prompt available"}
+                    </p>
+                  </TableCell>
+                  <TableCell className="font-medium text-sm">{asset.user_email || "Unknown"}</TableCell>
+                  <TableCell>
+                    {asset.featured ? (
+                      <Badge variant="default" className="gap-1">
+                        <Star className="w-3 h-3 fill-current" />
+                        Featured
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">Not Featured</Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-3 text-sm text-muted-foreground">
@@ -166,8 +210,10 @@ export const AdminInspireManagement = () => {
                         size="sm"
                         variant={asset.featured ? "default" : "outline"}
                         onClick={() => toggleFeatured(asset.id, asset.featured)}
+                        className="gap-1"
                       >
-                        <Star className="w-4 h-4" />
+                        <Star className={`w-4 h-4 ${asset.featured ? 'fill-current' : ''}`} />
+                        {asset.featured ? 'Unfeature' : 'Feature'}
                       </Button>
                       <Button
                         size="sm"

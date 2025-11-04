@@ -26,34 +26,58 @@ export const AdminUserManagement = () => {
   const [creditAmount, setCreditAmount] = useState(0);
   const [creditDescription, setCreditDescription] = useState("");
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const USERS_PER_PAGE = 20;
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [currentPage]);
 
   const fetchUsers = async () => {
     try {
-      // Fetch all authenticated users from profiles
+      setLoading(true);
+      
+      // Get total count first
+      const { count } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      
+      setTotalUsers(count || 0);
+
+      // Fetch paginated profiles
+      const from = (currentPage - 1) * USERS_PER_PAGE;
+      const to = from + USERS_PER_PAGE - 1;
+      
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, email, username, created_at')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (profilesError) throw profilesError;
 
-      // Fetch credit balances for each user
+      if (!profiles || profiles.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      // Fetch credit balances for visible users only
       const { data: credits, error: creditsError } = await supabase
         .from('credits')
-        .select('user_id, balance');
+        .select('user_id, balance')
+        .in('user_id', profiles.map(p => p.id));
 
-      if (creditsError) throw creditsError;
+      if (creditsError) {
+        console.error("Error fetching credits:", creditsError);
+      }
 
-      const creditsMap = new Map(credits?.map(c => [c.user_id, c.balance]));
+      const creditsMap = new Map(credits?.map(c => [c.user_id, c.balance]) || []);
       
-      const usersWithCredits = profiles?.map(p => ({
+      const usersWithCredits = profiles.map(p => ({
         ...p,
-        balance: creditsMap.get(p.id) || 0
-      })) || [];
+        balance: creditsMap.get(p.id) ?? 0
+      }));
 
       setUsers(usersWithCredits);
     } catch (error) {
@@ -89,10 +113,25 @@ export const AdminUserManagement = () => {
       }
 
       toast.success(`Successfully ${creditAmount > 0 ? 'added' : 'deducted'} ${Math.abs(creditAmount)} credits for ${selectedUser.email}`);
+      
+      // Re-fetch user data to get updated balance
+      const { data: updatedCredits } = await supabase
+        .from('credits')
+        .select('balance')
+        .eq('user_id', selectedUser.id)
+        .single();
+      
+      if (updatedCredits) {
+        setUsers(prev => prev.map(u => 
+          u.id === selectedUser.id 
+            ? { ...u, balance: updatedCredits.balance }
+            : u
+        ));
+      }
+      
       setAdjustDialogOpen(false);
       setCreditAmount(0);
       setCreditDescription("");
-      fetchUsers();
     } catch (error: any) {
       console.error("Failed to adjust credits:", error);
       toast.error(`Failed to adjust credits: ${error.message || 'Unknown error'}`);
@@ -112,10 +151,14 @@ export const AdminUserManagement = () => {
     }
   };
 
-  const filteredUsers = users.filter(user => 
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.username?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = searchQuery 
+    ? users.filter(user => 
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.username?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : users;
+
+  const totalPages = Math.ceil(totalUsers / USERS_PER_PAGE);
 
   if (loading) {
     return <div>Loading users...</div>;
@@ -127,18 +170,41 @@ export const AdminUserManagement = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             User Management
-            <Badge variant="secondary">{users.length} total users</Badge>
+            <Badge variant="secondary">{totalUsers} total users</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Search className="w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by email or username..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-            />
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-1">
+              <Search className="w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by email or username..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1 || loading}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || loading}
+              >
+                Next
+              </Button>
+            </div>
           </div>
 
           <div className="rounded-md border">
