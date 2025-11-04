@@ -42,7 +42,7 @@ export const PricingTable = () => {
   const { session } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
 
-  const handlePurchase = async (packageName: string, credits: number) => {
+  const handlePurchase = async (packageName: string) => {
     if (!session) {
       toast.error("Please sign in to purchase credits");
       return;
@@ -54,7 +54,6 @@ export const PricingTable = () => {
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
           packageName,
-          credits,
         },
       });
 
@@ -106,7 +105,7 @@ export const PricingTable = () => {
             <Button 
               className="w-full" 
               variant={pkg.popular ? "default" : "outline"}
-              onClick={() => handlePurchase(pkg.name, pkg.credits)}
+              onClick={() => handlePurchase(pkg.name)}
               disabled={loading === pkg.name}
             >
               {loading === pkg.name ? (

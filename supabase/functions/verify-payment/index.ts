@@ -11,6 +11,14 @@ import {
   logRequest,
 } from "../_shared/edgeFunctionUtils.ts";
 
+// Server-side price ID to credits mapping (single source of truth)
+const PLAN_CREDITS: Record<string, number> = {
+  'price_1SOzqZBOqYfTntNBPPmRVqCB': 10,   // Starter - $5
+  'price_1SOzr0BOqYfTntNBih2xnB1Y': 50,   // Pro - $20
+  'price_1SOzrGBOqYfTntNBCF49yTpu': 100,  // Business - $35
+  'price_1SOzrUBOqYfTntNBAfYNELS7': 500,  // Enterprise - $150
+};
+
 serve(async (req) => {
   const correlationId = generateCorrelationId();
   
@@ -50,8 +58,10 @@ serve(async (req) => {
       apiVersion: '2024-11-20.acacia',
     });
 
-    // Retrieve the checkout session (idempotent operation)
-    const session = await stripe.checkout.sessions.retrieve(session_id);
+    // Retrieve the checkout session with line items (idempotent operation)
+    const session = await stripe.checkout.sessions.retrieve(session_id, {
+      expand: ['line_items'],
+    });
 
     if (session.payment_status !== 'paid') {
       return createErrorResponse(
@@ -63,8 +73,22 @@ serve(async (req) => {
     }
 
     const sessionUserId = session.metadata?.user_id;
-    const credits = parseInt(session.metadata?.credits || '0');
     const packageName = session.metadata?.package_name;
+    
+    // Get price_id from line items to determine credits (server-side mapping)
+    const priceId = session.line_items?.data[0]?.price?.id;
+    if (!priceId || !PLAN_CREDITS[priceId]) {
+      console.error(`[${correlationId}] Invalid or unmapped price ID:`, priceId);
+      return createErrorResponse(
+        new Error('Invalid pricing configuration'),
+        correlationId,
+        400,
+        'INVALID_PRICE_ID'
+      );
+    }
+    
+    const credits = PLAN_CREDITS[priceId];
+    console.log(`[${correlationId}] Price ID ${priceId} mapped to ${credits} credits`);
 
     // Security: verify session belongs to requesting user
     if (sessionUserId !== userId) {
@@ -86,11 +110,49 @@ serve(async (req) => {
       );
     }
 
-    // Use service role to update credits (idempotent)
+    // Use service role to update credits
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // IDEMPOTENCY CHECK: Verify this session hasn't been processed already
+    const { data: existingTransaction, error: txCheckError } = await supabaseAdmin
+      .from('credit_transactions')
+      .select('id, amount')
+      .eq('user_id', userId)
+      .contains('description', session_id)
+      .maybeSingle();
+
+    if (txCheckError) {
+      console.error(`[${correlationId}] Error checking existing transaction:`, txCheckError);
+    }
+
+    if (existingTransaction) {
+      console.log(`[${correlationId}] Session ${session_id} already processed. Returning cached result.`);
+      
+      // Get current balance
+      const { data: currentCredits, error: fetchError } = await supabaseAdmin
+        .from('credits')
+        .select('balance')
+        .eq('user_id', userId)
+        .single();
+
+      if (fetchError) {
+        console.error(`[${correlationId}] Error fetching credits:`, fetchError);
+      }
+
+      return createSuccessResponse(
+        {
+          success: true,
+          credits_added: existingTransaction.amount,
+          new_balance: currentCredits?.balance || 0,
+          package_name: packageName,
+          already_processed: true,
+        },
+        correlationId
+      );
+    }
 
     // Get current balance
     const { data: currentCredits, error: fetchError } = await supabaseAdmin
@@ -137,23 +199,25 @@ serve(async (req) => {
       );
     }
 
-    // Log transaction (idempotent check via notes containing session_id)
-    try {
-      const { error: transactionError } = await supabaseAdmin
-        .from('credit_transactions')
-        .insert({
-          user_id: userId,
-          amount: credits,
-          action: 'purchase',
-          provider: 'stripe',
-          description: `Purchased ${packageName} package via Stripe (Session: ${session_id}) - Correlation ID: ${correlationId}`,
-        });
+    // Log transaction FIRST (serves as idempotency record)
+    const { error: transactionError } = await supabaseAdmin
+      .from('credit_transactions')
+      .insert({
+        user_id: userId,
+        amount: credits,
+        action: 'purchase',
+        provider: 'stripe',
+        description: `Purchased ${packageName} package via Stripe (Session: ${session_id}) - Correlation ID: ${correlationId}`,
+      });
 
-      if (transactionError) {
-        console.warn(`[${correlationId}] Transaction log warning:`, transactionError);
-      }
-    } catch (txError) {
-      console.warn(`[${correlationId}] Transaction log error:`, txError);
+    if (transactionError) {
+      console.error(`[${correlationId}] Failed to log transaction:`, transactionError);
+      return createErrorResponse(
+        new Error('Failed to record transaction'),
+        correlationId,
+        500,
+        'TRANSACTION_LOG_FAILED'
+      );
     }
 
     console.log(`[${correlationId}] Successfully added ${credits} credits. New balance: ${newBalance}`);

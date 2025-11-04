@@ -35,7 +35,7 @@ serve(async (req) => {
       throw new Error('User not authenticated or email not available');
     }
 
-    const { packageName, credits } = await req.json();
+    const { packageName } = await req.json();
     const priceId = PRICE_IDS[packageName];
 
     if (!priceId) {
@@ -70,7 +70,6 @@ serve(async (req) => {
       cancel_url: `${origin}/payment-cancelled`,
       metadata: {
         user_id: user.id,
-        credits: credits.toString(),
         package_name: packageName,
       },
     });
