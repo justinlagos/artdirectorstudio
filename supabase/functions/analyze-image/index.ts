@@ -1,6 +1,29 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+interface LogEntry {
+  op: string;
+  user: string;
+  req: string;
+  phase: string;
+  result: string;
+  ms?: number;
+  err?: string;
+}
+
+function structuredLog(entry: LogEntry): void {
+  const parts = [
+    `[op=${entry.op}]`,
+    `[user=${entry.user}]`,
+    `[req=${entry.req}]`,
+    `[phase=${entry.phase}]`,
+    `[result=${entry.result}]`,
+  ];
+  if (entry.ms !== undefined) parts.push(`[ms=${entry.ms}]`);
+  if (entry.err) parts.push(`[err=${entry.err.substring(0, 200)}]`);
+  console.log(parts.join(' '));
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -8,9 +31,14 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const startTime = Date.now();
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
+
+  let userId = 'unknown';
+  let requestId = 'unknown';
 
   try {
     const authHeader = req.headers.get('Authorization');
@@ -34,7 +62,7 @@ serve(async (req) => {
 
     // Decode the payload (second part of JWT)
     const payload = JSON.parse(atob(parts[1]));
-    const userId = payload.sub;
+    userId = payload.sub;
     
     if (!userId) {
       console.error("No user ID in JWT");
@@ -56,12 +84,17 @@ serve(async (req) => {
       }
     );
 
-    const { image } = await req.json();
+    const body = await req.json();
+    const { image, request_id } = body;
+    requestId = request_id || crypto.randomUUID();
+    
+    structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'preflight', result: 'ok', ms: Date.now() - startTime });
     
     // Validate input
     if (!image) {
+      structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'preflight', result: 'err', ms: Date.now() - startTime, err: 'INVALID_INPUT: No image provided' });
       return new Response(
-        JSON.stringify({ error: "No image provided" }),
+        JSON.stringify({ error: "INVALID_INPUT: No image provided" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -172,6 +205,7 @@ Example: portrait|0.95`
         contextPrompt = '\n\nAnalyze this image comprehensively, adapting your description to what you observe.';
     }
 
+    structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'model', result: 'ok', ms: Date.now() - startTime });
     console.log("Calling Lovable AI for image analysis...");
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -229,24 +263,26 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
 
     if (!response.ok) {
       const errorText = await response.text();
+      const errorCode = response.status === 429 ? 'TIMEOUT' : response.status === 402 ? 'INSUFFICIENT_CREDITS' : 'MODEL_EMPTY';
+      structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'model', result: 'err', ms: Date.now() - startTime, err: `${errorCode}: ${errorText.substring(0, 100)}` });
       console.error("Lovable AI error:", response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+          JSON.stringify({ error: "TIMEOUT: Rate limit exceeded. Please try again later." }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits to your workspace." }),
+          JSON.stringify({ error: "INSUFFICIENT_CREDITS: AI credits exhausted. Please add credits to your workspace." }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
       return new Response(
-        JSON.stringify({ error: "AI analysis failed" }),
+        JSON.stringify({ error: "MODEL_EMPTY: AI analysis failed" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -356,6 +392,8 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
       detection_confidence: confidence
     };
 
+    structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'commit', result: 'ok', ms: Date.now() - startTime });
+
     return new Response(
       JSON.stringify(responseData),
       { 
@@ -364,9 +402,11 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
     );
 
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    structuredLog({ op: 'analyze', user: userId, req: requestId, phase: 'commit', result: 'err', ms: Date.now() - startTime, err: errorMsg });
     console.error("Error in analyze-image function:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: errorMsg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

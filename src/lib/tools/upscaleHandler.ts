@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { reserveCredits, commitCredits, refundCredits } from "@/lib/credits";
+import { parseErrorCode, ErrorCode } from "@/lib/utils/errorCodes";
 
 export interface UpscaleHandlerParams {
   image: File;
@@ -12,6 +13,7 @@ export interface UpscaleHandlerResult {
   success: boolean;
   imageUrl?: string;
   error?: string;
+  errorCode?: ErrorCode;
   requestId: string;
 }
 
@@ -140,9 +142,11 @@ export async function handleUpscale({
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorCode = parseErrorCode(error);
     
     console.error(`[Upscale:${requestId}] Failed after ${duration}ms:`, {
       error: errorMessage,
+      errorCode,
       timestamp: new Date().toISOString(),
     });
 
@@ -159,6 +163,7 @@ export async function handleUpscale({
     return {
       success: false,
       error: errorMessage,
+      errorCode,
       requestId,
     };
   }

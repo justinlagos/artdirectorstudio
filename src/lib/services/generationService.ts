@@ -164,8 +164,9 @@ export async function generateImage(
 export async function analyzeImage(
   base64Image: string,
   config: Partial<GenerationConfig> = {}
-): Promise<{ success: boolean; data?: any; error?: string }> {
+): Promise<{ success: boolean; data?: any; error?: string; requestId?: string }> {
   const { maxRetries, retryDelay, timeout } = { ...DEFAULT_CONFIG, ...config };
+  const requestId = crypto.randomUUID();
   
   let lastError: any = null;
   
@@ -197,7 +198,10 @@ export async function analyzeImage(
       });
 
       const analyzePromise = supabase.functions.invoke("analyze-image", {
-        body: { image: base64Image },
+        body: { 
+          image: base64Image,
+          request_id: requestId 
+        },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -221,7 +225,7 @@ export async function analyzeImage(
         throw error;
       }
 
-      return { success: true, data };
+      return { success: true, data, requestId };
     } catch (error) {
       lastError = error;
       console.error(`Analysis attempt ${attempt + 1} failed:`, error);
@@ -242,5 +246,5 @@ export async function analyzeImage(
     ? lastError.message 
     : "Analysis failed after multiple attempts";
   
-  return { success: false, error: errorMsg };
+  return { success: false, error: errorMsg, requestId };
 }

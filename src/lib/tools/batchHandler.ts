@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { reserveCredits, commitCredits, refundCredits } from "@/lib/credits";
+import { parseErrorCode, ErrorCode } from "@/lib/utils/errorCodes";
 
 export interface BatchHandlerParams {
   images: File[];
@@ -12,6 +13,7 @@ export interface BatchImageResult {
   fileName: string;
   data?: any;
   error?: string;
+  errorCode?: ErrorCode;
 }
 
 export interface BatchHandlerResult {
@@ -101,11 +103,18 @@ export async function handleBatch({
             clearTimeout(timeoutId);
 
             if (error) {
+              const errorCode = parseErrorCode(error);
               console.error(`[Batch:${requestId}] Image ${i + 1} attempt ${attempt} error:`, error);
               lastError = new Error(error.message || "Analysis failed");
               
               // Don't retry on validation errors
               if (error.message?.includes("Invalid") || error.message?.includes("required")) {
+                results.push({
+                  success: false,
+                  fileName: file.name,
+                  error: error?.message || 'Analysis failed',
+                  errorCode,
+                });
                 break;
               }
               continue; // Retry on other errors
@@ -138,19 +147,23 @@ export async function handleBatch({
 
         // If all attempts failed, add error result
         if (!analysisSuccess) {
+          const errorCode = parseErrorCode(lastError);
           results.push({
             success: false,
             fileName: file.name,
             error: lastError?.message || "Analysis failed after retries",
+            errorCode,
           });
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        const errorCode = parseErrorCode(error);
         console.error(`[Batch:${requestId}] Image ${i + 1} processing error:`, errorMessage);
         results.push({
           success: false,
           fileName: file.name,
           error: errorMessage,
+          errorCode,
         });
       }
     }

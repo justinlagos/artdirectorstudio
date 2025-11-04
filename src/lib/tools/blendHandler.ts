@@ -1,9 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { reserveCredits, commitCredits, refundCredits } from "@/lib/credits";
+import { parseErrorCode, ErrorCode } from "@/lib/utils/errorCodes";
 
 export interface BlendHandlerParams {
   images: File[];
-  instruction: string;
+  instruction?: string;
   onProgress?: (progress: number) => void;
   requestId?: string;
 }
@@ -12,6 +13,7 @@ export interface BlendHandlerResult {
   success: boolean;
   imageUrl?: string;
   error?: string;
+  errorCode?: ErrorCode;
   requestId: string;
 }
 
@@ -144,9 +146,11 @@ export async function handleBlend({
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorCode = parseErrorCode(error);
     
     console.error(`[Blend:${requestId}] Failed after ${duration}ms:`, {
       error: errorMessage,
+      errorCode,
       timestamp: new Date().toISOString(),
     });
 
@@ -163,6 +167,7 @@ export async function handleBlend({
     return {
       success: false,
       error: errorMessage,
+      errorCode,
       requestId,
     };
   }
