@@ -58,64 +58,85 @@ export async function handleUpscale({
 
     console.log(`[Upscale:${requestId}] Image converted, calling edge function`);
 
-    // Call edge function with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    // Call edge function with retry logic
+    let attempt = 0;
+    const maxAttempts = 2;
+    let lastError: Error | null = null;
 
-    try {
-      const { data, error } = await supabase.functions.invoke("upscale-image", {
-        body: {
-          image: imageUrl,
-          targetSize,
-          request_id: requestId,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (error) {
-        console.error(`[Upscale:${requestId}] Edge function error:`, error);
-        
-        // Check if this is a retriable error
-        const isRetriable = error.message?.includes("timeout") || 
-                           error.message?.includes("network") ||
-                           !error.message?.includes("Insufficient credits");
-        
-        throw new Error(
-          isRetriable 
-            ? "Upscale timed out. Please try again." 
-            : error.message || "Upscale operation failed"
-        );
-      }
-
-      if (!data?.image) {
-        console.error(`[Upscale:${requestId}] Empty response:`, data);
-        throw new Error("No image returned from upscale operation. Please try again.");
-      }
-
-      onProgress?.(100);
-
-      // Commit credits after successful operation
-      console.log(`[Upscale:${requestId}] Committing credits`);
-      await commitCredits(requestId);
-
-      const duration = Date.now() - startTime;
-      console.log(`[Upscale:${requestId}] Success in ${duration}ms`);
-
-      return {
-        success: true,
-        imageUrl: data.image,
-        requestId,
-      };
-    } catch (err) {
-      clearTimeout(timeoutId);
+    while (attempt < maxAttempts) {
+      attempt++;
+      const isRetry = attempt > 1;
       
-      if (err instanceof Error && err.name === "AbortError") {
-        throw new Error("Upscale operation timed out. Please try again.");
+      if (isRetry) {
+        console.log(`[Upscale:${requestId}] Retry attempt ${attempt}/${maxAttempts}`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2s delay before retry
       }
-      throw err;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      try {
+        const { data, error } = await supabase.functions.invoke("upscale-image", {
+          body: {
+            image: imageUrl,
+            targetSize,
+            request_id: requestId,
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (error) {
+          console.error(`[Upscale:${requestId}] Attempt ${attempt} error:`, error);
+          lastError = new Error(error.message || "Upscale operation failed");
+          
+          // Don't retry on insufficient credits or validation errors
+          if (error.message?.includes("Insufficient credits") || 
+              error.message?.includes("Invalid") ||
+              error.message?.includes("required")) {
+            throw lastError;
+          }
+          
+          // Retry on network/timeout errors
+          continue;
+        }
+
+        if (!data?.image) {
+          console.error(`[Upscale:${requestId}] Attempt ${attempt}: No image returned`);
+          lastError = new Error("No image returned from upscale operation");
+          continue; // Retry
+        }
+
+        // Success!
+        onProgress?.(100);
+
+        // Commit credits after successful operation
+        console.log(`[Upscale:${requestId}] Committing credits`);
+        await commitCredits(requestId);
+
+        const duration = Date.now() - startTime;
+        console.log(`[Upscale:${requestId}] Success in ${duration}ms after ${attempt} attempt(s)`);
+
+        return {
+          success: true,
+          imageUrl: data.image,
+          requestId,
+        };
+      } catch (err) {
+        clearTimeout(timeoutId);
+        
+        if (err instanceof Error && err.name === "AbortError") {
+          lastError = new Error("Upscale operation timed out");
+          console.error(`[Upscale:${requestId}] Attempt ${attempt} timed out`);
+          continue; // Retry on timeout
+        }
+        throw err; // Don't retry on unexpected errors
+      }
     }
+
+    // All attempts failed
+    throw lastError || new Error("Upscale operation failed after retries");
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

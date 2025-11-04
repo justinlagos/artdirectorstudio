@@ -62,53 +62,85 @@ export async function handleBlend({
 
     console.log(`[Blend:${requestId}] Images converted, calling edge function`);
 
-    // Call edge function with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    // Call edge function with retry logic
+    let attempt = 0;
+    const maxAttempts = 2;
+    let lastError: Error | null = null;
 
-    try {
-      const { data, error } = await supabase.functions.invoke("blend-images", {
-        body: {
-          images: imageUrls,
-          instruction,
-          request_id: requestId,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (error) {
-        console.error(`[Blend:${requestId}] Edge function error:`, error);
-        throw new Error(error.message || "Blend operation failed");
-      }
-
-      if (!data?.image) {
-        throw new Error("No image returned from blend operation");
-      }
-
-      onProgress?.(100);
-
-      // Commit credits after successful operation
-      console.log(`[Blend:${requestId}] Committing credits`);
-      await commitCredits(requestId);
-
-      const duration = Date.now() - startTime;
-      console.log(`[Blend:${requestId}] Success in ${duration}ms`);
-
-      return {
-        success: true,
-        imageUrl: data.image,
-        requestId,
-      };
-    } catch (err) {
-      clearTimeout(timeoutId);
+    while (attempt < maxAttempts) {
+      attempt++;
+      const isRetry = attempt > 1;
       
-      if (err instanceof Error && err.name === "AbortError") {
-        throw new Error("Blend operation timed out. Please try again.");
+      if (isRetry) {
+        console.log(`[Blend:${requestId}] Retry attempt ${attempt}/${maxAttempts}`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2s delay before retry
       }
-      throw err;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      try {
+        const { data, error } = await supabase.functions.invoke("blend-images", {
+          body: {
+            images: imageUrls,
+            instruction,
+            request_id: requestId,
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (error) {
+          console.error(`[Blend:${requestId}] Attempt ${attempt} error:`, error);
+          lastError = new Error(error.message || "Blend operation failed");
+          
+          // Don't retry on insufficient credits or validation errors
+          if (error.message?.includes("Insufficient credits") || 
+              error.message?.includes("Invalid") ||
+              error.message?.includes("requires")) {
+            throw lastError;
+          }
+          
+          // Retry on network/timeout errors
+          continue;
+        }
+
+        if (!data?.image) {
+          console.error(`[Blend:${requestId}] Attempt ${attempt}: No image returned`);
+          lastError = new Error("No image returned from blend operation");
+          continue; // Retry
+        }
+
+        // Success!
+        onProgress?.(100);
+
+        // Commit credits after successful operation
+        console.log(`[Blend:${requestId}] Committing credits`);
+        await commitCredits(requestId);
+
+        const duration = Date.now() - startTime;
+        console.log(`[Blend:${requestId}] Success in ${duration}ms after ${attempt} attempt(s)`);
+
+        return {
+          success: true,
+          imageUrl: data.image,
+          requestId,
+        };
+      } catch (err) {
+        clearTimeout(timeoutId);
+        
+        if (err instanceof Error && err.name === "AbortError") {
+          lastError = new Error("Blend operation timed out");
+          console.error(`[Blend:${requestId}] Attempt ${attempt} timed out`);
+          continue; // Retry on timeout
+        }
+        throw err; // Don't retry on unexpected errors
+      }
     }
+
+    // All attempts failed
+    throw lastError || new Error("Blend operation failed after retries");
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

@@ -72,47 +72,77 @@ export async function handleBatch({
           reader.readAsDataURL(file);
         });
 
-        // Call analyze-image edge function with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_PER_IMAGE_MS);
+        // Call analyze-image edge function with retry logic (max 2 attempts per image)
+        let attempt = 0;
+        const maxAttempts = 2;
+        let lastError: Error | null = null;
+        let analysisSuccess = false;
 
-        try {
-          const { data, error } = await supabase.functions.invoke("analyze-image", {
-            body: {
-              image: imageUrl,
-              request_id: `${requestId}-${i}`,
-            },
-            signal: controller.signal,
-          });
+        while (attempt < maxAttempts && !analysisSuccess) {
+          attempt++;
+          
+          if (attempt > 1) {
+            console.log(`[Batch:${requestId}] Image ${i + 1} retry attempt ${attempt}/${maxAttempts}`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1s delay before retry
+          }
 
-          clearTimeout(timeoutId);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_PER_IMAGE_MS);
 
-          if (error) {
-            console.error(`[Batch:${requestId}] Image ${i + 1} error:`, error);
-            results.push({
-              success: false,
-              fileName: file.name,
-              error: error.message || "Analysis failed",
+          try {
+            const { data, error } = await supabase.functions.invoke("analyze-image", {
+              body: {
+                image: imageUrl,
+                request_id: `${requestId}-${i}`,
+              },
+              signal: controller.signal,
             });
-          } else {
+
+            clearTimeout(timeoutId);
+
+            if (error) {
+              console.error(`[Batch:${requestId}] Image ${i + 1} attempt ${attempt} error:`, error);
+              lastError = new Error(error.message || "Analysis failed");
+              
+              // Don't retry on validation errors
+              if (error.message?.includes("Invalid") || error.message?.includes("required")) {
+                break;
+              }
+              continue; // Retry on other errors
+            }
+
+            if (!data) {
+              console.error(`[Batch:${requestId}] Image ${i + 1} attempt ${attempt}: No data returned`);
+              lastError = new Error("No analysis data returned");
+              continue; // Retry
+            }
+
+            // Success!
             results.push({
               success: true,
               fileName: file.name,
               data: data,
             });
+            analysisSuccess = true;
+          } catch (err) {
+            clearTimeout(timeoutId);
+            
+            if (err instanceof Error && err.name === "AbortError") {
+              lastError = new Error("Analysis timed out");
+              console.error(`[Batch:${requestId}] Image ${i + 1} attempt ${attempt} timed out`);
+              continue; // Retry on timeout
+            }
+            throw err; // Don't retry on unexpected errors
           }
-        } catch (err) {
-          clearTimeout(timeoutId);
-          
-          if (err instanceof Error && err.name === "AbortError") {
-            results.push({
-              success: false,
-              fileName: file.name,
-              error: "Analysis timed out",
-            });
-          } else {
-            throw err;
-          }
+        }
+
+        // If all attempts failed, add error result
+        if (!analysisSuccess) {
+          results.push({
+            success: false,
+            fileName: file.name,
+            error: lastError?.message || "Analysis failed after retries",
+          });
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
