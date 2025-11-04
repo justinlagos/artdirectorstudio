@@ -49,7 +49,7 @@ serve(async (req) => {
     // Get pricing configuration
     const { data: pricingData, error: pricingError } = await supabaseClient
       .from('pricing_config')
-      .select('credits_required')
+      .select('credits')
       .eq('action', action)
       .eq('provider', provider)
       .single();
@@ -64,7 +64,7 @@ serve(async (req) => {
       );
     }
 
-    const creditsRequired = pricingData.credits_required;
+    const creditsRequired = pricingData.credits;
 
     // Check current balance
     const { data: currentBalance, error: balanceError } = await supabaseClient
