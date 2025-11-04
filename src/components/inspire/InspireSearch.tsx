@@ -55,40 +55,40 @@ export const InspireSearch = ({ onSearch }: InspireSearchProps) => {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="w-full space-y-2">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         <Input
-          placeholder='Search prompts (use "+" for AND, e.g., "portraits + golden hour")'
+          type="text"
+          placeholder="Search prompts, styles, artists..."
           value={searchValue}
           onChange={(e) => handleSearch(e.target.value)}
-          className="pl-10 pr-10 glass-strong"
+          className="pl-10 pr-10 w-full min-h-[44px]"
         />
         {searchValue && (
           <Button
-            size="sm"
             variant="ghost"
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+            size="sm"
             onClick={handleClear}
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4 text-muted-foreground" />
           </Button>
         )}
       </div>
-
+      
       {searchTerms.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-muted-foreground">Searching for:</span>
-          {searchTerms.map((term, index) => (
+        <div className="flex flex-wrap gap-2 px-1">
+          {searchTerms.map((term) => (
             <Badge
-              key={index}
+              key={term}
               variant="secondary"
-              className="gap-1 pr-1"
+              className="gap-1.5 pr-1 min-h-[32px] text-xs"
             >
-              {term}
+              <span>{term}</span>
               <button
                 onClick={() => removeSearchTerm(term)}
-                className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
+                className="hover:bg-muted rounded-sm p-0.5 transition-colors min-h-[24px] min-w-[24px] flex items-center justify-center"
               >
                 <X className="h-3 w-3" />
               </button>

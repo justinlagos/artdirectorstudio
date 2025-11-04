@@ -72,6 +72,86 @@ export type Database = {
           },
         ]
       }
+      beta_invites: {
+        Row: {
+          code: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          used_at: string | null
+          waitlist_id: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          used_at?: string | null
+          waitlist_id?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          used_at?: string | null
+          waitlist_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beta_invites_waitlist_id_fkey"
+            columns: ["waitlist_id"]
+            isOneToOne: false
+            referencedRelation: "beta_waitlist"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beta_waitlist: {
+        Row: {
+          activated_at: string | null
+          consent: boolean
+          created_at: string
+          email: string
+          id: string
+          invite_sent_at: string | null
+          metadata: Json | null
+          name: string | null
+          source: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          consent?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          invite_sent_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          consent?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          invite_sent_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       credit_transactions: {
         Row: {
           action: Database["public"]["Enums"]["credit_action"]
@@ -126,6 +206,33 @@ export type Database = {
         }
         Relationships: []
       }
+      funnel_metrics: {
+        Row: {
+          created_at: string
+          email: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       generated_assets: {
         Row: {
           analysis_data: Json | null
@@ -153,6 +260,36 @@ export type Database = {
           prompt?: string | null
           type?: Database["public"]["Enums"]["asset_type"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      newsletter_subscribers: {
+        Row: {
+          email: string
+          id: string
+          metadata: Json | null
+          source: string | null
+          status: string
+          subscribed_at: string
+          unsubscribed_at: string | null
+        }
+        Insert: {
+          email: string
+          id?: string
+          metadata?: Json | null
+          source?: string | null
+          status?: string
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+        }
+        Update: {
+          email?: string
+          id?: string
+          metadata?: Json | null
+          source?: string | null
+          status?: string
+          subscribed_at?: string
+          unsubscribed_at?: string | null
         }
         Relationships: []
       }
@@ -266,6 +403,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      testimonials: {
+        Row: {
+          avatar_url: string | null
+          content: string
+          created_at: string
+          display_order: number
+          featured: boolean
+          id: string
+          name: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          content: string
+          created_at?: string
+          display_order?: number
+          featured?: boolean
+          id?: string
+          name: string
+          role: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          content?: string
+          created_at?: string
+          display_order?: number
+          featured?: boolean
+          id?: string
+          name?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_follows: {
         Row: {

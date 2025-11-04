@@ -12,6 +12,12 @@ import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { PricingManagement } from "@/components/admin/PricingManagement";
 import { AdminUserManagement } from "@/components/admin/AdminUserManagement";
 import { SystemHealth } from "@/components/admin/SystemHealth";
+import { AdminBetaManagement } from "@/components/admin/AdminBetaManagement";
+import { AdminTestimonials } from "@/components/admin/AdminTestimonials";
+import { AdminRevenue } from "@/components/admin/AdminRevenue";
+import { AdminUsagePatterns } from "@/components/admin/AdminUsagePatterns";
+import { AdminActiveUsers } from "@/components/admin/AdminActiveUsers";
+import { EnhancedPricingManagement } from "@/components/admin/EnhancedPricingManagement";
 import { Shield } from "lucide-react";
 
 const Admin = () => {
@@ -46,32 +52,53 @@ const Admin = () => {
             <h1 className="text-3xl font-semibold">Admin Dashboard</h1>
           </div>
           <p className="text-muted-foreground">
-            Manage system analytics and pricing configuration
+            Comprehensive platform management, analytics, and control center
           </p>
         </div>
 
-        <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="revenue">Revenue</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="health">System Health</TabsTrigger>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="usage">Usage</TabsTrigger>
             <TabsTrigger value="pricing">Pricing</TabsTrigger>
+            <TabsTrigger value="testimonials">Content</TabsTrigger>
+            <TabsTrigger value="beta">Beta</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="analytics" className="space-y-6">
+          <TabsContent value="overview" className="space-y-6">
             <AdminAnalytics />
-          </TabsContent>
-
-          <TabsContent value="users">
-            <AdminUserManagement />
-          </TabsContent>
-
-          <TabsContent value="health">
             <SystemHealth />
           </TabsContent>
 
-          <TabsContent value="pricing">
-            <PricingManagement />
+          <TabsContent value="revenue" className="space-y-6">
+            <AdminRevenue />
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-6">
+            <AdminUserManagement />
+          </TabsContent>
+
+          <TabsContent value="active" className="space-y-6">
+            <AdminActiveUsers />
+          </TabsContent>
+
+          <TabsContent value="usage" className="space-y-6">
+            <AdminUsagePatterns />
+          </TabsContent>
+
+          <TabsContent value="pricing" className="space-y-6">
+            <EnhancedPricingManagement />
+          </TabsContent>
+
+          <TabsContent value="testimonials" className="space-y-6">
+            <AdminTestimonials />
+          </TabsContent>
+
+          <TabsContent value="beta" className="space-y-6">
+            <AdminBetaManagement />
           </TabsContent>
         </Tabs>
       </main>

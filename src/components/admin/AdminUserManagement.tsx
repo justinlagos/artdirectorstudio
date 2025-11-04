@@ -32,6 +32,7 @@ export const AdminUserManagement = () => {
 
   const fetchUsers = async () => {
     try {
+      // Fetch all authenticated users from profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, email, username, created_at')

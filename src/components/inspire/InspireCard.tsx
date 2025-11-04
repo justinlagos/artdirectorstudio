@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Tooltip,
   TooltipContent,
@@ -56,7 +57,8 @@ export const InspireCard = ({
 }: InspireCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [showOverlay, setShowOverlay] = useState(false);
+  const isMobile = useIsMobile();
+  const [showOverlay, setShowOverlay] = useState(isMobile);
   const {
     isLiked,
     isBookmarked,
@@ -102,8 +104,9 @@ export const InspireCard = ({
       <Card
         className="group cursor-pointer overflow-hidden hover:shadow-strong transition-all duration-300 interactive-card border-border/50"
         onClick={onClick}
-        onMouseEnter={() => setShowOverlay(true)}
-        onMouseLeave={() => setShowOverlay(false)}
+        onMouseEnter={() => !isMobile && setShowOverlay(true)}
+        onMouseLeave={() => !isMobile && setShowOverlay(false)}
+        onTouchStart={() => isMobile && setShowOverlay(prev => !prev)}
       >
         <div className="relative aspect-square overflow-hidden bg-muted">
           {imageUrl && (
@@ -120,7 +123,7 @@ export const InspireCard = ({
                   showOverlay ? "opacity-100" : "opacity-0"
                 }`}
               >
-                <div className="absolute inset-0 p-4 flex flex-col justify-between">
+                <div className="absolute inset-0 p-3 sm:p-4 flex flex-col justify-between">
                   {/* Top Actions */}
                   <div className="flex justify-end gap-2">
                     <Tooltip>
@@ -128,7 +131,7 @@ export const InspireCard = ({
                         <Button
                           size="sm"
                           variant={isLiked ? "default" : "secondary"}
-                          className="h-8 w-8 p-0 rounded-full"
+                          className="h-11 w-11 sm:h-10 sm:w-10 p-0 rounded-full"
                           onClick={handleLike}
                         >
                           <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
@@ -144,7 +147,7 @@ export const InspireCard = ({
                         <Button
                           size="sm"
                           variant={isBookmarked ? "default" : "secondary"}
-                          className="h-8 w-8 p-0 rounded-full"
+                          className="h-11 w-11 sm:h-10 sm:w-10 p-0 rounded-full"
                           onClick={handleBookmark}
                         >
                           <Bookmark className={`w-4 h-4 ${isBookmarked ? "fill-current" : ""}`} />
@@ -157,26 +160,26 @@ export const InspireCard = ({
                   </div>
 
                   {/* Bottom Info */}
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {prompt && (
-                      <p className="text-white text-sm line-clamp-2 font-medium">
+                      <p className="text-white text-xs sm:text-sm line-clamp-2 font-medium">
                         {prompt}
                       </p>
                     )}
                     
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-white/80 text-xs">
-                        <span className="font-medium">{creator.name}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-white/80 text-xs min-w-0">
+                        <span className="font-medium truncate">{creator.name}</span>
                       </div>
                       
                       <Button
                         size="sm"
                         variant="default"
-                        className="h-8 gap-1.5"
+                        className="min-h-[44px] h-11 sm:h-10 gap-1.5 flex-shrink-0"
                         onClick={handleRemix}
                       >
                         <Wand2 className="w-3.5 h-3.5" />
-                        Remix
+                        <span className="hidden sm:inline">Remix</span>
                       </Button>
                     </div>
                   </div>
@@ -186,7 +189,7 @@ export const InspireCard = ({
           )}
         </div>
 
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="p-3 sm:p-4 space-y-2 sm:space-y-3">
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-3 text-muted-foreground">
               <Tooltip>
