@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +24,12 @@ interface ImageFile {
 }
 
 export const ImageBlendDialogEnhanced = ({ open, onOpenChange }: ImageBlendDialogEnhancedProps) => {
+  const { captureOrigin, returnToOrigin } = useNavigationContext();
   const [images, setImages] = useState<ImageFile[]>([]);
+
+  useEffect(() => {
+    if (open) captureOrigin();
+  }, [open, captureOrigin]);
   const [instruction, setInstruction] = useState("Blend these images seamlessly with consistent lighting and harmonious color grading");
   const [blendStyle, setBlendStyle] = useState<string>("seamless");
   const [composition, setComposition] = useState<string>("auto");
@@ -159,6 +165,7 @@ Requirements:
     } catch (error) {
       clearInterval(progressInterval);
       console.error("Blend error:", error);
+      console.error("Full error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
       
       const errorMessage = error instanceof Error ? error.message : "Failed to blend images";
       const isGeolocationError = errorMessage.includes("not available in your country") || 
@@ -167,7 +174,7 @@ Requirements:
       toast.error(
         isGeolocationError 
           ? "Image blending is not available in your region due to AI service restrictions. Please try again later or from a different location."
-          : errorMessage
+          : `Blend failed: ${errorMessage}`
       );
     } finally {
       setIsBlending(false);
@@ -197,6 +204,7 @@ Requirements:
     setComposition("auto");
     setColorHarmony("auto");
     setProgress(0);
+    returnToOrigin();
     onOpenChange(false);
   };
 

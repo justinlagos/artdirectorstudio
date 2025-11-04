@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, Maximize2, Upload } from "lucide-react";
-import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
+import { handleUpscale } from "@/lib/tools/upscaleHandler";
+import { CreditConfirmDialog } from "@/components/tools/CreditConfirmDialog";
+import { showErrorToast, showSuccessToast, showRequestToast } from "@/lib/utils/toastManager";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -19,18 +21,25 @@ interface SourceImage {
 }
 
 export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogProps) => {
+  const { captureOrigin, returnToOrigin } = useNavigationContext();
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
+
+  useEffect(() => {
+    if (open) captureOrigin();
+  }, [open, captureOrigin]);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [showCreditConfirm, setShowCreditConfirm] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
+      showErrorToast("upscale-file-type", "Please upload an image file");
       return;
     }
 
@@ -40,9 +49,9 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setUpscaledImage(null);
   };
 
-  const handleUpscale = async () => {
+  const executeUpscale = useCallback(async () => {
     if (!sourceImage) {
-      toast.error("Please upload an image first");
+      showErrorToast("upscale-no-image", "Please upload an image first");
       return;
     }
 
@@ -50,77 +59,53 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setProgress(0);
     setUpscaledImage(null);
 
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 2000);
+    const reqId = crypto.randomUUID();
+    setRequestId(reqId);
 
     try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsUpscaling(false);
-        clearInterval(progressInterval);
+      const result = await handleUpscale({
+        image: sourceImage.file,
+        targetSize,
+        onProgress: setProgress,
+        requestId: reqId,
+      });
+
+      if (!result.success) {
+        showRequestToast(reqId, {
+          variant: "destructive",
+          title: "Error",
+          description: result.error || "Failed to upscale image",
+        });
         return;
       }
 
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "upscale", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 2 credits to upscale an image.");
-        } else {
-          toast.error("Failed to process credit deduction.");
-        }
-        setIsUpscaling(false);
-        clearInterval(progressInterval);
-        return;
-      }
-
-      // Convert file to base64 for edge function
-      const base64Image = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(sourceImage.file);
-      });
-
-      const { data, error } = await supabase.functions.invoke("upscale-image", {
-        body: { image: base64Image, targetSize },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      clearInterval(progressInterval);
-      setProgress(100);
-
-      if (error) throw error;
-
-      if (data?.image) {
-        setUpscaledImage(data.image);
-        toast.success(`Image upscaled successfully! ${deductData.remaining_balance} credits remaining.`);
+      if (result.imageUrl) {
+        setUpscaledImage(result.imageUrl);
+        showRequestToast(reqId, {
+          title: "Success",
+          description: "All done. Your result is ready.",
+        });
       }
     } catch (error) {
-      clearInterval(progressInterval);
       console.error("Upscale error:", error);
-      toast.error("Failed to upscale image. Please try again.");
+      showRequestToast(reqId, {
+        variant: "destructive",
+        title: "Error",
+        description: "This didn't complete. Try again or adjust inputs.",
+      });
     } finally {
       setIsUpscaling(false);
       setTimeout(() => setProgress(0), 1000);
     }
+  }, [sourceImage, targetSize]);
+
+  const handleUpscaleClick = () => {
+    setShowCreditConfirm(true);
+  };
+
+  const handleConfirmUpscale = () => {
+    setShowCreditConfirm(false);
+    executeUpscale();
   };
 
   const handleDownload = () => {
@@ -133,7 +118,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     link.click();
     document.body.removeChild(link);
     
-    toast.success("Image downloaded!");
+    showSuccessToast("image-download", "Image downloaded!");
   };
 
   const handleClose = () => {
@@ -145,6 +130,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setUpscaledImage(null);
     setTargetSize('1536x1536');
     setProgress(0);
+    returnToOrigin();
     onOpenChange(false);
   };
 
@@ -227,7 +213,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
             <div className="space-y-2">
               <Progress value={progress} className="w-full" />
               <p className="text-sm text-muted-foreground text-center">
-                Upscaling image... (~20-40 seconds)
+                {progress < 30 ? "Preparing assets…" : progress < 80 ? "Generating…" : "Finishing up…"}
               </p>
             </div>
           )}
@@ -280,7 +266,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           {/* Upscale Button */}
           {sourceImage && !upscaledImage && (
             <Button
-              onClick={handleUpscale}
+              onClick={handleUpscaleClick}
               disabled={isUpscaling}
               className="w-full"
               size="lg"
@@ -291,6 +277,14 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           )}
         </div>
       </DialogContent>
+      
+      <CreditConfirmDialog
+        open={showCreditConfirm}
+        onOpenChange={setShowCreditConfirm}
+        credits={2}
+        action="upscale"
+        onConfirm={handleConfirmUpscale}
+      />
     </Dialog>
   );
 };

@@ -24,35 +24,60 @@ export const AdminUserManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [creditAmount, setCreditAmount] = useState(0);
+  const [creditDescription, setCreditDescription] = useState("");
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const USERS_PER_PAGE = 20;
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [currentPage]);
 
   const fetchUsers = async () => {
     try {
-      // Fetch all authenticated users from profiles
+      setLoading(true);
+      
+      // Get total count first
+      const { count } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      
+      setTotalUsers(count || 0);
+
+      // Fetch paginated profiles
+      const from = (currentPage - 1) * USERS_PER_PAGE;
+      const to = from + USERS_PER_PAGE - 1;
+      
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, email, username, created_at')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (profilesError) throw profilesError;
 
-      // Fetch credit balances for each user
+      if (!profiles || profiles.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      // Fetch credit balances for visible users only
       const { data: credits, error: creditsError } = await supabase
         .from('credits')
-        .select('user_id, balance');
+        .select('user_id, balance')
+        .in('user_id', profiles.map(p => p.id));
 
-      if (creditsError) throw creditsError;
+      if (creditsError) {
+        console.error("Error fetching credits:", creditsError);
+      }
 
-      const creditsMap = new Map(credits?.map(c => [c.user_id, c.balance]));
+      const creditsMap = new Map(credits?.map(c => [c.user_id, c.balance]) || []);
       
-      const usersWithCredits = profiles?.map(p => ({
+      const usersWithCredits = profiles.map(p => ({
         ...p,
-        balance: creditsMap.get(p.id) || 0
-      })) || [];
+        balance: creditsMap.get(p.id) ?? 0
+      }));
 
       setUsers(usersWithCredits);
     } catch (error) {
@@ -64,29 +89,59 @@ export const AdminUserManagement = () => {
   };
 
   const handleAdjustCredits = async () => {
-    if (!selectedUser || creditAmount === 0) return;
+    if (!selectedUser || creditAmount === 0) {
+      toast.error("Please enter a valid credit amount");
+      return;
+    }
 
     try {
-      const { error } = await supabase.rpc('adjust_user_credits', {
-        target_user_id: selectedUser.id,
-        amount: creditAmount
+      console.log("Adjusting credits:", {
+        user: selectedUser.email,
+        amount: creditAmount,
+        description: creditDescription
       });
 
-      if (error) throw error;
+      const { error } = await supabase.rpc('adjust_user_credits', {
+        target_user_id: selectedUser.id,
+        amount: creditAmount,
+        description_text: creditDescription || null
+      });
 
-      toast.success(`Credits ${creditAmount > 0 ? 'added' : 'deducted'} successfully`);
+      if (error) {
+        console.error("RPC error:", error);
+        throw error;
+      }
+
+      toast.success(`Successfully ${creditAmount > 0 ? 'added' : 'deducted'} ${Math.abs(creditAmount)} credits for ${selectedUser.email}`);
+      
+      // Re-fetch user data to get updated balance
+      const { data: updatedCredits } = await supabase
+        .from('credits')
+        .select('balance')
+        .eq('user_id', selectedUser.id)
+        .single();
+      
+      if (updatedCredits) {
+        setUsers(prev => prev.map(u => 
+          u.id === selectedUser.id 
+            ? { ...u, balance: updatedCredits.balance }
+            : u
+        ));
+      }
+      
       setAdjustDialogOpen(false);
       setCreditAmount(0);
-      fetchUsers();
+      setCreditDescription("");
     } catch (error: any) {
-      toast.error(error.message || "Failed to adjust credits");
+      console.error("Failed to adjust credits:", error);
+      toast.error(`Failed to adjust credits: ${error.message || 'Unknown error'}`);
     }
   };
 
   const handleResetPassword = async (userId: string, email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`
+        redirectTo: `${window.location.origin}/reset-password`
       });
 
       if (error) throw error;
@@ -96,10 +151,14 @@ export const AdminUserManagement = () => {
     }
   };
 
-  const filteredUsers = users.filter(user => 
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.username?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = searchQuery 
+    ? users.filter(user => 
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.username?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : users;
+
+  const totalPages = Math.ceil(totalUsers / USERS_PER_PAGE);
 
   if (loading) {
     return <div>Loading users...</div>;
@@ -111,18 +170,41 @@ export const AdminUserManagement = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             User Management
-            <Badge variant="secondary">{users.length} total users</Badge>
+            <Badge variant="secondary">{totalUsers} total users</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Search className="w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by email or username..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-            />
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-1">
+              <Search className="w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by email or username..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1 || loading}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || loading}
+              >
+                Next
+              </Button>
+            </div>
           </div>
 
           <div className="rounded-md border">
@@ -198,11 +280,25 @@ export const AdminUserManagement = () => {
                 placeholder="e.g. 50 or -10"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (optional)</Label>
+              <Input
+                id="description"
+                type="text"
+                value={creditDescription}
+                onChange={(e) => setCreditDescription(e.target.value)}
+                placeholder="e.g. Bonus credits, refund, etc."
+              />
+            </div>
             <div className="flex gap-2">
               <Button onClick={handleAdjustCredits} disabled={creditAmount === 0}>
                 Apply Changes
               </Button>
-              <Button variant="outline" onClick={() => setAdjustDialogOpen(false)}>
+              <Button variant="outline" onClick={() => {
+                setAdjustDialogOpen(false);
+                setCreditAmount(0);
+                setCreditDescription("");
+              }}>
                 Cancel
               </Button>
             </div>

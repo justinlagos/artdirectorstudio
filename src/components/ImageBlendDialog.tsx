@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Download, Blend, X, Upload } from "lucide-react";
-import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
+import { handleBlend } from "@/lib/tools/blendHandler";
+import { CreditConfirmDialog } from "@/components/tools/CreditConfirmDialog";
+import { showErrorToast, showSuccessToast, showRequestToast } from "@/lib/utils/toastManager";
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -19,23 +21,30 @@ interface ImageFile {
 }
 
 export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) => {
+  const { captureOrigin, returnToOrigin } = useNavigationContext();
   const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("Blend these images seamlessly together");
   const [isBlending, setIsBlending] = useState(false);
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [showCreditConfirm, setShowCreditConfirm] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) captureOrigin();
+  }, [open, captureOrigin]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
     if (images.length + files.length > 4) {
-      toast.error("Maximum 4 images allowed");
+      showErrorToast("blend-max-images", "Maximum 4 images allowed");
       return;
     }
 
     files.forEach(file => {
       if (!file.type.startsWith("image/")) {
-        toast.error("Please upload image files only");
+        showErrorToast("blend-file-type", "Please upload image files only");
         return;
       }
 
@@ -53,9 +62,9 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     });
   };
 
-  const handleBlend = async () => {
+  const executeBlend = useCallback(async () => {
     if (images.length < 2) {
-      toast.error("Please upload at least 2 images to blend");
+      showErrorToast("blend-min-images", "Please upload at least 2 images to blend");
       return;
     }
 
@@ -63,79 +72,53 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     setProgress(0);
     setBlendedImage(null);
 
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 2000);
+    const reqId = crypto.randomUUID();
+    setRequestId(reqId);
 
     try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsBlending(false);
-        clearInterval(progressInterval);
+      const result = await handleBlend({
+        images: images.map(img => img.file),
+        instruction,
+        onProgress: setProgress,
+        requestId: reqId,
+      });
+
+      if (!result.success) {
+        showRequestToast(reqId, {
+          variant: "destructive",
+          title: "Error",
+          description: result.error || "Failed to blend images",
+        });
         return;
       }
 
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "blend", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 2 credits to blend images.");
-        } else {
-          toast.error("Failed to process credit deduction.");
-        }
-        setIsBlending(false);
-        clearInterval(progressInterval);
-        return;
-      }
-
-      // Convert files to base64 for edge function
-      const base64Images = await Promise.all(
-        images.map(img => new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(img.file);
-        }))
-      );
-
-      const { data, error } = await supabase.functions.invoke("blend-images", {
-        body: { images: base64Images, instruction },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      clearInterval(progressInterval);
-      setProgress(100);
-
-      if (error) throw error;
-
-      if (data?.image) {
-        setBlendedImage(data.image);
-        toast.success(`Images blended successfully! ${deductData.remaining_balance} credits remaining.`);
+      if (result.imageUrl) {
+        setBlendedImage(result.imageUrl);
+        showRequestToast(reqId, {
+          title: "Success",
+          description: "All done. Your result is ready.",
+        });
       }
     } catch (error) {
-      clearInterval(progressInterval);
       console.error("Blend error:", error);
-      toast.error("Failed to blend images. Please try again.");
+      showRequestToast(reqId, {
+        variant: "destructive",
+        title: "Error",
+        description: "This didn't complete. Try again or adjust inputs.",
+      });
     } finally {
       setIsBlending(false);
       setTimeout(() => setProgress(0), 1000);
     }
+  }, [images, instruction]);
+
+  const handleBlendClick = () => {
+    setShowCreditConfirm(true);
+  };
+
+  const handleConfirmBlend = () => {
+    setShowCreditConfirm(false);
+    executeBlend();
   };
 
   const handleDownload = () => {
@@ -148,7 +131,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     link.click();
     document.body.removeChild(link);
     
-    toast.success("Image downloaded!");
+    showSuccessToast("image-download", "Image downloaded!");
   };
 
   const handleClose = () => {
@@ -158,6 +141,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     setBlendedImage(null);
     setInstruction("Blend these images seamlessly together");
     setProgress(0);
+    returnToOrigin();
     onOpenChange(false);
   };
 
@@ -243,7 +227,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
             <div className="space-y-2">
               <Progress value={progress} className="w-full" />
               <p className="text-sm text-muted-foreground text-center">
-                Blending images... (~20-40 seconds)
+                {progress < 30 ? "Preparing assets…" : progress < 80 ? "Generating…" : "Finishing up…"}
               </p>
             </div>
           )}
@@ -286,7 +270,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           {/* Blend Button */}
           {images.length >= 2 && !blendedImage && (
             <Button
-              onClick={handleBlend}
+              onClick={handleBlendClick}
               disabled={isBlending}
               className="w-full"
               size="lg"
@@ -297,6 +281,14 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           )}
         </div>
       </DialogContent>
+      
+      <CreditConfirmDialog
+        open={showCreditConfirm}
+        onOpenChange={setShowCreditConfirm}
+        credits={2}
+        action="blend"
+        onConfirm={handleConfirmBlend}
+      />
     </Dialog>
   );
 };

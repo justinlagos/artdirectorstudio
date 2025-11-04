@@ -1,10 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { isMobileDevice, handleMobileKeyboard } from "@/lib/utils/mobileOptimizations";
 
 interface UploadSectionProps {
   onFileSelect: (file: File) => void;
@@ -21,6 +22,14 @@ export const UploadSection = ({
 }: UploadSectionProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Handle mobile keyboard optimizations
+  useEffect(() => {
+    if (isMobileDevice()) {
+      const cleanup = handleMobileKeyboard();
+      return cleanup;
+    }
+  }, []);
 
   const handleAuthCheck = useCallback(() => {
     if (!user) {

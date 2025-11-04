@@ -1,166 +1,175 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import {
+  handleCorsPreflightRequest,
+  createErrorResponse,
+  createSuccessResponse,
+  generateCorrelationId,
+  validateEnvVars,
+  extractUserIdFromJWT,
+  logRequest,
+} from "../_shared/edgeFunctionUtils.ts";
 
 serve(async (req) => {
+  const correlationId = generateCorrelationId();
+  
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest();
   }
 
   try {
-    // Get JWT from Authorization header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.error("No authorization header provided");
-      return new Response(
-        JSON.stringify({ error: "No authorization header" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Extract and decode JWT to get user ID
-    const token = authHeader.replace('Bearer ', '');
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      console.error("Invalid JWT format");
-      return new Response(
-        JSON.stringify({ error: "Invalid token format" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Decode the payload (second part of JWT)
-    const payload = JSON.parse(atob(parts[1]));
-    const userId = payload.sub;
+    logRequest(req.method, '/deduct-credits', correlationId);
     
-    if (!userId) {
-      console.error("No user ID in JWT");
-      return new Response(
-        JSON.stringify({ error: "Invalid token: no user ID" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Validate environment
+    validateEnvVars(['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'], correlationId);
 
-    console.log("Authenticated user:", userId);
+    // Extract user ID from JWT
+    const userId = extractUserIdFromJWT(req.headers.get('Authorization'), correlationId);
 
-    // Create Supabase client
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { 
-        global: { 
-          headers: { Authorization: authHeader } 
-        }
-      }
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!
+    );
+
+    // Create admin client for later use
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
     const { action, provider } = await req.json();
-    
+
+    console.log(`[${correlationId}] Deducting credits for:`, { userId, action, provider });
+
+    // Validate input
     if (!action || !provider) {
-      return new Response(
-        JSON.stringify({ error: "Missing action or provider" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return createErrorResponse(
+        new Error('Action and provider are required'),
+        correlationId,
+        400,
+        'INVALID_INPUT'
       );
     }
 
-    // Get pricing config
+    // Get pricing configuration
     const { data: pricingData, error: pricingError } = await supabaseClient
       .from('pricing_config')
       .select('credits')
       .eq('action', action)
       .eq('provider', provider)
-      .eq('active', true)
       .single();
 
     if (pricingError || !pricingData) {
-      console.error("Pricing config error:", pricingError);
-      return new Response(
-        JSON.stringify({ error: "Pricing configuration not found" }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(`[${correlationId}] Pricing lookup error:`, pricingError);
+      return createErrorResponse(
+        new Error('Invalid action or provider'),
+        correlationId,
+        400,
+        'INVALID_PRICING'
       );
     }
 
     const creditsRequired = pricingData.credits;
 
-    // Get current balance
-    const { data: creditsData, error: creditsError } = await supabaseClient
+    // Check current balance
+    let { data: currentBalance, error: balanceError } = await supabaseClient
       .from('credits')
       .select('balance')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (creditsError || !creditsData) {
-      console.error("Credits fetch error:", creditsError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch credits" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    if (balanceError) {
+      console.error(`[${correlationId}] Balance check error:`, balanceError);
+      return createErrorResponse(
+        new Error('Failed to check credit balance'),
+        correlationId,
+        500,
+        'BALANCE_CHECK_FAILED'
       );
     }
 
-    if (creditsData.balance < creditsRequired) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Insufficient credits",
-          required: creditsRequired,
-          balance: creditsData.balance
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // If no credits record exists, create one with default balance
+    if (!currentBalance) {
+      console.log(`[${correlationId}] Creating credits record for user ${userId}`);
+      const { error: createError } = await supabaseAdmin
+        .from('credits')
+        .insert({ user_id: userId, balance: 50 });
+      
+      if (createError) {
+        console.error(`[${correlationId}] Failed to create credits record:`, createError);
+        return createErrorResponse(
+          new Error('Failed to initialize credit balance'),
+          correlationId,
+          500,
+          'CREDIT_INIT_FAILED'
+        );
+      }
+      
+      // Set balance to 50 for the deduction check
+      currentBalance = { balance: 50 };
     }
 
-    // Use service role key for operations that bypass RLS
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    if (currentBalance.balance < creditsRequired) {
+      console.log(`[${correlationId}] Insufficient credits:`, {
+        required: creditsRequired,
+        available: currentBalance.balance
+      });
+      return createErrorResponse(
+        new Error(`Insufficient credits. Required: ${creditsRequired}, Available: ${currentBalance.balance}`),
+        correlationId,
+        402,
+        'INSUFFICIENT_CREDITS'
+      );
+    }
 
     // Deduct credits
-    const { error: updateError } = await supabaseAdmin
+    const { error: deductError } = await supabaseAdmin
       .from('credits')
-      .update({ balance: creditsData.balance - creditsRequired })
+      .update({ balance: currentBalance.balance - creditsRequired })
       .eq('user_id', userId);
 
-    if (updateError) {
-      console.error("Credits deduction error:", updateError);
-      return new Response(
-        JSON.stringify({ error: "Failed to deduct credits" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    if (deductError) {
+      console.error(`[${correlationId}] Deduction error:`, deductError);
+      return createErrorResponse(
+        new Error('Failed to deduct credits'),
+        correlationId,
+        500,
+        'DEDUCTION_FAILED'
       );
     }
 
-    // Log transaction
-    const { error: transactionError } = await supabaseAdmin
-      .from('credit_transactions')
-      .insert({
-        user_id: userId,
-        amount: -creditsRequired,
-        action: action,
-        provider: provider,
-        notes: `Deducted ${creditsRequired} credits for ${action} using ${provider}`
-      });
-
-    if (transactionError) {
-      console.error("Transaction logging error:", transactionError);
+    // Log transaction (best-effort, don't fail if this errors)
+    try {
+      await supabaseAdmin
+        .from('credit_transactions')
+        .insert({
+          user_id: userId,
+          amount: -creditsRequired,
+          action,
+          provider,
+          description: `Deducted via ${action} (${provider}) - Correlation ID: ${correlationId}`,
+        });
+    } catch (txError) {
+      console.warn(`[${correlationId}] Transaction log warning:`, txError);
     }
 
-    return new Response(
-      JSON.stringify({ 
+    const newBalance = currentBalance.balance - creditsRequired;
+    console.log(`[${correlationId}] Credits deducted successfully:`, {
+      deducted: creditsRequired,
+      newBalance
+    });
+
+    return createSuccessResponse(
+      {
         success: true,
-        remaining_balance: creditsData.balance - creditsRequired,
-        deducted: creditsRequired
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        credits_deducted: creditsRequired,
+        remaining_balance: newBalance,
+      },
+      correlationId
     );
 
   } catch (error) {
-    console.error("Error in deduct-credits function:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createErrorResponse(error, correlationId);
   }
 });

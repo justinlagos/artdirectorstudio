@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Copy, Download, RefreshCw, Wand2, FileJson, Edit2 } from "lucide-react";
+import { Copy, Download, FileJson, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
-import { Separator } from "@/components/ui/separator";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
-import { CreditCostIndicator } from "@/components/CreditCostIndicator";
-import { AnalysisSelect } from "@/components/AnalysisSelect";
+import { CompactSummary } from "./analysis/CompactSummary";
+import { AnalysisGroup } from "./analysis/AnalysisGroup";
+import { PillSelector } from "./analysis/PillSelector";
+import { ColorSwatch } from "./analysis/ColorSwatch";
+import { LivePreviewPanel } from "./analysis/LivePreviewPanel";
+import { useIsMobile } from "@/hooks/use-mobile";
 import jsPDF from "jspdf";
+import { Card } from "@/components/ui/card";
 
 interface ResultsSectionProps {
   result: AnalysisResult;
@@ -20,19 +23,6 @@ interface ResultsSectionProps {
   onDeleteImage: (id: string) => void;
 }
 
-// Predefined intelligent suggestions for each parameter
-const SUGGESTIONS = {
-  subject_gender: ["Male", "Female", "Non-binary", "Androgynous", "Child", "Elderly"],
-  subject_ethnicity: ["Asian", "African", "Caucasian", "Hispanic", "Middle Eastern", "Mixed", "Not specified"],
-  camera_type: ["DSLR Canon 5D", "Sony A7III", "Fujifilm X-T4", "iPhone 15 Pro", "Medium Format Hasselblad", "Film Camera", "Vintage Polaroid"],
-  lighting_type: ["Golden hour sunlight", "Soft window light", "Studio softbox", "Dramatic side lighting", "Neon lighting", "Candlelight", "Overcast natural", "Ring light", "Rembrandt lighting"],
-  dominant_color_1: ["Warm gold", "Deep blue", "Emerald green", "Crimson red", "Soft pink", "Charcoal black", "Pure white", "Burnt orange", "Navy blue"],
-  dominant_color_2: ["Cream", "Sky blue", "Mint green", "Rose", "Lavender", "Slate gray", "Ivory", "Terracotta", "Teal"],
-  art_style: ["Photorealistic", "Cinematic", "Editorial fashion", "Fine art", "Street photography", "Minimalist", "Vintage film", "Contemporary", "Surreal", "Impressionist"],
-  background_type: ["Solid color backdrop", "Natural outdoor", "Urban cityscape", "Studio gradient", "Bokeh blur", "Textured wall", "Abstract patterns", "Empty space"],
-  intended_platform: ["Instagram", "Print magazine", "Website hero", "Portfolio", "Social media ad", "Billboard", "Product catalog", "Art gallery"]
-};
-
 export const ResultsSection = ({ 
   result, 
   onRegenerate, 
@@ -41,10 +31,17 @@ export const ResultsSection = ({
   generatedImages,
   onDeleteImage
 }: ResultsSectionProps) => {
+  const isMobile = useIsMobile();
   const [userEdits, setUserEdits] = useState<UserEdits>({});
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
   const [livePreviewPrompt, setLivePreviewPrompt] = useState(result.full_regeneration_prompt);
   const [modifiedCount, setModifiedCount] = useState(0);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    subject: false,
+    camera: false,
+    color: false,
+    background: false,
+  });
 
   // Load edits from local storage on mount
   useEffect(() => {
@@ -83,23 +80,22 @@ export const ResultsSection = ({
     setModifiedCount(count);
 
     const timeoutId = setTimeout(() => {
-      // Generate live preview by merging edits into prompt
       let preview = result.full_regeneration_prompt;
       
-      // Replace values contextually in the prompt
       Object.entries(userEdits).forEach(([key, value]) => {
         if (value) {
-          // Simple replacement - in production, you'd call the API
           const fieldNames: Record<string, string> = {
-            subject_gender: 'gender',
-            subject_ethnicity: 'ethnicity',
-            camera_type: 'camera',
+            subject_description: 'subject',
+            design_style: 'style',
             lighting_type: 'lighting',
-            dominant_color_1: 'primary color',
-            dominant_color_2: 'secondary color',
-            art_style: 'style',
-            background_type: 'background',
-            intended_platform: 'platform'
+            color_palette: 'colors',
+            camera_composition: 'camera',
+            texture_material: 'texture',
+            mood_emotion: 'mood',
+            background_environment: 'background',
+            artistic_medium: 'medium',
+            art_direction_influence: 'art direction',
+            intended_use: 'intended for'
           };
           
           const fieldName = fieldNames[key] || key;
@@ -116,7 +112,7 @@ export const ResultsSection = ({
     return () => clearTimeout(timeoutId);
   }, [userEdits, result.full_regeneration_prompt]);
 
-  const handleEditChange = (field: keyof UserEdits, value: string) => {
+  const handleEditChange = (field: string, value: string) => {
     setUserEdits(prev => ({
       ...prev,
       [field]: value
@@ -124,13 +120,8 @@ export const ResultsSection = ({
   };
 
   const handleCopyPrompt = () => {
-    navigator.clipboard.writeText(result.full_regeneration_prompt);
+    navigator.clipboard.writeText(livePreviewPrompt);
     toast.success("Prompt copied to clipboard!");
-  };
-
-  const handleCopySection = (content: string, sectionName: string) => {
-    navigator.clipboard.writeText(content);
-    toast.success(`${sectionName} copied to clipboard!`);
   };
 
   const handleDownloadTxt = () => {
@@ -142,7 +133,7 @@ Generated: ${timestamp}
 
 FULL REGENERATION PROMPT
 
-${result.full_regeneration_prompt}
+${livePreviewPrompt}
 
 ═══════════════════════════════════════════════════════════════
 
@@ -186,12 +177,8 @@ ${result.analysis.intended_use}
 
 ═══════════════════════════════════════════════════════════════
 
-USER EDITS (if any):
-${Object.keys(userEdits).length > 0 ? JSON.stringify(userEdits, null, 2) : 'None'}
-
-═══════════════════════════════════════════════════════════════
-
-Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
+USER EDITS:
+${Object.keys(userEdits).length > 0 ? JSON.stringify(userEdits, null, 2) : 'None'}`;
     
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -206,75 +193,11 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     toast.success("TXT file downloaded!");
   };
 
-  const handleDownloadPdf = () => {
-    const timestamp = new Date().toISOString().split('T')[0];
-    const doc = new jsPDF();
-    const margin = 15;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const maxWidth = pageWidth - 2 * margin;
-    let yPos = margin;
-
-    const addText = (text: string, fontSize = 10, isBold = false) => {
-      doc.setFontSize(fontSize);
-      doc.setFont("helvetica", isBold ? "bold" : "normal");
-      const lines = doc.splitTextToSize(text, maxWidth);
-      
-      lines.forEach((line: string) => {
-        if (yPos > doc.internal.pageSize.getHeight() - margin) {
-          doc.addPage();
-          yPos = margin;
-        }
-        doc.text(line, margin, yPos);
-        yPos += fontSize * 0.5;
-      });
-      yPos += 3;
-    };
-
-    addText("AI IMAGE PROMPT RECONSTRUCTION SHEET", 16, true);
-    addText(`Generated: ${timestamp}`, 9);
-    yPos += 5;
-    
-    addText("FULL REGENERATION PROMPT", 14, true);
-    addText(result.full_regeneration_prompt);
-    yPos += 5;
-    
-    addText("COMPREHENSIVE ANALYSIS", 14, true);
-    
-    const analysisFields = [
-      ["1. Image Overview", result.analysis.image_overview],
-      ["2. Subject Description", result.analysis.subject_description],
-      ["3. Camera & Composition", result.analysis.camera_composition],
-      ["4. Lighting", result.analysis.lighting],
-      ["5. Color Palette", result.analysis.color_palette],
-      ["6. Design Style", result.analysis.design_style],
-      ["7. Texture & Material", result.analysis.texture_material],
-      ["8. Mood & Emotion", result.analysis.mood_emotion],
-      ["9. Background & Environment", result.analysis.background_environment],
-      ["10. Artistic Medium", result.analysis.artistic_medium],
-      ["11. Art Direction & Influence", result.analysis.art_direction_influence],
-      ["12. Intended Use", result.analysis.intended_use],
-    ];
-    
-    analysisFields.forEach(([title, content]) => {
-      addText(title, 11, true);
-      addText(content, 10);
-      yPos += 2;
-    });
-    
-    if (Object.keys(userEdits).length > 0) {
-      addText("USER EDITS", 12, true);
-      addText(JSON.stringify(userEdits, null, 2), 9);
-    }
-    
-    doc.save(`prompt-reconstruction-${timestamp}.pdf`);
-    toast.success("PDF downloaded!");
-  };
-
   const handleDownloadJson = () => {
     const timestamp = new Date().toISOString().split('T')[0];
     const jsonData = {
       generated: timestamp,
-      full_regeneration_prompt: result.full_regeneration_prompt,
+      full_regeneration_prompt: livePreviewPrompt,
       analysis: result.analysis,
       user_edits: userEdits,
     };
@@ -296,271 +219,301 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     onRegenerate(userEdits);
   };
 
-  const sections = [
-    { 
-      title: "1. Image Overview", 
-      content: result.analysis.image_overview,
-      key: "image_overview" as const
-    },
-    { 
-      title: "2. Subject Description", 
-      content: result.analysis.subject_description,
-      key: "subject_description" as const,
-      editFields: [
-        { label: "Gender", key: "subject_gender" as keyof UserEdits, options: SUGGESTIONS.subject_gender, helpText: "Specify the gender presentation of the subject" },
-        { label: "Ethnicity/Skin Tone", key: "subject_ethnicity" as keyof UserEdits, options: SUGGESTIONS.subject_ethnicity, helpText: "Define the subject's ethnicity or skin tone" }
-      ]
-    },
-    { 
-      title: "3. Camera & Composition", 
-      content: result.analysis.camera_composition,
-      key: "camera_composition" as const,
-      editFields: [
-        { label: "Camera Type", key: "camera_type" as keyof UserEdits, options: SUGGESTIONS.camera_type, helpText: "Choose the camera type that defines the look and feel" }
-      ]
-    },
-    { 
-      title: "4. Lighting", 
-      content: result.analysis.lighting,
-      key: "lighting" as const,
-      editFields: [
-        { label: "Lighting Type", key: "lighting_type" as keyof UserEdits, options: SUGGESTIONS.lighting_type, helpText: "Select the dominant light source and direction" }
-      ]
-    },
-    { 
-      title: "5. Color Palette", 
-      content: result.analysis.color_palette,
-      key: "color_palette" as const,
-      editFields: [
-        { label: "Dominant Color 1", key: "dominant_color_1" as keyof UserEdits, options: SUGGESTIONS.dominant_color_1, helpText: "Primary color that defines the image mood" },
-        { label: "Dominant Color 2", key: "dominant_color_2" as keyof UserEdits, options: SUGGESTIONS.dominant_color_2, helpText: "Secondary accent color for color harmony" }
-      ]
-    },
-    { 
-      title: "6. Design Style", 
-      content: result.analysis.design_style,
-      key: "design_style" as const,
-      editFields: [
-        { label: "Art Style", key: "art_style" as keyof UserEdits, options: SUGGESTIONS.art_style, helpText: "Visual aesthetic and artistic direction" }
-      ]
-    },
-    { 
-      title: "7. Texture & Material", 
-      content: result.analysis.texture_material,
-      key: "texture_material" as const
-    },
-    { 
-      title: "8. Mood & Emotion", 
-      content: result.analysis.mood_emotion,
-      key: "mood_emotion" as const
-    },
-    { 
-      title: "9. Background & Environment", 
-      content: result.analysis.background_environment,
-      key: "background_environment" as const,
-      editFields: [
-        { label: "Background Type", key: "background_type" as keyof UserEdits, options: SUGGESTIONS.background_type, helpText: "Environment or backdrop behind the subject" }
-      ]
-    },
-    { 
-      title: "10. Artistic Medium", 
-      content: result.analysis.artistic_medium,
-      key: "artistic_medium" as const
-    },
-    { 
-      title: "11. Art Direction & Influence", 
-      content: result.analysis.art_direction_influence,
-      key: "art_direction_influence" as const
-    },
-    { 
-      title: "12. Intended Use", 
-      content: result.analysis.intended_use,
-      key: "intended_use" as const,
-      editFields: [
-        { label: "Intended Platform", key: "intended_platform" as keyof UserEdits, options: SUGGESTIONS.intended_platform, helpText: "Where this image will be published" }
-      ]
-    },
-  ];
+  const handleResetEdits = () => {
+    setUserEdits({});
+    setModifiedCount(0);
+    localStorage.removeItem('prompt_reconstructor_edits');
+    toast.success("All changes reset");
+  };
+
+  const handleQuickChange = (field: string, value: string) => {
+    handleEditChange(field, value);
+  };
+
+  const handleToggleGroup = (groupId: string) => {
+    if (isMobile) {
+      setOpenGroups((prev) => {
+        const newState: Record<string, boolean> = {
+          subject: false,
+          camera: false,
+          color: false,
+          background: false,
+        };
+        newState[groupId] = !prev[groupId];
+        return newState;
+      });
+    } else {
+      setOpenGroups((prev) => ({
+        ...prev,
+        [groupId]: !prev[groupId],
+      }));
+    }
+  };
+
+  const getEditCountForGroup = (groupFields: string[]) => {
+    return groupFields.filter((field) => userEdits[field as keyof UserEdits]).length;
+  };
+
+  const getSummaryValues = () => ({
+    subject: userEdits.subject_description || result.analysis.subject_description || "Not set",
+    style: userEdits.design_style || result.analysis.design_style || "Not set",
+    lighting: userEdits.lighting_type || result.analysis.lighting || "Not set",
+    colors: userEdits.color_palette || result.analysis.color_palette || "Not set",
+  });
 
   return (
-    <section className="space-y-12 animate-fade-in">
-      {/* Full Regeneration Prompt */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-3xl font-display font-bold tracking-tight">
-            Full Regeneration Prompt
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleCopyPrompt}
-              className="shadow-xs"
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Copy
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleDownloadTxt}
-              className="shadow-xs"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              TXT
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleDownloadPdf}
-              className="shadow-xs"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              PDF
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleDownloadJson}
-              className="shadow-xs"
-            >
-              <FileJson className="w-4 h-4 mr-2" />
-              JSON
-            </Button>
-          </div>
-        </div>
-        
-        <div className="relative group">
-          {modifiedCount > 0 && (
-            <div className="absolute -top-2 right-4 z-10 px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full shadow-md animate-fade-in">
-              {modifiedCount} parameter{modifiedCount !== 1 ? 's' : ''} modified
+    <div className="space-y-6 animate-fade-in">
+      <div className={`${isMobile ? "space-y-4" : "grid grid-cols-1 lg:grid-cols-3 gap-6"}`}>
+        {/* Main Content */}
+        <div className={`${isMobile ? "" : "lg:col-span-2"} space-y-4`}>
+          {/* Compact Summary */}
+          <CompactSummary
+            {...getSummaryValues()}
+            onQuickChange={handleQuickChange}
+          />
+
+          {/* Full Prompt Preview */}
+          <Card className="p-6 bg-gradient-to-br from-surface-1 via-surface-2 to-surface-1 border-border/50">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-primary" />
+                Full Regeneration Prompt
+              </h2>
             </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="relative bg-surface-1 rounded-2xl p-8 shadow-subtle ring-1 ring-border/50 hover:shadow-medium hover:ring-border transition-all duration-300">
-            <Textarea
-              value={livePreviewPrompt}
-              readOnly
-              className="min-h-[180px] resize-none bg-transparent border-0 focus-visible:ring-0 text-base leading-relaxed transition-all duration-300"
-            />
-          </div>
-        </div>
-      </div>
+            <div className="bg-surface-2/50 backdrop-blur-sm rounded-lg p-4 border border-border/30">
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {livePreviewPrompt}
+              </p>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button variant="outline" size="sm" onClick={handleCopyPrompt}>
+                <Copy className="w-4 h-4 mr-2" />
+                Copy
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownloadTxt}>
+                <Download className="w-4 h-4 mr-2" />
+                .txt
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownloadJson}>
+                <FileJson className="w-4 h-4 mr-2" />
+                .json
+              </Button>
+            </div>
+          </Card>
 
-      <Separator className="my-12" />
+          {/* Collapsible Groups */}
+          <div className="space-y-3">
+            {/* Group 1: Subject and Style */}
+            <AnalysisGroup
+              title="Subject and Style"
+              icon="🎭"
+              editCount={getEditCountForGroup([
+                "subject_description",
+                "design_style",
+                "artistic_medium",
+                "art_direction_influence",
+              ])}
+              isOpen={openGroups.subject}
+              onToggle={() => handleToggleGroup("subject")}
+            >
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium mb-1">Subject Description</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {result.analysis.subject_description}
+                  </p>
+                  <PillSelector
+                    label="Quick tweaks"
+                    value={userEdits.subject_description || ""}
+                    options={["Softer expression", "More confident pose", "Natural smile", "Direct gaze", "Professional", "Casual"]}
+                    onChange={(val) => handleEditChange("subject_description", val)}
+                    emptyHint="Try adjusting the subject's expression or pose"
+                    quickActions={["Add warmth", "More dynamic"]}
+                  />
+                </div>
 
-      {/* Comprehensive Analysis */}
-      <div className="space-y-8">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h2 className="text-3xl font-display font-bold tracking-tight">
-              Comprehensive Analysis
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Tweak parameters below to regenerate with custom settings
-            </p>
+                <PillSelector
+                  label="Design Style"
+                  value={userEdits.design_style || result.analysis.design_style || ""}
+                  options={["Photorealistic", "Cinematic", "Minimalist", "Vintage", "Modern", "Editorial", "Fine Art"]}
+                  onChange={(val) => handleEditChange("design_style", val)}
+                />
+
+                <PillSelector
+                  label="Artistic Medium"
+                  value={userEdits.artistic_medium || result.analysis.artistic_medium || ""}
+                  options={["Photography", "Digital Art", "Oil Painting", "Watercolor", "Mixed Media", "3D Render"]}
+                  onChange={(val) => handleEditChange("artistic_medium", val)}
+                />
+
+                <PillSelector
+                  label="Art Direction & Influence"
+                  value={userEdits.art_direction_influence || result.analysis.art_direction_influence || ""}
+                  options={["Contemporary", "Classic", "Avant-garde", "Commercial", "Fine Art", "Editorial"]}
+                  onChange={(val) => handleEditChange("art_direction_influence", val)}
+                />
+              </div>
+            </AnalysisGroup>
+
+            {/* Group 2: Camera and Lighting */}
+            <AnalysisGroup
+              title="Camera and Lighting"
+              icon="📷"
+              editCount={getEditCountForGroup(["camera_composition", "lighting_type"])}
+              isOpen={openGroups.camera}
+              onToggle={() => handleToggleGroup("camera")}
+            >
+              <div className="space-y-4">
+                <PillSelector
+                  label="Camera & Composition"
+                  value={userEdits.camera_composition || result.analysis.camera_composition || ""}
+                  options={["Close-up", "Medium shot", "Wide angle", "Portrait", "Landscape", "Macro", "Aerial"]}
+                  onChange={(val) => handleEditChange("camera_composition", val)}
+                />
+
+                <PillSelector
+                  label="Lighting Type"
+                  value={userEdits.lighting_type || result.analysis.lighting || ""}
+                  options={["Soft", "Hard", "Natural", "Studio", "Golden Hour", "Dramatic", "Backlit", "Rim light"]}
+                  onChange={(val) => handleEditChange("lighting_type", val)}
+                  emptyHint="Want softer light or more drama?"
+                  quickActions={["Golden hour", "Studio softbox"]}
+                />
+              </div>
+            </AnalysisGroup>
+
+            {/* Group 3: Color and Material */}
+            <AnalysisGroup
+              title="Color and Material"
+              icon="🎨"
+              editCount={getEditCountForGroup(["color_palette", "texture_material"])}
+              isOpen={openGroups.color}
+              onToggle={() => handleToggleGroup("color")}
+            >
+              <div className="space-y-4">
+                <ColorSwatch
+                  label="Color Palette"
+                  value={userEdits.color_palette || result.analysis.color_palette || ""}
+                  onChange={(val) => handleEditChange("color_palette", val)}
+                />
+
+                <PillSelector
+                  label="Texture & Material"
+                  value={userEdits.texture_material || result.analysis.texture_material || ""}
+                  options={["Smooth", "Rough", "Glossy", "Matte", "Metallic", "Fabric", "Wood", "Stone"]}
+                  onChange={(val) => handleEditChange("texture_material", val)}
+                />
+              </div>
+            </AnalysisGroup>
+
+            {/* Group 4: Background and Mood */}
+            <AnalysisGroup
+              title="Background and Mood"
+              icon="🌄"
+              editCount={getEditCountForGroup([
+                "background_environment",
+                "mood_emotion",
+                "image_overview",
+                "intended_use",
+              ])}
+              isOpen={openGroups.background}
+              onToggle={() => handleToggleGroup("background")}
+            >
+              <div className="space-y-4">
+                <PillSelector
+                  label="Background & Environment"
+                  value={
+                    userEdits.background_environment ||
+                    result.analysis.background_environment ||
+                    ""
+                  }
+                  options={["Studio", "Natural", "Urban", "Abstract", "Gradient", "Solid", "Textured"]}
+                  onChange={(val) => handleEditChange("background_environment", val)}
+                />
+
+                <PillSelector
+                  label="Mood & Emotion"
+                  value={userEdits.mood_emotion || result.analysis.mood_emotion || ""}
+                  options={["Calm", "Energetic", "Mysterious", "Joyful", "Dramatic", "Serene", "Bold"]}
+                  onChange={(val) => handleEditChange("mood_emotion", val)}
+                />
+
+                <div>
+                  <p className="text-sm font-medium mb-1">Image Overview</p>
+                  <p className="text-sm text-muted-foreground">
+                    {result.analysis.image_overview}
+                  </p>
+                </div>
+
+                <PillSelector
+                  label="Intended Use"
+                  value={userEdits.intended_use || result.analysis.intended_use || ""}
+                  options={["Commercial", "Editorial", "Social Media", "Print", "Web", "Advertising", "Portfolio"]}
+                  onChange={(val) => handleEditChange("intended_use", val)}
+                />
+              </div>
+            </AnalysisGroup>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setShowGenerationDialog(true)}
-                className="shadow-sm"
-              >
-                <Wand2 className="w-4 h-4 mr-2" />
+
+          {/* Generate Image Button - Mobile */}
+          {isMobile && (
+            <div className="pb-32">
+              <Button onClick={() => setShowGenerationDialog(true)} size="lg" className="w-full">
+                <Sparkles className="w-5 h-5 mr-2" />
                 Generate Image
               </Button>
-              <CreditCostIndicator cost={3} action="image generation" />
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleRegenerate}
-                disabled={isRegenerating || Object.keys(userEdits).length === 0}
-                className="shadow-xs"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
-                Regenerate
-              </Button>
-              <CreditCostIndicator cost={1} action="prompt refinement" />
-            </div>
-          </div>
+          )}
         </div>
-        
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-          {sections.map((section, index) => (
-            <div 
-              key={index}
-              className="group relative bg-surface-1 rounded-xl p-6 shadow-xs ring-1 ring-border/30 hover:shadow-medium hover:ring-border/60 transition-all duration-300 space-y-4"
-            >
-              {/* Subtle gradient on hover */}
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-primary/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-              
-              <div className="relative flex items-start justify-between gap-2">
-                <h3 className="text-lg font-semibold text-foreground leading-tight">
-                  {section.title}
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleCopySection(section.content, section.title)}
-                  className="shrink-0 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-              
-              <p className="relative text-muted-foreground leading-relaxed text-sm">
-                {section.content}
-              </p>
 
-              {/* Editable Fields */}
-              {section.editFields && section.editFields.length > 0 && (
-                <div className="relative space-y-3 pt-4 border-t border-border/50">
-                  <div className="flex items-center gap-2">
-                    <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Customize
-                    </p>
-                  </div>
-                  {section.editFields.map((field) => (
-                    <AnalysisSelect
-                      key={field.key}
-                      label={field.label}
-                      value={userEdits[field.key] || ''}
-                      onChange={(value) => handleEditChange(field.key, value)}
-                      options={field.options}
-                      placeholder={`Select ${field.label.toLowerCase()}...`}
-                      helpText={field.helpText}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        {/* Live Preview Panel - Desktop Only */}
+        {!isMobile && (
+          <div className="lg:col-span-1">
+            <LivePreviewPanel
+              prompt={livePreviewPrompt}
+              changeCount={modifiedCount}
+              isRegenerating={isRegenerating}
+              onApply={handleRegenerate}
+              onReset={handleResetEdits}
+            />
+            <Button
+              onClick={() => setShowGenerationDialog(true)}
+              size="lg"
+              className="w-full mt-4"
+            >
+              <Sparkles className="w-5 h-5 mr-2" />
+              Generate Image
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Generated Images Gallery */}
-      {generatedImages.length > 0 && (
-        <>
-          <Separator className="my-12" />
-          <GeneratedImagesGallery 
-            images={generatedImages}
-            onDelete={onDeleteImage}
-          />
-        </>
+      {/* Mobile Sticky Footer */}
+      {isMobile && (
+        <LivePreviewPanel
+          prompt={livePreviewPrompt}
+          changeCount={modifiedCount}
+          isRegenerating={isRegenerating}
+          onApply={handleRegenerate}
+          onReset={handleResetEdits}
+        />
       )}
 
       {/* Image Generation Dialog */}
       <ImageGenerationDialog
         open={showGenerationDialog}
         onOpenChange={setShowGenerationDialog}
-        initialPrompt={result.full_regeneration_prompt}
+        initialPrompt={livePreviewPrompt}
         onGenerate={onGenerateImage}
       />
-    </section>
+
+      {/* Generated Images Gallery */}
+      {generatedImages.length > 0 && (
+        <GeneratedImagesGallery
+          images={generatedImages}
+          onDelete={onDeleteImage}
+        />
+      )}
+    </div>
   );
 };

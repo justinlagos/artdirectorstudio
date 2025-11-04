@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = `${window.location.origin}/studio`;
     
     const { error } = await supabase.auth.signUp({
       email,
@@ -52,7 +52,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     
     if (!error) {
-      navigate("/");
+      // Mark beta entry as complete once user signs up
+      localStorage.setItem("beta_entry_complete", "true");
+      navigate("/studio");
     }
     
     return { error };
@@ -65,15 +67,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     
     if (!error) {
-      navigate("/");
+      // Mark beta entry as complete once user logs in
+      localStorage.setItem("beta_entry_complete", "true");
+      navigate("/studio");
     }
     
     return { error };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Sign out error:", error);
+    } finally {
+      // Always clear local state and navigate, even if API call fails
+      setUser(null);
+      setSession(null);
+      sessionStorage.removeItem("invite_code");
+      localStorage.clear();
+      navigate("/welcome");
+    }
   };
 
   return (

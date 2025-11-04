@@ -157,6 +157,7 @@ export type Database = {
           action: Database["public"]["Enums"]["credit_action"]
           amount: number
           asset_id: string | null
+          description: string | null
           id: string
           notes: string | null
           provider: Database["public"]["Enums"]["credit_provider"]
@@ -167,6 +168,7 @@ export type Database = {
           action: Database["public"]["Enums"]["credit_action"]
           amount: number
           asset_id?: string | null
+          description?: string | null
           id?: string
           notes?: string | null
           provider: Database["public"]["Enums"]["credit_provider"]
@@ -177,6 +179,7 @@ export type Database = {
           action?: Database["public"]["Enums"]["credit_action"]
           amount?: number
           asset_id?: string | null
+          description?: string | null
           id?: string
           notes?: string | null
           provider?: Database["public"]["Enums"]["credit_provider"]
@@ -322,6 +325,7 @@ export type Database = {
           bio: string | null
           created_at: string
           email: string
+          has_seen_onboarding: boolean
           id: string
           updated_at: string
           username: string | null
@@ -330,6 +334,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           email: string
+          has_seen_onboarding?: boolean
           id: string
           updated_at?: string
           username?: string | null
@@ -338,6 +343,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           email?: string
+          has_seen_onboarding?: boolean
           id?: string
           updated_at?: string
           username?: string | null
@@ -517,10 +523,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      adjust_user_credits: {
-        Args: { amount: number; target_user_id: string }
-        Returns: undefined
-      }
+      adjust_user_credits:
+        | {
+            Args: {
+              amount: number
+              description_text?: string
+              target_user_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: { amount: number; target_user_id: string }
+            Returns: undefined
+          }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

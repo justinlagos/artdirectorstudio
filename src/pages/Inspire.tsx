@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useNavigationContext } from "@/hooks/useNavigationContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { LAYOUT, PADDING, GRID } from "@/lib/utils/layoutConstants";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,6 +62,7 @@ const Inspire = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { isAdmin } = useAdminCheck();
+  const { captureOrigin } = useNavigationContext();
   const [items, setItems] = useState<InspireItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<InspireItem[]>([]);
   const [displayedItems, setDisplayedItems] = useState<InspireItem[]>([]);
@@ -103,6 +106,8 @@ const Inspire = () => {
 
   const fetchInspireItems = async () => {
     try {
+      console.log("Fetching inspire items, user:", user ? user.email : "signed out");
+      
       const { data, error } = await supabase
         .from("shared_assets")
         .select(`
@@ -131,16 +136,24 @@ const Inspire = () => {
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase query error:", error);
+        throw error;
+      }
+
+      console.log("Received data:", data?.length || 0, "items");
 
       const validItems = (data as unknown as InspireItem[]).filter(
         item => item.asset !== null && item.asset.image_url
       );
       
+      console.log("Valid items after filtering:", validItems.length);
+      
       setItems(validItems);
       setFilteredItems(validItems);
     } catch (error) {
       console.error("Error fetching inspire items:", error);
+      console.error("Full error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
       toast.error("Failed to load inspire gallery");
     } finally {
       setLoading(false);
@@ -251,7 +264,7 @@ const Inspire = () => {
     return (
       <div className="min-h-screen flex flex-col bg-surface-1">
         <Header />
-        <main className="flex-1 container mx-auto px-6 py-12 max-w-7xl">
+        <main className={`flex-1 container mx-auto ${PADDING.responsive} py-12 ${LAYOUT.gallery}`}>
           <div className="space-y-8">
             <Skeleton className="h-48 w-full max-w-3xl mx-auto" />
             <div className="flex gap-4">
@@ -273,10 +286,10 @@ const Inspire = () => {
   return (
     <div className="min-h-screen flex flex-col bg-surface-1">
       <Header />
-      <main className="flex-1 container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-7xl">
+      <main className={`flex-1 container mx-auto ${PADDING.responsive} py-8 sm:py-12 ${LAYOUT.gallery}`}>
         <div className="space-y-6 sm:space-y-8 animate-fade-in">
           {/* Hero Section */}
-          <div className="text-center space-y-4 sm:space-y-6 max-w-4xl mx-auto">
+          <div className={`text-center space-y-4 sm:space-y-6 ${LAYOUT.contentWide} mx-auto`}>
             <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
               <Sparkles className="w-4 h-4" />
               <span className="text-xs sm:text-sm font-medium">Inspire Gallery</span>
@@ -314,7 +327,7 @@ const Inspire = () => {
 
           {/* Content Tabs */}
           <Tabs defaultValue="all" className="w-full">
-            <TabsList className="glass-strong mb-6 w-full sm:w-auto overflow-x-auto flex-nowrap">
+            <TabsList className="glass-strong mb-6 w-full sm:w-auto flex-wrap">
               <TabsTrigger value="all" className="gap-1.5 sm:gap-2 min-h-[44px] flex-shrink-0">
                 <Sparkles className="w-4 h-4" />
                 <span className="hidden sm:inline">All</span> ({filteredItems.length})
@@ -385,7 +398,7 @@ const Inspire = () => {
       <Footer />
 
       {/* Detail Modal */}
-      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+      <Dialog open={!!selectedItem} onOpenChange={() => { setSelectedItem(null); captureOrigin(); }}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           {selectedItem && (
             <div className="space-y-4 sm:space-y-6">

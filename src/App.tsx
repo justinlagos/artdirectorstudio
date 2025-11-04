@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import History from "./pages/History";
 import Admin from "./pages/Admin";
 import Inspire from "./pages/Inspire";
@@ -22,7 +23,10 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
 import NotFound from "./pages/NotFound";
 import Beta from "./pages/Beta";
+import Welcome from "./pages/Welcome";
+import MainLanding from "./pages/MainLanding";
 import { ArtieChat } from "./components/ArtieChat";
+import { ProtectedStudio } from "./components/ProtectedStudio";
 
 const queryClient = new QueryClient();
 
@@ -32,12 +36,20 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
           <AuthProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<Index />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/" element={<MainLanding />} />
               <Route path="/beta" element={<Beta />} />
+              <Route path="/welcome" element={<Welcome />} />
+              <Route path="/studio" element={<ProtectedStudio><Index /></ProtectedStudio>} />
               <Route path="/history" element={<History />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/inspire" element={<Inspire />} />

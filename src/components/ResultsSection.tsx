@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, Download, RefreshCw, Wand2, FileJson } from "lucide-react";
+import { Copy, Download, RefreshCw, Wand2, FileJson, Edit2 } from "lucide-react";
 import { toast } from "sonner";
 import { AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
 import { Separator } from "@/components/ui/separator";
@@ -10,6 +10,8 @@ import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGene
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import jsPDF from "jspdf";
+import { dropdownConfig, imageTypeLabels, type ImageType } from "@/lib/dropdownConfig";
+import { Badge } from "@/components/ui/badge";
 
 interface ResultsSectionProps {
   result: AnalysisResult;
@@ -30,6 +32,10 @@ export const ResultsSection = ({
 }: ResultsSectionProps) => {
   const [userEdits, setUserEdits] = useState<UserEdits>({});
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
+  const [imageType, setImageType] = useState<ImageType>(
+    (result.image_type as ImageType) || "unknown"
+  );
+  const [showTypeOverride, setShowTypeOverride] = useState(false);
 
   // Load edits from local storage on mount
   useEffect(() => {
@@ -236,6 +242,15 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     onRegenerate(userEdits);
   };
 
+  const handleTypeChange = (newType: ImageType) => {
+    setImageType(newType);
+    setShowTypeOverride(false);
+    toast.success(`Switched to ${imageTypeLabels[newType]} mode`);
+  };
+
+  // Get the appropriate dropdown fields based on image type
+  const editFields = dropdownConfig[imageType] || dropdownConfig.unknown;
+
   const sections = [
     { 
       title: "1. Image Overview", 
@@ -246,43 +261,26 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       title: "2. Subject Description", 
       content: result.analysis.subject_description,
       key: "subject_description" as const,
-      editFields: [
-        { label: "Gender", key: "subject_gender" as keyof UserEdits },
-        { label: "Ethnicity/Skin Tone", key: "subject_ethnicity" as keyof UserEdits }
-      ]
     },
     { 
       title: "3. Camera & Composition", 
       content: result.analysis.camera_composition,
       key: "camera_composition" as const,
-      editFields: [
-        { label: "Camera Type", key: "camera_type" as keyof UserEdits }
-      ]
     },
     { 
       title: "4. Lighting", 
       content: result.analysis.lighting,
       key: "lighting" as const,
-      editFields: [
-        { label: "Lighting Type", key: "lighting_type" as keyof UserEdits }
-      ]
     },
     { 
       title: "5. Color Palette", 
       content: result.analysis.color_palette,
       key: "color_palette" as const,
-      editFields: [
-        { label: "Dominant Color 1", key: "dominant_color_1" as keyof UserEdits },
-        { label: "Dominant Color 2", key: "dominant_color_2" as keyof UserEdits }
-      ]
     },
     { 
       title: "6. Design Style", 
       content: result.analysis.design_style,
       key: "design_style" as const,
-      editFields: [
-        { label: "Art Style", key: "art_style" as keyof UserEdits }
-      ]
     },
     { 
       title: "7. Texture & Material", 
@@ -298,9 +296,6 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       title: "9. Background & Environment", 
       content: result.analysis.background_environment,
       key: "background_environment" as const,
-      editFields: [
-        { label: "Background Type", key: "background_type" as keyof UserEdits }
-      ]
     },
     { 
       title: "10. Artistic Medium", 
@@ -316,9 +311,6 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       title: "12. Intended Use", 
       content: result.analysis.intended_use,
       key: "intended_use" as const,
-      editFields: [
-        { label: "Intended Platform", key: "intended_platform" as keyof UserEdits }
-      ]
     },
   ];
 
@@ -387,9 +379,50 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       {/* Comprehensive Analysis */}
       <div className="space-y-8">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-3xl font-display font-bold tracking-tight">
-            Comprehensive Analysis
-          </h2>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-display font-bold tracking-tight">
+              Comprehensive Analysis
+            </h2>
+            
+            {/* Image Type Detection Badge */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground">Detected:</span>
+              <Badge variant="secondary" className="font-medium">
+                {imageTypeLabels[imageType]}
+              </Badge>
+              {result.detection_confidence && result.detection_confidence >= 0.6 && (
+                <span className="text-xs text-muted-foreground">
+                  ({Math.round(result.detection_confidence * 100)}% confidence)
+                </span>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTypeOverride(!showTypeOverride)}
+                className="h-6 px-2 text-xs"
+              >
+                <Edit2 className="w-3 h-3 mr-1" />
+                Change
+              </Button>
+            </div>
+
+            {/* Type Override Pills */}
+            {showTypeOverride && (
+              <div className="flex items-center gap-2 flex-wrap pt-2 animate-fade-in">
+                {(["portrait", "product", "environment", "graphic", "abstract"] as ImageType[]).map((type) => (
+                  <Button
+                    key={type}
+                    variant={imageType === type ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleTypeChange(type)}
+                    className="h-7 text-xs"
+                  >
+                    {imageTypeLabels[type]}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <Button
@@ -445,30 +478,39 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
               <p className="relative text-muted-foreground leading-relaxed text-sm">
                 {section.content}
               </p>
-
-              {/* Editable Fields */}
-              {section.editFields && section.editFields.length > 0 && (
-                <div className="relative space-y-3 pt-4 border-t border-border/50">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Customize
-                  </p>
-                  {section.editFields.map((field) => (
-                    <div key={field.key} className="space-y-1.5">
-                      <label className="text-xs text-muted-foreground font-medium">
-                        {field.label}
-                      </label>
-                      <Input
-                        placeholder={`Enter ${field.label.toLowerCase()}...`}
-                        value={userEdits[field.key] || ''}
-                        onChange={(e) => handleEditChange(field.key, e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           ))}
+        </div>
+
+        {/* Dynamic Editable Fields based on Image Type */}
+        <div className="bg-surface-1 rounded-xl p-6 shadow-xs ring-1 ring-border/30 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Customize Your Prompt</h3>
+            <span className="text-xs text-muted-foreground">
+              Optimized for {imageTypeLabels[imageType].toLowerCase()}
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {editFields.map((field) => (
+              <div key={field.key} className="space-y-2">
+                <label className="text-xs text-muted-foreground font-medium">
+                  {field.label}
+                </label>
+                <select
+                  value={userEdits[field.key as keyof UserEdits] || ''}
+                  onChange={(e) => handleEditChange(field.key as keyof UserEdits, e.target.value)}
+                  className="w-full h-9 px-3 text-sm rounded-md bg-background border border-border hover:border-border/80 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                >
+                  <option value="">Select...</option>
+                  {field.options.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

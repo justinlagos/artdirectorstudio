@@ -12,10 +12,13 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
+import { LAYOUT, PADDING } from "@/lib/utils/layoutConstants";
+import { showErrorToast, showSuccessToast } from "@/lib/utils/toastManager";
 
 // Testimonials component
 const TestimonialsSection = () => {
   const [testimonials, setTestimonials] = useState<any[]>([]);
+  const [showHint, setShowHint] = useState(true);
 
   useEffect(() => {
     const fetchTestimonials = async () => {
@@ -30,44 +33,88 @@ const TestimonialsSection = () => {
     };
 
     fetchTestimonials();
+
+    // Hide hint after first interaction
+    const hasSeenHint = sessionStorage.getItem('testimonials_hint_seen');
+    if (hasSeenHint) setShowHint(false);
   }, []);
+
+  const handleInteraction = () => {
+    if (showHint) {
+      setShowHint(false);
+      sessionStorage.setItem('testimonials_hint_seen', 'true');
+    }
+  };
 
   if (testimonials.length === 0) return null;
 
   return (
-    <section id="testimonials" className="py-20 border-t border-border/40 scroll-mt-14">
+    <section id="testimonials" className={`${PADDING.section} border-t border-border/40 scroll-mt-14`}>
+      <div className={`container mx-auto ${PADDING.responsive} ${LAYOUT.gallery}`}>
       <div className="text-center space-y-4 mb-16">
-        <h2 className="text-4xl font-display font-bold tracking-tight">
+        <h2 className="text-4xl sm:text-5xl font-display font-bold tracking-tight">
           Loved by Creatives
         </h2>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           See what our users are saying
         </p>
+        {showHint && (
+          <p className="text-sm text-muted-foreground/70 animate-fade-in">
+            Drag or swipe to see more →
+          </p>
+        )}
       </div>
-      <div className="relative overflow-hidden px-4">
-        <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
-          {testimonials.map((testimonial) => (
-            <div 
-              key={testimonial.id} 
-              className="glass rounded-2xl p-8 hover-lift min-w-[320px] md:min-w-[380px] snap-center flex-shrink-0"
-            >
-              <p className="text-muted-foreground mb-6 leading-relaxed">
-                "{testimonial.content}"
-              </p>
-              <div className="flex items-center gap-3">
-                {testimonial.avatar_url && (
-                  <img 
-                    src={testimonial.avatar_url} 
-                    alt={testimonial.name}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                )}
-                <div>
-                  <p className="font-semibold">{testimonial.name}</p>
-                  <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+      <div className="relative">
+        {/* Gradient fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+        
+        <div 
+          className="overflow-x-auto pb-6 scrollbar-hide px-4 scroll-smooth"
+          onScroll={handleInteraction}
+          onTouchStart={handleInteraction}
+        >
+          <div className="flex gap-6 min-w-max">
+            {testimonials.map((testimonial) => (
+              <div 
+                key={testimonial.id}
+                className="group relative w-[380px] flex-shrink-0"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative h-full glass border border-border/50 hover:border-primary/30 rounded-2xl p-8 transition-all duration-300">
+                  <p className="text-muted-foreground mb-6 leading-relaxed text-base">
+                    "{testimonial.content}"
+                  </p>
+                  <div className="flex items-center gap-4">
+                    {testimonial.avatar_url ? (
+                      <img 
+                        src={testimonial.avatar_url} 
+                        alt={testimonial.name}
+                        className="w-14 h-14 rounded-full object-cover ring-2 ring-border"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary via-primary/80 to-primary/60 flex items-center justify-center text-primary-foreground text-lg font-bold ring-2 ring-border">
+                        {testimonial.name.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold text-lg">{testimonial.name}</p>
+                      <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Progress indicators */}
+        <div className="flex justify-center gap-2 mt-6">
+          {testimonials.map((_, index) => (
+            <div 
+              key={index}
+              className="w-2 h-2 rounded-full bg-muted-foreground/30"
+            />
           ))}
         </div>
       </div>
@@ -80,6 +127,7 @@ const TestimonialsSection = () => {
           scrollbar-width: none;
         }
       `}</style>
+      </div>
     </section>
   );
 };
@@ -102,6 +150,8 @@ export interface Analysis {
 export interface AnalysisResult {
   full_regeneration_prompt: string;
   analysis: Analysis;
+  image_type?: string;
+  detection_confidence?: number;
 }
 
 export interface UserEdits {
@@ -114,6 +164,18 @@ export interface UserEdits {
   art_style?: string;
   background_type?: string;
   intended_platform?: string;
+  // New fields for enhanced UX
+  subject_description?: string;
+  design_style?: string;
+  color_palette?: string;
+  camera_composition?: string;
+  artistic_medium?: string;
+  art_direction_influence?: string;
+  texture_material?: string;
+  mood_emotion?: string;
+  background_environment?: string;
+  image_overview?: string;
+  intended_use?: string;
 }
 
 export interface GeneratedImage {
@@ -178,7 +240,7 @@ const Index = () => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k' && result) {
         e.preventDefault();
         navigator.clipboard.writeText(result.full_regeneration_prompt);
-        toast.success("Prompt copied!");
+        showSuccessToast("prompt-copy", "Prompt copied!");
       }
     };
 
@@ -205,23 +267,40 @@ const Index = () => {
     setResult(null);
   };
 
-  const handleAnalyze = async (retryCount = 0) => {
+  const handleAnalyze = async () => {
     if (!selectedFile) return;
+
+    // Preflight credit check
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      showErrorToast("analyze-auth", "Please sign in to analyze images");
+      return;
+    }
+
+    // Check credit balance
+    const { data: creditData, error: creditError } = await supabase
+      .from('credits')
+      .select('balance')
+      .eq('user_id', session.user.id)
+      .single();
+
+    if (creditError || !creditData) {
+      showErrorToast("analyze-credit-check", "Unable to check credit balance. Please try again.");
+      return;
+    }
+
+    const ANALYSIS_COST = 1;
+    if (creditData.balance < ANALYSIS_COST) {
+      showErrorToast("analyze-insufficient", "Insufficient credits. You need at least 1 credit to analyze images.");
+      return;
+    }
 
     setIsAnalyzing(true);
     
     try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsAnalyzing(false);
-        return;
-      }
-
-      // First deduct credits
+      // Deduct credits first
       const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "analyze", provider: "lovable" },
+        body: { action: "analysis", provider: "lovable" },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -229,9 +308,9 @@ const Index = () => {
 
       if (deductError || !deductData?.success) {
         if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. Please purchase more credits.");
+          showErrorToast("analyze-deduct", "Insufficient credits. Please purchase more credits.");
         } else {
-          toast.error("Failed to process payment. Please try again.");
+          showErrorToast("analyze-payment", "Failed to process payment. Please try again.");
         }
         setIsAnalyzing(false);
         return;
@@ -241,44 +320,38 @@ const Index = () => {
       const reader = new FileReader();
       reader.readAsDataURL(selectedFile);
       
-      reader.onload = async () => {
-        const base64Image = reader.result as string;
-        
-        const { data, error } = await supabase.functions.invoke("analyze-image", {
-          body: { image: base64Image },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
+      await new Promise<void>((resolve, reject) => {
+        reader.onload = async () => {
+          try {
+            const base64Image = reader.result as string;
+            const { analyzeImage } = await import("@/lib/services/generationService");
+            
+            const result = await analyzeImage(base64Image);
 
-        if (error) {
-          console.error("Analysis error:", error);
-          toast.error("Failed to analyze image. Please try again.");
-          setIsAnalyzing(false);
-          return;
-        }
+            if (!result.success) {
+              showErrorToast("analyze-result", result.error || "Failed to analyze image");
+              setIsAnalyzing(false);
+              return;
+            }
 
-        setResult(data as AnalysisResult);
-        setIsAnalyzing(false);
-        toast.success(`Image analyzed! ${deductData.remaining_balance} credits remaining.`);
-      };
+            setResult(result.data);
+            showSuccessToast("analyze-success", "Image analyzed successfully!");
+            resolve();
+          } catch (error) {
+            reject(error);
+          } finally {
+            setIsAnalyzing(false);
+          }
+        };
 
-      reader.onerror = () => {
-        toast.error("Failed to read image file.");
-        setIsAnalyzing(false);
-      };
+        reader.onerror = () => {
+          reject(new Error("Failed to read image file"));
+        };
+      });
     } catch (error) {
       console.error("Error during analysis:", error);
-      const errorMsg = error instanceof Error ? error.message : "An error occurred during analysis.";
-      toast.error(errorMsg);
+      showErrorToast("analyze-error", "An error occurred during analysis.");
       setIsAnalyzing(false);
-      
-      // Retry logic for network errors
-      if (retryCount < 2 && errorMsg.toLowerCase().includes('network')) {
-        toast.info("Retrying analysis...");
-        setTimeout(() => handleAnalyze(retryCount + 1), 1000);
-        return;
-      }
     }
   };
 
@@ -341,90 +414,35 @@ const Index = () => {
     }
   };
 
-  const handleGenerateImage = async (prompt: string, options: GenerationOptions, retryCount = 0): Promise<string | null> => {
+  const handleGenerateImage = async (prompt: string, options: GenerationOptions): Promise<string | null> => {
     try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
+      const { generateImage } = await import("@/lib/services/generationService");
+      
+      const result = await generateImage(prompt, options);
+
+      if (!result.success) {
+        toast.error(result.error || "Failed to generate image");
         return null;
       }
 
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "generate", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 3 credits to generate an image.");
-        } else {
-          toast.error("Failed to process payment. Please try again.");
-        }
-        return null;
-      }
-
-      // Call generate-image edge function
-      const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: { 
-          prompt,
-          quality: options.quality,
-          size: options.size,
-          background: options.background
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) {
-        console.error("Generation error:", error);
+      if (result.imageUrl) {
+        // Add to generated images list
+        const newImage: GeneratedImage = {
+          id: result.assetId || crypto.randomUUID(),
+          imageUrl: result.imageUrl,
+          prompt: prompt,
+          timestamp: new Date()
+        };
         
-        if (error.message?.includes("Rate limit")) {
-          toast.error("Too many requests. Please wait a moment and try again.");
-        } else if (error.message?.includes("credits exhausted")) {
-          toast.error("AI service temporarily unavailable. Please try again later.");
-        } else {
-          toast.error("Failed to generate image. Please try again.");
-        }
-        return null;
+        setGeneratedImages(prev => [newImage, ...prev]);
+        toast.success("Image generated successfully!");
+        return result.imageUrl;
       }
 
-      if (!data?.image) {
-        toast.error("Failed to generate image. Please try again.");
-        return null;
-      }
-
-      // Add to generated images list
-      const newImage: GeneratedImage = {
-        id: data.assetId || crypto.randomUUID(),
-        imageUrl: data.image,
-        prompt: prompt,
-        timestamp: new Date()
-      };
-      
-      setGeneratedImages(prev => [newImage, ...prev]);
-      toast.success(`Image generated! ${deductData.remaining_balance} credits remaining.`);
-      
-      return data.image;
+      return null;
     } catch (error) {
       console.error("Error during image generation:", error);
-      const errorMsg = error instanceof Error ? error.message : "An error occurred during image generation.";
-      toast.error(errorMsg);
-      
-      // Retry logic for network errors
-      if (retryCount < 2 && errorMsg.toLowerCase().includes('network')) {
-        toast.info("Retrying generation...");
-        return new Promise(resolve => {
-          setTimeout(() => {
-            resolve(handleGenerateImage(prompt, options, retryCount + 1));
-          }, 1000);
-        });
-      }
-      
+      toast.error("An error occurred during image generation.");
       return null;
     }
   };
@@ -440,8 +458,8 @@ const Index = () => {
       
       {/* Hero Section */}
       <section id="hero" className="relative overflow-hidden border-b border-border/40 bg-gradient-to-b from-background via-background to-surface-1/30">
-        <div className="container mx-auto px-4 py-20 md:py-32">
-          <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
+        <div className={`container mx-auto ${PADDING.responsive} py-20 md:py-32`}>
+          <div className={`${LAYOUT.contentWide} mx-auto text-center ${PADDING.sectionInner} animate-fade-in`}>
             <h1 className="text-5xl md:text-7xl font-display font-bold leading-tight tracking-tight">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white">
                 ArtDirector Studio
@@ -454,7 +472,7 @@ const Index = () => {
         </div>
       </section>
       
-      <main id="studio" className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
+      <main id="studio" className={`flex-1 container mx-auto ${PADDING.responsive} py-8 ${LAYOUT.contentWide}`}>
         <div className="space-y-16 animate-fade-in">
           <UploadSection
             onFileSelect={handleFileSelect}
@@ -493,8 +511,8 @@ const Index = () => {
           )}
 
           {/* How It Works Section */}
-          <section id="how-it-works" className="py-20 border-t border-border/40 scroll-mt-14">
-            <div className="text-center space-y-4 mb-16">
+          <section id="how-it-works" className={`${PADDING.section} border-t border-border/40 scroll-mt-14`}>
+            <div className={`text-center ${PADDING.sectionInner} mb-16`}>
               <h2 className="text-4xl font-display font-bold tracking-tight">
                 How It Works
               </h2>
@@ -553,10 +571,10 @@ const Index = () => {
           <TestimonialsSection />
 
           {/* Trust Section */}
-          <section id="trust" className="py-20 border-t border-border/40 scroll-mt-14">
+          <section id="trust" className={`${PADDING.section} border-t border-border/40 scroll-mt-14`}>
             <div className="glass rounded-2xl overflow-hidden">
-              <div className="p-12 md:p-16">
-                <div className="max-w-3xl mx-auto text-center space-y-6">
+              <div className={`p-12 md:p-16 ${LAYOUT.content} mx-auto`}>
+                <div className={`text-center ${PADDING.sectionInner}`}>
                   <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight">
                     Built for Creators, Privacy First
                   </h2>
