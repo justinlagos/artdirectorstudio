@@ -32,6 +32,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY')!
     );
 
+    // Create admin client for later use
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
     const { action, provider } = await req.json();
 
     console.log(`[${correlationId}] Deducting credits for:`, { userId, action, provider });
@@ -67,11 +73,11 @@ serve(async (req) => {
     const creditsRequired = pricingData.credits;
 
     // Check current balance
-    const { data: currentBalance, error: balanceError } = await supabaseClient
+    let { data: currentBalance, error: balanceError } = await supabaseClient
       .from('credits')
       .select('balance')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (balanceError) {
       console.error(`[${correlationId}] Balance check error:`, balanceError);
@@ -81,6 +87,27 @@ serve(async (req) => {
         500,
         'BALANCE_CHECK_FAILED'
       );
+    }
+
+    // If no credits record exists, create one with default balance
+    if (!currentBalance) {
+      console.log(`[${correlationId}] Creating credits record for user ${userId}`);
+      const { error: createError } = await supabaseAdmin
+        .from('credits')
+        .insert({ user_id: userId, balance: 50 });
+      
+      if (createError) {
+        console.error(`[${correlationId}] Failed to create credits record:`, createError);
+        return createErrorResponse(
+          new Error('Failed to initialize credit balance'),
+          correlationId,
+          500,
+          'CREDIT_INIT_FAILED'
+        );
+      }
+      
+      // Set balance to 50 for the deduction check
+      currentBalance = { balance: 50 };
     }
 
     if (currentBalance.balance < creditsRequired) {
@@ -95,12 +122,6 @@ serve(async (req) => {
         'INSUFFICIENT_CREDITS'
       );
     }
-
-    // Use service role for deduction (idempotent operation)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
 
     // Deduct credits
     const { error: deductError } = await supabaseAdmin
