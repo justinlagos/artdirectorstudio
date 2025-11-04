@@ -71,11 +71,22 @@ export async function handleUpscale({
 
       if (error) {
         console.error(`[Upscale:${requestId}] Edge function error:`, error);
-        throw new Error(error.message || "Upscale operation failed");
+        
+        // Check if this is a retriable error
+        const isRetriable = error.message?.includes("timeout") || 
+                           error.message?.includes("network") ||
+                           !error.message?.includes("Insufficient credits");
+        
+        throw new Error(
+          isRetriable 
+            ? "Upscale timed out. Please try again." 
+            : error.message || "Upscale operation failed"
+        );
       }
 
       if (!data?.image) {
-        throw new Error("No image returned from upscale operation");
+        console.error(`[Upscale:${requestId}] Empty response:`, data);
+        throw new Error("No image returned from upscale operation. Please try again.");
       }
 
       onProgress?.(100);

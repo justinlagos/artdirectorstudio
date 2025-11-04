@@ -102,20 +102,20 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
         requestId: reqId,
       });
 
-      // Update final results
-      result.results.forEach((res, idx) => {
-        setImages(prev =>
-          prev.map((img, i) =>
-            i === idx
-              ? {
-                  ...img,
-                  status: res.success ? 'completed' as const : 'error' as const,
-                  result: res.data?.full_regeneration_prompt,
-                  error: res.error
-                }
-              : img
-          )
-        );
+      // Update final results - use functional update to ensure we have latest state
+      setImages(prev => {
+        const updated = [...prev];
+        result.results.forEach((res, idx) => {
+          if (updated[idx]) {
+            updated[idx] = {
+              ...updated[idx],
+              status: res.success ? 'completed' as const : 'error' as const,
+              result: res.data?.full_regeneration_prompt,
+              error: res.error
+            };
+          }
+        });
+        return updated;
       });
 
       const successCount = result.results.filter(r => r.success).length;
@@ -234,25 +234,35 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
 
           {/* Images List */}
           {images.length > 0 && (
-            <ScrollArea className="flex-1 border rounded-lg">
+            <ScrollArea className="flex-1 border rounded-lg max-h-[400px]">
               <div className="space-y-2 p-4">
                 {images.map((img) => (
                   <div 
                     key={img.id}
-                    className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg"
+                    className="flex items-start gap-3 p-3 bg-card border border-border rounded-lg"
                   >
                     <img 
                       src={img.preview} 
                       alt={img.file.name}
-                      className="w-16 h-16 object-cover rounded"
+                      className="w-16 h-16 object-cover rounded flex-shrink-0"
                     />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 space-y-1">
                       <p className="text-sm font-medium truncate">{img.file.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {(img.file.size / 1024).toFixed(1)} KB
                       </p>
+                      {img.status === 'completed' && img.result && (
+                        <p className="text-xs text-green-600 dark:text-green-400 line-clamp-2">
+                          ✓ Analysis complete
+                        </p>
+                      )}
+                      {img.status === 'error' && img.error && (
+                        <p className="text-xs text-red-600 dark:text-red-400 line-clamp-2">
+                          ✗ {img.error}
+                        </p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       {getStatusIcon(img.status)}
                       {img.status === 'pending' && !isProcessing && (
                         <Button

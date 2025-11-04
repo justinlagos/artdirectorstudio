@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import {
   corsHeaders,
   handleCorsPreflightRequest,
@@ -6,11 +7,14 @@ import {
   createSuccessResponse,
   generateCorrelationId,
   validateEnvVars,
+  extractUserIdFromJWT,
   fetchWithTimeout,
   retryWithBackoff,
   isRetryableError,
   logRequest,
 } from "../_shared/edgeFunctionUtils.ts";
+
+const BLEND_COST = 2;
 
 serve(async (req) => {
   const correlationId = generateCorrelationId();
@@ -24,12 +28,15 @@ serve(async (req) => {
     logRequest(req.method, '/blend-images', correlationId);
     
     // Validate required environment variables
-    validateEnvVars(['LOVABLE_API_KEY'], correlationId);
+    validateEnvVars(['LOVABLE_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'], correlationId);
+
+    // Extract user ID from JWT
+    const userId = extractUserIdFromJWT(req.headers.get('Authorization'), correlationId);
 
     const { images, instruction, request_id } = await req.json();
     const requestId = request_id || correlationId;
     
-    console.log(`[${correlationId}] [RequestID:${requestId}] Blending ${images?.length} images with instruction:`, instruction);
+    console.log(`[${correlationId}] [RequestID:${requestId}] User ${userId} blending ${images?.length} images`);
 
     // Validate input
     if (!images || !Array.isArray(images) || images.length < 2) {
@@ -49,6 +56,84 @@ serve(async (req) => {
         'TOO_MANY_IMAGES'
       );
     }
+
+    // ATOMIC CREDIT TRANSACTION - Check, log, deduct
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // Check balance
+    const { data: creditData, error: creditError } = await supabaseAdmin
+      .from('credits')
+      .select('balance')
+      .eq('user_id', userId)
+      .single();
+
+    if (creditError || !creditData) {
+      return createErrorResponse(
+        new Error('Failed to check credit balance'),
+        correlationId,
+        500,
+        'BALANCE_CHECK_FAILED'
+      );
+    }
+
+    if (creditData.balance < BLEND_COST) {
+      return createErrorResponse(
+        new Error(`Insufficient credits. Required: ${BLEND_COST}, Available: ${creditData.balance}`),
+        correlationId,
+        402,
+        'INSUFFICIENT_CREDITS'
+      );
+    }
+
+    // Log transaction first (idempotency record)
+    const { error: txError } = await supabaseAdmin
+      .from('credit_transactions')
+      .insert({
+        user_id: userId,
+        amount: -BLEND_COST,
+        action: 'blend',
+        provider: 'lovable',
+        description: `Blend operation (Request ID: ${requestId}) - Correlation ID: ${correlationId}`,
+      });
+
+    if (txError) {
+      console.error(`[${correlationId}] Failed to log transaction:`, txError);
+      return createErrorResponse(
+        new Error('Failed to record transaction'),
+        correlationId,
+        500,
+        'TRANSACTION_LOG_FAILED'
+      );
+    }
+
+    // Deduct credits
+    const { error: deductError } = await supabaseAdmin
+      .from('credits')
+      .update({ balance: creditData.balance - BLEND_COST })
+      .eq('user_id', userId);
+
+    if (deductError) {
+      console.error(`[${correlationId}] Credit deduction error:`, deductError);
+      
+      // Rollback transaction log
+      await supabaseAdmin
+        .from('credit_transactions')
+        .delete()
+        .eq('user_id', userId)
+        .contains('description', correlationId);
+      
+      return createErrorResponse(
+        new Error('Failed to deduct credits'),
+        correlationId,
+        500,
+        'CREDIT_DEDUCTION_FAILED'
+      );
+    }
+
+    console.log(`[${correlationId}] Credits deducted successfully`);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
 
@@ -131,8 +216,23 @@ serve(async (req) => {
     const blendedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!blendedImageUrl) {
+      console.error(`[${correlationId}] No image in blend response`);
+      
+      // Refund credits on API failure
+      await supabaseAdmin
+        .from('credits')
+        .update({ balance: creditData.balance })
+        .eq('user_id', userId);
+      
+      // Remove transaction log
+      await supabaseAdmin
+        .from('credit_transactions')
+        .delete()
+        .eq('user_id', userId)
+        .contains('description', correlationId);
+      
       return createErrorResponse(
-        new Error('No blended image returned from API'),
+        new Error('No blended image returned from API. Credits have been refunded.'),
         correlationId,
         500,
         'NO_IMAGE_RETURNED'

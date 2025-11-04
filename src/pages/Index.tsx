@@ -257,9 +257,61 @@ const Index = () => {
   const handleAnalyze = async () => {
     if (!selectedFile) return;
 
+    // Preflight credit check
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error("Please sign in to analyze images");
+      return;
+    }
+
+    // Check credit balance
+    const { data: creditData, error: creditError } = await supabase
+      .from('credits')
+      .select('balance')
+      .eq('user_id', session.user.id)
+      .single();
+
+    if (creditError || !creditData) {
+      toast.error("Unable to check credit balance. Please try again.");
+      return;
+    }
+
+    const ANALYSIS_COST = 1;
+    if (creditData.balance < ANALYSIS_COST) {
+      toast.error(
+        "Insufficient credits",
+        {
+          description: "You need at least 1 credit to analyze images",
+          action: {
+            label: "Buy Credits",
+            onClick: () => navigate("/")
+          }
+        }
+      );
+      return;
+    }
+
     setIsAnalyzing(true);
     
     try {
+      // Deduct credits first
+      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
+        body: { action: "analysis", provider: "lovable" },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (deductError || !deductData?.success) {
+        if (deductError?.message?.includes("Insufficient credits")) {
+          toast.error("Insufficient credits. Please purchase more credits.");
+        } else {
+          toast.error("Failed to process payment. Please try again.");
+        }
+        setIsAnalyzing(false);
+        return;
+      }
+
       // Convert file to base64
       const reader = new FileReader();
       reader.readAsDataURL(selectedFile);
