@@ -3,8 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserMenu } from "./UserMenu";
-import { CreditBalance } from "./CreditBalance";
-import { useCredits } from "@/hooks/useCredits";
+import { SubscriptionStatus } from "./SubscriptionStatus";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Menu, Sparkles, Home, BarChart3, Layers, Maximize2, ImageIcon, Coins, Wrench, ChevronDown } from "lucide-react";
 import { useState } from "react";
@@ -21,12 +20,7 @@ import { ToolDialog } from "./ToolDialog";
 export const Header = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { balance: credits } = useCredits();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const handleBuyCredits = () => {
-    navigate("/settings");
-  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -114,20 +108,6 @@ export const Header = () => {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              {/* Credits - Compact on mobile */}
-              <div className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] justify-center">
-                <Coins className="h-4 w-4" />
-                <span className="text-sm font-medium">{credits}</span>
-              </div>
-              
-              {/* Buy Credits - Hidden on mobile, in menu instead */}
-              <Button
-                onClick={handleBuyCredits}
-                size="sm"
-                className="hidden md:flex"
-              >
-                Buy Credits
-              </Button>
               <ThemeToggle />
               <UserMenu />
             </>
@@ -254,25 +234,6 @@ export const Header = () => {
                   )}
                 </nav>
                 
-                {user && (
-                  <>
-                    <Separator className="my-6" />
-                    
-                    {/* User Actions */}
-                    <div className="space-y-3">
-                      <Button 
-                        onClick={() => {
-                          handleBuyCredits();
-                          setMobileMenuOpen(false);
-                        }}
-                        size="lg"
-                        className="w-full min-h-[48px]"
-                      >
-                        Buy Credits
-                      </Button>
-                    </div>
-                  </>
-                )}
               </div>
             </SheetContent>
           </Sheet>

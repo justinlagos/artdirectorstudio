@@ -20,6 +20,8 @@ import Cookies from "./pages/Cookies";
 import SharedAsset from "./pages/SharedAsset";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
+import SubscriptionSuccess from "./pages/SubscriptionSuccess";
+import SignedOut from "./pages/SignedOut";
 import NotFound from "./pages/NotFound";
 import { ArtieChat } from "./components/ArtieChat";
 
@@ -51,6 +53,8 @@ const App = () => (
               <Route path="/share/:slug" element={<SharedAsset />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/payment-cancelled" element={<PaymentCancelled />} />
+              <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+              <Route path="/signed-out" element={<SignedOut />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

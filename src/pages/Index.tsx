@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { UploadSection } from "@/components/UploadSection";
 import { LoadingState } from "@/components/LoadingState";
 import { ResultsSection } from "@/components/ResultsSectionEnhanced";
-import { Tutorial } from "@/components/Tutorial";
+import { OnboardingPopup } from "@/components/OnboardingPopup";
 import { Footer } from "@/components/Footer";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { Button } from "@/components/ui/button";
@@ -132,24 +132,6 @@ const Index = () => {
         return;
       }
 
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "analyze", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. Please purchase more credits.");
-        } else {
-          toast.error("Failed to process payment. Please try again.");
-        }
-        setIsAnalyzing(false);
-        return;
-      }
-
       // Convert file to base64
       const reader = new FileReader();
       reader.readAsDataURL(selectedFile);
@@ -173,7 +155,7 @@ const Index = () => {
 
         setResult(data as AnalysisResult);
         setIsAnalyzing(false);
-        toast.success(`Image analyzed! ${deductData.remaining_balance} credits remaining.`);
+        toast.success("Image analyzed successfully!");
       };
 
       reader.onerror = () => {
@@ -209,24 +191,6 @@ const Index = () => {
         return;
       }
 
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "refine", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. Please purchase more credits.");
-        } else {
-          toast.error("Failed to process payment. Please try again.");
-        }
-        setIsAnalyzing(false);
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke("regenerate-prompt", {
         body: { 
           base_analysis: result.analysis,
@@ -246,7 +210,7 @@ const Index = () => {
 
       setResult(data as AnalysisResult);
       setIsAnalyzing(false);
-      toast.success(`Prompt regenerated! ${deductData.remaining_balance} credits remaining.`);
+      toast.success("Prompt regenerated successfully!");
     } catch (error) {
       console.error("Error during regeneration:", error);
       toast.error("An error occurred during regeneration.");
@@ -260,23 +224,6 @@ const Index = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Please log in to continue.");
-        return null;
-      }
-
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "generate", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 3 credits to generate an image.");
-        } else {
-          toast.error("Failed to process payment. Please try again.");
-        }
         return null;
       }
 
@@ -320,7 +267,7 @@ const Index = () => {
       };
       
       setGeneratedImages(prev => [newImage, ...prev]);
-      toast.success(`Image generated! ${deductData.remaining_balance} credits remaining.`);
+      toast.success("Image generated successfully!");
       
       return data.image;
     } catch (error) {
@@ -348,7 +295,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Tutorial />
+      <OnboardingPopup />
       <Header />
       
       {/* Hero Section */}
