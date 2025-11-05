@@ -10,9 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { PricingManagement } from "@/components/admin/PricingManagement";
-import { AdminUserManagement } from "@/components/admin/AdminUserManagement";
-import { SystemHealth } from "@/components/admin/SystemHealth";
-import { AdminBetaManagement } from "@/components/admin/AdminBetaManagement";
 import { Shield } from "lucide-react";
 
 const Admin = () => {
@@ -52,28 +49,13 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 sm:grid-cols-5">
+          <TabsList>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="beta">Beta</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="health">Health</TabsTrigger>
-            <TabsTrigger value="pricing">Pricing</TabsTrigger>
+            <TabsTrigger value="pricing">Pricing Management</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="analytics" className="space-y-6">
+          <TabsContent value="analytics">
             <AdminAnalytics />
-          </TabsContent>
-
-          <TabsContent value="beta">
-            <AdminBetaManagement />
-          </TabsContent>
-
-          <TabsContent value="users">
-            <AdminUserManagement />
-          </TabsContent>
-
-          <TabsContent value="health">
-            <SystemHealth />
           </TabsContent>
 
           <TabsContent value="pricing">

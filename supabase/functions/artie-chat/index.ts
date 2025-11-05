@@ -42,6 +42,11 @@ Response style:
 - Keep responses focused and actionable (2-4 paragraphs max)
 - When brainstorming, offer 2-3 specific directions
 
+Image generation:
+- When users request images, use the generate_image tool
+- Ask clarifying questions if needed (orientation, style, mood)
+- After generating, briefly describe what you created
+
 Platform features:
 - **Analyze**: Upload images to get AI prompt reconstruction (1 credit)
 - **Regenerate**: Refine prompts with custom parameters (2 credits)
@@ -72,7 +77,26 @@ Always be ready to switch between ideation, guidance, and execution seamlessly.`
           { role: 'system', content: systemPrompt },
           ...messages
         ],
-        stream: false,
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'generate_image',
+              description: 'Generate an image based on a text description. Use this when users ask you to create, generate, visualize, or show them an image.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  prompt: {
+                    type: 'string',
+                    description: 'Detailed description of the image to generate. Be specific about style, composition, lighting, colors, and mood.'
+                  }
+                },
+                required: ['prompt']
+              }
+            }
+          }
+        ],
+        stream: true,
       }),
     });
 
@@ -88,19 +112,12 @@ Always be ready to switch between ideation, guidance, and execution seamlessly.`
       );
     }
 
-    const data = await response.json();
-    const aiResponse = data.choices?.[0]?.message?.content;
-
-    if (!aiResponse) {
-      throw new Error('No response content from AI');
-    }
-
-    return new Response(
-      JSON.stringify({ response: aiResponse }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    return new Response(response.body, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+      },
+    });
   } catch (error) {
     console.error('Error in artie-chat function:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

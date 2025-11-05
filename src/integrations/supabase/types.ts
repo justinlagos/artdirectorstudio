@@ -14,144 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      asset_bookmarks: {
-        Row: {
-          created_at: string | null
-          id: string
-          shared_asset_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          shared_asset_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          shared_asset_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "asset_bookmarks_shared_asset_id_fkey"
-            columns: ["shared_asset_id"]
-            isOneToOne: false
-            referencedRelation: "shared_assets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      asset_likes: {
-        Row: {
-          created_at: string | null
-          id: string
-          shared_asset_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          shared_asset_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          shared_asset_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "asset_likes_shared_asset_id_fkey"
-            columns: ["shared_asset_id"]
-            isOneToOne: false
-            referencedRelation: "shared_assets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      beta_invites: {
-        Row: {
-          code: string
-          created_at: string
-          email: string
-          expires_at: string
-          id: string
-          used_at: string | null
-          waitlist_id: string | null
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          email: string
-          expires_at: string
-          id?: string
-          used_at?: string | null
-          waitlist_id?: string | null
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          email?: string
-          expires_at?: string
-          id?: string
-          used_at?: string | null
-          waitlist_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "beta_invites_waitlist_id_fkey"
-            columns: ["waitlist_id"]
-            isOneToOne: false
-            referencedRelation: "beta_waitlist"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      beta_waitlist: {
-        Row: {
-          activated_at: string | null
-          consent: boolean
-          created_at: string
-          email: string
-          id: string
-          invite_sent_at: string | null
-          metadata: Json | null
-          name: string | null
-          source: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          activated_at?: string | null
-          consent?: boolean
-          created_at?: string
-          email: string
-          id?: string
-          invite_sent_at?: string | null
-          metadata?: Json | null
-          name?: string | null
-          source?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          activated_at?: string | null
-          consent?: boolean
-          created_at?: string
-          email?: string
-          id?: string
-          invite_sent_at?: string | null
-          metadata?: Json | null
-          name?: string | null
-          source?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       credit_transactions: {
         Row: {
           action: Database["public"]["Enums"]["credit_action"]
@@ -206,33 +68,6 @@ export type Database = {
         }
         Relationships: []
       }
-      funnel_metrics: {
-        Row: {
-          created_at: string
-          email: string | null
-          event_type: string
-          id: string
-          metadata: Json | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          email?: string | null
-          event_type: string
-          id?: string
-          metadata?: Json | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string | null
-          event_type?: string
-          id?: string
-          metadata?: Json | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       generated_assets: {
         Row: {
           analysis_data: Json | null
@@ -260,36 +95,6 @@ export type Database = {
           prompt?: string | null
           type?: Database["public"]["Enums"]["asset_type"]
           user_id?: string
-        }
-        Relationships: []
-      }
-      newsletter_subscribers: {
-        Row: {
-          email: string
-          id: string
-          metadata: Json | null
-          source: string | null
-          status: string
-          subscribed_at: string
-          unsubscribed_at: string | null
-        }
-        Insert: {
-          email: string
-          id?: string
-          metadata?: Json | null
-          source?: string | null
-          status?: string
-          subscribed_at?: string
-          unsubscribed_at?: string | null
-        }
-        Update: {
-          email?: string
-          id?: string
-          metadata?: Json | null
-          source?: string | null
-          status?: string
-          subscribed_at?: string
-          unsubscribed_at?: string | null
         }
         Relationships: []
       }
@@ -347,42 +152,30 @@ export type Database = {
       shared_assets: {
         Row: {
           asset_id: string
-          bookmark_count: number | null
           created_at: string
-          featured: boolean | null
           id: string
           is_public: boolean
-          like_count: number | null
           share_token: string
-          tags: Json | null
           updated_at: string
           user_id: string
           view_count: number
         }
         Insert: {
           asset_id: string
-          bookmark_count?: number | null
           created_at?: string
-          featured?: boolean | null
           id?: string
           is_public?: boolean
-          like_count?: number | null
           share_token: string
-          tags?: Json | null
           updated_at?: string
           user_id: string
           view_count?: number
         }
         Update: {
           asset_id?: string
-          bookmark_count?: number | null
           created_at?: string
-          featured?: boolean | null
           id?: string
           is_public?: boolean
-          like_count?: number | null
           share_token?: string
-          tags?: Json | null
           updated_at?: string
           user_id?: string
           view_count?: number
@@ -403,63 +196,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      testimonials: {
-        Row: {
-          avatar_url: string | null
-          content: string
-          created_at: string
-          display_order: number
-          featured: boolean
-          id: string
-          name: string
-          role: string
-          updated_at: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          content: string
-          created_at?: string
-          display_order?: number
-          featured?: boolean
-          id?: string
-          name: string
-          role: string
-          updated_at?: string
-        }
-        Update: {
-          avatar_url?: string | null
-          content?: string
-          created_at?: string
-          display_order?: number
-          featured?: boolean
-          id?: string
-          name?: string
-          role?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      user_follows: {
-        Row: {
-          created_at: string | null
-          follower_id: string
-          following_id: string
-          id: string
-        }
-        Insert: {
-          created_at?: string | null
-          follower_id: string
-          following_id: string
-          id?: string
-        }
-        Update: {
-          created_at?: string | null
-          follower_id?: string
-          following_id?: string
-          id?: string
-        }
-        Relationships: []
       }
       user_preferences: {
         Row: {
@@ -517,10 +253,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      adjust_user_credits: {
-        Args: { amount: number; target_user_id: string }
-        Returns: undefined
-      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

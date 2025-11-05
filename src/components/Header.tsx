@@ -16,23 +16,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
 import { Separator } from "./ui/separator";
-import { ImageBlendDialogEnhanced } from "./ImageBlendDialogEnhanced";
-import { ImageUpscaleDialog } from "./ImageUpscaleDialog";
-import { BatchProcessDialog } from "./BatchProcessDialog";
-import { CreditPurchaseDialog } from "./CreditPurchaseDialog";
+import { ToolDialog } from "./ToolDialog";
 
 export const Header = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { balance: credits } = useCredits();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showBlendDialog, setShowBlendDialog] = useState(false);
-  const [showUpscaleDialog, setShowUpscaleDialog] = useState(false);
-  const [showBatchDialog, setShowBatchDialog] = useState(false);
-  const [showCreditPurchaseDialog, setShowCreditPurchaseDialog] = useState(false);
 
   const handleBuyCredits = () => {
-    setShowCreditPurchaseDialog(true);
+    navigate("/settings");
   };
 
   return (
@@ -59,27 +52,48 @@ export const Header = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 bg-background/95 backdrop-blur-xl z-50">
-                  <DropdownMenuItem onClick={() => setShowBlendDialog(true)}>
-                    <Layers className="mr-2 h-4 w-4" />
-                    <div>
-                      <p className="font-medium">Blend</p>
-                      <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowUpscaleDialog(true)}>
-                    <Maximize2 className="mr-2 h-4 w-4" />
-                    <div>
-                      <p className="font-medium">Upscale</p>
-                      <p className="text-xs text-muted-foreground">Enhance resolution</p>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowBatchDialog(true)}>
-                    <ImageIcon className="mr-2 h-4 w-4" />
-                    <div>
-                      <p className="font-medium">Batch</p>
-                      <p className="text-xs text-muted-foreground">Process multiple images</p>
-                    </div>
-                  </DropdownMenuItem>
+                  <ToolDialog
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <Layers className="mr-2 h-4 w-4" />
+                        <div>
+                          <p className="font-medium">Blend</p>
+                          <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
+                        </div>
+                      </DropdownMenuItem>
+                    }
+                    title="Blend Images"
+                    description="Seamlessly combine two images with customizable blend modes"
+                    toolType="blend"
+                  />
+                  <ToolDialog
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <Maximize2 className="mr-2 h-4 w-4" />
+                        <div>
+                          <p className="font-medium">Upscale</p>
+                          <p className="text-xs text-muted-foreground">Enhance resolution</p>
+                        </div>
+                      </DropdownMenuItem>
+                    }
+                    title="Upscale Image"
+                    description="Enhance image resolution with AI-powered upscaling"
+                    toolType="upscale"
+                  />
+                  <ToolDialog
+                    trigger={
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <ImageIcon className="mr-2 h-4 w-4" />
+                        <div>
+                          <p className="font-medium">Batch</p>
+                          <p className="text-xs text-muted-foreground">Process multiple images</p>
+                        </div>
+                      </DropdownMenuItem>
+                    }
+                    title="Batch Processing"
+                    description="Process multiple images at once with consistent operations"
+                    toolType="batch"
+                  />
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -165,46 +179,55 @@ export const Header = () => {
                         </AccordionTrigger>
                         <AccordionContent className="pb-2">
                           <div className="flex flex-col space-y-1 pl-4">
-                            <Button 
-                              variant="ghost" 
-                              className="justify-start min-h-[48px] w-full"
-                              onClick={() => {
-                                setShowBlendDialog(true);
-                                setMobileMenuOpen(false);
-                              }}
-                            >
-                              <Layers className="mr-3 h-4 w-4" />
-                              Blend
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              className="justify-start min-h-[48px] w-full"
-                              onClick={() => {
-                                setShowUpscaleDialog(true);
-                                setMobileMenuOpen(false);
-                              }}
-                            >
-                              <Maximize2 className="mr-3 h-4 w-4" />
-                              Upscale
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              className="justify-start min-h-[48px] w-full"
-                              onClick={() => {
-                                setShowBatchDialog(true);
-                                setMobileMenuOpen(false);
-                              }}
-                            >
-                              <ImageIcon className="mr-3 h-4 w-4" />
-                              Batch
-                            </Button>
+                            <ToolDialog
+                              trigger={
+                                <Button 
+                                  variant="ghost" 
+                                  className="justify-start min-h-[48px] w-full"
+                                >
+                                  <Layers className="mr-3 h-4 w-4" />
+                                  Blend
+                                </Button>
+                              }
+                              title="Blend Images"
+                              description="Seamlessly combine two images"
+                              toolType="blend"
+                            />
+                            <ToolDialog
+                              trigger={
+                                <Button 
+                                  variant="ghost" 
+                                  className="justify-start min-h-[48px] w-full"
+                                >
+                                  <Maximize2 className="mr-3 h-4 w-4" />
+                                  Upscale
+                                </Button>
+                              }
+                              title="Upscale Image"
+                              description="Enhance image resolution"
+                              toolType="upscale"
+                            />
+                            <ToolDialog
+                              trigger={
+                                <Button 
+                                  variant="ghost" 
+                                  className="justify-start min-h-[48px] w-full"
+                                >
+                                  <ImageIcon className="mr-3 h-4 w-4" />
+                                  Batch
+                                </Button>
+                              }
+                              title="Batch Processing"
+                              description="Process multiple images at once"
+                              toolType="batch"
+                            />
                           </div>
                         </AccordionContent>
                       </AccordionItem>
                     </Accordion>
                   )}
 
-                  <Button
+                  <Button 
                     variant="ghost" 
                     asChild 
                     className="justify-start min-h-[56px] text-base"
@@ -255,12 +278,6 @@ export const Header = () => {
           </Sheet>
         </div>
       </div>
-
-      {/* Tool Dialogs */}
-      <ImageBlendDialogEnhanced open={showBlendDialog} onOpenChange={setShowBlendDialog} />
-      <ImageUpscaleDialog open={showUpscaleDialog} onOpenChange={setShowUpscaleDialog} />
-      <BatchProcessDialog open={showBatchDialog} onOpenChange={setShowBatchDialog} />
-      <CreditPurchaseDialog open={showCreditPurchaseDialog} onOpenChange={setShowCreditPurchaseDialog} />
     </header>
   );
 };

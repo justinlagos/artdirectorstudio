@@ -204,18 +204,18 @@ export const ToolDialog = ({ trigger, title, description, toolType, onSubmit }: 
       <DialogTrigger asChild>
         {trigger}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl">{title}</DialogTitle>
-          <DialogDescription className="text-sm">{description}</DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
           {renderToolInputs()}
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <Button type="submit" className="flex-1 min-h-[44px]">
+          <div className="flex gap-3 pt-4">
+            <Button type="submit" className="flex-1">
               Process
             </Button>
-            <Button type="button" variant="outline" className="flex-1 min-h-[44px]">
+            <Button type="button" variant="outline" className="flex-1">
               Cancel
             </Button>
           </div>
