@@ -92,18 +92,6 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
         );
 
         try {
-          // Deduct credits for this analysis
-          const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-            body: { action: "analyze", provider: "lovable" },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
-
-          if (deductError || !deductData?.success) {
-            throw new Error("Insufficient credits");
-          }
-
           // Convert file to base64
           const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -216,7 +204,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
             Batch Process Images
           </DialogTitle>
           <DialogDescription>
-            Upload multiple images to analyze them all at once. Cost: <span className="font-semibold text-foreground">1 credit per image</span>
+            Analyze images across 12 professional categories. Free while subscriptions are being finalized!
           </DialogDescription>
         </DialogHeader>
 
@@ -313,7 +301,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
                 size="lg"
               >
                 <Layers className="w-4 h-4 mr-2" />
-                {isProcessing ? "Processing..." : `Process ${images.length} Images (${images.length} Credits)`}
+                {isProcessing ? "Processing..." : `Process ${images.length} Images`}
               </Button>
             )}
           </div>

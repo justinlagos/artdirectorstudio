@@ -70,25 +70,6 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         return;
       }
 
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "upscale", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 2 credits to upscale an image.");
-        } else {
-          toast.error("Failed to process credit deduction.");
-        }
-        setIsUpscaling(false);
-        clearInterval(progressInterval);
-        return;
-      }
-
       // Convert file to base64 for edge function
       const base64Image = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -111,7 +92,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
       if (data?.image) {
         setUpscaledImage(data.image);
-        toast.success(`Image upscaled successfully! ${deductData.remaining_balance} credits remaining.`);
+        toast.success("Image upscaled successfully!");
       }
     } catch (error) {
       clearInterval(progressInterval);
@@ -157,7 +138,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
             Upscale Image
           </DialogTitle>
           <DialogDescription>
-            Upscale your image to higher resolution. Cost: <span className="font-semibold text-foreground">2 credits</span>
+            Upscale your image to higher resolution. Free while subscriptions are being finalized!
           </DialogDescription>
         </DialogHeader>
 
@@ -286,7 +267,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
               size="lg"
             >
               <Maximize2 className="w-4 h-4 mr-2" />
-              {isUpscaling ? "Upscaling..." : "Upscale Image (2 Credits)"}
+              {isUpscaling ? "Upscaling..." : "Upscale Image"}
             </Button>
           )}
         </div>

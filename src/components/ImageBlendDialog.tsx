@@ -83,25 +83,6 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         return;
       }
 
-      // First deduct credits
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "blend", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 2 credits to blend images.");
-        } else {
-          toast.error("Failed to process credit deduction.");
-        }
-        setIsBlending(false);
-        clearInterval(progressInterval);
-        return;
-      }
-
       // Convert files to base64 for edge function
       const base64Images = await Promise.all(
         images.map(img => new Promise<string>((resolve, reject) => {
@@ -126,7 +107,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
       if (data?.image) {
         setBlendedImage(data.image);
-        toast.success(`Images blended successfully! ${deductData.remaining_balance} credits remaining.`);
+        toast.success("Images blended successfully!");
       }
     } catch (error) {
       clearInterval(progressInterval);
@@ -170,7 +151,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
             Blend Images
           </DialogTitle>
           <DialogDescription>
-            Upload 2-4 images to blend them together. Cost: <span className="font-semibold text-foreground">2 credits</span>
+            Upload 2-4 images to blend them together. Free while subscriptions are being finalized!
           </DialogDescription>
         </DialogHeader>
 
@@ -292,7 +273,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
               size="lg"
             >
               <Blend className="w-4 h-4 mr-2" />
-              {isBlending ? "Blending..." : "Blend Images (2 Credits)"}
+              {isBlending ? "Blending..." : "Blend Images"}
             </Button>
           )}
         </div>

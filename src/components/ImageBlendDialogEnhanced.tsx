@@ -92,25 +92,6 @@ export const ImageBlendDialogEnhanced = ({ open, onOpenChange }: ImageBlendDialo
         return;
       }
 
-      // Deduct credits (5 credits for blend with advanced controls)
-      const { data: deductData, error: deductError } = await supabase.functions.invoke("deduct-credits", {
-        body: { action: "blend", provider: "lovable" },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (deductError || !deductData?.success) {
-        if (deductError?.message?.includes("Insufficient credits")) {
-          toast.error("Insufficient credits. You need 5 credits for professional blend.");
-        } else {
-          toast.error("Failed to process credit deduction.");
-        }
-        setIsBlending(false);
-        clearInterval(progressInterval);
-        return;
-      }
-
       // Convert files to base64
       const base64Images = await Promise.all(
         images.map(img => new Promise<string>((resolve, reject) => {
@@ -151,7 +132,7 @@ Requirements:
 
       if (data?.image) {
         setBlendedImage(data.image);
-        toast.success(`Images blended professionally! ${deductData.remaining_balance} credits remaining.`);
+        toast.success("Images blended professionally!");
       }
     } catch (error) {
       clearInterval(progressInterval);
@@ -197,7 +178,7 @@ Requirements:
             Professional Image Blend
           </DialogTitle>
           <DialogDescription>
-            Upload 2-4 images and customize blend parameters. Cost: <span className="font-semibold text-foreground">5 credits</span>
+            Upload 2-4 images and customize blend parameters. Free while subscriptions are being finalized!
           </DialogDescription>
         </DialogHeader>
 
@@ -402,7 +383,7 @@ Requirements:
               size="lg"
             >
               <Blend className="w-4 h-4 mr-2" />
-              {isBlending ? "Blending..." : "Create Professional Blend (5 Credits)"}
+              {isBlending ? "Blending..." : "Create Professional Blend"}
             </Button>
           )}
         </div>
