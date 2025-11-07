@@ -50,31 +50,66 @@ serve(async (req) => {
 
     console.log("Regenerate-prompt: User authenticated:", user.id);
 
-    // Check feature access before processing using Supabase client
-    const { data: accessResult, error: accessError } = await supabaseClient.functions.invoke('check-feature-access', {
-      body: { action: 'regenerate_prompt' }
-    });
+    // Check feature access directly by querying profile
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('subscription_tier, free_credits, daily_usage, daily_limit')
+      .eq('id', user.id)
+      .single();
 
-    if (accessError) {
-      console.error("Feature access check error:", accessError);
+    if (profileError) {
+      console.error("Profile fetch error:", profileError);
       return new Response(
-        JSON.stringify({ error: "Failed to check feature access" }),
+        JSON.stringify({ error: "Failed to fetch user profile" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log("User profile:", profile);
+
+    // Check access based on tier
+    let allowed = false;
+    let reason = "";
     
-    if (!accessResult?.allowed) {
+    if (profile.subscription_tier === 'enterprise' || profile.subscription_tier === 'pro') {
+      allowed = true;
+    } else if (profile.subscription_tier === 'starter') {
+      if (profile.daily_usage < profile.daily_limit) {
+        allowed = true;
+        // Increment daily usage
+        await supabaseClient
+          .from('profiles')
+          .update({ daily_usage: profile.daily_usage + 1 })
+          .eq('id', user.id);
+      } else {
+        reason = "Daily limit reached for Starter tier";
+      }
+    } else if (profile.subscription_tier === 'free') {
+      if (profile.free_credits > 0) {
+        allowed = true;
+        // Deduct free credit
+        await supabaseClient
+          .from('profiles')
+          .update({ free_credits: profile.free_credits - 1 })
+          .eq('id', user.id);
+      } else {
+        reason = "No free credits remaining";
+      }
+    }
+
+    if (!allowed) {
+      console.log("Access denied:", reason);
       return new Response(
         JSON.stringify({ 
-          error: accessResult?.reason || "Access denied",
-          upgrade_required: accessResult?.upgrade_required || false,
-          tier: accessResult?.tier
+          error: reason || "Access denied",
+          upgrade_required: true,
+          tier: profile.subscription_tier
         }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log("Access granted for regenerate:", accessResult);
+    console.log("Access granted for regenerate");
 
     const { base_analysis, user_edits } = await req.json();
 
