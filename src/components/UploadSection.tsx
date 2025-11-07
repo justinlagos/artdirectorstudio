@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { OptimizedImage } from "@/components/ui/optimized-image";
 
 interface UploadSectionProps {
   onFileSelect: (file: File) => void;
@@ -130,10 +131,12 @@ export const UploadSection = ({
         {previewUrl ? (
           <div className="relative space-y-6 animate-scale-in">
             <div className="relative inline-block">
-              <img 
+              <OptimizedImage
                 src={previewUrl} 
                 alt="Preview" 
                 className="max-h-80 mx-auto rounded-xl shadow-strong ring-1 ring-border/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                widths={[640, 1024]}
               />
               <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-foreground/10 pointer-events-none" />
             </div>

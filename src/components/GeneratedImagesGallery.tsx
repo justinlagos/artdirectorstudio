@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Trash2, Maximize2, Image as ImageIcon } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { OptimizedImage } from "@/components/ui/optimized-image";
 
 interface GeneratedImage {
   id: string;
@@ -105,11 +106,12 @@ export const GeneratedImagesGallery = ({ images, onDelete }: GeneratedImagesGall
                 onClick={() => setSelectedImage(image)}
               >
                 <div className="aspect-square relative overflow-hidden bg-muted">
-                  <img
+                  <OptimizedImage
                     src={image.imageUrl}
                     alt={`Generated: ${image.prompt.slice(0, 50)}`}
                     className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                    loading="lazy"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    widths={[320, 640, 1024]}
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                     <Maximize2 className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -167,10 +169,12 @@ export const GeneratedImagesGallery = ({ images, onDelete }: GeneratedImagesGall
         <DialogContent className="max-w-5xl p-0">
           {selectedImage && (
             <div className="relative">
-              <img
+              <OptimizedImage
                 src={selectedImage.imageUrl}
                 alt="Full size view"
                 className="w-full h-auto max-h-[85vh] object-contain"
+                sizes="100vw"
+                widths={[1024, 1920]}
               />
               <div className="p-6 space-y-3">
                 <p className="text-sm text-muted-foreground">
