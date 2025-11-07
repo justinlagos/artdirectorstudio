@@ -5,7 +5,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { UserMenu } from "./UserMenu";
 import { SubscriptionStatus } from "./SubscriptionStatus";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { Menu, Sparkles, Home, BarChart3, Layers, Maximize2, ImageIcon, Coins, Wrench, ChevronDown } from "lucide-react";
+import { Menu, Sparkles, Home, BarChart3, Layers, Maximize2, ImageIcon, Coins, Wrench, ChevronDown, Crown } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -97,9 +97,17 @@ export const Header = () => {
             </Button>
             
             {user && (
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/analytics">Analytics</Link>
-              </Button>
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/analytics">Analytics</Link>
+                </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/subscriptions">
+                    <Crown className="h-4 w-4 mr-1" />
+                    Plans
+                  </Link>
+                </Button>
+              </>
             )}
           </nav>
         </div>
@@ -220,17 +228,30 @@ export const Header = () => {
                   </Button>
                   
                   {user && (
-                    <Button 
-                      variant="ghost" 
-                      asChild 
-                      className="justify-start min-h-[56px] text-base"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Link to="/analytics">
-                        <BarChart3 className="mr-3 h-5 w-5" />
-                        Analytics
-                      </Link>
-                    </Button>
+                    <>
+                      <Button 
+                        variant="ghost" 
+                        asChild 
+                        className="justify-start min-h-[56px] text-base"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link to="/analytics">
+                          <BarChart3 className="mr-3 h-5 w-5" />
+                          Analytics
+                        </Link>
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        asChild 
+                        className="justify-start min-h-[56px] text-base"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link to="/subscriptions">
+                          <Crown className="mr-3 h-5 w-5" />
+                          Plans
+                        </Link>
+                      </Button>
+                    </>
                   )}
                 </nav>
                 
