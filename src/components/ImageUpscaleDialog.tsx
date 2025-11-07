@@ -103,10 +103,26 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         
         toast.success("Image upscaled successfully!");
       }
-    } catch (error) {
+    } catch (error: any) {
       clearInterval(progressInterval);
       console.error("Upscale error:", error);
-      toast.error("Failed to upscale image. Please try again.");
+      
+      // Check for specific error types
+      if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
+        toast.error("Rate limit exceeded", {
+          description: "Please wait a minute and try again. The AI service needs a moment to recover.",
+          duration: 5000,
+        });
+      } else if (error?.message?.includes('Credits exhausted') || error?.message?.includes('402')) {
+        toast.error("Credits exhausted", {
+          description: "Please add credits to your workspace in Settings to continue.",
+          duration: 7000,
+        });
+      } else {
+        toast.error("Failed to upscale image", {
+          description: error?.message || "Please try again.",
+        });
+      }
     } finally {
       setIsUpscaling(false);
       setTimeout(() => setProgress(0), 1000);

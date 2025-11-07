@@ -132,15 +132,77 @@ Requirements:
 
       if (data?.image) {
         setBlendedImage(data.image);
+        
+        // Auto-save to My Projects
+        await saveToMyProjects(data.image);
+        
         toast.success("Images blended professionally!");
       }
-    } catch (error) {
+    } catch (error: any) {
       clearInterval(progressInterval);
       console.error("Blend error:", error);
-      toast.error("Failed to blend images. Please try again.");
+      
+      // Check for specific error types
+      if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
+        toast.error("Rate limit exceeded", {
+          description: "Please wait a minute and try again. The AI service needs a moment to recover.",
+          duration: 5000,
+        });
+      } else if (error?.message?.includes('Credits exhausted') || error?.message?.includes('402')) {
+        toast.error("Credits exhausted", {
+          description: "Please add credits to your workspace in Settings to continue.",
+          duration: 7000,
+        });
+      } else {
+        toast.error("Failed to blend images", {
+          description: error?.message || "Please try again.",
+        });
+      }
     } finally {
       setIsBlending(false);
       setTimeout(() => setProgress(0), 1000);
+    }
+  };
+
+  const saveToMyProjects = async (imageDataUrl: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Convert base64 to blob
+      const response = await fetch(imageDataUrl);
+      const blob = await response.blob();
+      
+      // Upload to storage
+      const fileName = `${user.id}/blended-${Date.now()}.png`;
+      const { error: uploadError } = await supabase.storage
+        .from('generated-images')
+        .upload(fileName, blob, {
+          contentType: 'image/png',
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('generated-images')
+        .getPublicUrl(fileName);
+
+      // Save metadata to database
+      await supabase
+        .from('generated_assets')
+        .insert({
+          user_id: user.id,
+          type: 'blend',
+          image_url: publicUrl,
+          prompt: instruction,
+          quality: 'standard',
+          size: '1024x1024'
+        });
+    } catch (error) {
+      console.error('Error saving blend:', error);
     }
   };
 

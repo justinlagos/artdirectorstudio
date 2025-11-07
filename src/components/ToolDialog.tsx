@@ -136,7 +136,6 @@ export const ToolDialog = ({ trigger, title, description, toolType, onSubmit }: 
                 <SelectContent>
                   <SelectItem value="analyze">Analyze All</SelectItem>
                   <SelectItem value="upscale">Upscale All</SelectItem>
-                  <SelectItem value="format">Convert Format</SelectItem>
                 </SelectContent>
               </Select>
             </div>

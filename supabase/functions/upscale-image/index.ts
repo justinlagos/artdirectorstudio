@@ -11,6 +11,9 @@ serve(async (req) => {
   }
 
   try {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    
     // Check authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -19,6 +22,23 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Extract user ID from token for logging
+    let userId = 'unknown';
+    try {
+      const token = authHeader.replace('Bearer ', '');
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userId = payload.sub || 'unknown';
+    } catch (e) {
+      console.warn('Could not extract userId from token');
+    }
+
+    console.log(JSON.stringify({
+      requestId,
+      action: 'upscale_start',
+      timestamp: new Date().toISOString(),
+      userId
+    }));
 
     // Check feature access before processing
     const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
@@ -33,6 +53,12 @@ serve(async (req) => {
     const accessResult = await accessResponse.json();
     
     if (!accessResult.allowed) {
+      console.log(JSON.stringify({
+        requestId,
+        action: 'access_denied',
+        timestamp: new Date().toISOString(),
+        reason: accessResult.reason
+      }));
       return new Response(
         JSON.stringify({ 
           error: accessResult.reason || "Access denied",
@@ -43,9 +69,21 @@ serve(async (req) => {
       );
     }
 
-    console.log("Access granted for upscale:", accessResult);
+    console.log(JSON.stringify({
+      requestId,
+      action: 'access_granted',
+      timestamp: new Date().toISOString(),
+      tier: accessResult.tier
+    }));
 
     const { image, targetSize } = await req.json();
+    
+    console.log(JSON.stringify({
+      requestId,
+      action: 'upscale_params',
+      timestamp: new Date().toISOString(),
+      targetSize
+    }));
     
     console.log('Upscaling image to size:', targetSize);
 
@@ -63,6 +101,13 @@ serve(async (req) => {
       ? "Upscale this image to ultra high resolution (2048x2048), enhancing details and clarity while preserving the original style and subject."
       : "Upscale this image to high resolution (1536x1536), enhancing details and clarity while maintaining the original composition.";
 
+    console.log(JSON.stringify({
+      requestId,
+      action: 'api_call',
+      model: 'google/gemini-2.5-flash-image',
+      timestamp: new Date().toISOString()
+    }));
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -70,7 +115,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
+        model: "google/gemini-2.5-flash-image",
         messages: [
           {
             role: "user",
@@ -92,7 +137,43 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Upscale API error:', response.status, errorText);
+      
+      console.error(JSON.stringify({
+        requestId,
+        action: 'api_error',
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errorText,
+        timestamp: new Date().toISOString()
+      }));
+
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Rate limit exceeded. Please wait a moment and try again.',
+            errorType: 'rate_limit',
+            retryAfter: 60
+          }),
+          { 
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Credits exhausted. Please add credits to your workspace to continue.',
+            errorType: 'payment_required'
+          }),
+          { 
+            status: 402,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
       throw new Error(`Failed to upscale image: ${response.statusText}`);
     }
 
@@ -100,16 +181,36 @@ serve(async (req) => {
     const upscaledImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!upscaledImageUrl) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'no_image_returned',
+        timestamp: new Date().toISOString(),
+        responseStructure: JSON.stringify(data).substring(0, 200)
+      }));
       throw new Error('No upscaled image returned from API');
     }
+
+    const duration = Date.now() - startTime;
+    console.log(JSON.stringify({
+      requestId,
+      action: 'upscale_success',
+      duration,
+      timestamp: new Date().toISOString(),
+      imageLength: upscaledImageUrl?.length || 0
+    }));
 
     return new Response(
       JSON.stringify({ image: upscaledImageUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error in upscale-image function:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error(JSON.stringify({
+      action: 'upscale_error',
+      timestamp: new Date().toISOString(),
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    }));
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { 
