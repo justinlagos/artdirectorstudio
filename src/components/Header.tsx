@@ -39,58 +39,63 @@ export const Header = () => {
             </Button>
             
             {user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1">
-                    Tools
-                    <ChevronDown className="h-3 w-3 opacity-50" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56 bg-background/95 backdrop-blur-xl z-50">
-                  <ToolDialog
-                    trigger={
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <Layers className="mr-2 h-4 w-4" />
-                        <div>
-                          <p className="font-medium">Blend</p>
-                          <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
-                        </div>
-                      </DropdownMenuItem>
-                    }
-                    title="Blend Images"
-                    description="Seamlessly combine two images with customizable blend modes"
-                    toolType="blend"
-                  />
-                  <ToolDialog
-                    trigger={
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <Maximize2 className="mr-2 h-4 w-4" />
-                        <div>
-                          <p className="font-medium">Upscale</p>
-                          <p className="text-xs text-muted-foreground">Enhance resolution</p>
-                        </div>
-                      </DropdownMenuItem>
-                    }
-                    title="Upscale Image"
-                    description="Enhance image resolution with AI-powered upscaling"
-                    toolType="upscale"
-                  />
-                  <ToolDialog
-                    trigger={
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <ImageIcon className="mr-2 h-4 w-4" />
-                        <div>
-                          <p className="font-medium">Batch</p>
-                          <p className="text-xs text-muted-foreground">Process multiple images</p>
-                        </div>
-                      </DropdownMenuItem>
-                    }
-                    title="Batch Processing"
-                    description="Process multiple images at once with consistent operations"
-                    toolType="batch"
-                  />
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/dashboard">Dashboard</Link>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-1">
+                      Tools
+                      <ChevronDown className="h-3 w-3 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56 bg-background/95 backdrop-blur-xl z-50">
+                    <ToolDialog
+                      trigger={
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <Layers className="mr-2 h-4 w-4" />
+                          <div>
+                            <p className="font-medium">Blend</p>
+                            <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
+                          </div>
+                        </DropdownMenuItem>
+                      }
+                      title="Blend Images"
+                      description="Seamlessly combine two images with customizable blend modes"
+                      toolType="blend"
+                    />
+                    <ToolDialog
+                      trigger={
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <Maximize2 className="mr-2 h-4 w-4" />
+                          <div>
+                            <p className="font-medium">Upscale</p>
+                            <p className="text-xs text-muted-foreground">Enhance resolution</p>
+                          </div>
+                        </DropdownMenuItem>
+                      }
+                      title="Upscale Image"
+                      description="Enhance image resolution with AI-powered upscaling"
+                      toolType="upscale"
+                    />
+                    <ToolDialog
+                      trigger={
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <ImageIcon className="mr-2 h-4 w-4" />
+                          <div>
+                            <p className="font-medium">Batch</p>
+                            <p className="text-xs text-muted-foreground">Process multiple images</p>
+                          </div>
+                        </DropdownMenuItem>
+                      }
+                      title="Batch Processing"
+                      description="Process multiple images at once with consistent operations"
+                      toolType="batch"
+                    />
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             )}
 
             <Button variant="ghost" size="sm" asChild>
