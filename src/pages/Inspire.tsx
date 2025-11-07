@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -66,6 +68,7 @@ const Inspire = () => {
   const { isAdmin } = useAdminCheck();
   const { openTool } = useToolsModal();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [items, setItems] = useState<InspireItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<InspireItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,6 +80,12 @@ const Inspire = () => {
   const [selectedItem, setSelectedItem] = useState<InspireItem | null>(null);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [editingTags, setEditingTags] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const observerTarget = useRef<HTMLDivElement>(null);
+  
+  const ITEMS_PER_PAGE = 24;
 
   useEffect(() => {
     fetchInspireItems();
@@ -121,9 +130,15 @@ const Inspire = () => {
     setFilteredItems(filtered);
   };
 
-  const fetchInspireItems = async () => {
+  const fetchInspireItems = async (pageNum: number = 1, append: boolean = false) => {
     try {
-      const { data, error } = await supabase
+      if (!append) setLoading(true);
+      else setLoadingMore(true);
+      
+      const from = (pageNum - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+      
+      const { data, error, count } = await supabase
         .from("shared_assets")
         .select(`
           id,
@@ -148,10 +163,10 @@ const Inspire = () => {
             email,
             username
           )
-        `)
+        `, { count: 'exact' })
         .eq("is_public", true)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .range(from, to);
 
       if (error) throw error;
 
@@ -178,15 +193,52 @@ const Inspire = () => {
         }));
       }
 
-      setItems(validItems);
-      setFilteredItems(validItems);
+      if (append) {
+        setItems(prev => [...prev, ...validItems]);
+        setFilteredItems(prev => [...prev, ...validItems]);
+      } else {
+        setItems(validItems);
+        setFilteredItems(validItems);
+      }
+      
+      setHasMore(validItems.length === ITEMS_PER_PAGE && (count ? from + ITEMS_PER_PAGE < count : true));
     } catch (error) {
       console.error("Error fetching inspire items:", error);
       toast.error("Failed to load inspire gallery");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchInspireItems(nextPage, true);
+  }, [page, loadingMore, hasMore]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [loadMore, hasMore, loadingMore]);
 
   const handleCopyPrompt = async (prompt: string) => {
     try {
@@ -412,11 +464,11 @@ const Inspire = () => {
               Explore community creations, discover styles, and find inspiration for your next masterpiece
             </p>
             {user ? (
-              <Button size="lg" onClick={() => navigate("/")} className="mt-4">
+              <Button size="lg" onClick={() => navigate("/")} className="mt-4 min-h-[48px]">
                 Start Creating
               </Button>
             ) : (
-              <Button size="lg" onClick={() => navigate("/auth")} className="mt-4">
+              <Button size="lg" onClick={() => navigate("/auth")} className="mt-4 min-h-[48px]">
                 Try ArtDirector Free
               </Button>
             )}
@@ -608,184 +660,365 @@ const Inspire = () => {
       <Footer />
 
       {/* Detail Modal */}
-      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent className="max-w-5xl max-h-[90dvh] overflow-y-auto">
-          {selectedItem && (
-            <div className="space-y-6">
-              {selectedItem.asset.image_url && (
-                <div className="relative overflow-hidden rounded-2xl bg-muted">
-                  <img
-                    src={selectedItem.asset.image_url}
-                    alt="Generated content"
-                    className="w-full"
-                  />
-                  {(selectedItem.staff_pick || selectedItem.featured) && (
-                    <div className="absolute top-4 right-4 flex gap-2">
-                      {selectedItem.staff_pick && (
-                        <Badge className="bg-amber-500 text-white border-amber-600">
-                          <Award className="w-3 h-3 mr-1" />
-                          Staff Pick
-                        </Badge>
-                      )}
-                      {selectedItem.featured && (
-                        <Badge className="bg-primary">
-                          <Star className="w-3 h-3 mr-1" />
-                          Featured
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              <div className="space-y-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-semibold text-lg">
-                      {getCreatorName(selectedItem)[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-lg">by {getCreatorName(selectedItem)}</p>
-                        {user && user.id !== selectedItem.profile.id && (
-                          <Button
-                            size="sm"
-                            variant={selectedItem.isFollowing ? "secondary" : "outline"}
-                            onClick={(e) => handleFollow(selectedItem, e)}
-                          >
-                            <UserPlus className="w-3 h-3 mr-1" />
-                            {selectedItem.isFollowing ? "Following" : "Follow"}
-                          </Button>
+      {isMobile ? (
+        <Drawer open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+          <DrawerContent className="max-h-[95dvh] overflow-y-auto">
+            {selectedItem && (
+              <div className="px-4 pb-4 space-y-6">
+                {selectedItem.asset.image_url && (
+                  <div className="relative overflow-hidden rounded-2xl bg-muted -mx-4">
+                    <img
+                      src={selectedItem.asset.image_url}
+                      alt="Generated content"
+                      className="w-full"
+                      loading="lazy"
+                    />
+                    {(selectedItem.staff_pick || selectedItem.featured) && (
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        {selectedItem.staff_pick && (
+                          <Badge className="bg-amber-500 text-white border-amber-600">
+                            <Award className="w-3 h-3 mr-1" />
+                            Staff Pick
+                          </Badge>
+                        )}
+                        {selectedItem.featured && (
+                          <Badge className="bg-primary">
+                            <Star className="w-3 h-3 mr-1" />
+                            Featured
+                          </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{formatDate(selectedItem.asset.created_at)}</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="capitalize text-sm px-3 py-1">
-                    {selectedItem.asset.type}
-                  </Badge>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={(e) => handleLike(selectedItem, e)}
-                          className="flex items-center gap-2 hover:text-foreground transition-colors"
-                        >
-                          <Heart className={`h-5 w-5 ${selectedItem.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-                          <span className="font-medium">{selectedItem.like_count}</span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>Like</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={(e) => handleBookmark(selectedItem, e)}
-                          className="flex items-center gap-2 hover:text-foreground transition-colors"
-                        >
-                          <Bookmark className={`h-5 w-5 ${selectedItem.isBookmarked ? 'fill-primary text-primary' : ''}`} />
-                          <span className="font-medium">{selectedItem.bookmark_count}</span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>Bookmark</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <div className="flex items-center gap-2">
-                    <Eye className="h-5 w-5" />
-                    <span className="font-medium">{selectedItem.view_count} views</span>
-                  </div>
-                </div>
-
-                {selectedItem.asset.prompt && (
-                  <div className="space-y-3 p-6 rounded-xl bg-muted/30 border border-border">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-lg">Prompt</h3>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleCopyPrompt(selectedItem.asset.prompt!)}
-                      >
-                        {copiedPrompt ? (
-                          <>
-                            <Check className="h-4 w-4 mr-2" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-4 w-4 mr-2" />
-                            Copy
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-sm leading-relaxed">{selectedItem.asset.prompt}</p>
+                    )}
                   </div>
                 )}
+                
+                <div className="space-y-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-semibold text-lg">
+                        {getCreatorName(selectedItem)[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-base">by {getCreatorName(selectedItem)}</p>
+                          {user && user.id !== selectedItem.profile.id && (
+                            <Button
+                              size="sm"
+                              variant={selectedItem.isFollowing ? "secondary" : "outline"}
+                              onClick={(e) => handleFollow(selectedItem, e)}
+                              className="min-h-[36px] text-xs"
+                            >
+                              <UserPlus className="w-3 h-3 mr-1" />
+                              {selectedItem.isFollowing ? "Following" : "Follow"}
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{formatDate(selectedItem.asset.created_at)}</p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="capitalize text-xs px-2 py-1">
+                      {selectedItem.asset.type}
+                    </Badge>
+                  </div>
 
-                <div className="flex gap-3">
-                  <Button 
-                    className="flex-1" 
-                    size="lg"
-                    onClick={() => handleUseInStudio(selectedItem)}
-                  >
-                    <Wand2 className="w-4 h-4 mr-2" />
-                    Use in Studio
-                  </Button>
-                  {user && (
-                    <Button 
-                      variant="outline" 
-                      size="lg"
-                      onClick={(e) => handleRemix(selectedItem, e)}
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                    <button
+                      onClick={(e) => handleLike(selectedItem, e)}
+                      className="flex items-center gap-2 hover:text-foreground transition-colors min-h-[44px] px-2"
                     >
-                      <Shuffle className="w-4 h-4 mr-2" />
-                      Remix
+                      <Heart className={`h-5 w-5 ${selectedItem.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                      <span className="font-medium">{selectedItem.like_count}</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => handleBookmark(selectedItem, e)}
+                      className="flex items-center gap-2 hover:text-foreground transition-colors min-h-[44px] px-2"
+                    >
+                      <Bookmark className={`h-5 w-5 ${selectedItem.isBookmarked ? 'fill-primary text-primary' : ''}`} />
+                      <span className="font-medium">{selectedItem.bookmark_count}</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-5 w-5" />
+                      <span className="font-medium">{selectedItem.view_count} views</span>
+                    </div>
+                  </div>
+
+                  {selectedItem.asset.prompt && (
+                    <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-base">Prompt</h3>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCopyPrompt(selectedItem.asset.prompt!)}
+                          className="min-h-[36px]"
+                        >
+                          {copiedPrompt ? (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-sm leading-relaxed">{selectedItem.asset.prompt}</p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-3">
+                    <Button 
+                      className="w-full min-h-[48px]" 
+                      size="lg"
+                      onClick={() => handleUseInStudio(selectedItem)}
+                    >
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      Use in Studio
                     </Button>
+                    {user && (
+                      <Button 
+                        variant="outline" 
+                        size="lg"
+                        className="w-full min-h-[48px]"
+                        onClick={(e) => handleRemix(selectedItem, e)}
+                      >
+                        <Shuffle className="w-4 h-4 mr-2" />
+                        Remix
+                      </Button>
+                    )}
+                  </div>
+
+                  {isAdmin && (
+                    <div className="pt-4 border-t border-border space-y-3">
+                      <p className="text-sm font-medium text-muted-foreground">Admin Tools</p>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          size="sm"
+                          variant={selectedItem.staff_pick ? "default" : "outline"}
+                          onClick={(e) => handleStaffPickToggle(selectedItem, e)}
+                          className="w-full min-h-[44px]"
+                        >
+                          <Award className="w-3 h-3 mr-1" />
+                          {selectedItem.staff_pick ? "Remove Staff Pick" : "Add Staff Pick"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={selectedItem.featured ? "default" : "outline"}
+                          onClick={(e) => handleFeatureToggle(selectedItem, e)}
+                          className="w-full min-h-[44px]"
+                        >
+                          <Star className="w-3 h-3 mr-1" />
+                          {selectedItem.featured ? "Unfeature" : "Feature"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={(e) => handleDelete(selectedItem, e)}
+                          className="w-full min-h-[44px]"
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {isAdmin && (
-                  <div className="pt-4 border-t border-border space-y-3">
-                    <p className="text-sm font-medium text-muted-foreground">Admin Tools</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant={selectedItem.staff_pick ? "default" : "outline"}
-                        onClick={(e) => handleStaffPickToggle(selectedItem, e)}
-                      >
-                        <Award className="w-3 h-3 mr-1" />
-                        {selectedItem.staff_pick ? "Remove Staff Pick" : "Add Staff Pick"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={selectedItem.featured ? "default" : "outline"}
-                        onClick={(e) => handleFeatureToggle(selectedItem, e)}
-                      >
-                        <Star className="w-3 h-3 mr-1" />
-                        {selectedItem.featured ? "Unfeature" : "Feature"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={(e) => handleDelete(selectedItem, e)}
-                      >
-                        <Trash2 className="w-3 h-3 mr-1" />
-                        Remove
-                      </Button>
-                    </div>
+              </div>
+            )}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+          <DialogContent className="max-w-5xl max-h-[90dvh] overflow-y-auto">
+            {selectedItem && (
+              <div className="space-y-6">
+                {selectedItem.asset.image_url && (
+                  <div className="relative overflow-hidden rounded-2xl bg-muted">
+                    <img
+                      src={selectedItem.asset.image_url}
+                      alt="Generated content"
+                      className="w-full"
+                      loading="lazy"
+                    />
+                    {(selectedItem.staff_pick || selectedItem.featured) && (
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        {selectedItem.staff_pick && (
+                          <Badge className="bg-amber-500 text-white border-amber-600">
+                            <Award className="w-3 h-3 mr-1" />
+                            Staff Pick
+                          </Badge>
+                        )}
+                        {selectedItem.featured && (
+                          <Badge className="bg-primary">
+                            <Star className="w-3 h-3 mr-1" />
+                            Featured
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
+                
+                <div className="space-y-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-semibold text-lg">
+                        {getCreatorName(selectedItem)[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-lg">by {getCreatorName(selectedItem)}</p>
+                          {user && user.id !== selectedItem.profile.id && (
+                            <Button
+                              size="sm"
+                              variant={selectedItem.isFollowing ? "secondary" : "outline"}
+                              onClick={(e) => handleFollow(selectedItem, e)}
+                              className="min-h-[36px]"
+                            >
+                              <UserPlus className="w-3 h-3 mr-1" />
+                              {selectedItem.isFollowing ? "Following" : "Follow"}
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{formatDate(selectedItem.asset.created_at)}</p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="capitalize text-sm px-3 py-1">
+                      {selectedItem.asset.type}
+                    </Badge>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => handleLike(selectedItem, e)}
+                            className="flex items-center gap-2 hover:text-foreground transition-colors min-h-[44px]"
+                          >
+                            <Heart className={`h-5 w-5 ${selectedItem.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                            <span className="font-medium">{selectedItem.like_count}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Like</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => handleBookmark(selectedItem, e)}
+                            className="flex items-center gap-2 hover:text-foreground transition-colors min-h-[44px]"
+                          >
+                            <Bookmark className={`h-5 w-5 ${selectedItem.isBookmarked ? 'fill-primary text-primary' : ''}`} />
+                            <span className="font-medium">{selectedItem.bookmark_count}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Bookmark</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-5 w-5" />
+                      <span className="font-medium">{selectedItem.view_count} views</span>
+                    </div>
+                  </div>
+
+                  {selectedItem.asset.prompt && (
+                    <div className="space-y-3 p-6 rounded-xl bg-muted/30 border border-border">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-lg">Prompt</h3>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCopyPrompt(selectedItem.asset.prompt!)}
+                          className="min-h-[36px]"
+                        >
+                          {copiedPrompt ? (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-sm leading-relaxed">{selectedItem.asset.prompt}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <Button 
+                      className="flex-1 min-h-[44px]" 
+                      size="lg"
+                      onClick={() => handleUseInStudio(selectedItem)}
+                    >
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      Use in Studio
+                    </Button>
+                    {user && (
+                      <Button 
+                        variant="outline" 
+                        size="lg"
+                        className="min-h-[44px]"
+                        onClick={(e) => handleRemix(selectedItem, e)}
+                      >
+                        <Shuffle className="w-4 h-4 mr-2" />
+                        Remix
+                      </Button>
+                    )}
+                  </div>
+
+                  {isAdmin && (
+                    <div className="pt-4 border-t border-border space-y-3">
+                      <p className="text-sm font-medium text-muted-foreground">Admin Tools</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant={selectedItem.staff_pick ? "default" : "outline"}
+                          onClick={(e) => handleStaffPickToggle(selectedItem, e)}
+                          className="min-h-[36px]"
+                        >
+                          <Award className="w-3 h-3 mr-1" />
+                          {selectedItem.staff_pick ? "Remove Staff Pick" : "Add Staff Pick"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={selectedItem.featured ? "default" : "outline"}
+                          onClick={(e) => handleFeatureToggle(selectedItem, e)}
+                          className="min-h-[36px]"
+                        >
+                          <Star className="w-3 h-3 mr-1" />
+                          {selectedItem.featured ? "Unfeature" : "Feature"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={(e) => handleDelete(selectedItem, e)}
+                          className="min-h-[36px]"
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
@@ -842,6 +1075,7 @@ const InspireGrid = ({
                 src={item.asset.image_url}
                 alt="Generated content"
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
               />
               
               {/* Badges */}
@@ -867,7 +1101,7 @@ const InspireGrid = ({
                         <Button
                           size="sm"
                           variant="secondary"
-                          className="h-8 w-8 p-0"
+                          className="min-h-[44px] min-w-[44px] p-0"
                           onClick={(e) => onLike(item, e)}
                         >
                           <Heart className={`h-4 w-4 ${item.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
@@ -883,7 +1117,7 @@ const InspireGrid = ({
                         <Button
                           size="sm"
                           variant="secondary"
-                          className="h-8 w-8 p-0"
+                          className="min-h-[44px] min-w-[44px] p-0"
                           onClick={(e) => onBookmark(item, e)}
                         >
                           <Bookmark className={`h-4 w-4 ${item.isBookmarked ? 'fill-primary text-primary' : ''}`} />
@@ -899,7 +1133,7 @@ const InspireGrid = ({
                         <Button
                           size="sm"
                           variant="secondary"
-                          className="h-8 w-8 p-0"
+                          className="min-h-[44px] min-w-[44px] p-0"
                           onClick={(e) => onRemix(item, e)}
                         >
                           <Shuffle className="h-4 w-4" />
@@ -915,7 +1149,7 @@ const InspireGrid = ({
                         <Button
                           size="sm"
                           variant="secondary"
-                          className="h-8 w-8 p-0 ml-auto"
+                          className="min-h-[44px] min-w-[44px] p-0 ml-auto"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="h-4 w-4" />

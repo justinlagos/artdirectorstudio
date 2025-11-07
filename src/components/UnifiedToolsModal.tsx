@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Layers, Maximize2, ImageIcon, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -24,6 +26,7 @@ export const UnifiedToolsModal = () => {
     setErrorMessage,
     updateInputs,
   } = useToolsModal();
+  const isMobile = useIsMobile();
 
   const [image1, setImage1] = useState<File | null>(null);
   const [image2, setImage2] = useState<File | null>(null);
@@ -234,12 +237,12 @@ export const UnifiedToolsModal = () => {
           <div className="flex gap-3 pt-4">
             <Button 
               onClick={handleProcess} 
-              className="flex-1"
+              className="flex-1 min-h-[44px]"
               disabled={!image1 || !image2}
             >
               Process
             </Button>
-            <Button onClick={closeTool} variant="outline" className="flex-1">
+            <Button onClick={closeTool} variant="outline" className="flex-1 min-h-[44px]">
               Cancel
             </Button>
           </div>
@@ -292,12 +295,12 @@ export const UnifiedToolsModal = () => {
           <div className="flex gap-3 pt-4">
             <Button 
               onClick={handleProcess} 
-              className="flex-1"
+              className="flex-1 min-h-[44px]"
               disabled={!singleImage}
             >
               Process
             </Button>
-            <Button onClick={closeTool} variant="outline" className="flex-1">
+            <Button onClick={closeTool} variant="outline" className="flex-1 min-h-[44px]">
               Cancel
             </Button>
           </div>
@@ -351,12 +354,12 @@ export const UnifiedToolsModal = () => {
           <div className="flex gap-3 pt-4">
             <Button 
               onClick={handleProcess} 
-              className="flex-1"
+              className="flex-1 min-h-[44px]"
               disabled={!multipleImages || multipleImages.length === 0}
             >
               Process
             </Button>
-            <Button onClick={closeTool} variant="outline" className="flex-1">
+            <Button onClick={closeTool} variant="outline" className="flex-1 min-h-[44px]">
               Cancel
             </Button>
           </div>
@@ -367,9 +370,17 @@ export const UnifiedToolsModal = () => {
     return null;
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && closeTool()}>
-      <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto">
+  const content = (
+    <>
+      {isMobile ? (
+        <DrawerHeader>
+          <div className="flex items-center gap-2">
+            <Icon className="w-5 h-5 text-primary" />
+            <DrawerTitle>{config.title}</DrawerTitle>
+          </div>
+          <DrawerDescription>{config.description}</DrawerDescription>
+        </DrawerHeader>
+      ) : (
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Icon className="w-5 h-5 text-primary" />
@@ -377,9 +388,27 @@ export const UnifiedToolsModal = () => {
           </div>
           <DialogDescription>{config.description}</DialogDescription>
         </DialogHeader>
-        <div className="mt-4">
-          {renderStateView()}
-        </div>
+      )}
+      <div className={isMobile ? "px-4 pb-4 mt-4" : "mt-4"}>
+        {renderStateView()}
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={isOpen} onOpenChange={(open) => !open && closeTool()}>
+        <DrawerContent className="max-h-[95dvh] overflow-y-auto">
+          {content}
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && closeTool()}>
+      <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto">
+        {content}
       </DialogContent>
     </Dialog>
   );
