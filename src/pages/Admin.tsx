@@ -13,7 +13,8 @@ import { ContentModeration } from "@/components/admin/ContentModeration";
 import { InviteTracking } from "@/components/admin/InviteTracking";
 import { SystemHealth } from "@/components/admin/SystemHealth";
 import { InspireApprovalPanel } from "@/components/admin/InspireApprovalPanel";
-import { Shield, Users, Flag, Mail, Activity, DollarSign, Sparkles } from "lucide-react";
+import TestimonialsManagement from "@/components/admin/TestimonialsManagement";
+import { Shield, Users, Flag, Mail, Activity, DollarSign, Sparkles, MessageSquare } from "lucide-react";
 
 const Admin = () => {
   const { user, loading: authLoading } = useAuth();
@@ -52,7 +53,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 h-auto">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-8 h-auto">
             <TabsTrigger value="overview" className="gap-2">
               <Activity className="w-4 h-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -80,6 +81,10 @@ const Admin = () => {
             <TabsTrigger value="health" className="gap-2">
               <Activity className="w-4 h-4" />
               <span className="hidden sm:inline">Health</span>
+            </TabsTrigger>
+            <TabsTrigger value="testimonials" className="gap-2">
+              <MessageSquare className="w-4 h-4" />
+              <span className="hidden sm:inline">Testimonials</span>
             </TabsTrigger>
           </TabsList>
 
@@ -109,6 +114,10 @@ const Admin = () => {
 
           <TabsContent value="health">
             <SystemHealth />
+          </TabsContent>
+
+          <TabsContent value="testimonials">
+            <TestimonialsManagement />
           </TabsContent>
         </Tabs>
       </main>

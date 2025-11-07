@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { UploadSection } from "@/components/UploadSection";
 import { ProgressiveAnalysisFeedback } from "@/components/ProgressiveAnalysisFeedback";
@@ -9,8 +11,11 @@ import { OnboardingPopup } from "@/components/OnboardingPopup";
 import { Footer } from "@/components/Footer";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Sparkles, Wand2, Upload, ArrowRight } from "lucide-react";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
 import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 
 export interface Analysis {
@@ -63,14 +68,28 @@ const Index = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
 
-  // Redirect unauthenticated users
+  // Fetch featured testimonials
+  const { data: testimonials } = useQuery({
+    queryKey: ["testimonials"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("testimonials")
+        .select("*")
+        .eq("featured", true)
+        .order("display_order", { ascending: true });
+      return data;
+    },
+  });
+
+  // Scroll to studio section when authenticated user arrives
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth", { 
-        state: { message: "Please sign in to access the Studio and start creating." }
-      });
+    if (user && !loading) {
+      const studioSection = document.getElementById("studio-section");
+      if (studioSection) {
+        studioSection.scrollIntoView({ behavior: "smooth" });
+      }
     }
-  }, [user, loading, navigate]);
+  }, [user, loading]);
 
   // Cleanup on unmount - MUST be before early returns
   useEffect(() => {
@@ -321,28 +340,140 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <OnboardingPopup />
+    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <Header />
       
       {/* Hero Section */}
-      <section id="hero" className="relative overflow-hidden border-b border-border/40 bg-gradient-to-b from-background via-background to-surface-1/30">
-        <div className="container mx-auto px-4 py-20 md:py-32">
-          <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
-            <h1 className="text-5xl md:text-7xl font-display font-bold leading-tight tracking-tight">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white">
-                ArtDirector Studio
-              </span>
-            </h1>
-            <p className="text-2xl md:text-3xl font-light text-muted-foreground">
-              Reconstruct. Refine. Reimagine.
-            </p>
+      <section className="pt-20 pb-16 px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10 mb-4">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">AI-Powered Creative Director</span>
           </div>
+          
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
+            Transform Your Images with
+            <span className="block text-primary mt-2">Professional AI Analysis</span>
+          </h1>
+          
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Upload any image and get instant expert feedback on composition, lighting, 
+            color theory, and more. Perfect for designers, photographers, and creatives.
+          </p>
+
+          {!user && (
+            <div className="flex items-center justify-center gap-4 mt-8">
+              <Button size="lg" onClick={() => navigate("/auth")}>
+                Get Started Free
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => navigate("/auth")}>
+                Sign In
+              </Button>
+            </div>
+          )}
         </div>
       </section>
-      
-      <main id="studio" className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
-        <div className="space-y-16 animate-fade-in">
+
+      {/* What You Can Do Section - Only for non-authenticated users */}
+      {!user && (
+        <section className="py-16 px-6 lg:px-8 bg-secondary/30">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center space-y-4 mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold">Get Started in 3 Simple Steps</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                No experience required. Upload, analyze, and create stunning visuals in seconds.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <Card className="text-center hover-lift">
+                <CardContent className="pt-6">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <Upload className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">1. Upload Your Image</h3>
+                  <p className="text-muted-foreground">
+                    Drop any image to get started. We support all common formats including JPG, PNG, and WebP.
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="text-center hover-lift">
+                <CardContent className="pt-6">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">2. Get AI Analysis</h3>
+                  <p className="text-muted-foreground">
+                    Our AI analyzes composition, lighting, colors, and provides professional insights instantly.
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="text-center hover-lift">
+                <CardContent className="pt-6">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <Wand2 className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">3. Generate Variations</h3>
+                  <p className="text-muted-foreground">
+                    Create stunning variations, apply tweaks, and refine until you achieve perfection.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Testimonials Section - Only for non-authenticated users */}
+      {!user && testimonials && testimonials.length > 0 && (
+        <section className="py-16 px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center space-y-4 mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold">Loved by Creatives Worldwide</h2>
+              <p className="text-lg text-muted-foreground">
+                See what our users say about ArtDirector Studio
+              </p>
+            </div>
+            <Carousel
+              opts={{
+                align: "start",
+                loop: true,
+              }}
+              className="w-full"
+            >
+              <CarouselContent className="-ml-4">
+                {testimonials.map((testimonial) => (
+                  <CarouselItem key={testimonial.id} className="pl-4 md:basis-1/2 lg:basis-1/3">
+                    <Card className="h-full hover-lift">
+                      <CardContent className="p-6">
+                        <div className="flex items-start gap-4 mb-4">
+                          <Avatar className="w-12 h-12">
+                            <AvatarImage src={testimonial.avatar_url || undefined} alt={testimonial.name} />
+                            <AvatarFallback>{testimonial.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="font-semibold">{testimonial.name}</div>
+                            <div className="text-sm text-muted-foreground">{testimonial.role}</div>
+                          </div>
+                        </div>
+                        <p className="text-muted-foreground leading-relaxed">{testimonial.content}</p>
+                      </CardContent>
+                    </Card>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="hidden md:flex" />
+              <CarouselNext className="hidden md:flex" />
+            </Carousel>
+          </div>
+        </section>
+      )}
+
+      {/* Studio Section - Only for authenticated users */}
+      {user && (
+        <div id="studio-section" className="max-w-7xl mx-auto px-6 lg:px-8 pb-16 space-y-8">
+          <OnboardingPopup />
+          
           <UploadSection
             onFileSelect={handleFileSelect}
             previewUrl={previewUrl}
@@ -371,90 +502,111 @@ const Index = () => {
               />
             </div>
           )}
-
-          {/* How It Works Section */}
-          <section id="how-it-works" className="py-20 border-t border-border/40 scroll-mt-14">
-            <div className="text-center space-y-4 mb-16">
-              <h2 className="text-4xl font-display font-bold tracking-tight">
-                How It Works
-              </h2>
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                  Three simple steps to transform your creative vision
-                </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                {
-                  title: "Analyze",
-                  description: "Upload your image and let AI understand its composition, style, and elements",
-                  icon: (
-                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8"/>
-                      <path d="m21 21-4.35-4.35"/>
-                    </svg>
-                  ),
-                },
-                {
-                  title: "Generate",
-                  description: "Create new visuals based on your prompt and refined parameters",
-                  icon: (
-                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-                      <path d="M5 3v4"/>
-                      <path d="M19 17v4"/>
-                      <path d="M3 5h4"/>
-                      <path d="M17 19h4"/>
-                    </svg>
-                  ),
-                },
-                {
-                  title: "Refine",
-                  description: "Iterate and enhance with precision controls until it's perfect",
-                  icon: (
-                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-                      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
-                      <path d="M2 2l7.586 7.586"/>
-                      <circle cx="11" cy="11" r="2"/>
-                    </svg>
-                  ),
-                },
-              ].map((step, index) => (
-                <div key={index} className="glass rounded-2xl p-8 text-center hover-lift transition-all duration-300">
-                  <div className="flex items-center justify-center mb-4 text-foreground">{step.icon}</div>
-                  <h3 className="text-2xl font-display font-semibold mb-3">{step.title}</h3>
-                  <p className="text-muted-foreground">{step.description}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Trust Section */}
-          <section id="trust" className="py-20 border-t border-border/40 scroll-mt-14">
-            <div className="glass rounded-2xl overflow-hidden">
-              <div className="p-12 md:p-16">
-                <div className="max-w-3xl mx-auto text-center space-y-6">
-                  <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight">
-                    Built for Creators, Privacy First
-                  </h2>
-                  <p className="text-lg text-muted-foreground">
-                    Your images and prompts are processed securely. We use industry-standard encryption
-                    and never share your creative work. Start with 50 free credits, no card required.
-                  </p>
-                  <div className="pt-6">
-                    <Button size="lg" onClick={() => document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth' })}>
-                      Start Creating Free
-                    </Button>
-                    <p className="text-sm text-muted-foreground mt-3">
-                      50 credits included, No credit card needed
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
         </div>
-      </main>
+      )}
+
+      {/* How It Works */}
+      <section className="py-24 px-6 lg:px-8 bg-secondary/30">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
+            How It Works
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                title: "Analyze",
+                description: "Upload your image and let AI understand its composition, style, and elements",
+                icon: (
+                  <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                  </svg>
+                ),
+              },
+              {
+                title: "Generate",
+                description: "Create new visuals based on your prompt and refined parameters",
+                icon: (
+                  <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                    <path d="M5 3v4"/>
+                    <path d="M19 17v4"/>
+                    <path d="M3 5h4"/>
+                    <path d="M17 19h4"/>
+                  </svg>
+                ),
+              },
+              {
+                title: "Refine",
+                description: "Iterate and enhance with precision controls until it's perfect",
+                icon: (
+                  <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                    <path d="M2 2l7.586 7.586"/>
+                    <circle cx="11" cy="11" r="2"/>
+                  </svg>
+                ),
+              },
+            ].map((step, index) => (
+              <div key={index} className="glass rounded-2xl p-8 text-center hover-lift transition-all duration-300">
+                <div className="flex items-center justify-center mb-4 text-foreground">{step.icon}</div>
+                <h3 className="text-2xl font-display font-semibold mb-3">{step.title}</h3>
+                <p className="text-muted-foreground">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Trust Section */}
+      <section className="py-24 px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center space-y-6 mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold">
+              Trusted by Creative Professionals
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Join thousands of designers and photographers who use ArtDirector Studio
+              to elevate their creative work.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div className="glass rounded-2xl p-8">
+              <div className="text-4xl font-bold mb-2">10K+</div>
+              <div className="text-muted-foreground">Active Users</div>
+            </div>
+            <div className="glass rounded-2xl p-8">
+              <div className="text-4xl font-bold mb-2">100K+</div>
+              <div className="text-muted-foreground">Images Analyzed</div>
+            </div>
+            <div className="glass rounded-2xl p-8">
+              <div className="text-4xl font-bold mb-2">4.9★</div>
+              <div className="text-muted-foreground">User Rating</div>
+            </div>
+          </div>
+
+          <div className="text-center mt-12">
+            {user ? (
+              <Button size="lg" className="gap-2" onClick={() => {
+                const studioSection = document.getElementById("studio-section");
+                if (studioSection) {
+                  studioSection.scrollIntoView({ behavior: "smooth" });
+                }
+              }}>
+                <Sparkles className="w-5 h-5" />
+                Start Analyzing Now
+              </Button>
+            ) : (
+              <Button size="lg" className="gap-2" onClick={() => navigate("/auth")}>
+                <Sparkles className="w-5 h-5" />
+                Start Analyzing for Free
+              </Button>
+            )}
+          </div>
+        </div>
+      </section>
 
       <Footer />
     </div>
