@@ -13,7 +13,10 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
+    console.log("Regenerate-prompt: Received auth header:", authHeader ? "present" : "missing");
+    
     if (!authHeader) {
+      console.error("Regenerate-prompt: No authorization header");
       return new Response(
         JSON.stringify({ error: "No authorization header" }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -26,14 +29,26 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
+    console.log("Regenerate-prompt: Getting user...");
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     
-    if (userError || !user) {
+    if (userError) {
+      console.error("Regenerate-prompt: User error:", userError);
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Authentication failed: " + userError.message }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    if (!user) {
+      console.error("Regenerate-prompt: No user found");
+      return new Response(
+        JSON.stringify({ error: "No user found" }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Regenerate-prompt: User authenticated:", user.id);
 
     // Check feature access before processing using Supabase client
     const { data: accessResult, error: accessError } = await supabaseClient.functions.invoke('check-feature-access', {
