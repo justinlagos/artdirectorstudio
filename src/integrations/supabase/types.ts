@@ -289,31 +289,70 @@ export type Database = {
       }
       generated_assets: {
         Row: {
+          action: string | null
           analysis_data: Json | null
           created_at: string
+          duration_ms: number | null
           id: string
           image_url: string | null
+          params: Json | null
           prompt: string | null
+          share_slug: string | null
+          source_urls: Json | null
+          thumbnail_url: string | null
           type: Database["public"]["Enums"]["asset_type"]
           user_id: string
         }
         Insert: {
+          action?: string | null
           analysis_data?: Json | null
           created_at?: string
+          duration_ms?: number | null
           id?: string
           image_url?: string | null
+          params?: Json | null
           prompt?: string | null
+          share_slug?: string | null
+          source_urls?: Json | null
+          thumbnail_url?: string | null
           type: Database["public"]["Enums"]["asset_type"]
           user_id: string
         }
         Update: {
+          action?: string | null
           analysis_data?: Json | null
           created_at?: string
+          duration_ms?: number | null
           id?: string
           image_url?: string | null
+          params?: Json | null
           prompt?: string | null
+          share_slug?: string | null
+          source_urls?: Json | null
+          thumbnail_url?: string | null
           type?: Database["public"]["Enums"]["asset_type"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      idempotency_cache: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          key: string
+          response: Json
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          key: string
+          response: Json
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          key?: string
+          response?: Json
         }
         Relationships: []
       }

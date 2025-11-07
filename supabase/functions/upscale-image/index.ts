@@ -1,4 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { validateImageData, validateTargetSize } from '../_shared/validation.ts';
+import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
+import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,14 +17,10 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    
     // Check authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized: No authorization header" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createErrorResponse(ERROR_MESSAGES.INVALID_INPUT, 401).response;
     }
 
     // Extract user ID from token for logging
@@ -60,14 +59,10 @@ serve(async (req) => {
         timestamp: new Date().toISOString(),
         reason: accessResult.reason
       }));
-      return new Response(
-        JSON.stringify({ 
-          error: accessResult.reason || "Access denied",
-          upgrade_required: accessResult.upgrade_required || false,
-          tier: accessResult.tier
-        }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createErrorResponse(
+        accessResult.reason || ERROR_MESSAGES.INVALID_INPUT,
+        403
+      ).response;
     }
 
     console.log(JSON.stringify({
@@ -77,7 +72,51 @@ serve(async (req) => {
       tier: accessResult.tier
     }));
 
-    const { image, targetSize } = await req.json();
+    const { image, targetSize, idempotencyKey } = await req.json();
+    
+    // Input validation
+    const imageValidation = validateImageData(image);
+    if (!imageValidation.valid) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'validation_failed',
+        error: imageValidation.error,
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse(imageValidation.error!, 400).response;
+    }
+
+    const sizeValidation = validateTargetSize(targetSize);
+    if (!sizeValidation.valid) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'validation_failed',
+        error: sizeValidation.error,
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse(sizeValidation.error!, 400).response;
+    }
+
+    // Check idempotency
+    if (idempotencyKey) {
+      const cached = await checkIdempotency(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+        idempotencyKey
+      );
+
+      if (cached.cached) {
+        console.log(JSON.stringify({
+          requestId,
+          action: 'idempotency_hit',
+          timestamp: new Date().toISOString()
+        }));
+        return new Response(
+          JSON.stringify(cached.response),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
     
     console.log(JSON.stringify({
       requestId,
@@ -85,12 +124,6 @@ serve(async (req) => {
       timestamp: new Date().toISOString(),
       targetSize
     }));
-    
-    console.log('Upscaling image to size:', targetSize);
-
-    if (!image) {
-      throw new Error('Image is required');
-    }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -144,38 +177,12 @@ serve(async (req) => {
         action: 'api_error',
         status: response.status,
         statusText: response.statusText,
-        errorBody: errorText,
+        errorBody: errorText.substring(0, 500),
         timestamp: new Date().toISOString()
       }));
 
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Rate limit exceeded. Please wait a moment and try again.',
-            errorType: 'rate_limit',
-            retryAfter: 60
-          }),
-          { 
-            status: 429,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-      
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Credits exhausted. Please add credits to your workspace to continue.',
-            errorType: 'payment_required'
-          }),
-          { 
-            status: 402,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-
-      throw new Error(`Failed to upscale image: ${response.statusText}`);
+      const errorMessage = mapAIError(response.status, errorText);
+      return createErrorResponse(errorMessage, response.status).response;
     }
 
     const data = await response.json();
@@ -232,24 +239,36 @@ serve(async (req) => {
       imageLength: upscaledImageUrl?.length || 0
     }));
 
+    const result = { image: upscaledImageUrl };
+
+    // Cache response for idempotency
+    if (idempotencyKey) {
+      await cacheResponse(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+        idempotencyKey,
+        result
+      );
+    }
+
     return new Response(
-      JSON.stringify({ image: upscaledImageUrl }),
+      JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
+    const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error(JSON.stringify({
+      requestId,
       action: 'upscale_error',
       timestamp: new Date().toISOString(),
       error: errorMessage,
+      duration,
       stack: error instanceof Error ? error.stack : undefined
     }));
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+    return createErrorResponse(
+      ERROR_MESSAGES.PROCESSING_FAILED,
+      500
+    ).response;
   }
 });

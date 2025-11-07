@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { validateImageData } from '../_shared/validation.ts';
+import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
+import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,39 +15,50 @@ serve(async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No authorization header" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error(JSON.stringify({
+        requestId,
+        action: 'auth_missing',
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse(ERROR_MESSAGES.INVALID_INPUT, 401).response;
     }
 
     // Extract and decode JWT to get user ID
     const token = authHeader.replace('Bearer ', '');
     const parts = token.split('.');
     if (parts.length !== 3) {
-      console.error("Invalid JWT format");
-      return new Response(
-        JSON.stringify({ error: "Invalid token format" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error(JSON.stringify({
+        requestId,
+        action: 'invalid_token',
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse("Invalid token format", 401).response;
     }
 
-    // Decode the payload (second part of JWT)
     const payload = JSON.parse(atob(parts[1]));
     const userId = payload.sub;
     
     if (!userId) {
-      console.error("No user ID in JWT");
-      return new Response(
-        JSON.stringify({ error: "Invalid token: no user ID" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error(JSON.stringify({
+        requestId,
+        action: 'no_user_id',
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse("Invalid token: no user ID", 401).response;
     }
 
-    console.log("Authenticated user:", userId);
+    console.log(JSON.stringify({
+      requestId,
+      action: 'analyze_start',
+      userId,
+      timestamp: new Date().toISOString()
+    }));
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -69,54 +83,75 @@ serve(async (req) => {
     const accessResult = await accessResponse.json();
     
     if (!accessResult.allowed) {
-      return new Response(
-        JSON.stringify({ 
-          error: accessResult.reason || "Access denied",
-          upgrade_required: accessResult.upgrade_required || false,
-          tier: accessResult.tier
-        }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.log(JSON.stringify({
+        requestId,
+        action: 'access_denied',
+        reason: accessResult.reason,
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse(
+        accessResult.reason || ERROR_MESSAGES.INVALID_INPUT,
+        403
+      ).response;
     }
 
-    console.log("Access granted:", accessResult);
+    console.log(JSON.stringify({
+      requestId,
+      action: 'access_granted',
+      tier: accessResult.tier,
+      timestamp: new Date().toISOString()
+    }));
 
-    const { image } = await req.json();
+    const { image, idempotencyKey } = await req.json();
     
-    // Validate input
-    if (!image) {
-      return new Response(
-        JSON.stringify({ error: "No image provided" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Input validation
+    const validation = validateImageData(image);
+    if (!validation.valid) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'validation_failed',
+        error: validation.error,
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse(validation.error!, 400).response;
     }
 
-    // Validate image format (base64)
-    if (!image.startsWith('data:image/')) {
-      return new Response(
-        JSON.stringify({ error: "Invalid image format. Expected base64 data URL" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    // Check idempotency
+    if (idempotencyKey) {
+      const cached = await checkIdempotency(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+        idempotencyKey
       );
-    }
 
-    // Validate image size (limit to ~10MB base64)
-    if (image.length > 15000000) {
-      return new Response(
-        JSON.stringify({ error: "Image too large. Maximum 15MB" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (cached.cached) {
+        console.log(JSON.stringify({
+          requestId,
+          action: 'idempotency_hit',
+          timestamp: new Date().toISOString()
+        }));
+        return new Response(
+          JSON.stringify(cached.response),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "AI service not configured" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error(JSON.stringify({
+        requestId,
+        action: 'config_error',
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse("AI service not configured", 500).response;
     }
 
-    console.log("Calling Lovable AI for image analysis...");
+    console.log(JSON.stringify({
+      requestId,
+      action: 'ai_call_start',
+      timestamp: new Date().toISOString()
+    }));
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -173,47 +208,39 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Lovable AI error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits to your workspace." }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      return new Response(
-        JSON.stringify({ error: "AI analysis failed" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error(JSON.stringify({
+        requestId,
+        action: 'ai_error',
+        status: response.status,
+        error: errorText.substring(0, 500),
+        timestamp: new Date().toISOString()
+      }));
+
+      const errorMessage = mapAIError(response.status, errorText);
+      return createErrorResponse(errorMessage, response.status).response;
     }
 
     const data = await response.json();
-    console.log("AI response received");
+    console.log(JSON.stringify({
+      requestId,
+      action: 'ai_response_received',
+      timestamp: new Date().toISOString()
+    }));
     
     const messageContent = data.choices?.[0]?.message?.content;
     
     if (!messageContent) {
-      console.error("No content in AI response", JSON.stringify(data));
-      return new Response(
-        JSON.stringify({ error: "Invalid AI response" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error(JSON.stringify({
+        requestId,
+        action: 'no_content',
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse("Invalid AI response", 500).response;
     }
-
-    console.log("Raw AI content:", messageContent.substring(0, 500));
 
     // Parse the JSON from the AI response
     let analysisData;
     try {
-      // Try multiple cleanup strategies
       let cleanContent = messageContent;
       
       // Remove markdown code blocks
@@ -226,27 +253,41 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
       }
       
       cleanContent = cleanContent.trim();
-      console.log("Cleaned content:", cleanContent.substring(0, 300));
-      
       analysisData = JSON.parse(cleanContent);
       
       // Validate the structure
       if (!analysisData.full_regeneration_prompt || !analysisData.analysis) {
-        throw new Error("Missing full_regeneration_prompt or analysis object in response");
+        throw new Error("Missing required fields in response");
       }
     } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : "Unknown parsing error";
-      console.error("Failed to parse AI response:", errorMessage);
-      console.error("Content sample:", messageContent.substring(0, 1000));
-      return new Response(
-        JSON.stringify({ error: "Failed to parse AI analysis: " + errorMessage }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(JSON.stringify({
+        requestId,
+        action: 'parse_failed',
+        error: e instanceof Error ? e.message : 'Unknown',
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse("Failed to parse AI analysis", 500).response;
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(JSON.stringify({
+      requestId,
+      action: 'analyze_success',
+      duration,
+      userId,
+      timestamp: new Date().toISOString()
+    }));
+
+    // Cache response for idempotency
+    if (idempotencyKey) {
+      await cacheResponse(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+        idempotencyKey,
+        analysisData
       );
     }
 
-    // Return the comprehensive analysis
-    // Note: Storage upload and database insertion are handled by the frontend
-    // to avoid duplicate entries and provide better UX control
     return new Response(
       JSON.stringify(analysisData),
       { 
@@ -255,10 +296,17 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
     );
 
   } catch (error) {
-    console.error("Error in analyze-image function:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    const duration = Date.now() - startTime;
+    console.error(JSON.stringify({
+      requestId,
+      action: 'analyze_error',
+      error: error instanceof Error ? error.message : 'Unknown',
+      duration,
+      timestamp: new Date().toISOString()
+    }));
+    return createErrorResponse(
+      ERROR_MESSAGES.PROCESSING_FAILED,
+      500
+    ).response;
   }
 });

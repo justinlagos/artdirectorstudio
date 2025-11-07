@@ -58,7 +58,11 @@ export const ToolsModalProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     
-    setScrollPosition(window.scrollY);
+    // Save scroll position to sessionStorage for reliable restoration
+    const scrollY = window.scrollY;
+    sessionStorage.setItem('toolModalScroll', scrollY.toString());
+    setScrollPosition(scrollY);
+    
     setActiveTool(tool);
     setIsOpen(true);
     setToolState('idle');
@@ -75,10 +79,18 @@ export const ToolsModalProvider = ({ children }: { children: ReactNode }) => {
 
   const closeTool = () => {
     setIsOpen(false);
-    // Restore scroll position
+    
+    // Restore scroll position after modal closes
     setTimeout(() => {
-      window.scrollTo({ top: scrollPosition, behavior: 'auto' });
-    }, 100);
+      const savedScroll = sessionStorage.getItem('toolModalScroll');
+      if (savedScroll) {
+        window.scrollTo({ top: parseInt(savedScroll), behavior: 'auto' });
+        sessionStorage.removeItem('toolModalScroll');
+      } else {
+        // Fallback to state
+        window.scrollTo({ top: scrollPosition, behavior: 'auto' });
+      }
+    }, 150);
     
     // Reset state after animation
     setTimeout(() => {
