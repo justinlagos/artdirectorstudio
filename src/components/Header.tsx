@@ -139,10 +139,10 @@ export const Header = () => {
                   {user && (
                     <Accordion type="single" collapsible className="w-full">
                       <AccordionItem value="tools" className="border-none">
-                        <AccordionTrigger className="py-3 px-3 hover:no-underline hover:bg-muted/50 rounded-md">
+                        <AccordionTrigger className="py-3 px-3 hover:no-underline hover:bg-muted/50 rounded-md text-base">
                           <div className="flex items-center gap-3">
                             <Wrench className="h-4 w-4" />
-                            <span className="font-normal">Tools</span>
+                            <span className="font-normal text-sm">Tools</span>
                           </div>
                         </AccordionTrigger>
                         <AccordionContent className="pb-1">
