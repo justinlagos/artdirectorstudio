@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock } from "lucide-react";
+import { Loader2, Lock, ArrowLeft } from "lucide-react";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -109,6 +109,17 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      
+      {/* Back to Home Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="absolute top-4 left-4 flex items-center gap-2 z-10"
+        onClick={() => navigate('/')}
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span className="hidden sm:inline">Back to Home</span>
+      </Button>
       
       <div className="relative w-full max-w-md animate-fade-in">
         <div className="text-center mb-8 space-y-3">
