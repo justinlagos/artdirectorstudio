@@ -5,12 +5,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Maximize2, Upload, Sparkles, FolderOpen, CheckCircle2, Eye } from "lucide-react";
+import { Download, Maximize2, Upload, Sparkles, FolderOpen, CheckCircle2, Eye, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { BeforeAfterSlider } from "@/components/ui/before-after-slider";
+import { ImageZoomDialog } from "./ImageZoomDialog";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -31,6 +32,8 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
   const [upscaledAssetId, setUpscaledAssetId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [showZoom, setShowZoom] = useState(false);
+  const [zoomImage, setZoomImage] = useState<'before' | 'after'>('after');
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -381,10 +384,38 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
                   </Badge>
                 </div>
 
-                {/* Before/After Comparison */}
+                {/* Before/After Comparison with Zoom */}
                 <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground text-center">
-                    Compare Original vs Upscaled
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      Compare Original vs Upscaled
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setZoomImage('before');
+                          setShowZoom(true);
+                        }}
+                        className="h-7 text-xs"
+                      >
+                        <ZoomIn className="w-3 h-3 mr-1" />
+                        Original
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setZoomImage('after');
+                          setShowZoom(true);
+                        }}
+                        className="h-7 text-xs"
+                      >
+                        <ZoomIn className="w-3 h-3 mr-1" />
+                        Upscaled
+                      </Button>
+                    </div>
                   </div>
                   <BeforeAfterSlider
                     beforeImage={sourceImage.preview}
@@ -459,6 +490,16 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
                 </Button>
               </CardFooter>
             </Card>
+          )}
+
+          {/* Image Zoom Dialog */}
+          {upscaledImage && sourceImage && (
+            <ImageZoomDialog
+              open={showZoom}
+              onOpenChange={setShowZoom}
+              imageUrl={zoomImage === 'before' ? sourceImage.preview : upscaledImage}
+              title={zoomImage === 'before' ? 'Original Image' : `Upscaled Image (${targetSize})`}
+            />
           )}
 
           {/* Upscale Button */}

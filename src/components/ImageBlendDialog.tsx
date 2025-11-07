@@ -5,11 +5,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Blend, X, Upload, Sparkles, FolderOpen, CheckCircle2, Eye } from "lucide-react";
+import { Download, Blend, X, Upload, Sparkles, FolderOpen, CheckCircle2, Eye, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { ImageZoomDialog } from "./ImageZoomDialog";
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -30,6 +31,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
   const [blendedAssetId, setBlendedAssetId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [showZoom, setShowZoom] = useState(false);
 
   const validateImage = async (file: File): Promise<{ valid: boolean; error?: string }> => {
     // Check file type
@@ -466,17 +468,18 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                   </Badge>
                 </div>
 
-                {/* Image Display */}
-                <div className="relative w-full rounded-lg overflow-hidden bg-muted/30 ring-1 ring-border/30">
+                {/* Image Display with Zoom */}
+                <div className="relative w-full rounded-lg overflow-hidden bg-muted/30 ring-1 ring-border/30 group">
                   <img
                     src={blendedImage}
                     alt="Blended result"
-                    className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                    className="w-full h-auto max-h-[600px] object-contain mx-auto cursor-pointer"
                     style={{
                       display: 'block',
                       maxWidth: '100%',
                       height: 'auto',
                     }}
+                    onClick={() => setShowZoom(true)}
                     onLoad={() => console.log('✅ [Blend] Image loaded successfully in UI:', { 
                       timestamp: new Date().toISOString(),
                       imageSize: blendedImage.length 
@@ -490,6 +493,13 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                       toast.error('Failed to display blended image');
                     }}
                   />
+                  {/* Zoom Overlay */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <div className="bg-background/95 backdrop-blur-sm px-3 py-2 rounded-lg flex items-center gap-2 text-sm">
+                      <ZoomIn className="w-4 h-4" />
+                      <span>Click to zoom</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Metadata */}
@@ -535,6 +545,16 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                 </Button>
               </CardFooter>
             </Card>
+          )}
+
+          {/* Image Zoom Dialog */}
+          {blendedImage && (
+            <ImageZoomDialog
+              open={showZoom}
+              onOpenChange={setShowZoom}
+              imageUrl={blendedImage}
+              title="Blended Image - Full Resolution"
+            />
           )}
 
           {/* Blend Button */}
