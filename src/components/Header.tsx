@@ -38,37 +38,39 @@ export const Header = () => {
               <Link to="/">Studio</Link>
             </Button>
             
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1">
-                  Tools
-                  <ChevronDown className="h-3 w-3 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 bg-background backdrop-blur-xl z-50">
-                <DropdownMenuItem onClick={() => openTool('blend')}>
-                  <Layers className="mr-2 h-4 w-4" />
-                  <div>
-                    <p className="font-medium">Blend</p>
-                    <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openTool('upscale')}>
-                  <Maximize2 className="mr-2 h-4 w-4" />
-                  <div>
-                    <p className="font-medium">Upscale</p>
-                    <p className="text-xs text-muted-foreground">Enhance resolution</p>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openTool('batch')}>
-                  <ImageIcon className="mr-2 h-4 w-4" />
-                  <div>
-                    <p className="font-medium">Batch</p>
-                    <p className="text-xs text-muted-foreground">Process multiple images</p>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    Tools
+                    <ChevronDown className="h-3 w-3 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56 bg-background backdrop-blur-xl z-50">
+                  <DropdownMenuItem onClick={() => openTool('blend')}>
+                    <Layers className="mr-2 h-4 w-4" />
+                    <div>
+                      <p className="font-medium">Blend</p>
+                      <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openTool('upscale')}>
+                    <Maximize2 className="mr-2 h-4 w-4" />
+                    <div>
+                      <p className="font-medium">Upscale</p>
+                      <p className="text-xs text-muted-foreground">Enhance resolution</p>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openTool('batch')}>
+                    <ImageIcon className="mr-2 h-4 w-4" />
+                    <div>
+                      <p className="font-medium">Batch</p>
+                      <p className="text-xs text-muted-foreground">Process multiple images</p>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             <Button variant="ghost" size="sm" asChild>
               <Link to="/inspire">Inspire</Link>
@@ -121,53 +123,55 @@ export const Header = () => {
                     </Link>
                   </Button>
                   
-                  <Accordion type="single" collapsible className="w-full">
-                    <AccordionItem value="tools" className="border-none">
-                      <AccordionTrigger className="py-4 px-4 hover:no-underline hover:bg-muted/50 rounded-md">
-                        <div className="flex items-center gap-3">
-                          <Wrench className="h-5 w-5" />
-                          <span className="text-base font-normal">Tools</span>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-2">
-                        <div className="flex flex-col space-y-1 pl-4">
-                          <Button 
-                            variant="ghost" 
-                            className="justify-start min-h-[48px] w-full"
-                            onClick={() => {
-                              openTool('blend');
-                              setMobileMenuOpen(false);
-                            }}
-                          >
-                            <Layers className="mr-3 h-4 w-4" />
-                            Blend
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            className="justify-start min-h-[48px] w-full"
-                            onClick={() => {
-                              openTool('upscale');
-                              setMobileMenuOpen(false);
-                            }}
-                          >
-                            <Maximize2 className="mr-3 h-4 w-4" />
-                            Upscale
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            className="justify-start min-h-[48px] w-full"
-                            onClick={() => {
-                              openTool('batch');
-                              setMobileMenuOpen(false);
-                            }}
-                          >
-                            <ImageIcon className="mr-3 h-4 w-4" />
-                            Batch
-                          </Button>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+                  {user && (
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="tools" className="border-none">
+                        <AccordionTrigger className="py-4 px-4 hover:no-underline hover:bg-muted/50 rounded-md">
+                          <div className="flex items-center gap-3">
+                            <Wrench className="h-5 w-5" />
+                            <span className="text-base font-normal">Tools</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-2">
+                          <div className="flex flex-col space-y-1 pl-4">
+                            <Button 
+                              variant="ghost" 
+                              className="justify-start min-h-[48px] w-full"
+                              onClick={() => {
+                                openTool('blend');
+                                setMobileMenuOpen(false);
+                              }}
+                            >
+                              <Layers className="mr-3 h-4 w-4" />
+                              Blend
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              className="justify-start min-h-[48px] w-full"
+                              onClick={() => {
+                                openTool('upscale');
+                                setMobileMenuOpen(false);
+                              }}
+                            >
+                              <Maximize2 className="mr-3 h-4 w-4" />
+                              Upscale
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              className="justify-start min-h-[48px] w-full"
+                              onClick={() => {
+                                openTool('batch');
+                                setMobileMenuOpen(false);
+                              }}
+                            >
+                              <ImageIcon className="mr-3 h-4 w-4" />
+                              Batch
+                            </Button>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  )}
 
                   <Button 
                     variant="ghost" 

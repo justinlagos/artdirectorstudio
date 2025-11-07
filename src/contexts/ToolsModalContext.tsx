@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 export type ToolType = 'blend' | 'upscale' | 'batch';
 export type ToolState = 'idle' | 'loading' | 'success' | 'error';
@@ -48,6 +50,14 @@ export const ToolsModalProvider = ({ children }: { children: ReactNode }) => {
   const [scrollPosition, setScrollPosition] = useState(0);
 
   const openTool = (tool: ToolType, preloadData?: any) => {
+    // Check if user is authenticated by checking localStorage
+    const hasSession = localStorage.getItem('sb-vsbjxktlrbfxfhxiqzlr-auth-token');
+    
+    if (!hasSession) {
+      toast.error('Please sign in to use tools');
+      return;
+    }
+    
     setScrollPosition(window.scrollY);
     setActiveTool(tool);
     setIsOpen(true);
