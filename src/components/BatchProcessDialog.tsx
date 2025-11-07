@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Download, Layers, Upload, X, CheckCircle2, AlertCircle, Sparkles, FolderOpen, RefreshCw } from "lucide-react";
+import { Download, Layers, Upload, X, CheckCircle2, AlertCircle, Sparkles, FolderOpen, RefreshCw, Eye, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
+import { Card } from "@/components/ui/card";
 
 interface BatchProcessDialogProps {
   open: boolean;
@@ -20,7 +21,10 @@ interface BatchImage {
   preview: string;
   status: 'pending' | 'processing' | 'completed' | 'error';
   result?: string;
+  analysisData?: any;
+  imageUrl?: string;
   error?: string;
+  errorType?: 'rate_limit' | 'credits' | 'generic';
 }
 
 export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogProps) => {
@@ -115,25 +119,46 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
 
           if (error) throw error;
 
-          // Save to My Projects
-          await saveAnalysisToMyProjects(base64, data.full_regeneration_prompt, image.file.name);
+          // Save to My Projects and get image URL
+          const imageUrl = await saveAnalysisToMyProjects(base64, data.full_regeneration_prompt, image.file.name);
 
           setImages(prev =>
             prev.map(img =>
               img.id === image.id
-                ? { ...img, status: 'completed' as const, result: data.full_regeneration_prompt }
+                ? { 
+                    ...img, 
+                    status: 'completed' as const, 
+                    result: data.full_regeneration_prompt,
+                    analysisData: data.analysis,
+                    imageUrl: imageUrl || base64
+                  }
                 : img
             )
           );
 
           completedCount++;
           setCurrentProgress((completedCount / totalImages) * 100);
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Error processing image ${image.file.name}:`, error);
+          
+          // Parse error type for better messaging
+          let errorMessage = 'Failed to analyze';
+          let errorType: 'rate_limit' | 'credits' | 'generic' = 'generic';
+          
+          if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('rate limit')) {
+            errorMessage = 'Rate limit exceeded. Wait a moment and retry.';
+            errorType = 'rate_limit';
+          } else if (error?.message?.includes('402') || error?.message?.toLowerCase().includes('credit')) {
+            errorMessage = 'Credits exhausted. Add credits to continue.';
+            errorType = 'credits';
+          } else if (error?.message) {
+            errorMessage = error.message;
+          }
+          
           setImages(prev =>
             prev.map(img =>
               img.id === image.id
-                ? { ...img, status: 'error' as const, error: error instanceof Error ? error.message : 'Failed to analyze' }
+                ? { ...img, status: 'error' as const, error: errorMessage, errorType }
                 : img
             )
           );
@@ -165,10 +190,10 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     }
   };
 
-  const saveAnalysisToMyProjects = async (imageBase64: string, prompt: string, fileName: string) => {
+  const saveAnalysisToMyProjects = async (imageBase64: string, prompt: string, fileName: string): Promise<string | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) return null;
 
       // Convert base64 to blob
       const response = await fetch(imageBase64);
@@ -202,8 +227,11 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
           quality: 'standard',
           size: 'original'
         });
+      
+      return publicUrl;
     } catch (error) {
       console.error('Error saving analysis:', error);
+      return null;
     }
   };
 
@@ -259,23 +287,41 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
 
           if (error) throw error;
 
-          await saveAnalysisToMyProjects(base64, data.full_regeneration_prompt, image.file.name);
+          const imageUrl = await saveAnalysisToMyProjects(base64, data.full_regeneration_prompt, image.file.name);
 
           setImages(prev =>
             prev.map(img =>
               img.id === image.id
-                ? { ...img, status: 'completed' as const, result: data.full_regeneration_prompt }
+                ? { 
+                    ...img, 
+                    status: 'completed' as const, 
+                    result: data.full_regeneration_prompt,
+                    analysisData: data.analysis,
+                    imageUrl: imageUrl || base64
+                  }
                 : img
             )
           );
 
           setCurrentProgress(((i + 1) / failedImages.length) * 100);
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Error processing image ${image.file.name}:`, error);
+          
+          let errorMessage = 'This didn\'t complete. Try again.';
+          let errorType: 'rate_limit' | 'credits' | 'generic' = 'generic';
+          
+          if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('rate limit')) {
+            errorMessage = 'Rate limit exceeded. Wait a moment.';
+            errorType = 'rate_limit';
+          } else if (error?.message?.includes('402') || error?.message?.toLowerCase().includes('credit')) {
+            errorMessage = 'Credits exhausted. Add credits.';
+            errorType = 'credits';
+          }
+          
           setImages(prev =>
             prev.map(img =>
               img.id === image.id
-                ? { ...img, status: 'error' as const, error: 'This didn\'t complete. Try again.' }
+                ? { ...img, status: 'error' as const, error: errorMessage, errorType }
                 : img
             )
           );
@@ -343,6 +389,38 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     }
   };
 
+  const handleViewAnalysis = (img: BatchImage) => {
+    if (!img.result) return;
+    
+    const content = `=== ${img.file.name} Analysis ===\n\n${img.result}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analysis-${img.file.name}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast.success("Analysis downloaded!");
+  };
+
+  const handleViewInStudio = (img: BatchImage) => {
+    if (!img.imageUrl) return;
+    navigate('/', { state: { scrollTo: 'studio' } });
+    setTimeout(() => {
+      const studioElement = document.getElementById('studio');
+      if (studioElement) {
+        studioElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+    onOpenChange(false);
+  };
+
+  const completedImages = images.filter(img => img.status === 'completed');
+  const hasCompleted = completedImages.length > 0;
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col">
@@ -391,15 +469,68 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
             </div>
           )}
 
-          {/* Images List */}
-          {images.length > 0 && (
+          {/* Results Gallery */}
+          {hasCompleted && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <Label className="text-base font-semibold">Completed Results ({completedImages.length})</Label>
+              </div>
+              <ScrollArea className="h-[300px] border rounded-lg">
+                <div className="grid grid-cols-2 gap-3 p-4">
+                  {completedImages.map((img) => (
+                    <Card 
+                      key={img.id}
+                      className="overflow-hidden hover:shadow-lg transition-all animate-scale-in"
+                    >
+                      <div className="relative aspect-square">
+                        <img 
+                          src={img.imageUrl || img.preview} 
+                          alt={img.file.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-2 right-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-500 bg-white rounded-full" />
+                        </div>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        <p className="text-xs font-medium truncate">{img.file.name}</p>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewAnalysis(img)}
+                            className="flex-1 text-xs h-7"
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewInStudio(img)}
+                            className="flex-1 text-xs h-7"
+                          >
+                            <ExternalLink className="w-3 h-3 mr-1" />
+                            Studio
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Processing/Pending Images List */}
+          {images.length > 0 && images.some(img => img.status !== 'completed') && (
             <ScrollArea className="flex-1 border rounded-lg">
               <div className="space-y-2 p-4">
-                {images.map((img) => (
+                {images.filter(img => img.status !== 'completed').map((img) => (
                   <div 
                     key={img.id}
                     className={`flex items-center gap-3 p-3 bg-card border rounded-lg transition-all ${
-                      img.status === 'completed' ? 'border-green-500/50 bg-green-50/10' :
                       img.status === 'error' ? 'border-red-500/50 bg-red-50/10' :
                       'border-border'
                     }`}
@@ -415,7 +546,10 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
                         {(img.file.size / 1024).toFixed(1)} KB
                       </p>
                       {img.status === 'error' && img.error && (
-                        <p className="text-xs text-red-500 mt-1">{img.error}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
+                          <p className="text-xs text-red-500">{img.error}</p>
+                        </div>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
