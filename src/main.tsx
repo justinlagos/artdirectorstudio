@@ -3,7 +3,6 @@ import { HelmetProvider } from "react-helmet-async";
 import App from "./App.tsx";
 import "./index.css";
 import { registerServiceWorker } from "./lib/serviceWorker";
-import { initPerformanceMonitoring } from "./lib/performanceMonitoring";
 
 createRoot(document.getElementById("root")!).render(
   <HelmetProvider>
@@ -13,6 +12,3 @@ createRoot(document.getElementById("root")!).render(
 
 // Register service worker for offline functionality
 registerServiceWorker();
-
-// Initialize performance monitoring
-initPerformanceMonitoring();
