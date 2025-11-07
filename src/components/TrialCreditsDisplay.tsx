@@ -1,5 +1,5 @@
 import { Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
@@ -10,6 +10,8 @@ export const TrialCreditsDisplay = () => {
   const [freeCredits, setFreeCredits] = useState<number>(0);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const previousCredits = useRef<number | null>(null);
 
   useEffect(() => {
     const fetchCredits = async () => {
@@ -26,7 +28,16 @@ export const TrialCreditsDisplay = () => {
 
         // Only show for free tier users
         if (data.subscription_tier === 'free') {
-          setFreeCredits(data.free_credits || 0);
+          const newCredits = data.free_credits || 0;
+          
+          // Trigger animation if credits changed
+          if (previousCredits.current !== null && previousCredits.current !== newCredits) {
+            setIsUpdating(true);
+            setTimeout(() => setIsUpdating(false), 2000);
+          }
+          
+          setFreeCredits(newCredits);
+          previousCredits.current = newCredits;
         }
       } catch (error) {
         console.error("Error fetching trial credits:", error);
@@ -80,9 +91,12 @@ export const TrialCreditsDisplay = () => {
 
   return (
     <>
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/5">
-        <Sparkles className="w-4 h-4 text-primary" />
-        <span className="text-sm font-medium">
+      <div className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/5 transition-all duration-200 ${isUpdating ? 'scale-105' : ''}`}>
+        {isUpdating && (
+          <div className="absolute inset-0 rounded-lg bg-primary/30 animate-pulse" />
+        )}
+        <Sparkles className={`relative w-4 h-4 text-primary ${isUpdating ? 'animate-pulse' : ''}`} />
+        <span className={`relative text-sm font-medium ${isUpdating ? 'animate-pulse' : ''}`}>
           {freeCredits} free {freeCredits === 1 ? 'credit' : 'credits'}
         </span>
       </div>
