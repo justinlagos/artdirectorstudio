@@ -517,6 +517,8 @@ export type Database = {
           created_at: string
           featured: boolean | null
           id: string
+          is_deleted: boolean | null
+          is_inspire_approved: boolean | null
           is_public: boolean
           like_count: number | null
           mood: string | null
@@ -536,6 +538,8 @@ export type Database = {
           created_at?: string
           featured?: boolean | null
           id?: string
+          is_deleted?: boolean | null
+          is_inspire_approved?: boolean | null
           is_public?: boolean
           like_count?: number | null
           mood?: string | null
@@ -555,6 +559,8 @@ export type Database = {
           created_at?: string
           featured?: boolean | null
           id?: string
+          is_deleted?: boolean | null
+          is_inspire_approved?: boolean | null
           is_public?: boolean
           like_count?: number | null
           mood?: string | null
