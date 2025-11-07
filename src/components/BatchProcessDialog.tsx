@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { mapErrorMessage, TOOL_ERROR_MESSAGES } from "@/lib/toolErrorMessages";
 
 interface BatchProcessDialogProps {
   open: boolean;
@@ -26,14 +27,16 @@ interface QueueItem {
   result?: string;
   error?: string;
   assetId?: string;
+  idempotencyKey?: string;
+  startTime?: number;
 }
 
-type ProcessType = 'upscale' | 'blend';
+type OperationType = 'analyze' | 'upscale';
 
 export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogProps) => {
   const navigate = useNavigate();
   const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [processType, setProcessType] = useState<ProcessType>('upscale');
+  const [operation, setOperation] = useState<OperationType>('upscale');
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -50,8 +53,8 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
-    if (queue.length + files.length > 20) {
-      toast.error("Maximum 20 images allowed in batch");
+    if (queue.length + files.length > 10) {
+      toast.error(TOOL_ERROR_MESSAGES.BATCH_FILE_COUNT);
       return;
     }
 
@@ -61,6 +64,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
       preview: URL.createObjectURL(file),
       status: 'pending',
       progress: 0,
+      idempotencyKey: crypto.randomUUID(), // Pre-generate for idempotency
     }));
 
     setQueue(prev => [...prev, ...newItems]);
@@ -93,10 +97,14 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     });
 
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("Please log in to continue");
+    if (!session) throw new Error("Please sign in to use this feature.");
 
     const { data, error } = await supabase.functions.invoke("upscale-image", {
-      body: { image: base64Image, targetSize },
+      body: { 
+        image: base64Image, 
+        targetSize,
+        idempotencyKey: item.idempotencyKey 
+      },
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
 
@@ -106,14 +114,75 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     return data.image;
   };
 
-  const saveToDatabase = async (imageDataUrl: string, type: string, size: string): Promise<string> => {
+  const processAnalyze = async (item: QueueItem): Promise<any> => {
+    const base64Image = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(item.file);
+    });
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Please sign in to use this feature.");
+
+    const { data, error } = await supabase.functions.invoke("analyze-image", {
+      body: { 
+        image: base64Image,
+        idempotencyKey: item.idempotencyKey 
+      },
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+
+    if (error) throw error;
+    if (!data) throw new Error("No analysis returned");
+
+    return data;
+  };
+
+  const saveToDatabase = async (
+    imageDataUrl: string, 
+    operationType: string, 
+    size: string,
+    sourceImage: string,
+    duration: number,
+    analysisData?: any
+  ): Promise<string> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not found");
 
+    // For analyze, we don't have an image to save, just analysis data
+    if (operationType === 'analyze') {
+      const { data: assetData, error: dbError } = await supabase
+        .from('generated_assets')
+        .insert({
+          user_id: user.id,
+          type: 'analysis',
+          action: 'batch',
+          prompt: analysisData?.full_regeneration_prompt || 'Batch analysis',
+          analysis_data: analysisData,
+          source_urls: [sourceImage],
+          params: {
+            operation: 'analyze',
+            batchItem: true
+          },
+          duration_ms: duration,
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+      return assetData.id;
+    }
+
+    // For upscale, save the image
     const response = await fetch(imageDataUrl);
     const blob = await response.blob();
     
-    const fileName = `${user.id}/batch-${type}-${Date.now()}.png`;
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const uuid = crypto.randomUUID();
+    const fileName = `results/${user.id}/${yearMonth}/batch/${uuid}.png`;
+    
     const { error: uploadError } = await supabase.storage
       .from('generated-images')
       .upload(fileName, blob, {
@@ -133,10 +202,16 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
       .insert({
         user_id: user.id,
         type: 'image',
+        action: 'batch',
         image_url: publicUrl,
-        prompt: `Batch ${type} to ${size}`,
-        quality: size === '2048x2048' ? 'ultra' : 'high',
-        size: size
+        prompt: `Batch ${operationType} to ${size}`,
+        source_urls: [sourceImage],
+        params: {
+          operation: operationType,
+          targetSize: size,
+          batchItem: true
+        },
+        duration_ms: duration,
       })
       .select()
       .single();
@@ -154,20 +229,18 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     setIsProcessing(true);
     setIsPaused(false);
 
-    // Start from currentIndex if resuming, otherwise start from 0
     const startIndex = isPaused ? currentIndex : 0;
     if (!isPaused) setCurrentIndex(0);
 
     for (let i = startIndex; i < queue.length; i++) {
-      // Check if paused before processing each item
-      if (isPaused) {
-        break;
-      }
+      if (isPaused) break;
 
       const item = queue[i];
       if (item.status !== 'pending') continue;
 
       setCurrentIndex(i);
+      const itemStartTime = Date.now();
+      item.startTime = itemStartTime;
       
       // Update to processing
       setQueue(prev => prev.map((q, idx) => 
@@ -175,7 +248,6 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
       ));
 
       try {
-        // Simulate progress updates
         const progressInterval = setInterval(() => {
           setQueue(prev => prev.map((q, idx) => 
             idx === i && q.progress < 90 
@@ -184,19 +256,36 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
           ));
         }, 2000);
 
-        // Process based on type
-        let result: string;
-        if (processType === 'upscale') {
+        let result: string | any;
+        let assetId: string;
+
+        if (operation === 'upscale') {
           result = await processUpscale(item);
+          const duration = Date.now() - itemStartTime;
+          
+          // Convert to base64 for source storage
+          const reader = new FileReader();
+          const originalBase64 = await new Promise<string>((resolve) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(item.file);
+          });
+          
+          assetId = await saveToDatabase(result, 'upscale', targetSize, originalBase64, duration);
         } else {
-          // For blend, we'd need at least 2 images
-          throw new Error("Blend mode requires implementation with image pairs");
+          // Analyze
+          result = await processAnalyze(item);
+          const duration = Date.now() - itemStartTime;
+          
+          const reader = new FileReader();
+          const originalBase64 = await new Promise<string>((resolve) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(item.file);
+          });
+          
+          assetId = await saveToDatabase('', 'analyze', '', originalBase64, duration, result);
         }
 
         clearInterval(progressInterval);
-
-        // Save to database
-        const assetId = await saveToDatabase(result, processType, targetSize);
 
         // Update to completed
         setQueue(prev => prev.map((q, idx) => 
@@ -205,25 +294,24 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
             : q
         ));
 
-        toast.success(`Image ${i + 1} processed successfully`);
-        
         // Small delay between items
         await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (error: any) {
         console.error(`Failed to process item ${i}:`, error);
+        const errorMsg = mapErrorMessage(error);
         setQueue(prev => prev.map((q, idx) => 
           idx === i 
-            ? { ...q, status: 'failed', error: error.message } 
+            ? { ...q, status: 'failed', error: errorMsg } 
             : q
         ));
-        toast.error(`Failed to process image ${i + 1}`);
       }
     }
 
     if (!isPaused) {
       setIsProcessing(false);
-      toast.success("Batch processing completed!");
+      const completedCount = queue.filter(i => i.status === 'completed').length;
+      toast.success(`Batch processing completed! ${completedCount} of ${queue.length} items processed.`);
     } else {
       setIsProcessing(false);
       toast.info("Batch processing paused");
@@ -277,23 +365,23 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
             <CardContent className="p-4 space-y-4">
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Process Type</label>
+                  <label className="text-sm font-medium mb-2 block">Operation</label>
                   <Select
-                    value={processType}
-                    onValueChange={(value) => setProcessType(value as ProcessType)}
+                    value={operation}
+                    onValueChange={(value) => setOperation(value as OperationType)}
                     disabled={isProcessing}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="upscale">Upscale Images</SelectItem>
-                      <SelectItem value="blend" disabled>Blend Images (Coming Soon)</SelectItem>
+                      <SelectItem value="upscale">Upscale All</SelectItem>
+                      <SelectItem value="analyze">Analyze All</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {processType === 'upscale' && (
+                {operation === 'upscale' && (
                   <div className="flex-1">
                     <label className="text-sm font-medium mb-2 block">Target Size</label>
                     <Select
@@ -324,10 +412,10 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
                     className="hidden"
                     id="batch-upload"
                   />
-                  <label htmlFor="batch-upload" className="cursor-pointer">
+                  <label htmlFor="batch-upload" className="cursor-pointer min-h-[44px] flex flex-col items-center justify-center">
                     <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      Click to add images (up to 20 total)
+                      Click to add images (up to 10 total)
                     </p>
                   </label>
                 </div>
@@ -489,14 +577,14 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
             <Button
               onClick={processQueue}
               disabled={stats.pending === 0}
-              className="min-w-[140px]"
+              className="min-w-[140px] min-h-[44px]"
             >
               Process {stats.pending} Image{stats.pending !== 1 ? 's' : ''}
             </Button>
           )}
 
           {isProcessing && !isPaused && (
-            <Button disabled className="min-w-[140px]">
+            <Button disabled className="min-w-[140px] min-h-[44px]">
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Processing {currentIndex + 1}/{stats.total}
             </Button>

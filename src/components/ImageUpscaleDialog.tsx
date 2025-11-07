@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { BeforeAfterSlider } from "@/components/ui/before-after-slider";
 import { ImageZoomDialog } from "./ImageZoomDialog";
+import { useToolState } from "@/hooks/useToolState";
+import { mapErrorMessage } from "@/lib/toolErrorMessages";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -25,15 +27,15 @@ interface SourceImage {
 
 export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogProps) => {
   const navigate = useNavigate();
+  const toolState = useToolState();
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
-  const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
   const [upscaledAssetId, setUpscaledAssetId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
   const [showZoom, setShowZoom] = useState(false);
   const [zoomImage, setZoomImage] = useState<'before' | 'after'>('after');
+  const [upscaleStartTime, setUpscaleStartTime] = useState<number>(0);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -56,7 +58,11 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       return;
     }
 
-    setIsUpscaling(true);
+    const idempotencyKey = crypto.randomUUID();
+    const startTime = Date.now();
+    setUpscaleStartTime(startTime);
+    
+    toolState.startProcessing();
     setProgress(0);
     setUpscaledImage(null);
 
@@ -71,38 +77,32 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     }, 2000);
 
     try {
-      console.log('🔍 [Upscale] Starting upscale process, target size:', targetSize);
+      console.log('🔍 [Upscale] Starting upscale, target:', targetSize, 'idempotency:', idempotencyKey);
       
-      // Get session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         console.error('❌ [Upscale] No session found');
-        toast.error("Please log in to continue.");
-        setIsUpscaling(false);
+        toolState.handleError("Please sign in to use this feature.");
+        toast.error("Please sign in to continue.");
         clearInterval(progressInterval);
         return;
       }
 
-      console.log('✅ [Upscale] Session validated');
-
-      // Convert file to base64 for edge function
-      console.log('📸 [Upscale] Converting image to base64...');
+      // Convert file to base64
       const base64Image = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => {
-          console.log('✅ [Upscale] Image converted, size:', (reader.result as string).length, 'chars');
-          resolve(reader.result as string);
-        };
-        reader.onerror = (error) => {
-          console.error('❌ [Upscale] Failed to read image:', error);
-          reject(error);
-        };
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
         reader.readAsDataURL(sourceImage.file);
       });
 
       console.log('🚀 [Upscale] Invoking upscale-image edge function...');
       const { data, error } = await supabase.functions.invoke("upscale-image", {
-        body: { image: base64Image, targetSize },
+        body: { 
+          image: base64Image, 
+          targetSize,
+          idempotencyKey 
+        },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -111,81 +111,45 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       clearInterval(progressInterval);
       setProgress(100);
 
-      console.log('📦 [Upscale] Response received:', {
-        hasData: !!data,
-        hasError: !!error,
-        dataKeys: data ? Object.keys(data) : [],
-        hasImage: !!data?.image,
-        imageLength: data?.image?.length || 0,
-        imagePrefix: data?.image?.substring(0, 50) || 'N/A'
-      });
+      if (error) throw error;
+      if (!data?.image) throw new Error('No upscaled image returned');
 
-      if (error) {
-        console.error('❌ [Upscale] Edge function error:', error);
-        throw error;
-      }
-
-      if (!data) {
-        console.error('❌ [Upscale] No data returned from edge function');
-        toast.error('No response from server');
-        return;
-      }
-
-      if (!data.image) {
-        console.error('❌ [Upscale] Response missing image field. Full response:', data);
-        toast.error('Image generation failed - no image returned');
-        return;
-      }
-
-      // Validate image format
+      // Validate and set image IMMEDIATELY
       let validatedImage = data.image;
       if (!data.image.startsWith('data:image/')) {
-        console.warn('⚠️ [Upscale] Invalid image format, adding data URI prefix');
         validatedImage = `data:image/png;base64,${data.image}`;
       }
 
-      console.log('✅ [Upscale] Image validated, setting state');
+      console.log('✅ [Upscale] Image validated, setting state immediately');
       setUpscaledImage(validatedImage);
+      toolState.handleSuccess();
       
-      // Auto-save to My Projects
-      console.log('💾 [Upscale] Saving to My Projects...');
-      await saveToMyProjects(validatedImage, targetSize);
+      // Save to database in background
+      const duration = Date.now() - startTime;
+      saveToMyProjects(validatedImage, targetSize, base64Image, duration).catch(err => {
+        console.error('Background save failed:', err);
+      });
       
-      console.log('🎉 [Upscale] Upscale completed successfully');
       toast.success("Image upscaled successfully!");
     } catch (error: any) {
       clearInterval(progressInterval);
-      console.error("❌ [Upscale] Error occurred:", {
-        message: error?.message,
-        details: error,
-        stack: error?.stack
-      });
+      console.error("❌ [Upscale] Error:", error);
       
-      // Check for specific error types
-      if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
-        toast.error("Rate limit exceeded", {
-          description: "Please wait a minute and try again. The AI service needs a moment to recover.",
-          duration: 5000,
-        });
-      } else if (error?.message?.includes('Credits exhausted') || error?.message?.includes('402')) {
-        toast.error("Credits exhausted", {
-          description: "Please add credits to your workspace in Settings to continue.",
-          duration: 7000,
-        });
-      } else {
-        toast.error("Failed to upscale image", {
-          description: error?.message || "Please try again.",
-        });
-      }
+      const errorMessage = mapErrorMessage(error);
+      toolState.handleError(errorMessage);
+      toast.error(errorMessage);
     } finally {
-      setIsUpscaling(false);
       setTimeout(() => setProgress(0), 1000);
     }
   };
 
-  const saveToMyProjects = async (imageDataUrl: string, size: string) => {
+  const saveToMyProjects = async (
+    imageDataUrl: string, 
+    size: string, 
+    originalImage: string,
+    duration: number
+  ) => {
     try {
-      setIsSaving(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -193,9 +157,13 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       const response = await fetch(imageDataUrl);
       const blob = await response.blob();
       
-      // Upload to storage
-      const fileName = `${user.id}/upscaled-${Date.now()}.png`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // Use standardized storage path: results/{userId}/{yyyy-mm}/upscale/{uuid}.png
+      const now = new Date();
+      const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const uuid = crypto.randomUUID();
+      const fileName = `results/${user.id}/${yearMonth}/upscale/${uuid}.png`;
+      
+      const { error: uploadError } = await supabase.storage
         .from('generated-images')
         .upload(fileName, blob, {
           contentType: 'image/png',
@@ -210,16 +178,22 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         .from('generated-images')
         .getPublicUrl(fileName);
 
-      // Save metadata to database
+      // Save metadata with new schema fields
       const { data: assetData, error: dbError } = await supabase
         .from('generated_assets')
         .insert({
           user_id: user.id,
           type: 'image',
+          action: 'upscale',
           image_url: publicUrl,
           prompt: `Upscaled to ${size}`,
-          quality: size === '2048x2048' ? 'ultra' : 'high',
-          size: size
+          source_urls: [originalImage], // Store original
+          params: {
+            targetSize: size,
+            originalSize: sourceImage?.file.size
+          },
+          duration_ms: duration,
+          // share_slug auto-generated by trigger
         })
         .select()
         .single();
@@ -228,11 +202,11 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       
       if (assetData) {
         setUpscaledAssetId(assetData.id);
+        console.log('✅ [Upscale] Saved to DB with share slug:', assetData.share_slug);
       }
     } catch (error) {
       console.error('Error saving to My Projects:', error);
-    } finally {
-      setIsSaving(false);
+      throw error;
     }
   };
 
@@ -271,7 +245,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setUpscaledAssetId(null);
     setTargetSize('1536x1536');
     setProgress(0);
-    setIsSaving(false);
+    toolState.reset();
     onOpenChange(false);
   };
 
@@ -309,7 +283,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
                   onChange={handleImageUpload}
                   className="hidden"
                   id="upscale-image"
-                  disabled={isUpscaling}
+                  disabled={toolState.isProcessing}
                 />
                 <label htmlFor="upscale-image" className="cursor-pointer">
                   <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
@@ -342,7 +316,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
               <Select
                 value={targetSize}
                 onValueChange={(value) => setTargetSize(value as any)}
-                disabled={isUpscaling}
+                disabled={toolState.isProcessing}
               >
                 <SelectTrigger id="targetSize">
                   <SelectValue />
@@ -359,7 +333,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           )}
 
           {/* Progress Bar */}
-          {isUpscaling && (
+          {toolState.isProcessing && (
             <div className="space-y-2">
               <Progress value={progress} className="w-full" />
               <p className="text-sm text-muted-foreground text-center">
@@ -506,12 +480,12 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           {sourceImage && !upscaledImage && (
             <Button
               onClick={handleUpscale}
-              disabled={isUpscaling}
-              className="w-full"
+              disabled={toolState.isProcessing}
+              className="w-full min-h-[44px]"
               size="lg"
             >
               <Maximize2 className="w-4 h-4 mr-2" />
-              {isUpscaling ? "Upscaling..." : "Upscale Image"}
+              {toolState.isProcessing ? "Upscaling..." : "Upscale Image"}
             </Button>
           )}
         </div>

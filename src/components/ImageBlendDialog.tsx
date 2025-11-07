@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { ImageZoomDialog } from "./ImageZoomDialog";
+import { useToolState } from "@/hooks/useToolState";
+import { mapErrorMessage } from "@/lib/toolErrorMessages";
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -24,14 +26,14 @@ interface ImageFile {
 
 export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) => {
   const navigate = useNavigate();
+  const toolState = useToolState();
   const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("Blend these images seamlessly together");
-  const [isBlending, setIsBlending] = useState(false);
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
   const [blendedAssetId, setBlendedAssetId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
   const [showZoom, setShowZoom] = useState(false);
+  const [blendStartTime, setBlendStartTime] = useState<number>(0);
 
   const validateImage = async (file: File): Promise<{ valid: boolean; error?: string }> => {
     // Check file type
@@ -136,7 +138,11 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       return;
     }
 
-    setIsBlending(true);
+    const idempotencyKey = crypto.randomUUID();
+    const startTime = Date.now();
+    setBlendStartTime(startTime);
+    
+    toolState.startProcessing();
     setProgress(0);
     setBlendedImage(null);
 
@@ -151,40 +157,34 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     }, 2000);
 
     try {
-      console.log('🎨 [Blend] Starting blend process with', images.length, 'images');
+      console.log('🎨 [Blend] Starting blend process with', images.length, 'images, idempotency:', idempotencyKey);
       
-      // Get session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         console.error('❌ [Blend] No session found');
-        toast.error("Please log in to continue.");
-        setIsBlending(false);
+        toolState.handleError("Please sign in to use this feature.");
+        toast.error("Please sign in to continue.");
         clearInterval(progressInterval);
         return;
       }
 
-      console.log('✅ [Blend] Session validated');
-
-      // Convert files to base64 for edge function
-      console.log('📸 [Blend] Converting images to base64...');
+      // Convert files to base64
       const base64Images = await Promise.all(
-        images.map((img, idx) => new Promise<string>((resolve, reject) => {
+        images.map((img) => new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
-          reader.onload = () => {
-            console.log(`✅ [Blend] Image ${idx + 1} converted, size: ${(reader.result as string).length} chars`);
-            resolve(reader.result as string);
-          };
-          reader.onerror = (error) => {
-            console.error(`❌ [Blend] Failed to read image ${idx + 1}:`, error);
-            reject(error);
-          };
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
           reader.readAsDataURL(img.file);
         }))
       );
 
       console.log('🚀 [Blend] Invoking blend-images edge function...');
       const { data, error } = await supabase.functions.invoke("blend-images", {
-        body: { images: base64Images, instruction },
+        body: { 
+          images: base64Images, 
+          instruction,
+          idempotencyKey 
+        },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -193,81 +193,52 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       clearInterval(progressInterval);
       setProgress(100);
 
-      console.log('📦 [Blend] Response received:', {
-        hasData: !!data,
-        hasError: !!error,
-        dataKeys: data ? Object.keys(data) : [],
-        hasImage: !!data?.image,
-        imageLength: data?.image?.length || 0,
-        imagePrefix: data?.image?.substring(0, 50) || 'N/A'
-      });
-
       if (error) {
         console.error('❌ [Blend] Edge function error:', error);
         throw error;
       }
 
-      if (!data) {
-        console.error('❌ [Blend] No data returned from edge function');
-        toast.error('No response from server');
-        return;
+      if (!data?.image) {
+        throw new Error('No blended image returned');
       }
 
-      if (!data.image) {
-        console.error('❌ [Blend] Response missing image field. Full response:', data);
-        toast.error('Image generation failed - no image returned');
-        return;
-      }
-
-      // Validate image format
+      // Validate and set image IMMEDIATELY for instant display
       let validatedImage = data.image;
       if (!data.image.startsWith('data:image/')) {
-        console.warn('⚠️ [Blend] Invalid image format, adding data URI prefix');
         validatedImage = `data:image/png;base64,${data.image}`;
       }
 
-      console.log('✅ [Blend] Image validated, setting state');
+      console.log('✅ [Blend] Image validated, setting state immediately');
       setBlendedImage(validatedImage);
+      toolState.handleSuccess();
       
-      // Auto-save to My Projects
-      console.log('💾 [Blend] Saving to My Projects...');
-      await saveToMyProjects(validatedImage, instruction);
+      // Save to database in background (don't block UI)
+      const duration = Date.now() - startTime;
+      saveToMyProjects(validatedImage, instruction, base64Images, duration).catch(err => {
+        console.error('Background save failed:', err);
+        // Don't show error since blend succeeded
+      });
       
-      console.log('🎉 [Blend] Blend completed successfully');
       toast.success("Images blended successfully!");
     } catch (error: any) {
       clearInterval(progressInterval);
-      console.error("❌ [Blend] Error occurred:", {
-        message: error?.message,
-        details: error,
-        stack: error?.stack
-      });
+      console.error("❌ [Blend] Error occurred:", error);
       
-      // Check for specific error types
-      if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
-        toast.error("Rate limit exceeded", {
-          description: "Please wait a minute and try again.",
-          duration: 5000,
-        });
-      } else if (error?.message?.includes('Credits exhausted') || error?.message?.includes('402')) {
-        toast.error("Credits exhausted", {
-          description: "Please add credits to continue.",
-          duration: 7000,
-        });
-      } else {
-        toast.error("Failed to blend images", {
-          description: error?.message || "Please try again.",
-        });
-      }
+      const errorMessage = mapErrorMessage(error);
+      toolState.handleError(errorMessage);
+      toast.error(errorMessage);
     } finally {
-      setIsBlending(false);
       setTimeout(() => setProgress(0), 1000);
     }
   };
 
-  const saveToMyProjects = async (imageDataUrl: string, prompt: string) => {
+  const saveToMyProjects = async (
+    imageDataUrl: string, 
+    prompt: string, 
+    sourceImages: string[], 
+    duration: number
+  ) => {
     try {
-      setIsSaving(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -275,9 +246,13 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       const response = await fetch(imageDataUrl);
       const blob = await response.blob();
       
-      // Upload to storage
-      const fileName = `${user.id}/blended-${Date.now()}.png`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // Use standardized storage path: results/{userId}/{yyyy-mm}/blend/{uuid}.png
+      const now = new Date();
+      const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const uuid = crypto.randomUUID();
+      const fileName = `results/${user.id}/${yearMonth}/blend/${uuid}.png`;
+      
+      const { error: uploadError } = await supabase.storage
         .from('generated-images')
         .upload(fileName, blob, {
           contentType: 'image/png',
@@ -292,16 +267,22 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         .from('generated-images')
         .getPublicUrl(fileName);
 
-      // Save metadata to database
+      // Save metadata with new schema fields
       const { data: assetData, error: dbError } = await supabase
         .from('generated_assets')
         .insert({
           user_id: user.id,
           type: 'image',
+          action: 'blend',
           image_url: publicUrl,
           prompt: prompt,
-          quality: 'standard',
-          size: '1536x1536'
+          source_urls: sourceImages,
+          params: {
+            imageCount: sourceImages.length,
+            instruction: prompt
+          },
+          duration_ms: duration,
+          // share_slug auto-generated by trigger
         })
         .select()
         .single();
@@ -310,12 +291,11 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       
       if (assetData) {
         setBlendedAssetId(assetData.id);
+        console.log('✅ [Blend] Saved to DB with share slug:', assetData.share_slug);
       }
     } catch (error) {
       console.error('Error saving to My Projects:', error);
-      // Don't show error to user, as blend was successful
-    } finally {
-      setIsSaving(false);
+      throw error; // Re-throw to be caught by background handler
     }
   };
 
@@ -352,7 +332,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     setBlendedAssetId(null);
     setInstruction("Blend these images seamlessly together");
     setProgress(0);
-    setIsSaving(false);
+    toolState.reset();
     onOpenChange(false);
   };
 
@@ -389,7 +369,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                   onChange={handleImageUpload}
                   className="hidden"
                   id="blend-images"
-                  disabled={isBlending}
+                  disabled={toolState.isProcessing}
                 />
                 <label htmlFor="blend-images" className="cursor-pointer">
                   <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
@@ -418,7 +398,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                     size="sm"
                     className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity min-w-[44px] min-h-[44px]"
                     onClick={() => removeImage(index)}
-                    disabled={isBlending}
+                    disabled={toolState.isProcessing}
                   >
                     <X className="w-4 h-4" />
                   </Button>
@@ -437,13 +417,13 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                 onChange={(e) => setInstruction(e.target.value)}
                 placeholder="Describe how you want the images blended..."
                 className="min-h-[80px] resize-none"
-                disabled={isBlending}
+                disabled={toolState.isProcessing}
               />
             </div>
           )}
 
           {/* Progress Bar */}
-          {isBlending && (
+          {toolState.isProcessing && (
             <div className="space-y-2">
               <Progress value={progress} className="w-full" />
               <p className="text-sm text-muted-foreground text-center">
@@ -561,12 +541,12 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           {images.length >= 2 && !blendedImage && (
             <Button
               onClick={handleBlend}
-              disabled={isBlending}
-              className="w-full"
+              disabled={toolState.isProcessing}
+              className="w-full min-h-[44px]"
               size="lg"
             >
               <Blend className="w-4 h-4 mr-2" />
-              {isBlending ? "Blending..." : "Blend Images"}
+              {toolState.isProcessing ? "Blending..." : "Blend Images"}
             </Button>
           )}
         </div>
