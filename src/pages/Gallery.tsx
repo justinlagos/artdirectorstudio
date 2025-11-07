@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,6 +31,8 @@ interface GalleryItem {
 }
 
 const Gallery = () => {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<GalleryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,8 +41,15 @@ const Gallery = () => {
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (!user) return;
     fetchGalleryItems();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (searchQuery) {
