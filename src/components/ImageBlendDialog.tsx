@@ -29,7 +29,64 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
   const [progress, setProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const validateImage = async (file: File): Promise<{ valid: boolean; error?: string }> => {
+    // Check file type
+    const validFormats = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validFormats.includes(file.type.toLowerCase())) {
+      return { 
+        valid: false, 
+        error: `${file.name}: Invalid format. Only PNG, JPG, and WebP are supported.` 
+      };
+    }
+
+    // Check file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+      return { 
+        valid: false, 
+        error: `${file.name}: File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 10MB.` 
+      };
+    }
+
+    // Check dimensions
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        
+        const minDimension = 256;
+        const maxDimension = 4096;
+        
+        if (img.width < minDimension || img.height < minDimension) {
+          resolve({ 
+            valid: false, 
+            error: `${file.name}: Image too small (${img.width}×${img.height}px). Minimum is ${minDimension}×${minDimension}px.` 
+          });
+        } else if (img.width > maxDimension || img.height > maxDimension) {
+          resolve({ 
+            valid: false, 
+            error: `${file.name}: Image too large (${img.width}×${img.height}px). Maximum is ${maxDimension}×${maxDimension}px.` 
+          });
+        } else {
+          resolve({ valid: true });
+        }
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve({ 
+          valid: false, 
+          error: `${file.name}: Failed to load image. File may be corrupted.` 
+        });
+      };
+      
+      img.src = url;
+    });
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
     if (images.length + files.length > 4) {
@@ -37,16 +94,28 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       return;
     }
 
-    files.forEach(file => {
-      if (!file.type.startsWith("image/")) {
-        toast.error("Please upload image files only");
-        return;
-      }
+    // Validate all files
+    const validationResults = await Promise.all(
+      files.map(file => validateImage(file))
+    );
 
-      // Use URL.createObjectURL for preview (better mobile performance)
+    // Show errors for invalid files
+    const errors = validationResults
+      .filter(result => !result.valid)
+      .map(result => result.error);
+    
+    if (errors.length > 0) {
+      errors.forEach(error => toast.error(error || "Validation failed"));
+      return;
+    }
+
+    // Add valid files
+    files.forEach(file => {
       const preview = URL.createObjectURL(file);
       setImages(prev => [...prev, { file, preview }]);
     });
+
+    toast.success(`${files.length} image${files.length > 1 ? 's' : ''} added successfully`);
   };
 
   const removeImage = (index: number) => {
