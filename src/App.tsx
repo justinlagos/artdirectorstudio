@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ToolsModalProvider } from "@/contexts/ToolsModalContext";
 import { UnifiedToolsModal } from "@/components/UnifiedToolsModal";
 import { LoadingState } from "@/components/LoadingState";
+import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
@@ -82,6 +83,7 @@ const App = () => (
               </Routes>
             </Suspense>
             <UnifiedToolsModal />
+            <OnlineStatusIndicator />
             <Suspense fallback={null}>
               <ArtieChat />
               <TrialWelcomeToast />
