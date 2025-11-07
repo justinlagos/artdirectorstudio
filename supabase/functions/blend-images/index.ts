@@ -186,16 +186,48 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const blendedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    // Log full response structure for debugging
+    console.log(JSON.stringify({
+      requestId,
+      action: 'api_response_structure',
+      timestamp: new Date().toISOString(),
+      hasChoices: !!data.choices,
+      choicesLength: data.choices?.length,
+      hasMessage: !!data.choices?.[0]?.message,
+      hasImages: !!data.choices?.[0]?.message?.images,
+      imageCount: data.choices?.[0]?.message?.images?.length,
+      responseKeys: Object.keys(data)
+    }));
+
+    // Try multiple extraction paths for the blended image
+    let blendedImageUrl = 
+      data.choices?.[0]?.message?.images?.[0]?.image_url?.url ||  // Primary path
+      data.choices?.[0]?.message?.content ||                       // Fallback 1: content field
+      data.images?.[0]?.url ||                                     // Fallback 2: direct images array
+      data.data?.[0]?.url;                                         // Fallback 3: data array
 
     if (!blendedImageUrl) {
       console.error(JSON.stringify({
         requestId,
         action: 'no_image_returned',
         timestamp: new Date().toISOString(),
-        responseStructure: JSON.stringify(data).substring(0, 200)
+        responseStructure: JSON.stringify(data).substring(0, 500),
+        allKeys: Object.keys(data),
+        choicesContent: data.choices?.[0]
       }));
       throw new Error('No blended image returned from API');
+    }
+
+    // Validate image format
+    const isValidImage = blendedImageUrl.startsWith('data:image/') || blendedImageUrl.startsWith('https://');
+    if (!isValidImage) {
+      console.warn(JSON.stringify({
+        requestId,
+        action: 'invalid_image_format',
+        timestamp: new Date().toISOString(),
+        urlPrefix: blendedImageUrl.substring(0, 50)
+      }));
     }
 
     const duration = Date.now() - startTime;

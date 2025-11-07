@@ -3,7 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Maximize2, Upload, Sparkles, FolderOpen } from "lucide-react";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Download, Maximize2, Upload, Sparkles, FolderOpen, CheckCircle2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -363,84 +365,100 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
             </div>
           )}
 
-          {/* Upscaled Image Result */}
-          {upscaledImage && (
-            <div className="space-y-4 pt-4 border-t animate-fade-in">
-              <div className="flex items-center justify-between">
-                <Label className="text-lg font-semibold">Done — image upscaled successfully</Label>
-                {isSaving && <span className="text-xs text-muted-foreground">Saving...</span>}
-              </div>
-              
-              {/* Interactive Before/After Comparison Slider */}
-              <div className="space-y-2">
-                <BeforeAfterSlider
-                  beforeImage={sourceImage!.preview}
-                  afterImage={upscaledImage}
-                  beforeLabel="Original"
-                  afterLabel={`Upscaled (${targetSize})`}
-                  className="shadow-medium"
-                />
-                <p className="text-xs text-center text-muted-foreground">
-                  Drag the slider to compare before and after
-                </p>
-                <img 
-                  src={upscaledImage} 
-                  alt="Upscaled verification" 
+          {/* Upscaled Image Result - Studio Style */}
+          {upscaledImage && sourceImage && (
+            <Card className="shadow-lg ring-1 ring-border/50">
+              <CardContent className="p-6 space-y-4">
+                {/* Success Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <span className="font-semibold">Upscale Complete</span>
+                  </div>
+                  <Badge variant="secondary" className="gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    {targetSize}
+                  </Badge>
+                </div>
+
+                {/* Before/After Comparison */}
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground text-center">
+                    Compare Original vs Upscaled
+                  </div>
+                  <BeforeAfterSlider
+                    beforeImage={sourceImage.preview}
+                    afterImage={upscaledImage}
+                    beforeLabel="Original"
+                    afterLabel={`Upscaled (${targetSize})`}
+                  />
+                </div>
+
+                {/* Hidden img for verification */}
+                <img
+                  src={upscaledImage}
+                  alt="Upscaled verification"
                   className="hidden"
-                  onLoad={() => console.log('✅ [Upscale] Image loaded successfully in UI')}
+                  onLoad={() => {
+                    console.log('✅ [Upscale] Image verified and loaded in UI:', {
+                      timestamp: new Date().toISOString(),
+                      targetSize,
+                      imageSize: upscaledImage.length
+                    });
+                  }}
                   onError={(e) => {
                     console.error('❌ [Upscale] Image failed to load in UI:', {
-                      src: upscaledImage?.substring(0, 100),
-                      error: e
+                      error: e,
+                      timestamp: new Date().toISOString(),
+                      imagePrefix: upscaledImage.substring(0, 50)
                     });
                     toast.error('Failed to display upscaled image');
                   }}
                 />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
+
+                {/* Metadata */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
+                  <span>Type: Image Upscale</span>
+                  <span>{new Date().toLocaleString()}</span>
+                </div>
+              </CardContent>
+
+              <CardFooter className="flex-col gap-3 p-6 pt-0">
+                {/* Primary Actions */}
+                <div className="flex gap-2 w-full">
+                  <Button
+                    onClick={handleViewInStudio}
+                    className="flex-1"
+                    disabled={!upscaledAssetId}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View in Studio
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleDownload}
+                    className="flex-1"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+
+                {/* Secondary Action */}
                 <Button
-                  onClick={handleViewInStudio}
-                  className="flex-1"
-                  disabled={!upscaledAssetId}
+                  variant="ghost"
+                  onClick={() => {
+                    setUpscaledImage(null);
+                    setUpscaledAssetId(null);
+                    setSourceImage(null);
+                    setTargetSize("1536x1536");
+                  }}
+                  className="w-full"
                 >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  View in Studio
+                  Upscale New Image
                 </Button>
-                <Button
-                  onClick={handleDownload}
-                  className="flex-1"
-                  variant="secondary"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-              </div>
-              
-              <Button
-                onClick={() => {
-                  setUpscaledImage(null);
-                  setUpscaledAssetId(null);
-                  setSourceImage(null);
-                }}
-                className="w-full"
-                variant="outline"
-              >
-                <Maximize2 className="w-4 h-4 mr-2" />
-                Upscale New Image
-              </Button>
-              
-              <div className="text-center">
-                <Button
-                  onClick={() => navigate('/history')}
-                  variant="link"
-                  className="text-sm"
-                >
-                  <FolderOpen className="w-4 h-4 mr-1" />
-                  View all in My Projects
-                </Button>
-              </div>
-            </div>
+              </CardFooter>
+            </Card>
           )}
 
           {/* Upscale Button */}

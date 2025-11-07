@@ -3,7 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Download, Blend, X, Upload, Sparkles, FolderOpen } from "lucide-react";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Download, Blend, X, Upload, Sparkles, FolderOpen, CheckCircle2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -448,79 +450,91 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
             </div>
           )}
 
-          {/* Blended Image Result */}
+          {/* Blended Image Result - Studio Style */}
           {blendedImage && (
-            <div className="space-y-4 pt-4 border-t animate-fade-in">
-              <div className="flex items-center justify-between">
-                <Label className="text-lg font-semibold">Done — images blended successfully</Label>
-                {isSaving && <span className="text-xs text-muted-foreground">Saving...</span>}
-              </div>
-              
-              <div className="relative rounded-lg overflow-hidden bg-muted ring-2 ring-primary/20 animate-scale-in flex items-center justify-center min-h-[300px]">
-                <img 
-                  src={blendedImage} 
-                  alt="Blended image" 
-                  className="w-full h-auto object-contain max-h-[600px]"
-                  onLoad={() => console.log('✅ [Blend] Image loaded successfully in UI')}
-                  onError={(e) => {
-                    console.error('❌ [Blend] Image failed to load in UI:', {
-                      src: blendedImage?.substring(0, 100),
-                      error: e
-                    });
-                    toast.error('Failed to display blended image');
-                  }}
-                />
-                <div className="absolute top-2 right-2">
-                  <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" />
-                    Completed
+            <Card className="shadow-lg ring-1 ring-border/50">
+              <CardContent className="p-6 space-y-4">
+                {/* Success Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <span className="font-semibold">Blend Complete</span>
                   </div>
+                  <Badge variant="secondary" className="gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    Generated
+                  </Badge>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
+
+                {/* Image Display */}
+                <div className="relative w-full rounded-lg overflow-hidden bg-muted/30 ring-1 ring-border/30">
+                  <img
+                    src={blendedImage}
+                    alt="Blended result"
+                    className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                    style={{
+                      display: 'block',
+                      maxWidth: '100%',
+                      height: 'auto',
+                    }}
+                    onLoad={() => console.log('✅ [Blend] Image loaded successfully in UI:', { 
+                      timestamp: new Date().toISOString(),
+                      imageSize: blendedImage.length 
+                    })}
+                    onError={(e) => {
+                      console.error('❌ [Blend] Image failed to load in UI:', {
+                        src: blendedImage?.substring(0, 100),
+                        error: e,
+                        timestamp: new Date().toISOString()
+                      });
+                      toast.error('Failed to display blended image');
+                    }}
+                  />
+                </div>
+
+                {/* Metadata */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
+                  <span>Type: Image Blend</span>
+                  <span>{new Date().toLocaleString()}</span>
+                </div>
+              </CardContent>
+
+              <CardFooter className="flex-col gap-3 p-6 pt-0">
+                {/* Primary Actions */}
+                <div className="flex gap-2 w-full">
+                  <Button
+                    onClick={handleViewInStudio}
+                    className="flex-1"
+                    disabled={!blendedAssetId}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View in Studio
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleDownload}
+                    className="flex-1"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+
+                {/* Secondary Action */}
                 <Button
-                  onClick={handleViewInStudio}
-                  className="flex-1"
-                  disabled={!blendedAssetId}
+                  variant="ghost"
+                  onClick={() => {
+                    setBlendedImage(null);
+                    setBlendedAssetId(null);
+                    setImages([]);
+                    setInstruction("Blend these images seamlessly together");
+                  }}
+                  className="w-full"
                 >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  View in Studio
+                  Blend New Images
                 </Button>
-                <Button
-                  onClick={handleDownload}
-                  className="flex-1"
-                  variant="secondary"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-              </div>
-              
-              <Button
-                onClick={() => {
-                  setBlendedImage(null);
-                  setBlendedAssetId(null);
-                  setImages([]);
-                }}
-                className="w-full"
-                variant="outline"
-              >
-                <Blend className="w-4 h-4 mr-2" />
-                Blend New Images
-              </Button>
-              
-              <div className="text-center">
-                <Button
-                  onClick={() => navigate('/history')}
-                  variant="link"
-                  className="text-sm"
-                >
-                  <FolderOpen className="w-4 h-4 mr-1" />
-                  View all in My Projects
-                </Button>
-              </div>
-            </div>
+              </CardFooter>
+            </Card>
           )}
 
           {/* Blend Button */}
