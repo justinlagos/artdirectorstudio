@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -446,8 +447,53 @@ const Inspire = () => {
     );
   }
 
+  // Get featured image for social sharing
+  const featuredImage = filteredItems.find(item => item.featured)?.asset?.image_url || 
+                        filteredItems[0]?.asset?.image_url ||
+                        "https://storage.googleapis.com/gpt-engineer-file-uploads/RlxlOFYt8hNksHtmpOGReulPRGQ2/social-images/social-1762339250584-AD-studio-visuals.jpg";
+
   return (
     <div className="min-h-screen flex flex-col bg-surface-1">
+      <Helmet>
+        <title>Inspire - Discover AI-Generated Art & Design | ArtDirector Studio</title>
+        <meta name="description" content="Explore stunning AI-generated images from the ArtDirector Studio community. Discover creative styles, find inspiration, and create your own masterpieces. Free to browse." />
+        <meta name="keywords" content="AI art gallery, AI-generated images, design inspiration, creative community, art styles, digital art, AI design tool" />
+        
+        {/* OpenGraph Tags for Social Sharing */}
+        <meta property="og:title" content="Inspire - Discover AI-Generated Art & Design | ArtDirector Studio" />
+        <meta property="og:description" content="Explore stunning AI-generated images from the ArtDirector Studio community. Discover creative styles, find inspiration, and create your own masterpieces." />
+        <meta property="og:image" content={featuredImage} />
+        <meta property="og:url" content={`${window.location.origin}/inspire`} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="ArtDirector Studio" />
+        
+        {/* Twitter Card Tags */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Inspire - Discover AI-Generated Art & Design" />
+        <meta name="twitter:description" content="Explore stunning AI-generated images from the ArtDirector Studio community. Discover creative styles and find inspiration." />
+        <meta name="twitter:image" content={featuredImage} />
+        <meta name="twitter:site" content="@lovable_dev" />
+        
+        {/* Structured Data for Rich Results */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ImageGallery",
+            "name": "ArtDirector Studio Inspire Gallery",
+            "description": "Community gallery of AI-generated images and designs",
+            "url": `${window.location.origin}/inspire`,
+            "image": featuredImage,
+            "publisher": {
+              "@type": "Organization",
+              "name": "ArtDirector Studio",
+              "url": window.location.origin
+            }
+          })}
+        </script>
+        
+        <link rel="canonical" href={`${window.location.origin}/inspire`} />
+      </Helmet>
+      
       <Header />
       <main className="flex-1 container mx-auto px-6 py-12 max-w-7xl">
         <div className="space-y-8 animate-fade-in">
@@ -1054,6 +1100,8 @@ const InspireGrid = ({
   formatDate,
   isAdmin
 }: InspireGridProps) => {
+  const { user } = useAuth();
+
   if (items.length === 0) {
     return (
       <Card className="p-12 text-center glass">
@@ -1113,7 +1161,9 @@ const InspireGrid = ({
                            <Heart className={`h-4 w-4 ${item.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
                          </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Like</TooltipContent>
+                      <TooltipContent>
+                        {user ? (item.isLiked ? "Unlike" : "Like") : "Sign in to like"}
+                      </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
 
@@ -1130,7 +1180,9 @@ const InspireGrid = ({
                            <Bookmark className={`h-4 w-4 ${item.isBookmarked ? 'fill-primary text-primary' : ''}`} />
                          </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Bookmark</TooltipContent>
+                      <TooltipContent>
+                        {user ? (item.isBookmarked ? "Remove bookmark" : "Bookmark") : "Sign in to bookmark"}
+                      </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
 
@@ -1147,7 +1199,9 @@ const InspireGrid = ({
                            <Shuffle className="h-4 w-4" />
                          </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Remix</TooltipContent>
+                      <TooltipContent>
+                        {user ? "Remix this creation" : "Sign in to remix"}
+                      </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
 
