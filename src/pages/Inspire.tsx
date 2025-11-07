@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InspireActivityFeed } from "@/components/InspireActivityFeed";
 
 interface InspireItem {
   id: string;
@@ -582,7 +583,16 @@ const Inspire = () => {
       
       <Header />
       <main className="flex-1 container mx-auto px-6 py-12 max-w-7xl">
-        <div className="space-y-8 animate-fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-fade-in">
+          {/* Activity Feed Sidebar */}
+          <aside className="lg:col-span-1 order-2 lg:order-1">
+            <div className="sticky top-24">
+              <InspireActivityFeed />
+            </div>
+          </aside>
+          
+          {/* Main Content */}
+          <div className="lg:col-span-3 order-1 lg:order-2 space-y-8">
           {/* Header */}
           <div className="text-center space-y-4 max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
@@ -793,6 +803,7 @@ const Inspire = () => {
               </TabsContent>
             )}
           </Tabs>
+          </div>
         </div>
       </main>
       <Footer />

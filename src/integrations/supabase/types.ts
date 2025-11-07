@@ -317,6 +317,41 @@ export type Database = {
         }
         Relationships: []
       }
+      inspire_activity: {
+        Row: {
+          action_type: string
+          admin_email: string
+          admin_id: string
+          created_at: string
+          id: string
+          shared_asset_id: string
+        }
+        Insert: {
+          action_type: string
+          admin_email: string
+          admin_id: string
+          created_at?: string
+          id?: string
+          shared_asset_id: string
+        }
+        Update: {
+          action_type?: string
+          admin_email?: string
+          admin_id?: string
+          created_at?: string
+          id?: string
+          shared_asset_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspire_activity_shared_asset_id_fkey"
+            columns: ["shared_asset_id"]
+            isOneToOne: false
+            referencedRelation: "shared_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       newsletter_subscribers: {
         Row: {
           email: string
