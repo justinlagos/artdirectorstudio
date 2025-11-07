@@ -12,6 +12,7 @@ import History from "./pages/History";
 import Admin from "./pages/Admin";
 import Inspire from "./pages/Inspire";
 import Analytics from "./pages/Analytics";
+import Insights from "./pages/Insights";
 import Settings from "./pages/Settings";
 import Contact from "./pages/Contact";
 import Help from "./pages/Help";
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/inspire" element={<Inspire />} />
               <Route path="/gallery" element={<Inspire />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/insights" element={<Insights />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/help" element={<Help />} />
@@ -61,7 +63,8 @@ const App = () => (
               <Route path="/payment-cancelled" element={<PaymentCancelled />} />
               <Route path="/subscription-success" element={<SubscriptionSuccess />} />
               <Route path="/subscriptions" element={<Subscriptions />} />
-          <Route path="/subscription-history" element={<SubscriptionHistory />} />
+              <Route path="/plans" element={<Subscriptions />} />
+              <Route path="/subscription-history" element={<SubscriptionHistory />} />
           <Route path="/billing-history" element={<BillingHistory />} />
               <Route path="/signed-out" element={<SignedOut />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

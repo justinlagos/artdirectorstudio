@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, User, History, Shield, Settings } from "lucide-react";
+import { LogOut, User, History, Shield, Settings, BarChart3, Crown } from "lucide-react";
 
 export const UserMenu = () => {
   const { user, signOut } = useAuth();
@@ -53,6 +53,14 @@ export const UserMenu = () => {
         <DropdownMenuItem onClick={() => navigate("/history")} className="cursor-pointer">
           <History className="mr-2 h-4 w-4" />
           <span>My Projects</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/insights")} className="cursor-pointer">
+          <BarChart3 className="mr-2 h-4 w-4" />
+          <span>Insights</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/plans")} className="cursor-pointer">
+          <Crown className="mr-2 h-4 w-4" />
+          <span>Plans</span>
         </DropdownMenuItem>
         {isAdmin && (
           <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">
