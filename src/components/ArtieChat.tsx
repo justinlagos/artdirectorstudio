@@ -458,38 +458,77 @@ export const ArtieChat = () => {
                 );
 
                 try {
+                  console.log('[ARTIE] Generating image with prompt:', args.prompt);
                   const { data: { session } } = await supabase.auth.getSession();
+                  
+                  if (!session?.access_token) {
+                    throw new Error('No active session');
+                  }
+
                   const genResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session?.access_token}`,
+                      'Authorization': `Bearer ${session.access_token}`,
                     },
-                    body: JSON.stringify({ prompt: args.prompt })
+                    body: JSON.stringify({ 
+                      prompt: args.prompt,
+                      quality: args.quality || 'auto',
+                      size: args.size || '1024x1024'
+                    })
                   });
 
+                  console.log('[ARTIE] Generate image response status:', genResponse.status);
+                  
+                  if (!genResponse.ok) {
+                    const errorData = await genResponse.json().catch(() => ({ error: 'Failed to generate image' }));
+                    console.error('[ARTIE] Generate image error:', errorData);
+                    throw new Error(errorData.error || `Failed to generate image (${genResponse.status})`);
+                  }
+
                   const genData = await genResponse.json();
-                  if (genData.imageUrl) {
+                  console.log('[ARTIE] Generated image data:', genData);
+                  
+                  if (genData.image) {
                     accumulatedText = accumulatedText.replace('(Generating image...)', '');
-                    accumulatedText += `\n\n[Generated Image]\n${genData.imageUrl}`;
+                    accumulatedText += `\n\n[Generated Image]\n${genData.image}`;
+                    await refetchCredits();
                     setMessages(prev => 
                       prev.map(m => 
                         m.id === assistantMessageId 
-                          ? { ...m, text: accumulatedText }
+                          ? { 
+                              ...m, 
+                              text: accumulatedText,
+                              attachment: {
+                                type: 'image',
+                                url: genData.image,
+                                name: 'Generated Image'
+                              }
+                            }
                           : m
                       )
                     );
+                  } else {
+                    throw new Error('No image URL in response');
                   }
                 } catch (imgError) {
-                  console.error('Image generation error:', imgError);
-                  accumulatedText = accumulatedText.replace('(Generating image...)', '(Image generation failed)');
+                  console.error('[ARTIE] Image generation error:', imgError);
+                  const errorMessage = imgError instanceof Error ? imgError.message : 'Unknown error';
+                  accumulatedText = accumulatedText.replace('(Generating image...)', '');
+                  accumulatedText += `\n\n❌ Failed to generate image: ${errorMessage}`;
                   setMessages(prev => 
                     prev.map(m => 
                       m.id === assistantMessageId 
                         ? { ...m, text: accumulatedText }
-                          : m
+                        : m
                     )
                   );
+                  
+                  toast({
+                    title: "Image generation failed",
+                    description: errorMessage,
+                    variant: "destructive",
+                  });
                 }
               }
             }
