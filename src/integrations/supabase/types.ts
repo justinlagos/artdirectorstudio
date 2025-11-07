@@ -477,12 +477,17 @@ export type Database = {
         Row: {
           asset_id: string
           bookmark_count: number | null
+          color_palette: string | null
+          composition: string | null
           created_at: string
           featured: boolean | null
           id: string
           is_public: boolean
           like_count: number | null
+          mood: string | null
           share_token: string
+          staff_pick: boolean | null
+          style: string | null
           tags: Json | null
           updated_at: string
           user_id: string
@@ -491,12 +496,17 @@ export type Database = {
         Insert: {
           asset_id: string
           bookmark_count?: number | null
+          color_palette?: string | null
+          composition?: string | null
           created_at?: string
           featured?: boolean | null
           id?: string
           is_public?: boolean
           like_count?: number | null
+          mood?: string | null
           share_token: string
+          staff_pick?: boolean | null
+          style?: string | null
           tags?: Json | null
           updated_at?: string
           user_id: string
@@ -505,12 +515,17 @@ export type Database = {
         Update: {
           asset_id?: string
           bookmark_count?: number | null
+          color_palette?: string | null
+          composition?: string | null
           created_at?: string
           featured?: boolean | null
           id?: string
           is_public?: boolean
           like_count?: number | null
+          mood?: string | null
           share_token?: string
+          staff_pick?: boolean | null
+          style?: string | null
           tags?: Json | null
           updated_at?: string
           user_id?: string
