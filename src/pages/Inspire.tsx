@@ -84,6 +84,7 @@ const Inspire = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [recentlyUpdatedIds, setRecentlyUpdatedIds] = useState<Set<string>>(new Set());
   const observerTarget = useRef<HTMLDivElement>(null);
   
   const ITEMS_PER_PAGE = 24;
@@ -122,6 +123,16 @@ const Inspire = () => {
                 : item
             )
           );
+          
+          // Add visual indicator for updated item
+          setRecentlyUpdatedIds(prev => new Set(prev).add(payload.new.id));
+          setTimeout(() => {
+            setRecentlyUpdatedIds(prev => {
+              const next = new Set(prev);
+              next.delete(payload.new.id);
+              return next;
+            });
+          }, 5000);
           
           // Show toast notification for featured/staff pick changes
           if (payload.new.featured !== payload.old.featured) {
@@ -720,6 +731,7 @@ const Inspire = () => {
                 getCreatorName={getCreatorName}
                 formatDate={formatDate}
                 isAdmin={isAdmin}
+                recentlyUpdatedIds={recentlyUpdatedIds}
               />
             </TabsContent>
 
@@ -739,6 +751,7 @@ const Inspire = () => {
                 getCreatorName={getCreatorName}
                 formatDate={formatDate}
                 isAdmin={isAdmin}
+                recentlyUpdatedIds={recentlyUpdatedIds}
               />
             </TabsContent>
 
@@ -756,6 +769,7 @@ const Inspire = () => {
                 getCreatorName={getCreatorName}
                 formatDate={formatDate}
                 isAdmin={isAdmin}
+                recentlyUpdatedIds={recentlyUpdatedIds}
               />
             </TabsContent>
 
@@ -774,6 +788,7 @@ const Inspire = () => {
                   getCreatorName={getCreatorName}
                   formatDate={formatDate}
                   isAdmin={isAdmin}
+                  recentlyUpdatedIds={recentlyUpdatedIds}
                 />
               </TabsContent>
             )}
@@ -1159,6 +1174,7 @@ interface InspireGridProps {
   getCreatorName: (item: InspireItem) => string;
   formatDate: (date: string) => string;
   isAdmin: boolean;
+  recentlyUpdatedIds: Set<string>;
 }
 
 const InspireGrid = ({ 
@@ -1173,7 +1189,8 @@ const InspireGrid = ({
   onDelete,
   getCreatorName, 
   formatDate,
-  isAdmin
+  isAdmin,
+  recentlyUpdatedIds
 }: InspireGridProps) => {
   const { user } = useAuth();
 
@@ -1191,7 +1208,9 @@ const InspireGrid = ({
       {items.map((item) => (
         <Card
           key={item.id}
-          className="group cursor-pointer overflow-hidden hover:shadow-strong transition-all duration-300 interactive-card border-border/50 relative"
+          className={`group cursor-pointer overflow-hidden hover:shadow-strong transition-all duration-300 interactive-card border-border/50 relative ${
+            recentlyUpdatedIds.has(item.id) ? 'animate-scale-in ring-2 ring-primary shadow-lg' : ''
+          }`}
           onClick={() => onItemClick(item)}
         >
           {item.asset?.image_url && (
@@ -1208,6 +1227,11 @@ const InspireGrid = ({
               
               {/* Badges */}
               <div className="absolute top-2 right-2 flex gap-1">
+                {recentlyUpdatedIds.has(item.id) && (
+                  <Badge className="animate-pulse bg-primary text-primary-foreground text-xs">
+                    <Sparkles className="w-3 h-3" />
+                  </Badge>
+                )}
                 {item.staff_pick && (
                   <Badge className="bg-amber-500 text-white border-amber-600 text-xs">
                     <Award className="w-3 h-3" />
