@@ -12,7 +12,9 @@ const Analytics = () => {
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate("/auth");
+      navigate("/auth", { 
+        state: { message: "Please sign in to view your analytics." }
+      });
     }
   }, [user, loading, navigate]);
 

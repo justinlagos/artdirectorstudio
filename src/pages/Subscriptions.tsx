@@ -21,7 +21,9 @@ const Subscriptions = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate("/auth");
+      navigate("/auth", { 
+        state: { message: "Please sign in to manage your subscriptions." }
+      });
     }
   }, [user, navigate]);
 

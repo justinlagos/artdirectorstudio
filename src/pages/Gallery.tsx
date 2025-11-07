@@ -42,7 +42,9 @@ const Gallery = () => {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate("/auth");
+      navigate("/auth", { 
+        state: { message: "Please sign in to access your personal gallery." }
+      });
     }
   }, [user, authLoading, navigate]);
 

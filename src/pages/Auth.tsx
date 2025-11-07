@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -17,6 +18,10 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Check if user was redirected from a protected route
+  const redirectMessage = location.state?.message;
 
   // Redirect if already logged in
   if (user) {
@@ -86,6 +91,15 @@ export default function Auth() {
             Reconstruct. Refine. Reimagine.
           </p>
         </div>
+
+        {redirectMessage && (
+          <Alert className="mb-6 border-primary/20 bg-primary/5">
+            <Lock className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              {redirectMessage}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="glass-strong rounded-2xl p-8 shadow-xl">
           <Tabs defaultValue="signin" className="w-full">

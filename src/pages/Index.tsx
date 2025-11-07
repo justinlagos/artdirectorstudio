@@ -66,7 +66,9 @@ const Index = () => {
   // Redirect unauthenticated users
   useEffect(() => {
     if (!loading && !user) {
-      navigate("/auth");
+      navigate("/auth", { 
+        state: { message: "Please sign in to access the Studio and start creating." }
+      });
     }
   }, [user, loading, navigate]);
 

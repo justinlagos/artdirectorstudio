@@ -30,7 +30,9 @@ const History = () => {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate("/auth");
+      navigate("/auth", { 
+        state: { message: "Please sign in to view your creation history." }
+      });
     }
   }, [user, authLoading, navigate]);
 

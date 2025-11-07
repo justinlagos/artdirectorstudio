@@ -34,7 +34,9 @@ const SubscriptionHistory = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate("/auth");
+      navigate("/auth", { 
+        state: { message: "Please sign in to view your subscription history." }
+      });
       return;
     }
 

@@ -33,7 +33,9 @@ const Insights = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
+      navigate('/auth', { 
+        state: { message: "Please sign in to view your insights." }
+      });
       return;
     }
     loadData();

@@ -35,7 +35,9 @@ export default function BillingHistory() {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
+      navigate('/auth', { 
+        state: { message: "Please sign in to view your billing history." }
+      });
       return;
     }
 
