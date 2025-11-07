@@ -71,13 +71,33 @@ For visual direction, I'd suggest:
 
 Would you like me to [Suggest Compositions] [Explore Color Palettes] [Draft Copy Ideas]?"
 
+PHASE 3 CAPABILITIES - Actions & Execution:
+
+**Platform Actions:**
+You can now trigger real platform actions:
+1. **open_studio**: Send refined prompts to Studio for generation (PREFERRED for generation requests)
+2. **open_upscale**: Open upscale tool with context
+3. **open_blend**: Open blend tool for combining images
+4. **generate_image**: Generate inline (only use if user explicitly wants immediate result in chat)
+
+**When to Use Each:**
+- User says "generate this", "create an image": → Use open_studio (sends to Studio)
+- User wants to upscale/enhance: → Use open_upscale
+- User wants to combine images: → Use open_blend
+- User explicitly wants immediate result in chat: → Use generate_image
+
+**Credit Awareness:**
+- Before triggering actions, acknowledge: "This will use [X] credits. Ready to proceed?"
+- Don't trigger actions without clear user intent
+
 Your capabilities:
 1. **Creative Brief Analysis**: Understand project goals, audience, and visual requirements
 2. **Image Analysis**: Review uploaded images for style, composition, lighting
 3. **Brainstorming**: Explore ideas, styles, campaigns, artistic directions
-4. **Image Generation**: Generate visuals when requested
-5. **Platform Guidance**: Explain features (Analyze, Blend, Upscale, Batch)
-6. **Art Direction**: Offer actionable creative suggestions
+4. **Platform Actions**: Send prompts to Studio, open Upscale/Blend tools
+5. **Image Generation**: Generate visuals inline when explicitly requested
+6. **Platform Guidance**: Explain features (Analyze, Blend, Upscale, Batch)
+7. **Art Direction**: Offer actionable creative suggestions
 
 Response style:
 - Natural, conversational tone (like speaking to a colleague)
@@ -90,6 +110,98 @@ Response style:
 Always be ready to switch between ideation, guidance, and execution seamlessly.
 Remember: You're a creative mind that happens to live inside the interface.`;
 
+    // Define platform action tools
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "open_studio",
+          description: "Send a refined prompt to Studio for image generation. Use when user wants to generate images or refine prompts for generation.",
+          parameters: {
+            type: "object",
+            properties: {
+              prompt: {
+                type: "string",
+                description: "The refined, detailed image generation prompt"
+              },
+              quality: {
+                type: "string",
+                enum: ["high", "medium", "low", "auto"],
+                description: "Image quality setting"
+              },
+              size: {
+                type: "string",
+                enum: ["1024x1024", "1536x1024", "1024x1536"],
+                description: "Image dimensions"
+              }
+            },
+            required: ["prompt"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "open_upscale",
+          description: "Open the upscale tool. Use when user wants to enhance or upscale an image.",
+          parameters: {
+            type: "object",
+            properties: {
+              imageUrl: {
+                type: "string",
+                description: "URL of the image to upscale (if available from context)"
+              },
+              scaleFactor: {
+                type: "string",
+                enum: ["2", "4"],
+                description: "Scale factor for upscaling"
+              }
+            },
+            required: []
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "open_blend",
+          description: "Open the blend tool to merge two images. Use when user wants to combine or blend images.",
+          parameters: {
+            type: "object",
+            properties: {
+              mode: {
+                type: "string",
+                enum: ["merge", "overlay", "dissolve"],
+                description: "Blending mode"
+              },
+              ratio: {
+                type: "number",
+                description: "Blend ratio between 0-100"
+              }
+            },
+            required: []
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "generate_image",
+          description: "Generate an image directly inline in the chat. Use only when explicitly requested for immediate generation in conversation.",
+          parameters: {
+            type: "object",
+            properties: {
+              prompt: {
+                type: "string",
+                description: "The image generation prompt"
+              }
+            },
+            required: ["prompt"]
+          }
+        }
+      }
+    ];
+
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -98,28 +210,10 @@ Remember: You're a creative mind that happens to live inside the interface.`;
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
+        tools: tools,
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'generate_image',
-              description: 'Generate an image based on a text description. Use this when users ask you to create, generate, visualize, or show them an image.',
-              parameters: {
-                type: 'object',
-                properties: {
-                  prompt: {
-                    type: 'string',
-                    description: 'Detailed description of the image to generate. Be specific about style, composition, lighting, colors, and mood.'
-                  }
-                },
-                required: ['prompt']
-              }
-            }
-          }
         ],
         stream: true,
       }),

@@ -5,10 +5,14 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck, Zap } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useToolsModal } from "@/contexts/ToolsModalContext";
+import { useCredits } from "@/hooks/useCredits";
+import { useState as useImageGenerationState } from "react";
 
 interface Message {
   id: string;
@@ -39,6 +43,8 @@ const quickActions: QuickAction[] = [
 
 export const ArtieChat = () => {
   const location = useLocation();
+  const { openTool } = useToolsModal();
+  const { balance, refetch: refetchCredits } = useCredits();
   const [isOpen, setIsOpen] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [hasSeenTooltip, setHasSeenTooltip] = useState(false);
@@ -50,6 +56,11 @@ export const ArtieChat = () => {
     lastAnalysis?: any;
     briefSummary?: string;
   }>({});
+  const [showGenerationDialog, setShowGenerationDialog] = useState(false);
+  const [generationPrompt, setGenerationPrompt] = useState("");
+  const [generationOptions, setGenerationOptions] = useState<any>({});
+  const [pendingAction, setPendingAction] = useState<{ type: string; data: any } | null>(null);
+  const [showCreditConfirm, setShowCreditConfirm] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -386,8 +397,57 @@ export const ArtieChat = () => {
 
           if (toolCalls.length > 0) {
             for (const toolCall of toolCalls) {
-              if (toolCall.function.name === 'generate_image') {
-                const args = JSON.parse(toolCall.function.arguments);
+              const args = JSON.parse(toolCall.function.arguments);
+              
+              if (toolCall.function.name === 'open_studio') {
+                accumulatedText += `\n\n✨ Opening Studio with your refined prompt...`;
+                setMessages(prev => 
+                  prev.map(m => 
+                    m.id === assistantMessageId 
+                      ? { ...m, text: accumulatedText }
+                      : m
+                  )
+                );
+                
+                // Set generation dialog data
+                setGenerationPrompt(args.prompt);
+                setGenerationOptions({
+                  quality: args.quality || 'auto',
+                  size: args.size || '1024x1024'
+                });
+                setShowGenerationDialog(true);
+                
+              } else if (toolCall.function.name === 'open_upscale') {
+                accumulatedText += `\n\n🔍 Opening Upscale tool...`;
+                setMessages(prev => 
+                  prev.map(m => 
+                    m.id === assistantMessageId 
+                      ? { ...m, text: accumulatedText }
+                      : m
+                  )
+                );
+                
+                openTool('upscale', {
+                  scaleFactor: args.scaleFactor || '2',
+                  ...(args.imageUrl && { imageUrl: args.imageUrl })
+                });
+                
+              } else if (toolCall.function.name === 'open_blend') {
+                accumulatedText += `\n\n🎨 Opening Blend tool...`;
+                setMessages(prev => 
+                  prev.map(m => 
+                    m.id === assistantMessageId 
+                      ? { ...m, text: accumulatedText }
+                      : m
+                  )
+                );
+                
+                openTool('blend', {
+                  mode: args.mode || 'merge',
+                  ratio: args.ratio || 50
+                });
+                
+              } else if (toolCall.function.name === 'generate_image') {
                 accumulatedText += '\n\n(Generating image...)';
                 setMessages(prev => 
                   prev.map(m => 
@@ -754,6 +814,102 @@ export const ArtieChat = () => {
           </form>
         </div>
       </div>
+
+      {/* Image Generation Dialog */}
+      {showGenerationDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto p-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Generate Image</h3>
+                <p className="text-sm text-muted-foreground">Artie has prepared this prompt for you.</p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Prompt</label>
+                <textarea
+                  value={generationPrompt}
+                  onChange={(e) => setGenerationPrompt(e.target.value)}
+                  className="w-full min-h-[120px] p-3 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/50 outline-none resize-y"
+                  placeholder="Describe the image you want to generate..."
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowGenerationDialog(false);
+                    setGenerationPrompt("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!generationPrompt.trim()) {
+                      toast({ title: "Please enter a prompt", variant: "destructive" });
+                      return;
+                    }
+
+                    try {
+                      setShowGenerationDialog(false);
+                      
+                      // Add a message showing generation started
+                      const genMessageId = Date.now().toString();
+                      setMessages(prev => [...prev, {
+                        id: genMessageId,
+                        text: `Generating: "${generationPrompt.slice(0, 100)}..." ✨`,
+                        sender: 'artie',
+                        timestamp: new Date()
+                      }]);
+
+                      const { data: { session } } = await supabase.auth.getSession();
+                      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${session?.access_token}`,
+                        },
+                        body: JSON.stringify({ 
+                          prompt: generationPrompt,
+                          ...generationOptions
+                        })
+                      });
+
+                      const data = await response.json();
+                      if (data.imageUrl) {
+                        setMessages(prev => prev.map(m => 
+                          m.id === genMessageId
+                            ? { ...m, text: `Generated successfully! 🎨\n\n![Generated Image](${data.imageUrl})`, attachment: { type: 'image' as const, url: data.imageUrl, name: 'Generated' } }
+                            : m
+                        ));
+                        toast({ title: "Image generated successfully!" });
+                        refetchCredits();
+                      } else {
+                        throw new Error(data.error || 'Generation failed');
+                      }
+                    } catch (error: any) {
+                      console.error('Generation error:', error);
+                      toast({ 
+                        title: "Generation failed", 
+                        description: error.message,
+                        variant: "destructive" 
+                      });
+                    }
+                    
+                    setGenerationPrompt("");
+                  }}
+                  className="gap-2"
+                >
+                  <Zap className="h-4 w-4" />
+                  Generate (1 credit)
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
