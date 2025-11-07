@@ -35,6 +35,7 @@ const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const SubscriptionHistory = lazy(() => import("./pages/SubscriptionHistory"));
 const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const SignedOut = lazy(() => import("./pages/SignedOut"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Lazy load heavy components
@@ -55,6 +56,7 @@ const App = () => (
             <Suspense fallback={<LoadingState />}>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/" element={<Index />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/history" element={<History />} />

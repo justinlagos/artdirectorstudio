@@ -16,6 +16,9 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,6 +76,34 @@ export default function Auth() {
     setLoading(false);
   };
 
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Password reset email sent!",
+        description: "Check your email for the reset link.",
+      });
+      setShowForgotPassword(false);
+      setResetEmail("");
+    } catch (error: any) {
+      toast({
+        title: "Error sending reset email",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
@@ -101,8 +132,60 @@ export default function Auth() {
           </Alert>
         )}
 
-        <div className="glass-strong rounded-2xl p-8 shadow-xl">
-          <Tabs defaultValue="signin" className="w-full">
+        {showForgotPassword ? (
+          <div className="glass-strong rounded-2xl p-8 shadow-xl">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-2xl font-bold">Reset Password</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Enter your email and we'll send you a reset link
+                </p>
+              </div>
+              
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email" className="text-sm font-medium">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => setShowForgotPassword(false)}
+                    disabled={resetLoading}
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className="flex-1"
+                    disabled={resetLoading}
+                  >
+                    {resetLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      "Send Reset Link"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <div className="glass-strong rounded-2xl p-8 shadow-xl">
+            <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50 p-1">
               <TabsTrigger value="signin" className="rounded-lg">Sign In</TabsTrigger>
               <TabsTrigger value="signup" className="rounded-lg">Sign Up</TabsTrigger>
@@ -122,7 +205,17 @@ export default function Auth() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="p-0 h-auto text-xs text-primary"
+                      onClick={() => setShowForgotPassword(true)}
+                    >
+                      Forgot password?
+                    </Button>
+                  </div>
                   <Input
                     id="signin-password"
                     type="password"
@@ -189,6 +282,7 @@ export default function Auth() {
             </TabsContent>
           </Tabs>
         </div>
+        )}
       </div>
     </div>
   );
