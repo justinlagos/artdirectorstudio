@@ -352,8 +352,7 @@ const Index = () => {
           </div>
           
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-            Transform Your Images with
-            <span className="block text-primary mt-2">Professional AI Analysis</span>
+            <span className="text-primary">Art Director Studio</span>
           </h1>
           
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
