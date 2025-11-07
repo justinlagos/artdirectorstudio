@@ -196,42 +196,42 @@ export type Database = {
       }
       credit_transactions: {
         Row: {
-          action: Database["public"]["Enums"]["credit_action"]
+          action: Database["public"]["Enums"]["credit_action"] | null
           amount: number
           asset_id: string | null
           completed_at: string | null
           description: string | null
           id: string
           notes: string | null
-          provider: Database["public"]["Enums"]["credit_provider"]
+          provider: Database["public"]["Enums"]["credit_provider"] | null
           request_id: string | null
           status: string | null
           timestamp: string
           user_id: string
         }
         Insert: {
-          action: Database["public"]["Enums"]["credit_action"]
+          action?: Database["public"]["Enums"]["credit_action"] | null
           amount: number
           asset_id?: string | null
           completed_at?: string | null
           description?: string | null
           id?: string
           notes?: string | null
-          provider: Database["public"]["Enums"]["credit_provider"]
+          provider?: Database["public"]["Enums"]["credit_provider"] | null
           request_id?: string | null
           status?: string | null
           timestamp?: string
           user_id: string
         }
         Update: {
-          action?: Database["public"]["Enums"]["credit_action"]
+          action?: Database["public"]["Enums"]["credit_action"] | null
           amount?: number
           asset_id?: string | null
           completed_at?: string | null
           description?: string | null
           id?: string
           notes?: string | null
-          provider?: Database["public"]["Enums"]["credit_provider"]
+          provider?: Database["public"]["Enums"]["credit_provider"] | null
           request_id?: string | null
           status?: string | null
           timestamp?: string
@@ -702,19 +702,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      adjust_user_credits:
-        | {
-            Args: {
-              amount: number
-              description_text?: string
-              target_user_id: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: { amount: number; target_user_id: string }
-            Returns: undefined
-          }
+      adjust_user_credits: {
+        Args: {
+          amount: number
+          description_text?: string
+          target_user_id: string
+        }
+        Returns: undefined
+      }
       has_active_subscription: {
         Args: { user_id_param: string }
         Returns: boolean
