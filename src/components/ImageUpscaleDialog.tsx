@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -204,6 +204,15 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setIsSaving(false);
     onOpenChange(false);
   };
+
+  // Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (sourceImage) {
+        URL.revokeObjectURL(sourceImage.preview);
+      }
+    };
+  }, [sourceImage]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

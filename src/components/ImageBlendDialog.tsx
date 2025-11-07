@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -217,6 +217,13 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     setIsSaving(false);
     onOpenChange(false);
   };
+
+  // Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      images.forEach(img => URL.revokeObjectURL(img.preview));
+    };
+  }, [images]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

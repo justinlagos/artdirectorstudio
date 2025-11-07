@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -375,6 +375,13 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     setCurrentProgress(0);
     onOpenChange(false);
   };
+
+  // Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      images.forEach(img => URL.revokeObjectURL(img.preview));
+    };
+  }, [images]);
 
   const getStatusIcon = (status: BatchImage['status']) => {
     switch (status) {
