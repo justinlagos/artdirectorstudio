@@ -1,20 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import { Sparkles, FileText, HelpCircle, Layers, Maximize2, ImageIcon, Wrench } from "lucide-react";
-import { ToolDialog } from "./ToolDialog";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
-import { ImageBlendDialogEnhanced } from "./ImageBlendDialogEnhanced";
-import { ImageUpscaleDialog } from "./ImageUpscaleDialog";
-import { BatchProcessDialog } from "./BatchProcessDialog";
+import { useToolsModal } from "@/contexts/ToolsModalContext";
 
 export const Footer = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [isBlendDialogOpen, setIsBlendDialogOpen] = useState(false);
-  const [isUpscaleDialogOpen, setIsUpscaleDialogOpen] = useState(false);
-  const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
+  const { openTool } = useToolsModal();
 
   const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault();
@@ -69,7 +63,7 @@ export const Footer = () => {
               <nav className="flex flex-col space-y-3">
                 <Button 
                   variant="ghost" 
-                  onClick={() => setIsBlendDialogOpen(true)}
+                  onClick={() => openTool('blend')}
                   className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2"
                 >
                   <Layers className="h-4 w-4" />
@@ -77,7 +71,7 @@ export const Footer = () => {
                 </Button>
                 <Button 
                   variant="ghost" 
-                  onClick={() => setIsUpscaleDialogOpen(true)}
+                  onClick={() => openTool('upscale')}
                   className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2"
                 >
                   <Maximize2 className="h-4 w-4" />
@@ -85,7 +79,7 @@ export const Footer = () => {
                 </Button>
                 <Button 
                   variant="ghost" 
-                  onClick={() => setIsBatchDialogOpen(true)}
+                  onClick={() => openTool('batch')}
                   className="justify-start text-muted-foreground hover:text-foreground transition-colors min-h-[44px] h-auto p-0 gap-2"
                 >
                   <ImageIcon className="h-4 w-4" />
@@ -150,11 +144,6 @@ export const Footer = () => {
         </p>
       </div>
     </div>
-    
-    {/* Tool Dialogs */}
-    <ImageBlendDialogEnhanced open={isBlendDialogOpen} onOpenChange={setIsBlendDialogOpen} />
-    <ImageUpscaleDialog open={isUpscaleDialogOpen} onOpenChange={setIsUpscaleDialogOpen} />
-    <BatchProcessDialog open={isBatchDialogOpen} onOpenChange={setIsBatchDialogOpen} />
   </footer>
   );
 };
