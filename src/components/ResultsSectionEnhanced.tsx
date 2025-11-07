@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Copy, Download, RefreshCw, Wand2, FileJson, Edit2 } from "lucide-react";
@@ -12,6 +12,10 @@ import { ChipSelector } from "@/components/ChipSelector";
 import { InsightChips } from "@/components/InsightChips";
 import { QuickTweaksRow } from "@/components/QuickTweaksRow";
 import { GuidedTweaks } from "@/components/GuidedTweaks";
+import { QuickStylesBar } from "@/components/QuickStylesBar";
+import { LivePromptEvolution } from "@/components/LivePromptEvolution";
+import { ApplyAllButton } from "@/components/ApplyAllButton";
+import { EmptyStatePrompts } from "@/components/EmptyStatePrompts";
 import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -51,9 +55,25 @@ export const ResultsSection = ({
   const [userEdits, setUserEdits] = useState<UserEdits>({});
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
   const [livePreviewPrompt, setLivePreviewPrompt] = useState(result.full_regeneration_prompt);
+  const [previousPrompt, setPreviousPrompt] = useState(result.full_regeneration_prompt);
   const [modifiedCount, setModifiedCount] = useState(0);
   const [promptPulse, setPromptPulse] = useState(false);
   const [isApplyingTweak, setIsApplyingTweak] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [isPromptDrawerOpen, setIsPromptDrawerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Use adaptive fields hook
   const adaptiveFields = useAdaptiveFields(result.analysis);
@@ -86,6 +106,7 @@ export const ResultsSection = ({
   // Live preview with debounced regeneration (2s delay) + pulse animation
   useEffect(() => {
     if (Object.keys(userEdits).length === 0) {
+      setPreviousPrompt(livePreviewPrompt);
       setLivePreviewPrompt(result.full_regeneration_prompt);
       setModifiedCount(0);
       return;
@@ -99,6 +120,8 @@ export const ResultsSection = ({
     setTimeout(() => setPromptPulse(false), 600);
 
     const timeoutId = setTimeout(() => {
+      setPreviousPrompt(livePreviewPrompt);
+      
       // Generate live preview by merging edits into prompt
       let preview = result.full_regeneration_prompt;
       
@@ -130,7 +153,7 @@ export const ResultsSection = ({
     }, 2000);
 
     return () => clearTimeout(timeoutId);
-  }, [userEdits, result.full_regeneration_prompt]);
+  }, [userEdits, result.full_regeneration_prompt, livePreviewPrompt]);
 
   const handleEditChange = (field: keyof UserEdits, value: string) => {
     setUserEdits(prev => ({
@@ -384,6 +407,21 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     onRegenerate(userEdits);
   };
 
+  const handleApplyPreset = (edits: Partial<UserEdits>, presetName: string) => {
+    setUserEdits(prev => ({ ...prev, ...edits }));
+    toast.success(`${presetName} style applied!`);
+  };
+
+  const handleApplyAll = () => {
+    handleRegenerate();
+    toast.success("Changes applied and saved to history!");
+  };
+
+  const toggleSection = (key: string) => {
+    if (!isMobile) return;
+    setExpandedSection(expandedSection === key ? null : key);
+  };
+
   const sections = [
     { 
       title: "1. Image Overview", 
@@ -628,13 +666,48 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
             </div>
           </div>
         </div>
+
+        {/* Quick Styles Bar */}
+        <QuickStylesBar 
+          onApplyPreset={handleApplyPreset} 
+          disabled={isRegenerating || isApplyingTweak}
+        />
+
+        {/* Live Prompt Evolution */}
+        {isMobile ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsPromptDrawerOpen(!isPromptDrawerOpen)}
+            className="w-full"
+          >
+            {isPromptDrawerOpen ? 'Hide' : 'Show'} Live Prompt Preview
+          </Button>
+        ) : null}
+
+        {(!isMobile || isPromptDrawerOpen) && (
+          <LivePromptEvolution 
+            prompt={livePreviewPrompt}
+            previousPrompt={previousPrompt}
+            modifiedCount={modifiedCount}
+          />
+        )}
+
+        {/* Empty State */}
+        {modifiedCount === 0 && <EmptyStatePrompts />}
         
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-          {sections.map((section, index) => (
-            <div 
-              key={index}
-              className="group relative bg-surface-1 rounded-xl p-6 shadow-xs ring-1 ring-border/30 hover:shadow-medium hover:ring-border/60 transition-all duration-300 space-y-4"
-            >
+          {sections.map((section, index) => {
+            const isExpanded = !isMobile || expandedSection === section.key || expandedSection === null;
+            
+            return (
+              <div 
+                key={index}
+                className={`group relative bg-surface-1 rounded-xl p-6 shadow-xs ring-1 ring-border/30 hover:shadow-medium hover:ring-border/60 transition-all duration-300 space-y-4 ${
+                  isMobile && !isExpanded ? 'opacity-50' : ''
+                }`}
+                onClick={() => toggleSection(section.key)}
+              >
               {/* Subtle gradient on hover */}
               <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-primary/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
               
@@ -657,7 +730,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
               </p>
 
               {/* Editable Fields */}
-              {section.editFields && section.editFields.length > 0 && (
+              {isExpanded && section.editFields && section.editFields.length > 0 && (
                 <div className="relative space-y-3 pt-4 border-t border-border/50">
                   <div className="flex items-center gap-2">
                     <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
@@ -677,8 +750,17 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
                 </div>
               )}
             </div>
-          ))}
+          );
+        })}
         </div>
+
+        {/* Apply All Button (sticky on mobile) */}
+        <ApplyAllButton 
+          pendingCount={modifiedCount}
+          onApply={handleApplyAll}
+          isLoading={isRegenerating}
+          className={isMobile ? 'md:relative' : ''}
+        />
       </div>
 
       {/* Generated Images Gallery */}
