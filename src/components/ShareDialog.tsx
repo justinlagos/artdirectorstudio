@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
-import { Copy, Check, Share2, Eye } from "lucide-react";
+import { Copy, Check, Share2, Eye, Download } from "lucide-react";
+import { FaXTwitter, FaLinkedin, FaPinterest } from "react-icons/fa6";
 
 interface ShareDialogProps {
   open: boolean;
@@ -106,6 +107,52 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
     }
   };
 
+  const handleShareToX = () => {
+    const text = `Check out my ${assetType} created with ArtDirector Studio`;
+    const url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareToLinkedIn = () => {
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareToPinterest = () => {
+    const url = `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(shareUrl)}&description=${encodeURIComponent(`Created with ArtDirector Studio`)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownload = async () => {
+    try {
+      const { data: asset } = await supabase
+        .from("generated_assets")
+        .select("image_url, prompt")
+        .eq("id", assetId)
+        .single();
+
+      if (!asset?.image_url) {
+        toast.error("No image to download");
+        return;
+      }
+
+      const response = await fetch(asset.image_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `artdirector-${assetType}-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Image downloaded");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download image");
+    }
+  };
+
   const content = (
     <div className="space-y-4">
       <div className="p-4 rounded-lg bg-muted/30 space-y-3">
@@ -174,6 +221,44 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
               <span>{shareData.view_count} views</span>
             </div>
           )}
+
+          <div className="space-y-3 pt-2">
+            <Label className="text-sm font-medium">Share on Social Media</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                onClick={handleShareToX}
+                variant="outline"
+                className="min-h-[44px] gap-2"
+              >
+                <FaXTwitter className="h-4 w-4" />
+                X (Twitter)
+              </Button>
+              <Button
+                onClick={handleShareToLinkedIn}
+                variant="outline"
+                className="min-h-[44px] gap-2"
+              >
+                <FaLinkedin className="h-4 w-4" />
+                LinkedIn
+              </Button>
+              <Button
+                onClick={handleShareToPinterest}
+                variant="outline"
+                className="min-h-[44px] gap-2"
+              >
+                <FaPinterest className="h-4 w-4" />
+                Pinterest
+              </Button>
+              <Button
+                onClick={handleDownload}
+                variant="outline"
+                className="min-h-[44px] gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
+            </div>
+          </div>
 
           <Button
             onClick={handleCreateShare}
