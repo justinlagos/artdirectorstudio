@@ -133,3 +133,86 @@ export function getOptimalDimensions(
       : prev;
   });
 }
+
+/**
+ * Generate a low-quality image placeholder (LQIP) for blur-up effect
+ */
+export async function generateLQIP(
+  imageUrl: string,
+  width: number = 20,
+  quality: number = 0.1
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      const aspectRatio = img.naturalHeight / img.naturalWidth;
+      const height = Math.round(width * aspectRatio);
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(URL.createObjectURL(blob));
+          } else {
+            reject(new Error('Failed to generate LQIP'));
+          }
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+    
+    img.onerror = () => reject(new Error('Failed to load image for LQIP'));
+    img.src = imageUrl;
+  });
+}
+
+/**
+ * Convert image to base64 LQIP data URL (for inline embedding)
+ */
+export async function generateBase64LQIP(
+  imageUrl: string,
+  width: number = 20,
+  quality: number = 0.1
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      const aspectRatio = img.naturalHeight / img.naturalWidth;
+      const height = Math.round(width * aspectRatio);
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(dataUrl);
+    };
+    
+    img.onerror = () => reject(new Error('Failed to load image for LQIP'));
+    img.src = imageUrl;
+  });
+}
