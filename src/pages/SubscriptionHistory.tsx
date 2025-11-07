@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Receipt, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Receipt, FileText, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
 
 interface Payment {
   id: string;
@@ -85,6 +87,87 @@ const SubscriptionHistory = () => {
     );
   };
 
+  const downloadInvoice = (payment: Payment) => {
+    try {
+      const doc = new jsPDF();
+      
+      // Header
+      doc.setFontSize(24);
+      doc.setTextColor(59, 130, 246); // Primary color
+      doc.text("INVOICE", 20, 20);
+      
+      // Invoice details
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Invoice #: ${payment.id.substring(0, 8).toUpperCase()}`, 20, 35);
+      doc.text(`Date: ${formatDate(payment.created_at)}`, 20, 42);
+      doc.text(`Status: ${payment.status.toUpperCase()}`, 20, 49);
+      
+      // Divider line
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, 55, 190, 55);
+      
+      // Bill to
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Bill To:", 20, 65);
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(user?.email || "Customer", 20, 72);
+      
+      // Transaction details
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Transaction Details", 20, 90);
+      
+      // Table header
+      doc.setFillColor(240, 240, 240);
+      doc.rect(20, 95, 170, 10, "F");
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Description", 25, 102);
+      doc.text("Credits", 110, 102);
+      doc.text("Amount", 150, 102);
+      
+      // Table row
+      doc.setFontSize(10);
+      doc.setTextColor(60, 60, 60);
+      const description = payment.package_name || "Credit Purchase";
+      doc.text(description, 25, 112);
+      doc.text(payment.credits_purchased.toString(), 110, 112);
+      doc.text(formatAmount(payment.amount_cents, payment.currency), 150, 112);
+      
+      // Divider
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, 118, 190, 118);
+      
+      // Total
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Total:", 130, 130);
+      doc.setFontSize(14);
+      doc.text(formatAmount(payment.amount_cents, payment.currency), 150, 130);
+      
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text("Thank you for your business!", 20, 270);
+      doc.text(`Generated on ${new Date().toLocaleDateString()}`, 20, 275);
+      
+      // Payment details
+      if (payment.stripe_payment_intent) {
+        doc.text(`Payment ID: ${payment.stripe_payment_intent}`, 20, 280);
+      }
+      
+      // Save PDF
+      doc.save(`invoice-${payment.id.substring(0, 8)}.pdf`);
+      toast.success("Invoice downloaded successfully");
+    } catch (error) {
+      console.error("Error generating invoice:", error);
+      toast.error("Failed to generate invoice");
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -132,6 +215,7 @@ const SubscriptionHistory = () => {
                       <TableHead>Credits</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Invoice</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -148,6 +232,16 @@ const SubscriptionHistory = () => {
                           {formatAmount(payment.amount_cents, payment.currency)}
                         </TableCell>
                         <TableCell>{getStatusBadge(payment.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadInvoice(payment)}
+                            disabled={payment.status !== "completed"}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
