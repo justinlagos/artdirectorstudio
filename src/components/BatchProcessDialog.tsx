@@ -6,12 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, X, CheckCircle2, Clock, AlertCircle, Loader2, Eye, Download, Trash2, Pause, Play } from "lucide-react";
+import { Upload, X, CheckCircle2, Clock, AlertCircle, Loader2, Eye, Download, Trash2, Pause, Play, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { mapErrorMessage, TOOL_ERROR_MESSAGES } from "@/lib/toolErrorMessages";
+import { useToolsModal } from "@/contexts/ToolsModalContext";
 
 interface BatchProcessDialogProps {
   open: boolean;
@@ -35,6 +36,7 @@ type OperationType = 'analyze' | 'upscale';
 
 export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogProps) => {
   const navigate = useNavigate();
+  const { openGenerateDialog } = useToolsModal();
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [operation, setOperation] = useState<OperationType>('upscale');
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
@@ -343,6 +345,22 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     onOpenChange(false);
   };
 
+  const handleUseInStudio = () => {
+    const completedCount = queue.filter(i => i.status === 'completed').length;
+    if (completedCount === 0) return;
+    
+    // Generate a prompt based on the batch operation
+    let studioPrompt = '';
+    if (operation === 'analyze') {
+      studioPrompt = `Create variations based on these ${completedCount} analyzed images`;
+    } else if (operation === 'upscale') {
+      studioPrompt = `Generate high-resolution variations of these ${completedCount} upscaled images`;
+    }
+    
+    openGenerateDialog(studioPrompt);
+    onOpenChange(false);
+  };
+
   useEffect(() => {
     return () => {
       queue.forEach(item => URL.revokeObjectURL(item.preview));
@@ -553,10 +571,16 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
           )}
           
           {stats.completed > 0 && (
-            <Button variant="outline" onClick={handleViewAll}>
-              <Eye className="w-4 h-4 mr-2" />
-              View All Results
-            </Button>
+            <>
+              <Button variant="outline" onClick={handleViewAll}>
+                <Eye className="w-4 h-4 mr-2" />
+                View All Results
+              </Button>
+              <Button onClick={handleUseInStudio} className="min-h-[44px]">
+                <Wand2 className="w-4 h-4 mr-2" />
+                Use in Studio
+              </Button>
+            </>
           )}
 
           <div className="flex-1" />

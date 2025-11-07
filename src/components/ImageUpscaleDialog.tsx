@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Maximize2, Upload, Sparkles, FolderOpen, CheckCircle2, Eye, ZoomIn } from "lucide-react";
+import { Download, Maximize2, Upload, Sparkles, FolderOpen, CheckCircle2, Wand2, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ import { BeforeAfterSlider } from "@/components/ui/before-after-slider";
 import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
+import { useToolsModal } from "@/contexts/ToolsModalContext";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -28,6 +29,7 @@ interface SourceImage {
 export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogProps) => {
   const navigate = useNavigate();
   const toolState = useToolState();
+  const { openGenerateDialog } = useToolsModal();
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
@@ -223,15 +225,13 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     toast.success("Image downloaded!");
   };
 
-  const handleViewInStudio = () => {
-    if (!upscaledAssetId) {
-      toast.error("Asset not saved yet. Please try again.");
-      return;
-    }
-    navigate('/');
-    setTimeout(() => {
-      document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  const handleUseInStudio = () => {
+    if (!upscaledImage) return;
+    
+    // Generate a prompt based on the upscale action
+    const studioPrompt = `Generate a high-resolution ${targetSize} variation of this upscaled image concept`;
+    
+    openGenerateDialog(studioPrompt);
     handleClose();
   };
 
@@ -432,17 +432,16 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
                 {/* Primary Actions */}
                 <div className="flex gap-2 w-full">
                   <Button
-                    onClick={handleViewInStudio}
-                    className="flex-1"
-                    disabled={!upscaledAssetId}
+                    onClick={handleUseInStudio}
+                    className="flex-1 min-h-[44px]"
                   >
-                    <Eye className="w-4 h-4 mr-2" />
-                    View in Studio
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Use in Studio
                   </Button>
                   <Button
                     variant="outline"
                     onClick={handleDownload}
-                    className="flex-1"
+                    className="flex-1 min-h-[44px]"
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Download

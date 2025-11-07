@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Blend, X, Upload, Sparkles, FolderOpen, CheckCircle2, Eye, ZoomIn } from "lucide-react";
+import { Download, Blend, X, Upload, Sparkles, FolderOpen, CheckCircle2, Wand2, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
+import { useToolsModal } from "@/contexts/ToolsModalContext";
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -27,6 +28,7 @@ interface ImageFile {
 export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) => {
   const navigate = useNavigate();
   const toolState = useToolState();
+  const { openGenerateDialog } = useToolsModal();
   const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("Blend these images seamlessly together");
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
@@ -312,15 +314,15 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     toast.success("Image downloaded!");
   };
 
-  const handleViewInStudio = () => {
-    if (!blendedAssetId) {
-      toast.error("Asset not saved yet. Please try again.");
-      return;
-    }
-    navigate('/');
-    setTimeout(() => {
-      document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  const handleUseInStudio = () => {
+    if (!blendedImage) return;
+    
+    // Generate a prompt based on the blend instruction
+    const studioPrompt = instruction 
+      ? `Create a variation of this blended image concept: ${instruction}` 
+      : "Create a variation of this blended image concept";
+    
+    openGenerateDialog(studioPrompt);
     handleClose();
   };
 
@@ -493,17 +495,16 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                 {/* Primary Actions */}
                 <div className="flex gap-2 w-full">
                   <Button
-                    onClick={handleViewInStudio}
-                    className="flex-1"
-                    disabled={!blendedAssetId}
+                    onClick={handleUseInStudio}
+                    className="flex-1 min-h-[44px]"
                   >
-                    <Eye className="w-4 h-4 mr-2" />
-                    View in Studio
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Use in Studio
                   </Button>
                   <Button
                     variant="outline"
                     onClick={handleDownload}
-                    className="flex-1"
+                    className="flex-1 min-h-[44px]"
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Download

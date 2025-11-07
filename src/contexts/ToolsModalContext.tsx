@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-export type ToolType = 'blend' | 'upscale' | 'batch';
+export type ToolType = 'blend' | 'upscale' | 'batch' | 'generate';
 export type ToolState = 'idle' | 'loading' | 'success' | 'error';
 
 interface ToolInputs {
@@ -22,6 +22,9 @@ interface ToolInputs {
     operation?: string;
     prompt?: string;
   };
+  generate?: {
+    prompt?: string;
+  };
 }
 
 interface ToolsModalContextType {
@@ -31,12 +34,14 @@ interface ToolsModalContextType {
   errorMessage: string | null;
   inputs: ToolInputs;
   scrollPosition: number;
+  generatePrompt: string | null;
   openTool: (tool: ToolType, preloadData?: any) => void;
   closeTool: () => void;
   setToolState: (state: ToolState) => void;
   setErrorMessage: (message: string | null) => void;
   updateInputs: (tool: ToolType, data: any) => void;
   clearInputs: (tool: ToolType) => void;
+  openGenerateDialog: (prompt: string) => void;
 }
 
 const ToolsModalContext = createContext<ToolsModalContextType | undefined>(undefined);
@@ -48,6 +53,7 @@ export const ToolsModalProvider = ({ children }: { children: ReactNode }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [inputs, setInputs] = useState<ToolInputs>({});
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [generatePrompt, setGeneratePrompt] = useState<string | null>(null);
 
   const openTool = (tool: ToolType, preloadData?: any) => {
     // Check if user is authenticated by checking localStorage
@@ -117,6 +123,19 @@ export const ToolsModalProvider = ({ children }: { children: ReactNode }) => {
     setInputs(prev => ({ ...prev, [tool]: {} }));
   };
 
+  const openGenerateDialog = (prompt: string) => {
+    setGeneratePrompt(prompt);
+    // Close current tool modal if open
+    if (isOpen) {
+      closeTool();
+    }
+    // Small delay to ensure smooth transition
+    setTimeout(() => {
+      setActiveTool('generate');
+      setIsOpen(true);
+    }, isOpen ? 200 : 0);
+  };
+
   return (
     <ToolsModalContext.Provider
       value={{
@@ -126,12 +145,14 @@ export const ToolsModalProvider = ({ children }: { children: ReactNode }) => {
         errorMessage,
         inputs,
         scrollPosition,
+        generatePrompt,
         openTool,
         closeTool,
         setToolState,
         setErrorMessage,
         updateInputs,
         clearInputs,
+        openGenerateDialog,
       }}
     >
       {children}
