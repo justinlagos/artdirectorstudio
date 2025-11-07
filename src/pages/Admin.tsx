@@ -13,8 +13,9 @@ import { ContentModeration } from "@/components/admin/ContentModeration";
 import { InviteTracking } from "@/components/admin/InviteTracking";
 import { SystemHealth } from "@/components/admin/SystemHealth";
 import { InspireApprovalPanel } from "@/components/admin/InspireApprovalPanel";
+import { CreditAuditLog } from "@/components/admin/CreditAuditLog";
 import TestimonialsManagement from "@/components/admin/TestimonialsManagement";
-import { Shield, Users, Flag, Mail, Activity, DollarSign, Sparkles, MessageSquare } from "lucide-react";
+import { Shield, Users, Flag, Mail, Activity, DollarSign, Sparkles, MessageSquare, Receipt } from "lucide-react";
 
 const Admin = () => {
   const { user, loading: authLoading } = useAuth();
@@ -53,7 +54,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-8 h-auto">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9 h-auto">
             <TabsTrigger value="overview" className="gap-2">
               <Activity className="w-4 h-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -61,6 +62,10 @@ const Admin = () => {
             <TabsTrigger value="users" className="gap-2">
               <Users className="w-4 h-4" />
               <span className="hidden sm:inline">Users</span>
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2">
+              <Receipt className="w-4 h-4" />
+              <span className="hidden sm:inline">Audit Log</span>
             </TabsTrigger>
             <TabsTrigger value="content" className="gap-2">
               <Flag className="w-4 h-4" />
@@ -94,6 +99,10 @@ const Admin = () => {
 
           <TabsContent value="users">
             <UserManagement />
+          </TabsContent>
+
+          <TabsContent value="audit">
+            <CreditAuditLog />
           </TabsContent>
 
           <TabsContent value="content">
