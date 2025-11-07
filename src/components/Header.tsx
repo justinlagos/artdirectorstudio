@@ -117,6 +117,8 @@ export const Header = () => {
         <div className="flex items-center gap-2">
           {user ? (
             <>
+              <TrialCreditsDisplay />
+              <SubscriptionStatus />
               <ThemeToggle />
               <UserMenu />
             </>

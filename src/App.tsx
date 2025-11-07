@@ -27,6 +27,7 @@ import BillingHistory from "./pages/BillingHistory";
 import SignedOut from "./pages/SignedOut";
 import NotFound from "./pages/NotFound";
 import { ArtieChat } from "./components/ArtieChat";
+import { TrialWelcomeToast } from "./components/TrialWelcomeToast";
 
 const queryClient = new QueryClient();
 
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             <ArtieChat />
+            <TrialWelcomeToast />
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

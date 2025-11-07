@@ -50,6 +50,31 @@ serve(async (req) => {
 
     console.log("Authenticated user:", userId);
 
+    // Check feature access before processing
+    const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'generate_image' }),
+    });
+
+    const accessResult = await accessResponse.json();
+    
+    if (!accessResult.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          error: accessResult.reason || "Access denied",
+          upgrade_required: accessResult.upgrade_required || false,
+          tier: accessResult.tier
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Access granted:", accessResult);
+
     // Parse request body
     const { prompt, quality = 'auto', size = '1024x1024', background = 'auto' } = await req.json();
     

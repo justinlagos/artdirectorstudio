@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,22 +10,24 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useCredits } from "@/hooks/useCredits";
-import { CreditPurchaseDialog } from "@/components/CreditPurchaseDialog";
-import { User, Shield, CreditCard, Settings2, Bell } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
+import { User, Shield, CreditCard, Settings2, Bell, Sparkles, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 
 const Settings = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { balance, refetch } = useCredits();
+  const { subscription } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
-  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
   
   // Profile state
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
+  const [freeCredits, setFreeCredits] = useState(0);
+  const [dailyUsage, setDailyUsage] = useState(0);
+  const [dailyLimit, setDailyLimit] = useState(10);
   
   // Security state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -35,28 +38,34 @@ const Settings = () => {
   const [newFeatures, setNewFeatures] = useState(true);
   const [galleryUpdates, setGalleryUpdates] = useState(false);
   
-  // Transaction history
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [loadingTransactions, setLoadingTransactions] = useState(false);
+  // Billing events
+  const [billingEvents, setBillingEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      loadProfile();
-      loadNotificationPreferences();
+    if (!user) {
+      navigate('/auth');
+      return;
     }
-  }, [user]);
+    
+    loadProfile();
+    loadNotificationPreferences();
+  }, [user, navigate]);
 
   const loadProfile = async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, bio')
+        .select('username, bio, free_credits, daily_usage, daily_limit')
         .eq('id', user?.id)
         .single();
       
       if (data) {
         setUsername(data.username || "");
         setBio(data.bio || "");
+        setFreeCredits(data.free_credits || 0);
+        setDailyUsage(data.daily_usage || 0);
+        setDailyLimit(data.daily_limit || 10);
       }
     } catch (error) {
       console.error("Error loading profile:", error);
@@ -81,25 +90,25 @@ const Settings = () => {
     }
   };
 
-  const loadTransactions = async () => {
+  const loadBillingEvents = async () => {
     if (!user) return;
     
-    setLoadingTransactions(true);
+    setLoadingEvents(true);
     try {
       const { data, error } = await supabase
-        .from('credit_transactions')
+        .from('billing_events')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(10);
       
       if (error) throw error;
-      setTransactions(data || []);
+      setBillingEvents(data || []);
     } catch (error) {
-      console.error("Error loading transactions:", error);
-      toast.error("Failed to load transaction history");
+      console.error("Error loading billing events:", error);
+      toast.error("Failed to load billing history");
     } finally {
-      setLoadingTransactions(false);
+      setLoadingEvents(false);
     }
   };
 
@@ -179,6 +188,17 @@ const Settings = () => {
     }
   };
 
+  const getTierDisplay = () => {
+    const tier = subscription.tier || 'free';
+    const tiers: Record<string, { name: string; icon: any; color: string }> = {
+      free: { name: 'Free Trial', icon: Sparkles, color: 'text-muted-foreground' },
+      starter: { name: 'Starter', icon: Crown, color: 'text-blue-500' },
+      pro: { name: 'Pro', icon: Crown, color: 'text-primary' },
+      enterprise: { name: 'Enterprise', icon: Crown, color: 'text-purple-500' },
+    };
+    return tiers[tier] || tiers.free;
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-surface-1">
       <Header />
@@ -201,7 +221,7 @@ const Settings = () => {
               </TabsTrigger>
               <TabsTrigger value="billing" className="gap-2 flex-shrink-0">
                 <CreditCard className="w-4 h-4" />
-                <span className="hidden sm:inline">Billing</span>
+                <span className="hidden sm:inline">Plan & Billing</span>
               </TabsTrigger>
               <TabsTrigger value="preferences" className="gap-2 flex-shrink-0">
                 <Settings2 className="w-4 h-4" />
@@ -283,47 +303,118 @@ const Settings = () => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="billing" className="mt-6" onFocus={loadTransactions}>
-              <Card className="glass">
-                <CardHeader>
-                  <CardTitle>Credits & Billing</CardTitle>
-                  <CardDescription>Manage your credits and payment information</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="p-6 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
-                    <p className="text-sm text-muted-foreground mb-2">Current Balance</p>
-                    <p className="text-4xl font-bold">{balance ?? 0} Credits</p>
-                    <Button className="mt-4" onClick={() => setPurchaseDialogOpen(true)}>
-                      Purchase Credits
-                    </Button>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-4">Transaction History</h3>
-                    {loadingTransactions ? (
-                      <p className="text-sm text-muted-foreground">Loading transactions...</p>
-                    ) : transactions.length > 0 ? (
-                      <div className="space-y-2">
-                        {transactions.map((tx) => (
-                          <div key={tx.id} className="flex justify-between p-3 rounded-lg bg-muted/30">
+            <TabsContent value="billing" className="mt-6" onFocus={loadBillingEvents}>
+              <div className="space-y-6">
+                {/* Current Plan */}
+                <Card className="glass">
+                  <CardHeader>
+                    <CardTitle>Current Plan</CardTitle>
+                    <CardDescription>Your subscription and usage information</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {(() => {
+                      const tierInfo = getTierDisplay();
+                      const TierIcon = tierInfo.icon;
+                      return (
+                        <div className="p-6 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                          <div className="flex items-center gap-3 mb-4">
+                            <TierIcon className={`w-6 h-6 ${tierInfo.color}`} />
                             <div>
-                              <p className="font-medium capitalize">{tx.action || 'Transaction'}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(tx.timestamp).toLocaleDateString()} • {tx.provider}
-                              </p>
-                              {tx.notes && <p className="text-xs text-muted-foreground mt-1">{tx.notes}</p>}
+                              <p className="text-2xl font-bold">{tierInfo.name}</p>
+                              {subscription.tier === 'free' && freeCredits > 0 && (
+                                <p className="text-sm text-muted-foreground">{freeCredits} free credits remaining</p>
+                              )}
+                              {subscription.tier === 'starter' && (
+                                <p className="text-sm text-muted-foreground">
+                                  {dailyUsage} / {dailyLimit} generations used today
+                                </p>
+                              )}
+                              {(subscription.tier === 'pro' || subscription.tier === 'enterprise') && (
+                                <p className="text-sm text-muted-foreground">Unlimited generations</p>
+                              )}
                             </div>
-                            <p className={`font-semibold ${tx.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {tx.amount > 0 ? '+' : ''}{tx.amount}
+                          </div>
+                          
+                          {subscription.tier === 'free' ? (
+                            <Button className="w-full" onClick={() => navigate('/subscriptions')}>
+                              <Crown className="w-4 h-4 mr-2" />
+                              Upgrade to Pro
+                            </Button>
+                          ) : (
+                            <Button variant="outline" className="w-full" onClick={() => navigate('/subscriptions')}>
+                              Manage Subscription
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Usage Stats */}
+                    {subscription.tier !== 'free' && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 rounded-lg bg-muted/30">
+                          <p className="text-sm text-muted-foreground">Plan Status</p>
+                          <p className="text-xl font-semibold">
+                            {subscription.isPro ? 'Active' : 'Inactive'}
+                          </p>
+                        </div>
+                        {subscription.expiresAt && (
+                          <div className="p-4 rounded-lg bg-muted/30">
+                            <p className="text-sm text-muted-foreground">Renews On</p>
+                            <p className="text-xl font-semibold">
+                              {new Date(subscription.expiresAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Billing History */}
+                <Card className="glass">
+                  <CardHeader>
+                    <CardTitle>Billing History</CardTitle>
+                    <CardDescription>Your subscription and credit transactions</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingEvents ? (
+                      <p className="text-sm text-muted-foreground">Loading transactions...</p>
+                    ) : billingEvents.length > 0 ? (
+                      <div className="space-y-2">
+                        {billingEvents.map((event) => (
+                          <div key={event.id} className="flex justify-between p-3 rounded-lg bg-muted/30">
+                            <div>
+                              <p className="font-medium capitalize">
+                                {event.event_type.replace(/_/g, ' ')}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(event.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <p className="font-semibold">
+                              {event.amount_cents > 0 
+                                ? `$${(event.amount_cents / 100).toFixed(2)}`
+                                : event.metadata?.credits 
+                                ? `+${event.metadata.credits} credits` 
+                                : '-'}
                             </p>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No transactions yet</p>
+                      <p className="text-sm text-muted-foreground">No billing history yet</p>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+                    <Button 
+                      variant="outline" 
+                      className="w-full mt-4"
+                      onClick={() => navigate('/billing-history')}
+                    >
+                      View Full History
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="preferences" className="mt-6">
@@ -365,7 +456,7 @@ const Settings = () => {
                   <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
                     <div className="space-y-0.5">
                       <Label>Credit Alerts</Label>
-                      <p className="text-sm text-muted-foreground">Get notified when credits are low</p>
+                      <p className="text-sm text-muted-foreground">Get notified when trial credits are running low</p>
                     </div>
                     <Switch 
                       checked={creditAlerts}
@@ -402,11 +493,6 @@ const Settings = () => {
         </div>
       </main>
       <Footer />
-      
-      <CreditPurchaseDialog 
-        open={purchaseDialogOpen} 
-        onOpenChange={setPurchaseDialogOpen} 
-      />
     </div>
   );
 };

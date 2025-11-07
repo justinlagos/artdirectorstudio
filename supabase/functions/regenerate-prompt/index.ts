@@ -35,6 +35,31 @@ serve(async (req) => {
       );
     }
 
+    // Check feature access before processing
+    const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'regenerate_prompt' }),
+    });
+
+    const accessResult = await accessResponse.json();
+    
+    if (!accessResult.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          error: accessResult.reason || "Access denied",
+          upgrade_required: accessResult.upgrade_required || false,
+          tier: accessResult.tier
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Access granted for regenerate:", accessResult);
+
     const { base_analysis, user_edits } = await req.json();
 
     // Validate input structure

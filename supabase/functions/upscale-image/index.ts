@@ -11,6 +11,40 @@ serve(async (req) => {
   }
 
   try {
+    // Check authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: No authorization header" }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check feature access before processing
+    const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'upscale_image' }),
+    });
+
+    const accessResult = await accessResponse.json();
+    
+    if (!accessResult.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          error: accessResult.reason || "Access denied",
+          upgrade_required: accessResult.upgrade_required || false,
+          tier: accessResult.tier
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Access granted for upscale:", accessResult);
+
     const { image, targetSize } = await req.json();
     
     console.log('Upscaling image to size:', targetSize);
