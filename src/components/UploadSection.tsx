@@ -130,11 +130,11 @@ export const UploadSection = ({
         
         {previewUrl ? (
           <div className="relative space-y-6 animate-scale-in">
-            <div className="relative inline-block">
+            <div className="relative inline-block bg-muted rounded-xl p-4 flex items-center justify-center min-h-[200px]">
               <OptimizedImage
                 src={previewUrl} 
                 alt="Preview" 
-                className="max-h-80 mx-auto rounded-xl shadow-strong ring-1 ring-border/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+                className="max-h-80 w-auto object-contain mx-auto rounded-xl shadow-strong ring-1 ring-border/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
                 sizes="(max-width: 768px) 100vw, 50vw"
                 widths={[640, 1024]}
               />

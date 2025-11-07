@@ -402,11 +402,13 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
             <div className="grid grid-cols-2 gap-4">
               {images.map((img, index) => (
                 <div key={index} className="relative group">
-                  <img 
-                    src={img.preview} 
-                    alt={`Image ${index + 1}`} 
-                    className="w-full h-40 object-cover rounded-lg"
-                  />
+                  <div className="bg-muted rounded-lg overflow-hidden flex items-center justify-center h-40 p-2">
+                    <img 
+                      src={img.preview} 
+                      alt={`Image ${index + 1}`} 
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  </div>
                   <Button
                     variant="destructive"
                     size="sm"
@@ -454,11 +456,11 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                 {isSaving && <span className="text-xs text-muted-foreground">Saving...</span>}
               </div>
               
-              <div className="relative rounded-lg overflow-hidden bg-muted ring-2 ring-primary/20 animate-scale-in">
+              <div className="relative rounded-lg overflow-hidden bg-muted ring-2 ring-primary/20 animate-scale-in flex items-center justify-center min-h-[300px]">
                 <img 
                   src={blendedImage} 
                   alt="Blended image" 
-                  className="w-full h-auto"
+                  className="w-full h-auto object-contain max-h-[600px]"
                   onLoad={() => console.log('✅ [Blend] Image loaded successfully in UI')}
                   onError={(e) => {
                     console.error('❌ [Blend] Image failed to load in UI:', {

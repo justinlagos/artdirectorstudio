@@ -320,11 +320,11 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           {sourceImage && !upscaledImage && (
             <div className="space-y-2">
               <Label>Source Image</Label>
-              <div className="relative rounded-lg overflow-hidden bg-muted">
+              <div className="relative rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[200px] p-4">
                 <img 
                   src={sourceImage.preview} 
                   alt="Source image" 
-                  className="w-full h-auto"
+                  className="w-full h-auto object-contain max-h-[400px]"
                 />
               </div>
             </div>

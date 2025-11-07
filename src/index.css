@@ -313,6 +313,37 @@ All colors MUST be HSL.
     @apply scale-110;
   }
 
+  /* Image aspect ratio preservation utilities */
+  .image-container-preserve {
+    @apply relative bg-muted rounded-lg overflow-hidden flex items-center justify-center;
+  }
+
+  .image-contain {
+    @apply w-full h-auto object-contain;
+  }
+
+  .image-cover-square {
+    @apply w-full h-full object-cover;
+  }
+
+  /* Modal/Detail View Image Containers */
+  .image-modal-container {
+    @apply bg-muted rounded-lg flex items-center justify-center min-h-[300px] p-4;
+  }
+
+  .image-modal-display {
+    @apply w-full h-auto object-contain max-h-[70vh];
+  }
+
+  /* Preview Image Containers */
+  .image-preview-container {
+    @apply bg-muted rounded-lg flex items-center justify-center min-h-[200px] p-2;
+  }
+
+  .image-preview-display {
+    @apply max-w-full max-h-full object-contain;
+  }
+
   /* Smooth page enter */
   .page-enter {
     animation: fade-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);

@@ -275,11 +275,11 @@ const History = () => {
 
                   {/* Image */}
                   {asset.image_url && (
-                    <div className="rounded-xl overflow-hidden border border-border/50 image-zoom-hover">
+                    <div className="rounded-xl overflow-hidden border border-border/50 bg-muted flex items-center justify-center min-h-[200px]">
                       <img 
                         src={asset.image_url} 
                         alt="Generated content" 
-                        className="w-full aspect-video object-cover"
+                        className="w-full h-full object-contain max-h-[400px]"
                       />
                     </div>
                   )}

@@ -830,11 +830,11 @@ const Inspire = () => {
             {selectedItem && (
               <div className="px-4 pb-4 space-y-6">
                 {selectedItem.asset.image_url && (
-                  <div className="relative overflow-hidden rounded-2xl bg-muted -mx-4">
+                  <div className="relative overflow-hidden rounded-2xl bg-muted flex items-center justify-center min-h-[300px]">
                     <img
                       src={selectedItem.asset.image_url}
                       alt="Generated content"
-                      className="w-full"
+                      className="w-full h-auto object-contain max-h-[70vh]"
                       loading="lazy"
                     />
                     {(selectedItem.staff_pick || selectedItem.featured) && (
@@ -1002,11 +1002,11 @@ const Inspire = () => {
             {selectedItem && (
               <div className="space-y-6">
                 {selectedItem.asset.image_url && (
-                  <div className="relative overflow-hidden rounded-2xl bg-muted">
+                  <div className="relative overflow-hidden rounded-2xl bg-muted flex items-center justify-center min-h-[300px]">
                     <img
                       src={selectedItem.asset.image_url}
                       alt="Generated content"
-                      className="w-full"
+                      className="w-full h-auto object-contain max-h-[70vh]"
                       loading="lazy"
                     />
                     {(selectedItem.staff_pick || selectedItem.featured) && (

@@ -213,11 +213,13 @@ const Gallery = () => {
           {selectedItem && (
             <div className="space-y-4">
               {selectedItem.asset.image_url && (
-                <img
-                  src={selectedItem.asset.image_url}
-                  alt="Generated content"
-                  className="w-full rounded-lg"
-                />
+                <div className="bg-muted rounded-lg flex items-center justify-center min-h-[300px] p-4">
+                  <img
+                    src={selectedItem.asset.image_url}
+                    alt="Generated content"
+                    className="w-full h-auto object-contain max-h-[70vh] rounded-lg"
+                  />
+                </div>
               )}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">

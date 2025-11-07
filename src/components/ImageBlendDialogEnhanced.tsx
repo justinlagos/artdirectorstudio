@@ -321,11 +321,13 @@ Requirements:
                 {images.map((img, index) => (
                   <div key={index} className="flex gap-4 items-start p-4 rounded-lg bg-muted/30">
                     <div className="relative group">
-                      <img 
-                        src={img.preview} 
-                        alt={`Image ${index + 1}`} 
-                        className="w-24 h-24 object-cover rounded-lg"
-                      />
+                      <div className="bg-muted rounded-lg overflow-hidden flex items-center justify-center w-24 h-24 p-1">
+                        <img 
+                          src={img.preview} 
+                          alt={`Image ${index + 1}`} 
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      </div>
                       <Button
                         variant="destructive"
                         size="sm"
@@ -449,11 +451,11 @@ Requirements:
           {blendedImage && (
             <div className="space-y-4 pt-4 border-t">
               <Label>Professional Blend Result</Label>
-              <div className="relative rounded-lg overflow-hidden bg-muted">
+              <div className="relative rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
                 <img 
                   src={blendedImage} 
                   alt="Professional blend" 
-                  className="w-full h-auto"
+                  className="w-full h-auto object-contain max-h-[600px]"
                   onLoad={() => console.log('✅ [BlendPro] Image loaded successfully')}
                   onError={(e) => {
                     console.error('❌ [BlendPro] Image failed to load:', e);

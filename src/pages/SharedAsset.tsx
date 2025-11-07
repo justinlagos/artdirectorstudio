@@ -186,11 +186,11 @@ const SharedAsset = () => {
           {/* Image */}
           {asset.asset.image_url && (
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="p-6 flex items-center justify-center bg-muted min-h-[300px]">
                 <img
                   src={asset.asset.image_url}
                   alt="Shared content"
-                  className="w-full rounded-lg"
+                  className="w-full h-auto object-contain max-h-[70vh] rounded-lg"
                 />
               </CardContent>
             </Card>
