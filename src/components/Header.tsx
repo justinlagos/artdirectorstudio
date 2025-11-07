@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserMenu } from "./UserMenu";
 import { SubscriptionStatus } from "./SubscriptionStatus";
+import { TrialCreditsDisplay } from "./TrialCreditsDisplay";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Menu, Sparkles, Home, BarChart3, Layers, Maximize2, ImageIcon, Coins, Wrench, ChevronDown, Crown } from "lucide-react";
 import { useState } from "react";

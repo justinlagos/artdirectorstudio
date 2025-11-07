@@ -33,113 +33,156 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Handle successful checkout
     if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session;
+      const session = event.data.object;
+      const customerId = session.customer as string;
+      const subscriptionId = session.subscription as string;
       
-      if (session.mode === 'subscription') {
-        const userId = session.metadata?.user_id;
-        const planName = session.metadata?.plan_name;
-        const customerId = session.customer as string;
-        const subscriptionId = session.subscription as string;
-
-        if (!userId) {
-          console.error('No user_id in metadata');
-          return new Response('No user_id', { status: 400 });
-        }
-
-        // Get subscription details
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        const expiresAt = new Date(subscription.current_period_end * 1000).toISOString();
-
-        // Update user profile with subscription
-        const { error } = await supabaseAdmin
-          .from('profiles')
-          .update({
-            is_pro: true,
-            subscription_tier: planName || 'Pro',
-            subscription_expires_at: expiresAt,
-            stripe_customer_id: customerId,
-            stripe_subscription_id: subscriptionId,
-          })
-          .eq('id', userId);
-
-        if (error) {
-          console.error('Error updating profile:', error);
-          return new Response('Database error', { status: 500 });
-        }
-
-        console.log(`Subscription activated for user ${userId}`);
-      }
-    }
-
-    if (event.type === 'customer.subscription.updated') {
-      const subscription = event.data.object as Stripe.Subscription;
-      const customerId = subscription.customer as string;
-
-      // Find user by customer ID
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('stripe_customer_id', customerId)
-        .single();
-
-      if (!profile) {
-        console.error('No profile found for customer:', customerId);
-        return new Response('Profile not found', { status: 404 });
+      // Get subscription details to find the price
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      const priceId = subscription.items.data[0].price.id;
+      const productId = subscription.items.data[0].price.product as string;
+      
+      // Map price IDs to tiers
+      let tier = 'starter';
+      let dailyLimit = 10;
+      
+      if (priceId === 'price_1SQqaNBOqYfTntNB5NF0eqFr' || productId === 'prod_TNbnpk8TQPKkOI') {
+        tier = 'starter';
+        dailyLimit = 10;
+      } else if (priceId === 'price_1SQqbLBOqYfTntNBjhHl91uA' || productId === 'prod_TNboMvg65fjVIr') {
+        tier = 'pro';
+        dailyLimit = 999999; // Unlimited
+      } else if (priceId === 'price_1SQqblBOqYfTntNBDB0wrK6Q' || productId === 'prod_TNbpDSX3jWb5GH') {
+        tier = 'enterprise';
+        dailyLimit = 999999; // Unlimited
       }
 
-      const expiresAt = new Date(subscription.current_period_end * 1000).toISOString();
-      const isActive = subscription.status === 'active';
-
-      // Update subscription status
-      const { error } = await supabaseAdmin
+      // Update user profile
+      const { error: updateError } = await supabaseAdmin
         .from('profiles')
         .update({
-          is_pro: isActive,
-          subscription_expires_at: expiresAt,
+          is_pro: tier !== 'starter',
+          subscription_tier: tier,
+          subscription_expires_at: new Date(subscription.current_period_end * 1000).toISOString(),
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+          daily_limit: dailyLimit,
+          daily_usage: 0,
+          daily_usage_reset_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         })
-        .eq('id', profile.id);
+        .eq('stripe_customer_id', customerId);
 
-      if (error) {
-        console.error('Error updating subscription:', error);
-        return new Response('Database error', { status: 500 });
+      if (updateError) {
+        console.error('Error updating profile:', updateError);
+        throw updateError;
       }
 
-      console.log(`Subscription updated for user ${profile.id}`);
-    }
-
-    if (event.type === 'customer.subscription.deleted') {
-      const subscription = event.data.object as Stripe.Subscription;
-      const customerId = subscription.customer as string;
-
-      // Find user by customer ID
+      // Log billing event
       const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('id')
         .eq('stripe_customer_id', customerId)
         .single();
 
-      if (!profile) {
-        console.error('No profile found for customer:', customerId);
-        return new Response('Profile not found', { status: 404 });
+      if (profile) {
+        await supabaseAdmin.from('billing_events').insert({
+          user_id: profile.id,
+          event_type: 'subscription_charge',
+          amount_cents: subscription.items.data[0].price.unit_amount || 0,
+          currency: subscription.currency,
+          stripe_subscription_id: subscriptionId,
+          stripe_invoice_id: subscription.latest_invoice as string,
+          metadata: { tier, plan: tier },
+          status: 'completed',
+        });
       }
 
+      console.log('Successfully updated profile for subscription:', subscriptionId, 'Tier:', tier);
+    }
+
+    // Handle subscription updates
+    if (event.type === 'customer.subscription.updated') {
+      const subscription = event.data.object;
+      const customerId = subscription.customer as string;
+      const priceId = subscription.items.data[0].price.id;
+      const productId = subscription.items.data[0].price.product as string;
+
+      let tier = 'starter';
+      let dailyLimit = 10;
+      
+      if (priceId === 'price_1SQqaNBOqYfTntNB5NF0eqFr' || productId === 'prod_TNbnpk8TQPKkOI') {
+        tier = 'starter';
+        dailyLimit = 10;
+      } else if (priceId === 'price_1SQqbLBOqYfTntNBjhHl91uA' || productId === 'prod_TNboMvg65fjVIr') {
+        tier = 'pro';
+        dailyLimit = 999999;
+      } else if (priceId === 'price_1SQqblBOqYfTntNBDB0wrK6Q' || productId === 'prod_TNbpDSX3jWb5GH') {
+        tier = 'enterprise';
+        dailyLimit = 999999;
+      }
+
+      // Update subscription expiry date and tier
+      const { error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          subscription_expires_at: new Date(subscription.current_period_end * 1000).toISOString(),
+          is_pro: subscription.status === 'active' && tier !== 'starter',
+          subscription_tier: tier,
+          daily_limit: dailyLimit,
+        })
+        .eq('stripe_customer_id', customerId);
+
+      if (updateError) {
+        console.error('Error updating subscription:', updateError);
+        throw updateError;
+      }
+
+      console.log('Successfully updated subscription for customer:', customerId, 'Tier:', tier);
+    }
+
+    // Handle subscription cancellation
+    if (event.type === 'customer.subscription.deleted') {
+      const subscription = event.data.object;
+      const customerId = subscription.customer as string;
+
+      // Get user profile for billing event
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('stripe_customer_id', customerId)
+        .single();
+
       // Deactivate subscription
-      const { error } = await supabaseAdmin
+      const { error: updateError } = await supabaseAdmin
         .from('profiles')
         .update({
           is_pro: false,
           subscription_tier: 'free',
           subscription_expires_at: null,
+          daily_limit: 10,
+          daily_usage: 0,
         })
-        .eq('id', profile.id);
+        .eq('stripe_customer_id', customerId);
 
-      if (error) {
-        console.error('Error deactivating subscription:', error);
-        return new Response('Database error', { status: 500 });
+      if (updateError) {
+        console.error('Error deactivating subscription:', updateError);
+        throw updateError;
       }
 
-      console.log(`Subscription cancelled for user ${profile.id}`);
+      // Log cancellation event
+      if (profile) {
+        await supabaseAdmin.from('billing_events').insert({
+          user_id: profile.id,
+          event_type: 'subscription_cancel',
+          amount_cents: 0,
+          stripe_subscription_id: subscription.id,
+          status: 'completed',
+        });
+      }
+
+      console.log('Successfully deactivated subscription for customer:', customerId);
     }
 
     return new Response(JSON.stringify({ received: true }), {
