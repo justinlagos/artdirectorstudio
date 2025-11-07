@@ -18,6 +18,12 @@ verify_jwt = true
 [functions.generate-image]
 verify_jwt = true
 
+[functions.edit-image]
+verify_jwt = true
+
+[functions.artie-chat]
+verify_jwt = false
+
 [functions.create-checkout-session]
 verify_jwt = true
 

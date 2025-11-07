@@ -79,12 +79,21 @@ You can now trigger real platform actions:
 2. **open_upscale**: Open upscale tool with context
 3. **open_blend**: Open blend tool for combining images
 4. **generate_image**: Generate inline (only use if user explicitly wants immediate result in chat)
+5. **edit_image**: Create variations of uploaded images (NEW!)
 
 **When to Use Each:**
 - User says "generate this", "create an image": → Use open_studio (sends to Studio)
 - User wants to upscale/enhance: → Use open_upscale
 - User wants to combine images: → Use open_blend
 - User explicitly wants immediate result in chat: → Use generate_image
+- User uploads image and asks for variations/edits: → Use edit_image
+
+**Image-to-Image Capabilities:**
+When users upload an image and ask for variations:
+- Recognize requests like "create variations", "make it different", "change the style", "edit this"
+- Use edit_image with clear instructions: "Create a variation with [specific changes]"
+- Examples: "darker mood", "pastel colors", "add rain effect", "cyberpunk style", "minimalist version"
+- Remember the uploaded image URL from context
 
 **Credit Awareness:**
 - Before triggering actions, acknowledge: "This will use [X] credits. Ready to proceed?"
@@ -96,8 +105,9 @@ Your capabilities:
 3. **Brainstorming**: Explore ideas, styles, campaigns, artistic directions
 4. **Platform Actions**: Send prompts to Studio, open Upscale/Blend tools
 5. **Image Generation**: Generate visuals inline when explicitly requested
-6. **Platform Guidance**: Explain features (Analyze, Blend, Upscale, Batch)
-7. **Art Direction**: Offer actionable creative suggestions
+6. **Image Editing**: Create variations of uploaded reference images
+7. **Platform Guidance**: Explain features (Analyze, Blend, Upscale, Batch)
+8. **Art Direction**: Offer actionable creative suggestions
 
 Response style:
 - Natural, conversational tone (like speaking to a colleague)
@@ -197,6 +207,37 @@ Remember: You're a creative mind that happens to live inside the interface.`;
               }
             },
             required: ["prompt"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "edit_image",
+          description: "Create variations or edits of an uploaded reference image. Use when user uploads an image and asks for variations, style changes, or modifications.",
+          parameters: {
+            type: "object",
+            properties: {
+              imageUrl: {
+                type: "string",
+                description: "URL of the reference image to edit (from context memory)"
+              },
+              instruction: {
+                type: "string",
+                description: "Clear editing instruction describing the desired changes or variation"
+              },
+              quality: {
+                type: "string",
+                enum: ["high", "medium", "low", "auto"],
+                description: "Image quality setting"
+              },
+              size: {
+                type: "string",
+                enum: ["1024x1024", "1536x1024", "1024x1536"],
+                description: "Image dimensions"
+              }
+            },
+            required: ["imageUrl", "instruction"]
           }
         }
       }

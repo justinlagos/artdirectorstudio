@@ -39,6 +39,7 @@ const quickActions: QuickAction[] = [
   { icon: Wand2, label: "Refine my visual brief", prompt: "Can you help refine my visual direction?" },
   { icon: Sparkles, label: "Suggest social post", prompt: "Give me ideas for a compelling social media post" },
   { icon: ImageIcon, label: "Analyze my image", prompt: "Help me analyze and improve my uploaded image" },
+  { icon: ImagePlus, label: "Edit my image", prompt: "Create variations of my uploaded image" },
 ];
 
 export const ArtieChat = () => {
@@ -64,7 +65,7 @@ export const ArtieChat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi! I'm Artie — Your Creative Collaborator.\n\nI can help you brainstorm ideas, refine visual concepts, analyze images, or guide you through any creative challenge. You can also upload images or creative briefs for me to review.\n\nWhat are we working on today?",
+      text: "Hi! I'm Artie — Your Creative Collaborator.\n\nI can help you brainstorm ideas, refine visual concepts, analyze images, or guide you through any creative challenge. You can also upload images or creative briefs for me to review, and I can create variations of your images.\n\nWhat are we working on today?",
       sender: 'artie',
       timestamp: new Date()
     }
@@ -526,6 +527,90 @@ export const ArtieChat = () => {
                   
                   toast({
                     title: "Image generation failed",
+                    description: errorMessage,
+                    variant: "destructive",
+                  });
+                }
+              } else if (toolCall.function.name === 'edit_image') {
+                accumulatedText += '\n\n(Editing image...)';
+                setMessages(prev => 
+                  prev.map(m => 
+                    m.id === assistantMessageId 
+                      ? { ...m, text: accumulatedText }
+                      : m
+                  )
+                );
+
+                try {
+                  console.log('[ARTIE] Editing image with instruction:', args.instruction);
+                  const { data: { session } } = await supabase.auth.getSession();
+                  
+                  if (!session?.access_token) {
+                    throw new Error('No active session');
+                  }
+
+                  const editResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-image`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session.access_token}`,
+                    },
+                    body: JSON.stringify({ 
+                      imageUrl: args.imageUrl,
+                      instruction: args.instruction,
+                      quality: args.quality || 'auto',
+                      size: args.size || '1024x1024'
+                    })
+                  });
+
+                  console.log('[ARTIE] Edit image response status:', editResponse.status);
+                  
+                  if (!editResponse.ok) {
+                    const errorData = await editResponse.json().catch(() => ({ error: 'Failed to edit image' }));
+                    console.error('[ARTIE] Edit image error:', errorData);
+                    throw new Error(errorData.error || `Failed to edit image (${editResponse.status})`);
+                  }
+
+                  const editData = await editResponse.json();
+                  console.log('[ARTIE] Edited image data:', editData);
+                  
+                  if (editData.image) {
+                    accumulatedText = accumulatedText.replace('(Editing image...)', '');
+                    accumulatedText += `\n\n[Edited Image]\n${editData.image}`;
+                    await refetchCredits();
+                    setMessages(prev => 
+                      prev.map(m => 
+                        m.id === assistantMessageId 
+                          ? { 
+                              ...m, 
+                              text: accumulatedText,
+                              attachment: {
+                                type: 'image',
+                                url: editData.image,
+                                name: 'Edited Image'
+                              }
+                            }
+                          : m
+                      )
+                    );
+                  } else {
+                    throw new Error('No image URL in response');
+                  }
+                } catch (editError) {
+                  console.error('[ARTIE] Image editing error:', editError);
+                  const errorMessage = editError instanceof Error ? editError.message : 'Unknown error';
+                  accumulatedText = accumulatedText.replace('(Editing image...)', '');
+                  accumulatedText += `\n\n❌ Failed to edit image: ${errorMessage}`;
+                  setMessages(prev => 
+                    prev.map(m => 
+                      m.id === assistantMessageId 
+                        ? { ...m, text: accumulatedText }
+                        : m
+                    )
+                  );
+                  
+                  toast({
+                    title: "Image editing failed",
                     description: errorMessage,
                     variant: "destructive",
                   });
