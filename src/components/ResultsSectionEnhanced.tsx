@@ -12,9 +12,6 @@ import { ChipSelector } from "@/components/ChipSelector";
 import { InsightChips } from "@/components/InsightChips";
 import { QuickTweaksRow } from "@/components/QuickTweaksRow";
 import { GuidedTweaks } from "@/components/GuidedTweaks";
-import { QuickStylesBar } from "@/components/QuickStylesBar";
-import { LivePromptEvolution } from "@/components/LivePromptEvolution";
-import { ApplyAllButton } from "@/components/ApplyAllButton";
 import { EmptyStatePrompts } from "@/components/EmptyStatePrompts";
 import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,7 +57,6 @@ export const ResultsSection = ({
   const [promptPulse, setPromptPulse] = useState(false);
   const [isApplyingTweak, setIsApplyingTweak] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
-  const [isPromptDrawerOpen, setIsPromptDrawerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   // Detect mobile on mount and resize
@@ -407,16 +403,6 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     onRegenerate(userEdits);
   };
 
-  const handleApplyPreset = (edits: Partial<UserEdits>, presetName: string) => {
-    setUserEdits(prev => ({ ...prev, ...edits }));
-    toast.success(`${presetName} style applied!`);
-  };
-
-  const handleApplyAll = () => {
-    handleRegenerate();
-    toast.success("Changes applied and saved to history!");
-  };
-
   const toggleSection = (key: string) => {
     if (!isMobile) return;
     setExpandedSection(expandedSection === key ? null : key);
@@ -667,32 +653,6 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
           </div>
         </div>
 
-        {/* Quick Styles Bar */}
-        <QuickStylesBar 
-          onApplyPreset={handleApplyPreset} 
-          disabled={isRegenerating || isApplyingTweak}
-        />
-
-        {/* Live Prompt Evolution */}
-        {isMobile ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsPromptDrawerOpen(!isPromptDrawerOpen)}
-            className="w-full"
-          >
-            {isPromptDrawerOpen ? 'Hide' : 'Show'} Live Prompt Preview
-          </Button>
-        ) : null}
-
-        {(!isMobile || isPromptDrawerOpen) && (
-          <LivePromptEvolution 
-            prompt={livePreviewPrompt}
-            previousPrompt={previousPrompt}
-            modifiedCount={modifiedCount}
-          />
-        )}
-
         {/* Empty State */}
         {modifiedCount === 0 && <EmptyStatePrompts />}
         
@@ -754,13 +714,6 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         })}
         </div>
 
-        {/* Apply All Button (sticky on mobile) */}
-        <ApplyAllButton 
-          pendingCount={modifiedCount}
-          onApply={handleApplyAll}
-          isLoading={isRegenerating}
-          className={isMobile ? 'md:relative' : ''}
-        />
       </div>
 
       {/* Generated Images Gallery */}
