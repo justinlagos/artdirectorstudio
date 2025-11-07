@@ -93,82 +93,100 @@ const Inspire = () => {
     fetchInspireItems();
   }, []);
 
-  // Real-time subscription for admin changes
+  // Real-time subscription for inspire updates (admin approvals/changes)
   useEffect(() => {
     const channel = supabase
       .channel('inspire-updates')
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'shared_assets'
         },
         (payload) => {
-          console.log('Real-time update received:', payload);
+          console.log('Real-time inspire update:', payload);
           
-          // Update the specific item in local state
-          setItems(prevItems => 
-            prevItems.map(item => 
-              item.id === payload.new.id 
-                ? { ...item, ...payload.new }
-                : item
-            )
-          );
-          
-          setFilteredItems(prevItems => 
-            prevItems.map(item => 
-              item.id === payload.new.id 
-                ? { ...item, ...payload.new }
-                : item
-            )
-          );
-          
-          // Add visual indicator for updated item
-          setRecentlyUpdatedIds(prev => new Set(prev).add(payload.new.id));
-          setTimeout(() => {
-            setRecentlyUpdatedIds(prev => {
-              const next = new Set(prev);
-              next.delete(payload.new.id);
-              return next;
-            });
-          }, 5000);
-          
-          // Show toast notification for featured/staff pick changes
-          if (payload.new.featured !== payload.old.featured) {
-            toast.info(
-              payload.new.featured 
-                ? "An item was featured" 
-                : "An item was unfeatured",
-              { duration: 3000 }
-            );
+          // Handle INSERT (new approved items)
+          if (payload.eventType === 'INSERT') {
+            const newItem = payload.new as any;
+            if (newItem.is_inspire_approved && !newItem.is_deleted) {
+              fetchInspireItems(); // Refresh to get full item with relations
+              toast.info("New item added to gallery", { duration: 3000 });
+            }
           }
           
-          if (payload.new.staff_pick !== payload.old.staff_pick) {
-            toast.info(
-              payload.new.staff_pick 
-                ? "A new staff pick was added" 
-                : "A staff pick was removed",
-              { duration: 3000 }
-            );
+          // Handle UPDATE (approval/removal changes)
+          if (payload.eventType === 'UPDATE') {
+            const updatedItem = payload.new as any;
+            
+            // Item was approved for Inspire
+            if (updatedItem.is_inspire_approved && !updatedItem.is_deleted) {
+              // Check if this is a change in approval status
+              const wasApproved = payload.old.is_inspire_approved && !payload.old.is_deleted;
+              
+              if (!wasApproved) {
+                // New to Inspire gallery - fetch to get full data with relations
+                fetchInspireItems();
+                toast.info("New item approved for gallery", { duration: 3000 });
+              } else {
+                // Just update metadata (featured, staff_pick, etc.)
+                setItems(prevItems => 
+                  prevItems.map(item => 
+                    item.id === updatedItem.id 
+                      ? { ...item, ...updatedItem }
+                      : item
+                  )
+                );
+                
+                setFilteredItems(prevItems => 
+                  prevItems.map(item => 
+                    item.id === updatedItem.id 
+                      ? { ...item, ...updatedItem }
+                      : item
+                  )
+                );
+                
+                // Show notifications for featured/staff pick changes
+                if (updatedItem.featured !== payload.old.featured) {
+                  toast.info(
+                    updatedItem.featured ? "Item featured" : "Item unfeatured",
+                    { duration: 3000 }
+                  );
+                }
+                
+                if (updatedItem.staff_pick !== payload.old.staff_pick) {
+                  toast.info(
+                    updatedItem.staff_pick ? "New staff pick" : "Staff pick removed",
+                    { duration: 3000 }
+                  );
+                }
+                
+                // Visual indicator for recent updates
+                setRecentlyUpdatedIds(prev => new Set(prev).add(updatedItem.id));
+                setTimeout(() => {
+                  setRecentlyUpdatedIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(updatedItem.id);
+                    return next;
+                  });
+                }, 5000);
+              }
+            } else {
+              // Item was unapproved or deleted - remove from view
+              setItems(prevItems => prevItems.filter(item => item.id !== updatedItem.id));
+              setFilteredItems(prevItems => prevItems.filter(item => item.id !== updatedItem.id));
+              toast.info("Item removed from gallery", { duration: 3000 });
+            }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'shared_assets'
-        },
-        (payload) => {
-          console.log('Real-time delete received:', payload);
           
-          // Remove the item from local state
-          setItems(prevItems => prevItems.filter(item => item.id !== payload.old.id));
-          setFilteredItems(prevItems => prevItems.filter(item => item.id !== payload.old.id));
-          
-          toast.info("An item was removed", { duration: 3000 });
+          // Handle DELETE
+          if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            setItems(prevItems => prevItems.filter(item => item.id !== deletedId));
+            setFilteredItems(prevItems => prevItems.filter(item => item.id !== deletedId));
+            toast.info("Item removed from gallery", { duration: 3000 });
+          }
         }
       )
       .subscribe();
@@ -225,7 +243,8 @@ const Inspire = () => {
       const from = (pageNum - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
       
-      const { data, error, count } = await supabase
+      // @ts-ignore - Complex Supabase query types cause TS depth issues
+      const response = await supabase
         .from("shared_assets")
         .select(`
           id,
@@ -251,14 +270,15 @@ const Inspire = () => {
             username
           )
         `, { count: 'exact' })
-        .eq("is_public", true)
+        .eq("is_inspire_approved", true)
+        .eq("is_deleted", false)
         .order("created_at", { ascending: false })
         .range(from, to);
 
-      if (error) throw error;
+      if (response.error) throw response.error;
 
-      // Filter out items with null assets
-      let validItems = (data as unknown as InspireItem[]).filter(item => item.asset !== null);
+      // Filter out items with null assets and cast to InspireItem type
+      let validItems = ((response.data || []) as any[]).filter((item: any) => item.asset !== null) as InspireItem[];
 
       // If user is logged in, fetch their social interactions
       if (user) {
@@ -288,7 +308,7 @@ const Inspire = () => {
         setFilteredItems(validItems);
       }
       
-      setHasMore(validItems.length === ITEMS_PER_PAGE && (count ? from + ITEMS_PER_PAGE < count : true));
+      setHasMore(validItems.length === ITEMS_PER_PAGE && (response.count ? from + ITEMS_PER_PAGE < response.count : true));
     } catch (error) {
       console.error("Error fetching inspire items:", error);
       toast.error("Failed to load inspire gallery");

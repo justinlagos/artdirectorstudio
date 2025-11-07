@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -124,6 +125,41 @@ const SharedAsset = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <Helmet>
+        <title>{asset.asset.prompt ? `${asset.asset.prompt.split(' ').slice(0, 12).join(' ')}...` : 'Shared Asset'} | ArtDirector Studio</title>
+        <meta name="description" content="Created on ArtDirector Studio." />
+        
+        {/* OpenGraph Tags */}
+        <meta property="og:title" content={asset.asset.prompt ? `${asset.asset.prompt.split(' ').slice(0, 12).join(' ')}...` : 'Shared Asset'} />
+        <meta property="og:description" content="Created on ArtDirector Studio." />
+        {asset.asset.image_url && <meta property="og:image" content={asset.asset.image_url} />}
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content={window.location.href} />
+        
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={asset.asset.prompt ? `${asset.asset.prompt.split(' ').slice(0, 12).join(' ')}...` : 'Shared Asset'} />
+        <meta name="twitter:description" content="Created on ArtDirector Studio." />
+        {asset.asset.image_url && <meta name="twitter:image" content={asset.asset.image_url} />}
+        
+        {/* JSON-LD Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CreativeWork",
+            "name": asset.asset.prompt || 'AI Generated Art',
+            "description": "Created on ArtDirector Studio.",
+            "image": asset.asset.image_url,
+            "creator": {
+              "@type": "Organization",
+              "name": "ArtDirector Studio"
+            },
+            "dateCreated": asset.asset.created_at,
+            "url": window.location.href
+          })}
+        </script>
+      </Helmet>
+      
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto space-y-6">
