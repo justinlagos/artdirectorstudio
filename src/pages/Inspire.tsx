@@ -92,6 +92,81 @@ const Inspire = () => {
     fetchInspireItems();
   }, []);
 
+  // Real-time subscription for admin changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('inspire-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'shared_assets'
+        },
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          
+          // Update the specific item in local state
+          setItems(prevItems => 
+            prevItems.map(item => 
+              item.id === payload.new.id 
+                ? { ...item, ...payload.new }
+                : item
+            )
+          );
+          
+          setFilteredItems(prevItems => 
+            prevItems.map(item => 
+              item.id === payload.new.id 
+                ? { ...item, ...payload.new }
+                : item
+            )
+          );
+          
+          // Show toast notification for featured/staff pick changes
+          if (payload.new.featured !== payload.old.featured) {
+            toast.info(
+              payload.new.featured 
+                ? "An item was featured" 
+                : "An item was unfeatured",
+              { duration: 3000 }
+            );
+          }
+          
+          if (payload.new.staff_pick !== payload.old.staff_pick) {
+            toast.info(
+              payload.new.staff_pick 
+                ? "A new staff pick was added" 
+                : "A staff pick was removed",
+              { duration: 3000 }
+            );
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'shared_assets'
+        },
+        (payload) => {
+          console.log('Real-time delete received:', payload);
+          
+          // Remove the item from local state
+          setItems(prevItems => prevItems.filter(item => item.id !== payload.old.id));
+          setFilteredItems(prevItems => prevItems.filter(item => item.id !== payload.old.id));
+          
+          toast.info("An item was removed", { duration: 3000 });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
     applyFilters();
   }, [searchQuery, styleFilter, colorFilter, moodFilter, compositionFilter, items]);
