@@ -152,6 +152,48 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_events: {
+        Row: {
+          amount_cents: number | null
+          created_at: string | null
+          currency: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          status: string | null
+          stripe_invoice_id: string | null
+          stripe_payment_intent: string | null
+          stripe_subscription_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          created_at?: string | null
+          currency?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          status?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_intent?: string | null
+          stripe_subscription_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number | null
+          created_at?: string | null
+          currency?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          status?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_intent?: string | null
+          stripe_subscription_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_transactions: {
         Row: {
           action: Database["public"]["Enums"]["credit_action"]
@@ -378,7 +420,11 @@ export type Database = {
         Row: {
           bio: string | null
           created_at: string
+          daily_limit: number | null
+          daily_usage: number | null
+          daily_usage_reset_at: string | null
           email: string
+          free_credits: number | null
           has_seen_onboarding: boolean
           id: string
           is_pro: boolean | null
@@ -392,7 +438,11 @@ export type Database = {
         Insert: {
           bio?: string | null
           created_at?: string
+          daily_limit?: number | null
+          daily_usage?: number | null
+          daily_usage_reset_at?: string | null
           email: string
+          free_credits?: number | null
           has_seen_onboarding?: boolean
           id: string
           is_pro?: boolean | null
@@ -406,7 +456,11 @@ export type Database = {
         Update: {
           bio?: string | null
           created_at?: string
+          daily_limit?: number | null
+          daily_usage?: number | null
+          daily_usage_reset_at?: string | null
           email?: string
+          free_credits?: number | null
           has_seen_onboarding?: boolean
           id?: string
           is_pro?: boolean | null
@@ -620,6 +674,7 @@ export type Database = {
         Args: { share_token_param: string }
         Returns: undefined
       }
+      reset_daily_usage: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
