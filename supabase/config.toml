@@ -3,6 +3,9 @@ project_id = "vsbjxktlrbfxfhxiqzlr"
 [functions.analyze-image]
 verify_jwt = true
 
+[functions.check-renewal-reminders]
+verify_jwt = false
+
 [functions.regenerate-prompt]
 verify_jwt = true
 
