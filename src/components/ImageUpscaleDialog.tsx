@@ -3,10 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Maximize2, Upload } from "lucide-react";
+import { Download, Maximize2, Upload, Sparkles, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -19,11 +20,14 @@ interface SourceImage {
 }
 
 export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogProps) => {
+  const navigate = useNavigate();
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
+  const [upscaledAssetId, setUpscaledAssetId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -92,6 +96,10 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
       if (data?.image) {
         setUpscaledImage(data.image);
+        
+        // Auto-save to My Projects
+        await saveToMyProjects(data.image, targetSize);
+        
         toast.success("Image upscaled successfully!");
       }
     } catch (error) {
@@ -101,6 +109,59 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     } finally {
       setIsUpscaling(false);
       setTimeout(() => setProgress(0), 1000);
+    }
+  };
+
+  const saveToMyProjects = async (imageDataUrl: string, size: string) => {
+    try {
+      setIsSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Convert base64 to blob
+      const response = await fetch(imageDataUrl);
+      const blob = await response.blob();
+      
+      // Upload to storage
+      const fileName = `${user.id}/upscaled-${Date.now()}.png`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('generated-images')
+        .upload(fileName, blob, {
+          contentType: 'image/png',
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('generated-images')
+        .getPublicUrl(fileName);
+
+      // Save metadata to database
+      const { data: assetData, error: dbError } = await supabase
+        .from('generated_assets')
+        .insert({
+          user_id: user.id,
+          type: 'image',
+          image_url: publicUrl,
+          prompt: `Upscaled to ${size}`,
+          quality: size === '2048x2048' ? 'ultra' : 'high',
+          size: size
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+      
+      if (assetData) {
+        setUpscaledAssetId(assetData.id);
+      }
+    } catch (error) {
+      console.error('Error saving to My Projects:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -117,6 +178,18 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     toast.success("Image downloaded!");
   };
 
+  const handleViewInStudio = () => {
+    if (!upscaledAssetId) {
+      toast.error("Asset not saved yet. Please try again.");
+      return;
+    }
+    navigate('/');
+    setTimeout(() => {
+      document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+    handleClose();
+  };
+
   const handleClose = () => {
     // Clean up object URL to prevent memory leaks
     if (sourceImage) {
@@ -124,8 +197,10 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     }
     setSourceImage(null);
     setUpscaledImage(null);
+    setUpscaledAssetId(null);
     setTargetSize('1536x1536');
     setProgress(0);
+    setIsSaving(false);
     onOpenChange(false);
   };
 
@@ -215,44 +290,79 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
           {/* Upscaled Image Result */}
           {upscaledImage && (
-            <div className="space-y-4 pt-4 border-t">
+            <div className="space-y-4 pt-4 border-t animate-fade-in">
+              <div className="flex items-center justify-between">
+                <Label className="text-lg font-semibold">Done — image upscaled successfully</Label>
+                {isSaving && <span className="text-xs text-muted-foreground">Saving...</span>}
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Original</Label>
+                  <Label className="text-sm text-muted-foreground">Original</Label>
                   <img 
                     src={sourceImage!.preview} 
                     alt="Original" 
-                    className="w-full h-auto rounded-lg"
+                    className="w-full h-auto rounded-lg border"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Upscaled ({targetSize})</Label>
-                  <img 
-                    src={upscaledImage} 
-                    alt="Upscaled" 
-                    className="w-full h-auto rounded-lg"
-                  />
+                  <Label className="text-sm text-muted-foreground">Upscaled ({targetSize})</Label>
+                  <div className="relative">
+                    <img 
+                      src={upscaledImage} 
+                      alt="Upscaled" 
+                      className="w-full h-auto rounded-lg ring-2 ring-primary/20 animate-scale-in"
+                    />
+                    <div className="absolute top-2 right-2">
+                      <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Enhanced
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={handleViewInStudio}
+                  className="flex-1"
+                  disabled={!upscaledAssetId}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  View in Studio
+                </Button>
                 <Button
                   onClick={handleDownload}
                   className="flex-1"
                   variant="secondary"
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Download Upscaled
+                  Download
                 </Button>
+              </div>
+              
+              <Button
+                onClick={() => {
+                  setUpscaledImage(null);
+                  setUpscaledAssetId(null);
+                  setSourceImage(null);
+                }}
+                className="w-full"
+                variant="outline"
+              >
+                <Maximize2 className="w-4 h-4 mr-2" />
+                Upscale New Image
+              </Button>
+              
+              <div className="text-center">
                 <Button
-                  onClick={() => {
-                    setUpscaledImage(null);
-                    setSourceImage(null);
-                  }}
-                  className="flex-1"
+                  onClick={() => navigate('/history')}
+                  variant="link"
+                  className="text-sm"
                 >
-                  <Maximize2 className="w-4 h-4 mr-2" />
-                  Upscale New Image
+                  <FolderOpen className="w-4 h-4 mr-1" />
+                  View all in My Projects
                 </Button>
               </div>
             </div>

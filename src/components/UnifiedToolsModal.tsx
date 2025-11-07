@@ -336,7 +336,6 @@ export const UnifiedToolsModal = () => {
               <SelectContent className="bg-background z-[100]">
                 <SelectItem value="analyze">Analyze All</SelectItem>
                 <SelectItem value="upscale">Upscale All</SelectItem>
-                <SelectItem value="format">Convert Format</SelectItem>
               </SelectContent>
             </Select>
           </div>

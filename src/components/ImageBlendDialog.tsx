@@ -3,10 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Download, Blend, X, Upload } from "lucide-react";
+import { Download, Blend, X, Upload, Sparkles, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -19,11 +20,14 @@ interface ImageFile {
 }
 
 export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) => {
+  const navigate = useNavigate();
   const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("Blend these images seamlessly together");
   const [isBlending, setIsBlending] = useState(false);
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
+  const [blendedAssetId, setBlendedAssetId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -107,6 +111,10 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
       if (data?.image) {
         setBlendedImage(data.image);
+        
+        // Auto-save to My Projects
+        await saveToMyProjects(data.image, instruction);
+        
         toast.success("Images blended successfully!");
       }
     } catch (error) {
@@ -116,6 +124,60 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     } finally {
       setIsBlending(false);
       setTimeout(() => setProgress(0), 1000);
+    }
+  };
+
+  const saveToMyProjects = async (imageDataUrl: string, prompt: string) => {
+    try {
+      setIsSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Convert base64 to blob
+      const response = await fetch(imageDataUrl);
+      const blob = await response.blob();
+      
+      // Upload to storage
+      const fileName = `${user.id}/blended-${Date.now()}.png`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('generated-images')
+        .upload(fileName, blob, {
+          contentType: 'image/png',
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('generated-images')
+        .getPublicUrl(fileName);
+
+      // Save metadata to database
+      const { data: assetData, error: dbError } = await supabase
+        .from('generated_assets')
+        .insert({
+          user_id: user.id,
+          type: 'image',
+          image_url: publicUrl,
+          prompt: prompt,
+          quality: 'standard',
+          size: '1536x1536'
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+      
+      if (assetData) {
+        setBlendedAssetId(assetData.id);
+      }
+    } catch (error) {
+      console.error('Error saving to My Projects:', error);
+      // Don't show error to user, as blend was successful
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -132,13 +194,27 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     toast.success("Image downloaded!");
   };
 
+  const handleViewInStudio = () => {
+    if (!blendedAssetId) {
+      toast.error("Asset not saved yet. Please try again.");
+      return;
+    }
+    navigate('/');
+    setTimeout(() => {
+      document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+    handleClose();
+  };
+
   const handleClose = () => {
     // Clean up object URLs to prevent memory leaks
     images.forEach(img => URL.revokeObjectURL(img.preview));
     setImages([]);
     setBlendedImage(null);
+    setBlendedAssetId(null);
     setInstruction("Blend these images seamlessly together");
     setProgress(0);
+    setIsSaving(false);
     onOpenChange(false);
   };
 
@@ -231,17 +307,35 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
           {/* Blended Image Result */}
           {blendedImage && (
-            <div className="space-y-4 pt-4 border-t">
-              <Label>Blended Result</Label>
-              <div className="relative rounded-lg overflow-hidden bg-muted">
+            <div className="space-y-4 pt-4 border-t animate-fade-in">
+              <div className="flex items-center justify-between">
+                <Label className="text-lg font-semibold">Done — images blended successfully</Label>
+                {isSaving && <span className="text-xs text-muted-foreground">Saving...</span>}
+              </div>
+              
+              <div className="relative rounded-lg overflow-hidden bg-muted ring-2 ring-primary/20 animate-scale-in">
                 <img 
                   src={blendedImage} 
                   alt="Blended image" 
                   className="w-full h-auto"
                 />
+                <div className="absolute top-2 right-2">
+                  <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    Completed
+                  </div>
+                </div>
               </div>
               
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={handleViewInStudio}
+                  className="flex-1"
+                  disabled={!blendedAssetId}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  View in Studio
+                </Button>
                 <Button
                   onClick={handleDownload}
                   className="flex-1"
@@ -250,15 +344,29 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                   <Download className="w-4 h-4 mr-2" />
                   Download
                 </Button>
+              </div>
+              
+              <Button
+                onClick={() => {
+                  setBlendedImage(null);
+                  setBlendedAssetId(null);
+                  setImages([]);
+                }}
+                className="w-full"
+                variant="outline"
+              >
+                <Blend className="w-4 h-4 mr-2" />
+                Blend New Images
+              </Button>
+              
+              <div className="text-center">
                 <Button
-                  onClick={() => {
-                    setBlendedImage(null);
-                    setImages([]);
-                  }}
-                  className="flex-1"
+                  onClick={() => navigate('/history')}
+                  variant="link"
+                  className="text-sm"
                 >
-                  <Blend className="w-4 h-4 mr-2" />
-                  Blend New Images
+                  <FolderOpen className="w-4 h-4 mr-1" />
+                  View all in My Projects
                 </Button>
               </div>
             </div>

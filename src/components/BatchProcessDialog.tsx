@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Download, Layers, Upload, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Download, Layers, Upload, X, CheckCircle2, AlertCircle, Sparkles, FolderOpen, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useNavigate } from "react-router-dom";
 
 interface BatchProcessDialogProps {
   open: boolean;
@@ -23,9 +24,11 @@ interface BatchImage {
 }
 
 export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogProps) => {
+  const navigate = useNavigate();
   const [images, setImages] = useState<BatchImage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentProgress, setCurrentProgress] = useState(0);
+  const [processingStep, setProcessingStep] = useState("");
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -85,6 +88,8 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
         
+        setProcessingStep(`Processing ${i + 1} of ${totalImages}…`);
+        
         setImages(prev => 
           prev.map(img => 
             img.id === image.id ? { ...img, status: 'processing' as const } : img
@@ -109,6 +114,9 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
           });
 
           if (error) throw error;
+
+          // Save to My Projects
+          await saveAnalysisToMyProjects(base64, data.full_regeneration_prompt, image.file.name);
 
           setImages(prev =>
             prev.map(img =>
@@ -140,10 +148,150 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
       }
 
       const successCount = images.filter(img => img.status === 'completed').length;
-      toast.success(`Batch processing complete! ${successCount}/${totalImages} images analyzed`);
+      const failedCount = images.filter(img => img.status === 'error').length;
+      
+      if (failedCount > 0) {
+        toast.success(`${successCount} of ${totalImages} completed successfully`);
+      } else {
+        toast.success(`Done — all ${totalImages} images processed successfully`);
+      }
+      
+      setProcessingStep("");
     } catch (error) {
       console.error("Batch process error:", error);
       toast.error("Batch processing failed. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const saveAnalysisToMyProjects = async (imageBase64: string, prompt: string, fileName: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Convert base64 to blob
+      const response = await fetch(imageBase64);
+      const blob = await response.blob();
+      
+      // Upload to storage
+      const storageFileName = `${user.id}/analyzed-${Date.now()}-${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('generated-images')
+        .upload(storageFileName, blob, {
+          contentType: 'image/png',
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('generated-images')
+        .getPublicUrl(storageFileName);
+
+      // Save metadata
+      await supabase
+        .from('generated_assets')
+        .insert({
+          user_id: user.id,
+          type: 'analysis',
+          image_url: publicUrl,
+          prompt: prompt,
+          quality: 'standard',
+          size: 'original'
+        });
+    } catch (error) {
+      console.error('Error saving analysis:', error);
+    }
+  };
+
+  const handleRetryFailed = async () => {
+    const failedImages = images.filter(img => img.status === 'error');
+    
+    if (failedImages.length === 0) return;
+
+    // Reset failed images to pending
+    setImages(prev =>
+      prev.map(img =>
+        img.status === 'error' ? { ...img, status: 'pending' as const, error: undefined } : img
+      )
+    );
+
+    // Process only failed images
+    setIsProcessing(true);
+    setCurrentProgress(0);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to continue.");
+        setIsProcessing(false);
+        return;
+      }
+
+      for (let i = 0; i < failedImages.length; i++) {
+        const image = failedImages[i];
+        
+        setProcessingStep(`Retrying ${i + 1} of ${failedImages.length}…`);
+        
+        setImages(prev =>
+          prev.map(img =>
+            img.id === image.id ? { ...img, status: 'processing' as const } : img
+          )
+        );
+
+        try {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(image.file);
+          });
+
+          const { data, error } = await supabase.functions.invoke("analyze-image", {
+            body: { image: base64 },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+
+          if (error) throw error;
+
+          await saveAnalysisToMyProjects(base64, data.full_regeneration_prompt, image.file.name);
+
+          setImages(prev =>
+            prev.map(img =>
+              img.id === image.id
+                ? { ...img, status: 'completed' as const, result: data.full_regeneration_prompt }
+                : img
+            )
+          );
+
+          setCurrentProgress(((i + 1) / failedImages.length) * 100);
+        } catch (error) {
+          console.error(`Error processing image ${image.file.name}:`, error);
+          setImages(prev =>
+            prev.map(img =>
+              img.id === image.id
+                ? { ...img, status: 'error' as const, error: 'This didn\'t complete. Try again.' }
+                : img
+            )
+          );
+        }
+
+        if (i < failedImages.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      const successCount = images.filter(img => img.status === 'completed').length;
+      toast.success(`Retry complete! ${successCount} total images processed`);
+      setProcessingStep("");
+    } catch (error) {
+      console.error("Retry error:", error);
+      toast.error("Retry failed. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -238,7 +386,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
             <div className="space-y-2">
               <Progress value={currentProgress} className="w-full" />
               <p className="text-sm text-muted-foreground text-center">
-                Processing images... {Math.round(currentProgress)}%
+                {processingStep || `Processing images... ${Math.round(currentProgress)}%`}
               </p>
             </div>
           )}
@@ -250,7 +398,11 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
                 {images.map((img) => (
                   <div 
                     key={img.id}
-                    className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg"
+                    className={`flex items-center gap-3 p-3 bg-card border rounded-lg transition-all ${
+                      img.status === 'completed' ? 'border-green-500/50 bg-green-50/10' :
+                      img.status === 'error' ? 'border-red-500/50 bg-red-50/10' :
+                      'border-border'
+                    }`}
                   >
                     <img 
                       src={img.preview} 
@@ -262,6 +414,9 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
                       <p className="text-xs text-muted-foreground">
                         {(img.file.size / 1024).toFixed(1)} KB
                       </p>
+                      {img.status === 'error' && img.error && (
+                        <p className="text-xs text-red-500 mt-1">{img.error}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {getStatusIcon(img.status)}
@@ -282,26 +437,52 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
-            {images.some(img => img.status === 'completed') && (
+          <div className="space-y-2">
+            {images.some(img => img.status === 'completed' || img.status === 'error') && (
+              <div className="flex gap-2">
+                {images.some(img => img.status === 'completed') && (
+                  <>
+                    <Button
+                      onClick={handleDownloadAll}
+                      variant="secondary"
+                      className="flex-1"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Results
+                    </Button>
+                    <Button
+                      onClick={() => navigate('/history')}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <FolderOpen className="w-4 h-4 mr-2" />
+                      My Projects
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {images.some(img => img.status === 'error') && !isProcessing && (
               <Button
-                onClick={handleDownloadAll}
-                variant="secondary"
-                className="flex-1"
+                onClick={handleRetryFailed}
+                variant="destructive"
+                className="w-full"
               >
-                <Download className="w-4 h-4 mr-2" />
-                Download All Results
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry Failed Only
               </Button>
             )}
+            
             {images.length > 0 && images.every(img => img.status === 'pending') && (
               <Button
                 onClick={handleBatchProcess}
                 disabled={isProcessing}
-                className="flex-1"
+                className="w-full"
                 size="lg"
               >
                 <Layers className="w-4 h-4 mr-2" />
-                {isProcessing ? "Processing..." : `Process ${images.length} Images`}
+                {isProcessing ? "Processing..." : `Analyze ${images.length} Images`}
               </Button>
             )}
           </div>
