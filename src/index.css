@@ -9,10 +9,23 @@
   }
 }
 
-/* Prevent iOS bounce on body */
+/* Optimize mobile scrolling */
 @layer base {
-  html, body {
-    overscroll-behavior-y: none;
+  html {
+    height: 100%;
+    overflow-y: auto;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y pinch-zoom;
+  }
+  
+  /* Improve scroll momentum on mobile */
+  * {
     -webkit-overflow-scrolling: touch;
   }
 }
@@ -156,9 +169,11 @@ All colors MUST be HSL.
     @apply leading-relaxed;
   }
 
-  /* Smooth scrolling with reduced motion support */
-  html {
-    scroll-behavior: smooth;
+  /* Smooth scrolling with reduced motion support - disabled on mobile for better performance */
+  @media (min-width: 768px) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
