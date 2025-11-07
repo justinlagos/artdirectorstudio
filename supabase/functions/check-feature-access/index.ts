@@ -121,12 +121,38 @@ serve(async (req) => {
         .update({ daily_usage: profile.daily_usage + 1 })
         .eq('id', user.id);
 
+      const newUsage = profile.daily_usage + 1;
+
+      // Check if user just hit their daily limit and send notification
+      if (newUsage >= profile.daily_limit) {
+        const resetTime = profile.daily_usage_reset_at 
+          ? new Date(profile.daily_usage_reset_at).toLocaleTimeString()
+          : "midnight";
+        
+        // Send notification email asynchronously
+        fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-notification-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({
+            type: "daily_limit_reached",
+            userId: user.id,
+            data: { 
+              dailyLimit: profile.daily_limit,
+              resetTime,
+            },
+          }),
+        }).catch(err => console.error("Failed to send daily limit notification:", err));
+      }
+
       return new Response(
         JSON.stringify({
           allowed: true,
           tier: 'starter',
-          reason: `${profile.daily_limit - profile.daily_usage - 1} remaining today`,
-          remaining: profile.daily_limit - profile.daily_usage - 1,
+          reason: `${profile.daily_limit - newUsage} remaining today`,
+          remaining: profile.daily_limit - newUsage,
           deducted: 1
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -135,17 +161,36 @@ serve(async (req) => {
 
     // Free tier: Use trial credits
     if (profile.free_credits > 0) {
+      const newBalance = profile.free_credits - 1;
+      
       await supabaseClient
         .from('profiles')
-        .update({ free_credits: profile.free_credits - 1 })
+        .update({ free_credits: newBalance })
         .eq('id', user.id);
+
+      // Check if trial credits are low (3 or less) and send notification
+      if (newBalance <= 3 && newBalance > 0) {
+        // Send notification email asynchronously
+        fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-notification-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({
+            type: "trial_credits_low",
+            userId: user.id,
+            data: { creditsRemaining: newBalance },
+          }),
+        }).catch(err => console.error("Failed to send low credits notification:", err));
+      }
 
       return new Response(
         JSON.stringify({
           allowed: true,
           tier: 'free',
-          reason: `${profile.free_credits - 1} free credits remaining`,
-          remaining: profile.free_credits - 1,
+          reason: `${newBalance} free credits remaining`,
+          remaining: newBalance,
           deducted: 1
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
