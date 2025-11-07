@@ -644,17 +644,17 @@ export const ArtieChat = () => {
 
   // Persistent floating icon (always visible)
   const FloatingIcon = () => (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-6 right-4 md:bottom-8 md:right-6 z-40 pointer-events-auto">
       {/* Contextual prompt bubble */}
       {showPrompt && contextualPrompt && (
         <div 
-          className="absolute bottom-full right-0 mb-3 animate-slide-up"
+          className="absolute bottom-full right-0 mb-3 animate-slide-up pointer-events-auto"
           onClick={() => {
             setIsOpen(true);
             setShowPrompt(false);
           }}
         >
-          <div className="bg-card border border-border rounded-xl px-4 py-3 shadow-lg max-w-[280px] cursor-pointer hover:shadow-xl transition-shadow">
+          <div className="bg-card border border-border rounded-xl px-4 py-3 shadow-lg max-w-[240px] md:max-w-[280px] cursor-pointer hover:shadow-xl transition-shadow">
             <p className="text-sm font-medium">{contextualPrompt}</p>
             <div className="absolute bottom-0 right-6 transform translate-y-1/2 rotate-45 w-3 h-3 bg-card border-r border-b border-border" />
           </div>
@@ -662,12 +662,13 @@ export const ArtieChat = () => {
       )}
 
       {/* Animated Artie icon */}
-      <Tooltip open={!hasSeenTooltip && !isOpen}>
+      <Tooltip open={!hasSeenTooltip && !isOpen} delayDuration={300}>
         <TooltipTrigger asChild>
           <button
             onClick={() => setIsOpen(true)}
+            aria-label="Open Artie AI Assistant"
             className={cn(
-              "relative h-16 w-16 rounded-full shadow-strong transition-all duration-300",
+              "relative h-14 w-14 md:h-16 md:w-16 rounded-full shadow-strong transition-all duration-300",
               "bg-gradient-to-br from-primary to-primary/80",
               "hover:scale-110 hover:shadow-2xl",
               "flex items-center justify-center group",
@@ -679,14 +680,14 @@ export const ArtieChat = () => {
             
             {/* Icon with subtle animation */}
             <div className="relative">
-              <Sparkles className="h-7 w-7 text-primary-foreground transition-transform group-hover:rotate-12" />
+              <Sparkles className="h-6 w-6 md:h-7 md:w-7 text-primary-foreground transition-transform group-hover:rotate-12" />
             </div>
 
             {/* Breathing indicator */}
-            <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-green-500 border-2 border-background animate-pulse" />
+            <div className="absolute -top-1 -right-1 h-3 w-3 md:h-4 md:w-4 rounded-full bg-green-500 border-2 border-background animate-pulse" />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="left" className="text-sm max-w-[200px]">
+        <TooltipContent side="left" className="text-sm max-w-[180px] md:max-w-[200px] mr-2" sideOffset={8}>
           <p className="font-medium">Need creative help? Try Artie.</p>
         </TooltipContent>
       </Tooltip>
