@@ -317,4 +317,19 @@ All colors MUST be HSL.
   .page-enter {
     animation: fade-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  /* Content visibility for performance */
+  .content-visibility-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 500px;
+  }
+
+  /* Will-change optimization hints */
+  .will-change-transform {
+    will-change: transform;
+  }
+
+  .will-change-opacity {
+    will-change: opacity;
+  }
 }

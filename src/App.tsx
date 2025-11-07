@@ -2,36 +2,42 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { lazy, Suspense } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToolsModalProvider } from "@/contexts/ToolsModalContext";
 import { UnifiedToolsModal } from "@/components/UnifiedToolsModal";
+import { LoadingState } from "@/components/LoadingState";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import History from "./pages/History";
-import Admin from "./pages/Admin";
-import Inspire from "./pages/Inspire";
-import Analytics from "./pages/Analytics";
-import Insights from "./pages/Insights";
-import Settings from "./pages/Settings";
-import Contact from "./pages/Contact";
-import Help from "./pages/Help";
-import Terms from "./pages/Terms";
-import Privacy from "./pages/Privacy";
-import Cookies from "./pages/Cookies";
-import SharedAsset from "./pages/SharedAsset";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentCancelled from "./pages/PaymentCancelled";
-import SubscriptionSuccess from "./pages/SubscriptionSuccess";
-import Subscriptions from "./pages/Subscriptions";
-import SubscriptionHistory from "./pages/SubscriptionHistory";
-import BillingHistory from "./pages/BillingHistory";
-import SignedOut from "./pages/SignedOut";
-import NotFound from "./pages/NotFound";
-import { ArtieChat } from "./components/ArtieChat";
-import { TrialWelcomeToast } from "./components/TrialWelcomeToast";
+
+// Lazy load non-critical routes
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const History = lazy(() => import("./pages/History"));
+const Admin = lazy(() => import("./pages/Admin"));
+const Inspire = lazy(() => import("./pages/Inspire"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const Insights = lazy(() => import("./pages/Insights"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Help = lazy(() => import("./pages/Help"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Cookies = lazy(() => import("./pages/Cookies"));
+const SharedAsset = lazy(() => import("./pages/SharedAsset"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const PaymentCancelled = lazy(() => import("./pages/PaymentCancelled"));
+const SubscriptionSuccess = lazy(() => import("./pages/SubscriptionSuccess"));
+const Subscriptions = lazy(() => import("./pages/Subscriptions"));
+const SubscriptionHistory = lazy(() => import("./pages/SubscriptionHistory"));
+const BillingHistory = lazy(() => import("./pages/BillingHistory"));
+const SignedOut = lazy(() => import("./pages/SignedOut"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Lazy load heavy components
+const ArtieChat = lazy(() => import("./components/ArtieChat").then(m => ({ default: m.ArtieChat })));
+const TrialWelcomeToast = lazy(() => import("./components/TrialWelcomeToast").then(m => ({ default: m.TrialWelcomeToast })));
 
 const queryClient = new QueryClient();
 
@@ -44,38 +50,42 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <ToolsModalProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<Index />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/inspire" element={<Inspire />} />
-              <Route path="/gallery" element={<Inspire />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/insights" element={<Insights />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/help" element={<Help />} />
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/cookies" element={<Cookies />} />
-              <Route path="/shared/:token" element={<SharedAsset />} />
-              <Route path="/share/:slug" element={<SharedAsset />} />
-              <Route path="/payment-success" element={<PaymentSuccess />} />
-              <Route path="/payment-cancelled" element={<PaymentCancelled />} />
-              <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-              <Route path="/subscriptions" element={<Subscriptions />} />
-              <Route path="/plans" element={<Subscriptions />} />
-              <Route path="/subscription-history" element={<SubscriptionHistory />} />
-          <Route path="/billing-history" element={<BillingHistory />} />
-              <Route path="/signed-out" element={<SignedOut />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense fallback={<LoadingState />}>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/" element={<Index />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/inspire" element={<Inspire />} />
+                <Route path="/gallery" element={<Inspire />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/insights" element={<Insights />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/help" element={<Help />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/cookies" element={<Cookies />} />
+                <Route path="/shared/:token" element={<SharedAsset />} />
+                <Route path="/share/:slug" element={<SharedAsset />} />
+                <Route path="/payment-success" element={<PaymentSuccess />} />
+                <Route path="/payment-cancelled" element={<PaymentCancelled />} />
+                <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+                <Route path="/subscriptions" element={<Subscriptions />} />
+                <Route path="/plans" element={<Subscriptions />} />
+                <Route path="/subscription-history" element={<SubscriptionHistory />} />
+                <Route path="/billing-history" element={<BillingHistory />} />
+                <Route path="/signed-out" element={<SignedOut />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
             <UnifiedToolsModal />
-            <ArtieChat />
-            <TrialWelcomeToast />
+            <Suspense fallback={null}>
+              <ArtieChat />
+              <TrialWelcomeToast />
+            </Suspense>
             </ToolsModalProvider>
           </AuthProvider>
         </BrowserRouter>

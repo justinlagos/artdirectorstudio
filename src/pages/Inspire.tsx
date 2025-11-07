@@ -478,22 +478,24 @@ const Inspire = () => {
           <Card className="glass p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="lg:col-span-1">
-                <label className="text-sm font-medium mb-2 block">Search</label>
+                <label htmlFor="inspire-search" className="text-sm font-medium mb-2 block">Search</label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <Input
+                    id="inspire-search"
                     placeholder="portraits + golden hour"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
+                    aria-label="Search inspiration gallery"
                   />
                 </div>
               </div>
               
               <div>
-                <label className="text-sm font-medium mb-2 block">Style</label>
+                <label htmlFor="style-filter" className="text-sm font-medium mb-2 block">Style</label>
                 <Select value={styleFilter} onValueChange={setStyleFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger id="style-filter" aria-label="Filter by style">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -508,9 +510,9 @@ const Inspire = () => {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Color</label>
+                <label htmlFor="color-filter" className="text-sm font-medium mb-2 block">Color</label>
                 <Select value={colorFilter} onValueChange={setColorFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger id="color-filter" aria-label="Filter by color">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -525,9 +527,9 @@ const Inspire = () => {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Mood</label>
+                <label htmlFor="mood-filter" className="text-sm font-medium mb-2 block">Mood</label>
                 <Select value={moodFilter} onValueChange={setMoodFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger id="mood-filter" aria-label="Filter by mood">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -542,9 +544,9 @@ const Inspire = () => {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Composition</label>
+                <label htmlFor="composition-filter" className="text-sm font-medium mb-2 block">Composition</label>
                 <Select value={compositionFilter} onValueChange={setCompositionFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger id="composition-filter" aria-label="Filter by composition">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1073,9 +1075,12 @@ const InspireGrid = ({
             <div className="aspect-square overflow-hidden bg-muted relative">
               <img
                 src={item.asset.image_url}
-                alt="Generated content"
+                alt={`Generated artwork - ${item.asset.prompt?.substring(0, 100) || 'Creative inspiration'}`}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 loading="lazy"
+                decoding="async"
+                width="400"
+                height="400"
               />
               
               {/* Badges */}
@@ -1098,14 +1103,15 @@ const InspireGrid = ({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="min-h-[44px] min-w-[44px] p-0"
-                          onClick={(e) => onLike(item, e)}
-                        >
-                          <Heart className={`h-4 w-4 ${item.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-                        </Button>
+                         <Button
+                           size="sm"
+                           variant="secondary"
+                           className="min-h-[44px] min-w-[44px] p-0"
+                           onClick={(e) => onLike(item, e)}
+                           aria-label={item.isLiked ? "Unlike this item" : "Like this item"}
+                         >
+                           <Heart className={`h-4 w-4 ${item.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Like</TooltipContent>
                     </Tooltip>
@@ -1114,14 +1120,15 @@ const InspireGrid = ({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="min-h-[44px] min-w-[44px] p-0"
-                          onClick={(e) => onBookmark(item, e)}
-                        >
-                          <Bookmark className={`h-4 w-4 ${item.isBookmarked ? 'fill-primary text-primary' : ''}`} />
-                        </Button>
+                         <Button
+                           size="sm"
+                           variant="secondary"
+                           className="min-h-[44px] min-w-[44px] p-0"
+                           onClick={(e) => onBookmark(item, e)}
+                           aria-label={item.isBookmarked ? "Remove bookmark" : "Bookmark this item"}
+                         >
+                           <Bookmark className={`h-4 w-4 ${item.isBookmarked ? 'fill-primary text-primary' : ''}`} />
+                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Bookmark</TooltipContent>
                     </Tooltip>
@@ -1130,14 +1137,15 @@ const InspireGrid = ({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="min-h-[44px] min-w-[44px] p-0"
-                          onClick={(e) => onRemix(item, e)}
-                        >
-                          <Shuffle className="h-4 w-4" />
-                        </Button>
+                         <Button
+                           size="sm"
+                           variant="secondary"
+                           className="min-h-[44px] min-w-[44px] p-0"
+                           onClick={(e) => onRemix(item, e)}
+                           aria-label="Remix this creation"
+                         >
+                           <Shuffle className="h-4 w-4" />
+                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Remix</TooltipContent>
                     </Tooltip>
@@ -1146,14 +1154,15 @@ const InspireGrid = ({
                   {isAdmin && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="min-h-[44px] min-w-[44px] p-0 ml-auto"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
+                         <Button
+                           size="sm"
+                           variant="secondary"
+                           className="min-h-[44px] min-w-[44px] p-0 ml-auto"
+                           onClick={(e) => e.stopPropagation()}
+                           aria-label="Admin actions menu"
+                         >
+                           <MoreVertical className="h-4 w-4" />
+                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenuItem onClick={(e) => onStaffPickToggle(item, e)}>
