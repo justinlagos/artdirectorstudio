@@ -489,7 +489,10 @@ const Inspire = () => {
     try {
       await supabase
         .from("shared_assets")
-        .update({ featured: !item.featured })
+        .update({ 
+          featured: !item.featured,
+          is_inspire_approved: true // Auto-approve when featuring
+        })
         .eq("id", item.id);
       
       toast.success(item.featured ? "Removed from featured" : "Added to featured");
@@ -507,7 +510,10 @@ const Inspire = () => {
     try {
       await supabase
         .from("shared_assets")
-        .update({ staff_pick: !item.staff_pick })
+        .update({ 
+          staff_pick: !item.staff_pick,
+          is_inspire_approved: true // Auto-approve when staff picking
+        })
         .eq("id", item.id);
       
       toast.success(item.staff_pick ? "Removed from staff picks" : "Added to staff picks");
