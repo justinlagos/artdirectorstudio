@@ -10,6 +10,7 @@ import { ToolsModalProvider } from "@/contexts/ToolsModalContext";
 import { UnifiedToolsModal } from "@/components/UnifiedToolsModal";
 import { LoadingState } from "@/components/LoadingState";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
+import { PerformanceMonitor } from "@/components/PerformanceMonitor";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
@@ -84,6 +85,7 @@ const App = () => (
             </Suspense>
             <UnifiedToolsModal />
             <OnlineStatusIndicator />
+            <PerformanceMonitor />
             <Suspense fallback={null}>
               <ArtieChat />
               <TrialWelcomeToast />
