@@ -38,6 +38,14 @@ serve(async (req) => {
       const session = event.data.object;
       const customerId = session.customer as string;
       const subscriptionId = session.subscription as string;
+      const customerEmail = session.customer_details?.email;
+      
+      if (!customerEmail) {
+        console.error('No customer email found in session');
+        throw new Error('Customer email is required');
+      }
+
+      console.log('Processing checkout for email:', customerEmail);
       
       // Get subscription details to find the price
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -59,8 +67,10 @@ serve(async (req) => {
         dailyLimit = 999999; // Unlimited
       }
 
-      // Update user profile
-      const { error: updateError } = await supabaseAdmin
+      console.log('Mapped tier:', tier, 'for price:', priceId);
+
+      // Update user profile by EMAIL (stripe_customer_id not set yet)
+      const { data: updatedProfile, error: updateError } = await supabaseAdmin
         .from('profiles')
         .update({
           is_pro: tier !== 'starter',
@@ -72,20 +82,72 @@ serve(async (req) => {
           daily_usage: 0,
           daily_usage_reset_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         })
-        .eq('stripe_customer_id', customerId);
+        .eq('email', customerEmail)
+        .select();
 
       if (updateError) {
         console.error('Error updating profile:', updateError);
+        
+        // Log webhook error to billing_events
+        const { data: userProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('email', customerEmail)
+          .single();
+        
+        if (userProfile) {
+          await supabaseAdmin.from('billing_events').insert({
+            user_id: userProfile.id,
+            event_type: 'webhook_error',
+            amount_cents: subscription.items.data[0].price.unit_amount || 0,
+            stripe_subscription_id: subscriptionId,
+            metadata: { 
+              error: updateError.message,
+              tier,
+              priceId,
+              email: customerEmail,
+            },
+            status: 'failed',
+          });
+        }
+        
         throw updateError;
       }
 
-      // Log billing event
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('stripe_customer_id', customerId)
-        .single();
+      // Check if profile was actually updated
+      if (!updatedProfile || updatedProfile.length === 0) {
+        console.error('Profile update affected 0 rows for email:', customerEmail);
+        
+        // Log webhook error
+        const { data: userProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('email', customerEmail)
+          .single();
+        
+        if (userProfile) {
+          await supabaseAdmin.from('billing_events').insert({
+            user_id: userProfile.id,
+            event_type: 'webhook_error',
+            amount_cents: subscription.items.data[0].price.unit_amount || 0,
+            stripe_subscription_id: subscriptionId,
+            metadata: { 
+              error: 'Profile update affected 0 rows',
+              tier,
+              priceId,
+              email: customerEmail,
+            },
+            status: 'failed',
+          });
+        }
+        
+        throw new Error('Profile not found for email: ' + customerEmail);
+      }
 
+      console.log('Successfully updated profile for:', customerEmail, 'Tier:', tier);
+
+      // Log billing event
+      const profile = updatedProfile[0];
       if (profile) {
         await supabaseAdmin.from('billing_events').insert({
           user_id: profile.id,
@@ -94,12 +156,12 @@ serve(async (req) => {
           currency: subscription.currency,
           stripe_subscription_id: subscriptionId,
           stripe_invoice_id: subscription.latest_invoice as string,
-          metadata: { tier, plan: tier },
+          metadata: { tier, plan: tier, priceId, email: customerEmail },
           status: 'completed',
         });
       }
 
-      console.log('Successfully updated profile for subscription:', subscriptionId, 'Tier:', tier);
+      console.log('Billing event logged for subscription:', subscriptionId);
     }
 
     // Handle subscription updates
