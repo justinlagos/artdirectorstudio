@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Receipt, FileText, Download } from "lucide-react";
+import { Receipt, FileText, Download, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
@@ -30,6 +30,7 @@ const SubscriptionHistory = () => {
   const { user } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -168,6 +169,25 @@ const SubscriptionHistory = () => {
     }
   };
 
+  const emailInvoice = async (payment: Payment) => {
+    try {
+      setSendingEmail(payment.id);
+      
+      const { data, error } = await supabase.functions.invoke("send-invoice-email", {
+        body: { paymentId: payment.id },
+      });
+
+      if (error) throw error;
+
+      toast.success(`Invoice emailed to ${user?.email}`);
+    } catch (error) {
+      console.error("Error emailing invoice:", error);
+      toast.error("Failed to send invoice email");
+    } finally {
+      setSendingEmail(null);
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -233,14 +253,30 @@ const SubscriptionHistory = () => {
                         </TableCell>
                         <TableCell>{getStatusBadge(payment.status)}</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => downloadInvoice(payment)}
-                            disabled={payment.status !== "completed"}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => downloadInvoice(payment)}
+                              disabled={payment.status !== "completed"}
+                              title="Download PDF"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => emailInvoice(payment)}
+                              disabled={payment.status !== "completed" || sendingEmail === payment.id}
+                              title="Email invoice"
+                            >
+                              {sendingEmail === payment.id ? (
+                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              ) : (
+                                <Mail className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
