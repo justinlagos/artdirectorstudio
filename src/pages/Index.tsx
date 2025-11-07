@@ -309,6 +309,10 @@ const Index = () => {
     setGeneratedImages(prev => prev.filter(img => img.id !== id));
   };
 
+  const handleResultUpdate = (updatedResult: AnalysisResult) => {
+    setResult(updatedResult);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <OnboardingPopup />
@@ -356,6 +360,7 @@ const Index = () => {
                 onGenerateImage={handleGenerateImage}
                 generatedImages={generatedImages}
                 onDeleteImage={handleDeleteImage}
+                onResultUpdate={handleResultUpdate}
               />
             </div>
           )}

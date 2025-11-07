@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Copy, Download, RefreshCw, Wand2, FileJson, Edit2 } from "lucide-react";
 import { toast } from "sonner";
-import { AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
+import { Analysis, AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
 import { Separator } from "@/components/ui/separator";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
@@ -13,6 +13,7 @@ import { InsightChips } from "@/components/InsightChips";
 import { QuickTweaksRow } from "@/components/QuickTweaksRow";
 import { GuidedTweaks } from "@/components/GuidedTweaks";
 import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
+import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 
 interface ResultsSectionProps {
@@ -22,6 +23,7 @@ interface ResultsSectionProps {
   onGenerateImage: (prompt: string, options: GenerationOptions) => Promise<string | null>;
   generatedImages: GeneratedImage[];
   onDeleteImage: (id: string) => void;
+  onResultUpdate?: (result: AnalysisResult) => void;
 }
 
 // Predefined intelligent suggestions for each parameter
@@ -43,7 +45,8 @@ export const ResultsSection = ({
   isRegenerating,
   onGenerateImage,
   generatedImages,
-  onDeleteImage
+  onDeleteImage,
+  onResultUpdate
 }: ResultsSectionProps) => {
   const [userEdits, setUserEdits] = useState<UserEdits>({});
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
@@ -139,19 +142,71 @@ export const ResultsSection = ({
   const handleApplyGuidedTweak = async (tweakDescription: string) => {
     setIsApplyingTweak(true);
     try {
-      // In a real implementation, call an edge function to apply the tweak
-      // For now, we'll add it as a note to the user
-      toast.info("Applying tweak: " + tweakDescription);
-      
-      // Simulate applying the tweak by triggering regeneration
-      setTimeout(() => {
-        onRegenerate({ ...userEdits });
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to continue.");
         setIsApplyingTweak(false);
-        toast.success("Tweak applied! Review the updated prompt.");
-      }, 1500);
+        return;
+      }
+
+      toast.info("Applying guided tweak with AI...");
+
+      // Call the edge function to apply the tweak
+      const { data, error } = await supabase.functions.invoke("apply-guided-tweak", {
+        body: { 
+          current_prompt: result.full_regeneration_prompt,
+          tweak_description: tweakDescription,
+          analysis: result.analysis
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error("Guided tweak error:", error);
+        toast.error("Failed to apply tweak. Please try again.");
+        setIsApplyingTweak(false);
+        return;
+      }
+
+      if (!data?.full_regeneration_prompt) {
+        toast.error("Invalid response from AI. Please try again.");
+        setIsApplyingTweak(false);
+        return;
+      }
+
+      // Update the result with the modified prompt and any changed analysis fields
+      const updatedAnalysis = { ...result.analysis };
+      if (data.modified_fields) {
+        Object.entries(data.modified_fields).forEach(([key, value]) => {
+          if (value && key in updatedAnalysis) {
+            updatedAnalysis[key as keyof Analysis] = value as string;
+          }
+        });
+      }
+
+      const updatedResult = {
+        full_regeneration_prompt: data.full_regeneration_prompt,
+        analysis: updatedAnalysis
+      };
+
+      // Call the parent callback to update the result
+      if (onResultUpdate) {
+        onResultUpdate(updatedResult);
+      }
+
+      setIsApplyingTweak(false);
+      toast.success("Tweak applied successfully!");
+      
+      // Trigger pulse animation
+      setPromptPulse(true);
+      setTimeout(() => setPromptPulse(false), 600);
+
     } catch (error) {
       console.error("Error applying guided tweak:", error);
-      toast.error("Failed to apply tweak");
+      toast.error("An error occurred while applying the tweak.");
       setIsApplyingTweak(false);
     }
   };
@@ -461,7 +516,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         <GuidedTweaks 
           analysis={result.analysis}
           onApplyTweak={handleApplyGuidedTweak}
-          isApplying={isApplyingTweak}
+          isApplying={isApplyingTweak || isRegenerating}
         />
       </div>
 

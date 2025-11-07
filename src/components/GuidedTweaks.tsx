@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import { Analysis } from "@/pages/Index";
+import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 
 interface GuidedTweaksProps {
   analysis: Analysis;
@@ -87,11 +88,14 @@ export const GuidedTweaks = ({ analysis, onApplyTweak, isApplying }: GuidedTweak
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center gap-2">
-        <Sparkles className="w-4 h-4 text-primary" />
-        <h3 className="text-sm font-semibold text-foreground">
-          Guided Tweaks
-        </h3>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">
+            Guided Tweaks
+          </h3>
+        </div>
+        <CreditCostIndicator cost={1} action="AI tweak" />
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
