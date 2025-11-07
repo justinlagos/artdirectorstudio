@@ -195,11 +195,9 @@ Requirements:
         .from('generated_assets')
         .insert({
           user_id: user.id,
-          type: 'blend',
+          type: 'image' as const,
           image_url: publicUrl,
-          prompt: instruction,
-          quality: 'standard',
-          size: '1024x1024'
+          prompt: instruction
         });
     } catch (error) {
       console.error('Error saving blend:', error);

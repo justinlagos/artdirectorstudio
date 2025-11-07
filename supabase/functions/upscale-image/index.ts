@@ -10,9 +10,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+
   try {
-    const requestId = crypto.randomUUID();
-    const startTime = Date.now();
     
     // Check authentication
     const authHeader = req.headers.get('Authorization');
