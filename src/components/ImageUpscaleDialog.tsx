@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { BeforeAfterSlider } from "@/components/ui/before-after-slider";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -296,31 +297,18 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
                 {isSaving && <span className="text-xs text-muted-foreground">Saving...</span>}
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Original</Label>
-                  <img 
-                    src={sourceImage!.preview} 
-                    alt="Original" 
-                    className="w-full h-auto rounded-lg border"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Upscaled ({targetSize})</Label>
-                  <div className="relative">
-                    <img 
-                      src={upscaledImage} 
-                      alt="Upscaled" 
-                      className="w-full h-auto rounded-lg ring-2 ring-primary/20 animate-scale-in"
-                    />
-                    <div className="absolute top-2 right-2">
-                      <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" />
-                        Enhanced
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              {/* Interactive Before/After Comparison Slider */}
+              <div className="space-y-2">
+                <BeforeAfterSlider
+                  beforeImage={sourceImage!.preview}
+                  afterImage={upscaledImage}
+                  beforeLabel="Original"
+                  afterLabel={`Upscaled (${targetSize})`}
+                  className="shadow-medium"
+                />
+                <p className="text-xs text-center text-muted-foreground">
+                  Drag the slider to compare before and after
+                </p>
               </div>
               
               <div className="grid grid-cols-2 gap-2">
