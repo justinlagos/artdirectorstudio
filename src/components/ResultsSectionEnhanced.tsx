@@ -9,6 +9,8 @@ import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGene
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { AnalysisSelect } from "@/components/AnalysisSelect";
+import { InsightChips } from "@/components/InsightChips";
+import { QuickTweaksRow } from "@/components/QuickTweaksRow";
 import jsPDF from "jspdf";
 
 interface ResultsSectionProps {
@@ -382,8 +384,52 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     },
   ];
 
+  // Extract key insights for chips
+  const extractInsights = (): string[] => {
+    const insights: string[] = [];
+    const { lighting, color_palette, camera_composition } = result.analysis;
+    
+    // Lighting insights
+    if (lighting.toLowerCase().includes('backlight')) insights.push('Strong backlight');
+    else if (lighting.toLowerCase().includes('soft')) insights.push('Soft lighting');
+    else if (lighting.toLowerCase().includes('dramatic')) insights.push('Dramatic lighting');
+    
+    // Color insights
+    if (color_palette.toLowerCase().includes('muted')) insights.push('Muted color palette');
+    else if (color_palette.toLowerCase().includes('vibrant')) insights.push('Vibrant colors');
+    else if (color_palette.toLowerCase().includes('warm')) insights.push('Warm tones');
+    
+    // Composition insights
+    if (camera_composition.toLowerCase().includes('center')) insights.push('Centered subject');
+    else if (camera_composition.toLowerCase().includes('rule of thirds')) insights.push('Rule of thirds');
+    
+    // Contrast
+    if (color_palette.toLowerCase().includes('high contrast')) insights.push('High contrast');
+    else if (color_palette.toLowerCase().includes('low contrast') || color_palette.toLowerCase().includes('subtle')) {
+      insights.push('Soft contrast');
+    }
+    
+    return insights.slice(0, 4); // Max 4 chips
+  };
+
   return (
-    <section className="space-y-12 animate-fade-in">
+    <section className="space-y-8">
+      {/* Intro Note + Insights */}
+      <div className="space-y-6 animate-fade-in">
+        <div className="bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 rounded-xl p-6 ring-1 ring-border/30">
+          <p className="text-center text-muted-foreground text-sm leading-relaxed">
+            We've analyzed your image and set up your creative breakdown. <br className="hidden sm:inline" />
+            You can tweak or regenerate below.
+          </p>
+        </div>
+        
+        <InsightChips insights={extractInsights()} />
+        
+        <QuickTweaksRow analysis={result.analysis} />
+      </div>
+
+      <Separator className="my-8" />
+
       {/* Full Regeneration Prompt */}
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">

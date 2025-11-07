@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { UploadSection } from "@/components/UploadSection";
-import { LoadingState } from "@/components/LoadingState";
+import { ProgressiveAnalysisFeedback } from "@/components/ProgressiveAnalysisFeedback";
 import { ResultsSection } from "@/components/ResultsSectionEnhanced";
 import { OnboardingPopup } from "@/components/OnboardingPopup";
 import { Footer } from "@/components/Footer";
@@ -58,6 +58,8 @@ const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showProgressiveFeedback, setShowProgressiveFeedback] = useState(false);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
 
@@ -100,7 +102,11 @@ const Index = () => {
   }, [selectedFile, isAnalyzing, result]);
 
   if (loading) {
-    return <LoadingState />;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   const handleFileSelect = (file: File) => {
@@ -122,6 +128,8 @@ const Index = () => {
     if (!selectedFile) return;
 
     setIsAnalyzing(true);
+    setShowProgressiveFeedback(true);
+    setAnalysisComplete(false);
     
     try {
       // Get session token
@@ -150,23 +158,31 @@ const Index = () => {
           console.error("Analysis error:", error);
           toast.error("Failed to analyze image. Please try again.");
           setIsAnalyzing(false);
+          setShowProgressiveFeedback(false);
           return;
         }
 
-        setResult(data as AnalysisResult);
-        setIsAnalyzing(false);
-        toast.success("Image analyzed successfully!");
+        // Wait for progressive feedback to complete (min 3 seconds)
+        setTimeout(() => {
+          setResult(data as AnalysisResult);
+          setAnalysisComplete(true);
+          setIsAnalyzing(false);
+          setShowProgressiveFeedback(false);
+          toast.success("Image analyzed successfully!");
+        }, 3000);
       };
 
       reader.onerror = () => {
         toast.error("Failed to read image file.");
         setIsAnalyzing(false);
+        setShowProgressiveFeedback(false);
       };
     } catch (error) {
       console.error("Error during analysis:", error);
       const errorMsg = error instanceof Error ? error.message : "An error occurred during analysis.";
       toast.error(errorMsg);
       setIsAnalyzing(false);
+      setShowProgressiveFeedback(false);
       
       // Retry logic for network errors
       if (retryCount < 2 && errorMsg.toLowerCase().includes('network')) {
@@ -329,17 +345,19 @@ const Index = () => {
             </div>
           )}
           
-          {isAnalyzing && <LoadingState />}
+          {showProgressiveFeedback && <ProgressiveAnalysisFeedback />}
           
-          {result && (
-            <ResultsSection 
-              result={result} 
-              onRegenerate={handleRegenerate}
-              isRegenerating={isAnalyzing}
-              onGenerateImage={handleGenerateImage}
-              generatedImages={generatedImages}
-              onDeleteImage={handleDeleteImage}
-            />
+          {result && analysisComplete && (
+            <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+              <ResultsSection 
+                result={result} 
+                onRegenerate={handleRegenerate}
+                isRegenerating={isAnalyzing}
+                onGenerateImage={handleGenerateImage}
+                generatedImages={generatedImages}
+                onDeleteImage={handleDeleteImage}
+              />
+            </div>
           )}
 
           {/* How It Works Section */}
