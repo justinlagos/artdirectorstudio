@@ -35,24 +35,25 @@ serve(async (req) => {
       );
     }
 
-    // Check feature access before processing
-    const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ action: 'regenerate_prompt' }),
+    // Check feature access before processing using Supabase client
+    const { data: accessResult, error: accessError } = await supabaseClient.functions.invoke('check-feature-access', {
+      body: { action: 'regenerate_prompt' }
     });
 
-    const accessResult = await accessResponse.json();
+    if (accessError) {
+      console.error("Feature access check error:", accessError);
+      return new Response(
+        JSON.stringify({ error: "Failed to check feature access" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
-    if (!accessResult.allowed) {
+    if (!accessResult?.allowed) {
       return new Response(
         JSON.stringify({ 
-          error: accessResult.reason || "Access denied",
-          upgrade_required: accessResult.upgrade_required || false,
-          tier: accessResult.tier
+          error: accessResult?.reason || "Access denied",
+          upgrade_required: accessResult?.upgrade_required || false,
+          tier: accessResult?.tier
         }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
