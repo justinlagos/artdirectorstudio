@@ -10,12 +10,14 @@ import { ResultsSection } from "@/components/ResultsSectionEnhanced";
 import { OnboardingPopup } from "@/components/OnboardingPopup";
 import { Footer } from "@/components/Footer";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Sparkles, Wand2, Upload, ArrowRight } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 
 export interface Analysis {
@@ -67,6 +69,19 @@ const Index = () => {
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+
+  // Pull-to-refresh functionality
+  const handleRefresh = async () => {
+    if (selectedFile && result) {
+      await handleAnalyze();
+    }
+  };
+
+  const { isRefreshing, pullDistance, isPulling } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    enabled: !!user && !!selectedFile && !!result,
+  });
 
   // Fetch featured testimonials
   const { data: testimonials } = useQuery({
@@ -341,6 +356,11 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        threshold={80}
+      />
       <Header />
       
       {/* Hero Section */}
