@@ -1,632 +1,468 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Download, Layers, Upload, X, CheckCircle2, AlertCircle, Sparkles, FolderOpen, RefreshCw, Eye, ExternalLink } from "lucide-react";
-import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Upload, X, CheckCircle2, Clock, AlertCircle, Loader2, Eye, Download, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
-import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface BatchProcessDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-interface BatchImage {
+interface QueueItem {
   id: string;
   file: File;
   preview: string;
-  status: 'pending' | 'processing' | 'completed' | 'error';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
   result?: string;
-  analysisData?: any;
-  imageUrl?: string;
   error?: string;
-  errorType?: 'rate_limit' | 'credits' | 'generic';
+  assetId?: string;
 }
+
+type ProcessType = 'upscale' | 'blend';
 
 export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogProps) => {
   const navigate = useNavigate();
-  const [images, setImages] = useState<BatchImage[]>([]);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [processType, setProcessType] = useState<ProcessType>('upscale');
+  const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentProgress, setCurrentProgress] = useState(0);
-  const [processingStep, setProcessingStep] = useState("");
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const stats = {
+    total: queue.length,
+    pending: queue.filter(item => item.status === 'pending').length,
+    processing: queue.filter(item => item.status === 'processing').length,
+    completed: queue.filter(item => item.status === 'completed').length,
+    failed: queue.filter(item => item.status === 'failed').length,
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
-    if (images.length + files.length > 10) {
-      toast.error("Maximum 10 images allowed for batch processing");
+    if (queue.length + files.length > 20) {
+      toast.error("Maximum 20 images allowed in batch");
       return;
     }
 
-    const newImages: BatchImage[] = files.map(file => {
-      if (!file.type.startsWith("image/")) {
-        toast.error("Please upload image files only");
-        return null;
-      }
+    const newItems: QueueItem[] = files.map(file => ({
+      id: crypto.randomUUID(),
+      file,
+      preview: URL.createObjectURL(file),
+      status: 'pending',
+      progress: 0,
+    }));
 
-      return {
-        id: crypto.randomUUID(),
-        file,
-        preview: URL.createObjectURL(file),
-        status: 'pending' as const
-      };
-    }).filter(Boolean) as BatchImage[];
-
-    setImages(prev => [...prev, ...newImages]);
+    setQueue(prev => [...prev, ...newItems]);
+    toast.success(`${files.length} image${files.length > 1 ? 's' : ''} added to queue`);
   };
 
-  const removeImage = (id: string) => {
-    setImages(prev => {
-      const img = prev.find(i => i.id === id);
-      if (img) URL.revokeObjectURL(img.preview);
+  const removeItem = (id: string) => {
+    setQueue(prev => {
+      const item = prev.find(i => i.id === id);
+      if (item) URL.revokeObjectURL(item.preview);
       return prev.filter(i => i.id !== id);
     });
   };
 
-  const handleBatchProcess = async () => {
-    if (images.length === 0) {
-      toast.error("Please upload at least one image");
+  const clearCompleted = () => {
+    setQueue(prev => {
+      const completed = prev.filter(i => i.status === 'completed');
+      completed.forEach(item => URL.revokeObjectURL(item.preview));
+      return prev.filter(i => i.status !== 'completed');
+    });
+    toast.success("Cleared completed items");
+  };
+
+  const processUpscale = async (item: QueueItem): Promise<string> => {
+    const base64Image = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(item.file);
+    });
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Please log in to continue");
+
+    const { data, error } = await supabase.functions.invoke("upscale-image", {
+      body: { image: base64Image, targetSize },
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+
+    if (error) throw error;
+    if (!data?.image) throw new Error("No image returned");
+
+    return data.image;
+  };
+
+  const saveToDatabase = async (imageDataUrl: string, type: string, size: string): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not found");
+
+    const response = await fetch(imageDataUrl);
+    const blob = await response.blob();
+    
+    const fileName = `${user.id}/batch-${type}-${Date.now()}.png`;
+    const { error: uploadError } = await supabase.storage
+      .from('generated-images')
+      .upload(fileName, blob, {
+        contentType: 'image/png',
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('generated-images')
+      .getPublicUrl(fileName);
+
+    const { data: assetData, error: dbError } = await supabase
+      .from('generated_assets')
+      .insert({
+        user_id: user.id,
+        type: 'image',
+        image_url: publicUrl,
+        prompt: `Batch ${type} to ${size}`,
+        quality: size === '2048x2048' ? 'ultra' : 'high',
+        size: size
+      })
+      .select()
+      .single();
+
+    if (dbError) throw dbError;
+    return assetData.id;
+  };
+
+  const processQueue = async () => {
+    if (queue.length === 0) {
+      toast.error("Please add images to the queue");
       return;
     }
 
     setIsProcessing(true);
-    setCurrentProgress(0);
+    setCurrentIndex(0);
 
-    try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsProcessing(false);
-        return;
-      }
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i];
+      if (item.status !== 'pending') continue;
 
-      const totalImages = images.length;
-      let completedCount = 0;
+      setCurrentIndex(i);
+      
+      // Update to processing
+      setQueue(prev => prev.map((q, idx) => 
+        idx === i ? { ...q, status: 'processing', progress: 10 } : q
+      ));
 
-      // Process each image sequentially
-      for (let i = 0; i < images.length; i++) {
-        const image = images[i];
-        
-        setProcessingStep(`Processing ${i + 1} of ${totalImages}…`);
-        
-        setImages(prev => 
-          prev.map(img => 
-            img.id === image.id ? { ...img, status: 'processing' as const } : img
-          )
-        );
+      try {
+        // Simulate progress updates
+        const progressInterval = setInterval(() => {
+          setQueue(prev => prev.map((q, idx) => 
+            idx === i && q.progress < 90 
+              ? { ...q, progress: q.progress + 10 } 
+              : q
+          ));
+        }, 2000);
 
-        try {
-          // Convert file to base64
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(image.file);
-          });
-
-          // Analyze the image
-          const { data, error } = await supabase.functions.invoke("analyze-image", {
-            body: { image: base64 },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
-
-          if (error) throw error;
-
-          // Save to My Projects and get image URL
-          const imageUrl = await saveAnalysisToMyProjects(base64, data.full_regeneration_prompt, image.file.name);
-
-          setImages(prev =>
-            prev.map(img =>
-              img.id === image.id
-                ? { 
-                    ...img, 
-                    status: 'completed' as const, 
-                    result: data.full_regeneration_prompt,
-                    analysisData: data.analysis,
-                    imageUrl: imageUrl || base64
-                  }
-                : img
-            )
-          );
-
-          completedCount++;
-          setCurrentProgress((completedCount / totalImages) * 100);
-        } catch (error: any) {
-          console.error(`Error processing image ${image.file.name}:`, error);
-          
-          // Parse error type for better messaging
-          let errorMessage = 'Failed to analyze';
-          let errorType: 'rate_limit' | 'credits' | 'generic' = 'generic';
-          
-          if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('rate limit')) {
-            errorMessage = 'Rate limit exceeded. Wait a moment and retry.';
-            errorType = 'rate_limit';
-          } else if (error?.message?.includes('402') || error?.message?.toLowerCase().includes('credit')) {
-            errorMessage = 'Credits exhausted. Add credits to continue.';
-            errorType = 'credits';
-          } else if (error?.message) {
-            errorMessage = error.message;
-          }
-          
-          setImages(prev =>
-            prev.map(img =>
-              img.id === image.id
-                ? { ...img, status: 'error' as const, error: errorMessage, errorType }
-                : img
-            )
-          );
-          completedCount++;
-          setCurrentProgress((completedCount / totalImages) * 100);
+        // Process based on type
+        let result: string;
+        if (processType === 'upscale') {
+          result = await processUpscale(item);
+        } else {
+          // For blend, we'd need at least 2 images
+          throw new Error("Blend mode requires implementation with image pairs");
         }
 
-        // Small delay between requests to avoid rate limiting
-        if (i < images.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
+        clearInterval(progressInterval);
 
-      const successCount = images.filter(img => img.status === 'completed').length;
-      const failedCount = images.filter(img => img.status === 'error').length;
-      
-      if (failedCount > 0) {
-        toast.success(`${successCount} of ${totalImages} completed successfully`);
-      } else {
-        toast.success(`Done — all ${totalImages} images processed successfully`);
+        // Save to database
+        const assetId = await saveToDatabase(result, processType, targetSize);
+
+        // Update to completed
+        setQueue(prev => prev.map((q, idx) => 
+          idx === i 
+            ? { ...q, status: 'completed', progress: 100, result, assetId } 
+            : q
+        ));
+
+        toast.success(`Image ${i + 1} processed successfully`);
+        
+        // Small delay between items
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+      } catch (error: any) {
+        console.error(`Failed to process item ${i}:`, error);
+        setQueue(prev => prev.map((q, idx) => 
+          idx === i 
+            ? { ...q, status: 'failed', error: error.message } 
+            : q
+        ));
+        toast.error(`Failed to process image ${i + 1}`);
       }
-      
-      setProcessingStep("");
-    } catch (error) {
-      console.error("Batch process error:", error);
-      toast.error("Batch processing failed. Please try again.");
-    } finally {
-      setIsProcessing(false);
     }
+
+    setIsProcessing(false);
+    toast.success("Batch processing completed!");
   };
 
-  const saveAnalysisToMyProjects = async (imageBase64: string, prompt: string, fileName: string): Promise<string | null> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      // Convert base64 to blob
-      const response = await fetch(imageBase64);
-      const blob = await response.blob();
-      
-      // Upload to storage
-      const storageFileName = `${user.id}/analyzed-${Date.now()}-${fileName}`;
-      const { error: uploadError } = await supabase.storage
-        .from('generated-images')
-        .upload(storageFileName, blob, {
-          contentType: 'image/png',
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('generated-images')
-        .getPublicUrl(storageFileName);
-
-      // Save metadata
-      await supabase
-        .from('generated_assets')
-        .insert({
-          user_id: user.id,
-          type: 'analysis',
-          image_url: publicUrl,
-          prompt: prompt,
-          quality: 'standard',
-          size: 'original'
-        });
-      
-      return publicUrl;
-    } catch (error) {
-      console.error('Error saving analysis:', error);
-      return null;
-    }
-  };
-
-  const handleRetryFailed = async () => {
-    const failedImages = images.filter(img => img.status === 'error');
+  const handleDownload = (item: QueueItem) => {
+    if (!item.result) return;
     
-    if (failedImages.length === 0) return;
-
-    // Reset failed images to pending
-    setImages(prev =>
-      prev.map(img =>
-        img.status === 'error' ? { ...img, status: 'pending' as const, error: undefined } : img
-      )
-    );
-
-    // Process only failed images
-    setIsProcessing(true);
-    setCurrentProgress(0);
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsProcessing(false);
-        return;
-      }
-
-      for (let i = 0; i < failedImages.length; i++) {
-        const image = failedImages[i];
-        
-        setProcessingStep(`Retrying ${i + 1} of ${failedImages.length}…`);
-        
-        setImages(prev =>
-          prev.map(img =>
-            img.id === image.id ? { ...img, status: 'processing' as const } : img
-          )
-        );
-
-        try {
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(image.file);
-          });
-
-          const { data, error } = await supabase.functions.invoke("analyze-image", {
-            body: { image: base64 },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
-
-          if (error) throw error;
-
-          const imageUrl = await saveAnalysisToMyProjects(base64, data.full_regeneration_prompt, image.file.name);
-
-          setImages(prev =>
-            prev.map(img =>
-              img.id === image.id
-                ? { 
-                    ...img, 
-                    status: 'completed' as const, 
-                    result: data.full_regeneration_prompt,
-                    analysisData: data.analysis,
-                    imageUrl: imageUrl || base64
-                  }
-                : img
-            )
-          );
-
-          setCurrentProgress(((i + 1) / failedImages.length) * 100);
-        } catch (error: any) {
-          console.error(`Error processing image ${image.file.name}:`, error);
-          
-          let errorMessage = 'This didn\'t complete. Try again.';
-          let errorType: 'rate_limit' | 'credits' | 'generic' = 'generic';
-          
-          if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('rate limit')) {
-            errorMessage = 'Rate limit exceeded. Wait a moment.';
-            errorType = 'rate_limit';
-          } else if (error?.message?.includes('402') || error?.message?.toLowerCase().includes('credit')) {
-            errorMessage = 'Credits exhausted. Add credits.';
-            errorType = 'credits';
-          }
-          
-          setImages(prev =>
-            prev.map(img =>
-              img.id === image.id
-                ? { ...img, status: 'error' as const, error: errorMessage, errorType }
-                : img
-            )
-          );
-        }
-
-        if (i < failedImages.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-
-      const successCount = images.filter(img => img.status === 'completed').length;
-      toast.success(`Retry complete! ${successCount} total images processed`);
-      setProcessingStep("");
-    } catch (error) {
-      console.error("Retry error:", error);
-      toast.error("Retry failed. Please try again.");
-    } finally {
-      setIsProcessing(false);
-    }
+    const link = document.createElement('a');
+    link.href = item.result;
+    link.download = `processed-${item.file.name}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const handleDownloadAll = () => {
-    const completedImages = images.filter(img => img.status === 'completed' && img.result);
-    
-    if (completedImages.length === 0) {
-      toast.error("No completed results to download");
-      return;
-    }
-
-    const timestamp = new Date().toISOString().split('T')[0];
-    const content = completedImages.map((img, index) => {
-      return `=== IMAGE ${index + 1}: ${img.file.name} ===\n\n${img.result}\n\n`;
-    }).join('\n' + '='.repeat(80) + '\n\n');
-
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `batch-analysis-${timestamp}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success("Batch results downloaded!");
-  };
-
-  const handleClose = () => {
-    images.forEach(img => URL.revokeObjectURL(img.preview));
-    setImages([]);
-    setCurrentProgress(0);
+  const handleViewAll = () => {
+    navigate('/history');
     onOpenChange(false);
   };
 
-  // Cleanup on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
-      images.forEach(img => URL.revokeObjectURL(img.preview));
+      queue.forEach(item => URL.revokeObjectURL(item.preview));
     };
-  }, [images]);
-
-  const getStatusIcon = (status: BatchImage['status']) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-      case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
-      case 'processing':
-        return <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />;
-      default:
-        return null;
-    }
-  };
-
-  const handleViewAnalysis = (img: BatchImage) => {
-    if (!img.result) return;
-    
-    const content = `=== ${img.file.name} Analysis ===\n\n${img.result}`;
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `analysis-${img.file.name}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success("Analysis downloaded!");
-  };
-
-  const handleViewInStudio = (img: BatchImage) => {
-    if (!img.imageUrl) return;
-    navigate('/', { state: { scrollTo: 'studio' } });
-    setTimeout(() => {
-      const studioElement = document.getElementById('studio');
-      if (studioElement) {
-        studioElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 100);
-    onOpenChange(false);
-  };
-
-  const completedImages = images.filter(img => img.status === 'completed');
-  const hasCompleted = completedImages.length > 0;
+  }, []);
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Layers className="w-5 h-5" />
-            Batch Process Images
+            Batch Image Processing
+            <Badge variant="secondary">{stats.total} items</Badge>
           </DialogTitle>
-          <DialogDescription>
-            Analyze images across 12 professional categories. Free while subscriptions are being finalized!
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 flex-1 overflow-hidden flex flex-col">
-          {/* Upload Area */}
-          {images.length < 10 && (
-            <div className="space-y-2">
-              <Label>Upload Images ({images.length}/10)</Label>
-              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-foreground/20 transition-colors cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="batch-images"
-                  disabled={isProcessing}
-                />
-                <label htmlFor="batch-images" className="cursor-pointer">
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Click to upload images (up to 10)
-                  </p>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* Progress Bar */}
-          {isProcessing && (
-            <div className="space-y-2">
-              <Progress value={currentProgress} className="w-full" />
-              <p className="text-sm text-muted-foreground text-center">
-                {processingStep || `Processing images... ${Math.round(currentProgress)}%`}
-              </p>
-            </div>
-          )}
-
-          {/* Results Gallery */}
-          {hasCompleted && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <Label className="text-base font-semibold">Completed Results ({completedImages.length})</Label>
-              </div>
-              <ScrollArea className="h-[300px] border rounded-lg">
-                <div className="grid grid-cols-2 gap-3 p-4">
-                  {completedImages.map((img) => (
-                    <Card 
-                      key={img.id}
-                      className="overflow-hidden hover:shadow-lg transition-all animate-scale-in"
-                    >
-                      <div className="relative aspect-square">
-                        <img 
-                          src={img.imageUrl || img.preview} 
-                          alt={img.file.name}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute top-2 right-2">
-                          <CheckCircle2 className="w-5 h-5 text-green-500 bg-white rounded-full" />
-                        </div>
-                      </div>
-                      <div className="p-3 space-y-2">
-                        <p className="text-xs font-medium truncate">{img.file.name}</p>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewAnalysis(img)}
-                            className="flex-1 text-xs h-7"
-                          >
-                            <Eye className="w-3 h-3 mr-1" />
-                            View
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewInStudio(img)}
-                            className="flex-1 text-xs h-7"
-                          >
-                            <ExternalLink className="w-3 h-3 mr-1" />
-                            Studio
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-
-          {/* Processing/Pending Images List */}
-          {images.length > 0 && images.some(img => img.status !== 'completed') && (
-            <ScrollArea className="flex-1 border rounded-lg">
-              <div className="space-y-2 p-4">
-                {images.filter(img => img.status !== 'completed').map((img) => (
-                  <div 
-                    key={img.id}
-                    className={`flex items-center gap-3 p-3 bg-card border rounded-lg transition-all ${
-                      img.status === 'error' ? 'border-red-500/50 bg-red-50/10' :
-                      'border-border'
-                    }`}
+        <div className="flex-1 overflow-y-auto space-y-4 py-4">
+          {/* Settings */}
+          <Card>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Process Type</label>
+                  <Select
+                    value={processType}
+                    onValueChange={(value) => setProcessType(value as ProcessType)}
+                    disabled={isProcessing}
                   >
-                    <img 
-                      src={img.preview} 
-                      alt={img.file.name}
-                      className="w-16 h-16 object-cover rounded"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{img.file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(img.file.size / 1024).toFixed(1)} KB
-                      </p>
-                      {img.status === 'error' && img.error && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
-                          <p className="text-xs text-red-500">{img.error}</p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(img.status)}
-                      {img.status === 'pending' && !isProcessing && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeImage(img.id)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="upscale">Upscale Images</SelectItem>
+                      <SelectItem value="blend" disabled>Blend Images (Coming Soon)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-2">
-            {images.some(img => img.status === 'completed' || img.status === 'error') && (
-              <div className="flex gap-2">
-                {images.some(img => img.status === 'completed') && (
-                  <>
-                    <Button
-                      onClick={handleDownloadAll}
-                      variant="secondary"
-                      className="flex-1"
+                {processType === 'upscale' && (
+                  <div className="flex-1">
+                    <label className="text-sm font-medium mb-2 block">Target Size</label>
+                    <Select
+                      value={targetSize}
+                      onValueChange={(value) => setTargetSize(value as any)}
+                      disabled={isProcessing}
                     >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Results
-                    </Button>
-                    <Button
-                      onClick={() => navigate('/history')}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      <FolderOpen className="w-4 h-4 mr-2" />
-                      My Projects
-                    </Button>
-                  </>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1536x1536">High (1536×1536)</SelectItem>
+                        <SelectItem value="2048x2048">Ultra (2048×2048)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
               </div>
+
+              {/* Upload Button */}
+              {!isProcessing && (
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="batch-upload"
+                  />
+                  <label htmlFor="batch-upload" className="cursor-pointer">
+                    <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Click to add images (up to 20 total)
+                    </p>
+                  </label>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Stats Bar */}
+          {queue.length > 0 && (
+            <div className="grid grid-cols-5 gap-2">
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <div className="text-xs text-muted-foreground">Total</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-2xl font-bold text-muted-foreground">{stats.pending}</div>
+                  <div className="text-xs text-muted-foreground">Pending</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-2xl font-bold text-blue-500">{stats.processing}</div>
+                  <div className="text-xs text-muted-foreground">Processing</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-2xl font-bold text-green-500">{stats.completed}</div>
+                  <div className="text-xs text-muted-foreground">Completed</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-2xl font-bold text-red-500">{stats.failed}</div>
+                  <div className="text-xs text-muted-foreground">Failed</div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Queue Items */}
+          <Tabs defaultValue="all" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
+              <TabsTrigger value="pending">Pending ({stats.pending})</TabsTrigger>
+              <TabsTrigger value="completed">Completed ({stats.completed})</TabsTrigger>
+              <TabsTrigger value="failed">Failed ({stats.failed})</TabsTrigger>
+            </TabsList>
+
+            {['all', 'pending', 'completed', 'failed'].map(tab => (
+              <TabsContent key={tab} value={tab} className="space-y-2 max-h-[400px] overflow-y-auto">
+                {queue
+                  .filter(item => tab === 'all' || item.status === tab)
+                  .map((item, idx) => (
+                    <Card key={item.id} className={cn(
+                      "transition-all",
+                      item.status === 'processing' && "ring-2 ring-primary"
+                    )}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-4">
+                          {/* Thumbnail */}
+                          <img
+                            src={item.preview}
+                            alt={`Queue item ${idx + 1}`}
+                            className="w-16 h-16 object-cover rounded"
+                          />
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-medium truncate">{item.file.name}</span>
+                              {item.status === 'pending' && <Clock className="w-4 h-4 text-muted-foreground" />}
+                              {item.status === 'processing' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
+                              {item.status === 'completed' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                              {item.status === 'failed' && <AlertCircle className="w-4 h-4 text-red-500" />}
+                            </div>
+
+                            {item.status === 'processing' && (
+                              <Progress value={item.progress} className="h-2" />
+                            )}
+
+                            {item.status === 'failed' && item.error && (
+                              <p className="text-xs text-red-500">{item.error}</p>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-1">
+                            {item.status === 'completed' && item.result && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDownload(item)}
+                                >
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                            {!isProcessing && item.status !== 'processing' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeItem(item.id)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                {queue.filter(item => tab === 'all' || item.status === tab).length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No items in this category
+                  </div>
+                )}
+              </TabsContent>
+            ))}
+          </Tabs>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-4 border-t">
+          {!isProcessing && stats.completed > 0 && (
+            <Button variant="outline" onClick={clearCompleted}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear Completed
+            </Button>
+          )}
+          
+          {stats.completed > 0 && (
+            <Button variant="outline" onClick={handleViewAll}>
+              <Eye className="w-4 h-4 mr-2" />
+              View All Results
+            </Button>
+          )}
+
+          <div className="flex-1" />
+
+          <Button
+            onClick={processQueue}
+            disabled={isProcessing || stats.pending === 0}
+            className="min-w-[140px]"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Processing {currentIndex + 1}/{stats.total}
+              </>
+            ) : (
+              `Process ${stats.pending} Image${stats.pending !== 1 ? 's' : ''}`
             )}
-            
-            {images.some(img => img.status === 'error') && !isProcessing && (
-              <Button
-                onClick={handleRetryFailed}
-                variant="destructive"
-                className="w-full"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Retry Failed Only
-              </Button>
-            )}
-            
-            {images.length > 0 && images.every(img => img.status === 'pending') && (
-              <Button
-                onClick={handleBatchProcess}
-                disabled={isProcessing}
-                className="w-full"
-                size="lg"
-              >
-                <Layers className="w-4 h-4 mr-2" />
-                {isProcessing ? "Processing..." : `Analyze ${images.length} Images`}
-              </Button>
-            )}
-          </div>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
