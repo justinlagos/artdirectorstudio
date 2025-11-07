@@ -1,3 +1,4 @@
+// Performance monitoring with Core Web Vitals (FCP, LCP, INP, CLS, TTFB)
 import { onCLS, onFCP, onLCP, onTTFB, onINP, Metric } from 'web-vitals';
 import { supabase } from '@/integrations/supabase/client';
 
