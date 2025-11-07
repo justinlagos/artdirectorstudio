@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, X, CheckCircle2, Clock, AlertCircle, Loader2, Eye, Download, Trash2 } from "lucide-react";
+import { Upload, X, CheckCircle2, Clock, AlertCircle, Loader2, Eye, Download, Trash2, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -36,6 +36,7 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
   const [processType, setProcessType] = useState<ProcessType>('upscale');
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const stats = {
@@ -151,9 +152,18 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     }
 
     setIsProcessing(true);
-    setCurrentIndex(0);
+    setIsPaused(false);
 
-    for (let i = 0; i < queue.length; i++) {
+    // Start from currentIndex if resuming, otherwise start from 0
+    const startIndex = isPaused ? currentIndex : 0;
+    if (!isPaused) setCurrentIndex(0);
+
+    for (let i = startIndex; i < queue.length; i++) {
+      // Check if paused before processing each item
+      if (isPaused) {
+        break;
+      }
+
       const item = queue[i];
       if (item.status !== 'pending') continue;
 
@@ -211,8 +221,22 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
       }
     }
 
-    setIsProcessing(false);
-    toast.success("Batch processing completed!");
+    if (!isPaused) {
+      setIsProcessing(false);
+      toast.success("Batch processing completed!");
+    } else {
+      setIsProcessing(false);
+      toast.info("Batch processing paused");
+    }
+  };
+
+  const handlePause = () => {
+    setIsPaused(true);
+  };
+
+  const handleResume = () => {
+    setIsPaused(false);
+    processQueue();
   };
 
   const handleDownload = (item: QueueItem) => {
@@ -449,20 +473,34 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
 
           <div className="flex-1" />
 
-          <Button
-            onClick={processQueue}
-            disabled={isProcessing || stats.pending === 0}
-            className="min-w-[140px]"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing {currentIndex + 1}/{stats.total}
-              </>
-            ) : (
-              `Process ${stats.pending} Image${stats.pending !== 1 ? 's' : ''}`
-            )}
-          </Button>
+          {isProcessing && !isPaused && (
+            <Button variant="outline" onClick={handlePause}>
+              Pause
+            </Button>
+          )}
+
+          {!isProcessing && isPaused && stats.pending > 0 && (
+            <Button onClick={handleResume} className="min-w-[140px]">
+              Resume Processing
+            </Button>
+          )}
+
+          {!isProcessing && !isPaused && (
+            <Button
+              onClick={processQueue}
+              disabled={stats.pending === 0}
+              className="min-w-[140px]"
+            >
+              Process {stats.pending} Image{stats.pending !== 1 ? 's' : ''}
+            </Button>
+          )}
+
+          {isProcessing && !isPaused && (
+            <Button disabled className="min-w-[140px]">
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Processing {currentIndex + 1}/{stats.total}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
