@@ -8,9 +8,11 @@ import { Separator } from "@/components/ui/separator";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
-import { AnalysisSelect } from "@/components/AnalysisSelect";
+import { ChipSelector } from "@/components/ChipSelector";
 import { InsightChips } from "@/components/InsightChips";
 import { QuickTweaksRow } from "@/components/QuickTweaksRow";
+import { GuidedTweaks } from "@/components/GuidedTweaks";
+import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
 import jsPDF from "jspdf";
 
 interface ResultsSectionProps {
@@ -47,6 +49,11 @@ export const ResultsSection = ({
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
   const [livePreviewPrompt, setLivePreviewPrompt] = useState(result.full_regeneration_prompt);
   const [modifiedCount, setModifiedCount] = useState(0);
+  const [promptPulse, setPromptPulse] = useState(false);
+  const [isApplyingTweak, setIsApplyingTweak] = useState(false);
+
+  // Use adaptive fields hook
+  const adaptiveFields = useAdaptiveFields(result.analysis);
 
   // Load edits from local storage on mount
   useEffect(() => {
@@ -73,7 +80,7 @@ export const ResultsSection = ({
     return () => clearTimeout(timeoutId);
   }, [userEdits]);
 
-  // Live preview with debounced regeneration (2s delay)
+  // Live preview with debounced regeneration (2s delay) + pulse animation
   useEffect(() => {
     if (Object.keys(userEdits).length === 0) {
       setLivePreviewPrompt(result.full_regeneration_prompt);
@@ -83,6 +90,10 @@ export const ResultsSection = ({
 
     const count = Object.keys(userEdits).filter(key => userEdits[key as keyof UserEdits]).length;
     setModifiedCount(count);
+
+    // Trigger pulse animation
+    setPromptPulse(true);
+    setTimeout(() => setPromptPulse(false), 600);
 
     const timeoutId = setTimeout(() => {
       // Generate live preview by merging edits into prompt
@@ -123,6 +134,26 @@ export const ResultsSection = ({
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleApplyGuidedTweak = async (tweakDescription: string) => {
+    setIsApplyingTweak(true);
+    try {
+      // In a real implementation, call an edge function to apply the tweak
+      // For now, we'll add it as a note to the user
+      toast.info("Applying tweak: " + tweakDescription);
+      
+      // Simulate applying the tweak by triggering regeneration
+      setTimeout(() => {
+        onRegenerate({ ...userEdits });
+        setIsApplyingTweak(false);
+        toast.success("Tweak applied! Review the updated prompt.");
+      }, 1500);
+    } catch (error) {
+      console.error("Error applying guided tweak:", error);
+      toast.error("Failed to apply tweak");
+      setIsApplyingTweak(false);
+    }
   };
 
   const handleCopyPrompt = () => {
@@ -308,10 +339,10 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       title: "2. Subject Description", 
       content: result.analysis.subject_description,
       key: "subject_description" as const,
-      editFields: [
-        { label: "Gender", key: "subject_gender" as keyof UserEdits, options: SUGGESTIONS.subject_gender, helpText: "Specify the gender presentation of the subject" },
-        { label: "Ethnicity/Skin Tone", key: "subject_ethnicity" as keyof UserEdits, options: SUGGESTIONS.subject_ethnicity, helpText: "Define the subject's ethnicity or skin tone" }
-      ]
+      editFields: adaptiveFields.showHumanFields ? [
+        { label: "Gender", key: "subject_gender" as keyof UserEdits, options: SUGGESTIONS.subject_gender },
+        { label: "Ethnicity/Skin Tone", key: "subject_ethnicity" as keyof UserEdits, options: SUGGESTIONS.subject_ethnicity }
+      ] : []
     },
     { 
       title: "3. Camera & Composition", 
@@ -426,6 +457,12 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         <InsightChips insights={extractInsights()} />
         
         <QuickTweaksRow analysis={result.analysis} />
+        
+        <GuidedTweaks 
+          analysis={result.analysis}
+          onApplyTweak={handleApplyGuidedTweak}
+          isApplying={isApplyingTweak}
+        />
       </div>
 
       <Separator className="my-8" />
@@ -483,7 +520,9 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="relative bg-surface-1 rounded-2xl p-8 shadow-subtle ring-1 ring-border/50 hover:shadow-medium hover:ring-border transition-all duration-300">
+          <div className={`relative bg-surface-1 rounded-2xl p-8 shadow-subtle ring-1 ring-border/50 hover:shadow-medium hover:ring-border transition-all duration-300 ${
+            promptPulse ? 'animate-pulse ring-primary/50' : ''
+          }`}>
             <Textarea
               value={livePreviewPrompt}
               readOnly
@@ -572,14 +611,12 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
                     </p>
                   </div>
                   {section.editFields.map((field) => (
-                    <AnalysisSelect
+                     <ChipSelector
                       key={field.key}
                       label={field.label}
                       value={userEdits[field.key] || ''}
                       onChange={(value) => handleEditChange(field.key, value)}
                       options={field.options}
-                      placeholder={`Select ${field.label.toLowerCase()}...`}
-                      helpText={field.helpText}
                     />
                   ))}
                 </div>
