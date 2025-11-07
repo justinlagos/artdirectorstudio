@@ -84,20 +84,32 @@ export const ImageBlendDialogEnhanced = ({ open, onOpenChange }: ImageBlendDialo
     }, 2000);
 
     try {
+      console.log('🎨 [BlendPro] Starting professional blend with', images.length, 'images');
+      
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        console.error('❌ [BlendPro] No session found');
         toast.error("Please log in to continue.");
         setIsBlending(false);
         clearInterval(progressInterval);
         return;
       }
 
+      console.log('✅ [BlendPro] Session validated');
+
       // Convert files to base64
+      console.log('📸 [BlendPro] Converting images to base64...');
       const base64Images = await Promise.all(
-        images.map(img => new Promise<string>((resolve, reject) => {
+        images.map((img, idx) => new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
+          reader.onload = () => {
+            console.log(`✅ [BlendPro] Image ${idx + 1} converted`);
+            resolve(reader.result as string);
+          };
+          reader.onerror = (error) => {
+            console.error(`❌ [BlendPro] Failed to read image ${idx + 1}:`, error);
+            reject(error);
+          };
           reader.readAsDataURL(img.file);
         }))
       );
@@ -118,6 +130,7 @@ Requirements:
 - Unified artistic style and mood
 - Professional, designer-quality result`;
 
+      console.log('🚀 [BlendPro] Invoking blend-images with enhanced instruction');
       const { data, error } = await supabase.functions.invoke("blend-images", {
         body: { images: base64Images, instruction: enhancedInstruction },
         headers: {
@@ -128,19 +141,52 @@ Requirements:
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (error) throw error;
+      console.log('📦 [BlendPro] Response:', {
+        hasData: !!data,
+        hasError: !!error,
+        hasImage: !!data?.image,
+        imageLength: data?.image?.length || 0
+      });
 
-      if (data?.image) {
-        setBlendedImage(data.image);
-        
-        // Auto-save to My Projects
-        await saveToMyProjects(data.image);
-        
-        toast.success("Images blended professionally!");
+      if (error) {
+        console.error('❌ [BlendPro] Edge function error:', error);
+        throw error;
       }
+
+      if (!data) {
+        console.error('❌ [BlendPro] No data returned');
+        toast.error('No response from server');
+        return;
+      }
+
+      if (!data.image) {
+        console.error('❌ [BlendPro] No image in response');
+        toast.error('Image generation failed');
+        return;
+      }
+
+      // Validate image format
+      let validatedImage = data.image;
+      if (!data.image.startsWith('data:image/')) {
+        console.warn('⚠️ [BlendPro] Adding data URI prefix');
+        validatedImage = `data:image/png;base64,${data.image}`;
+      }
+
+      console.log('✅ [BlendPro] Setting blended image');
+      setBlendedImage(validatedImage);
+      
+      // Auto-save to My Projects
+      console.log('💾 [BlendPro] Saving to projects...');
+      await saveToMyProjects(validatedImage);
+      
+      console.log('🎉 [BlendPro] Blend completed successfully');
+      toast.success("Images blended professionally!");
     } catch (error: any) {
       clearInterval(progressInterval);
-      console.error("Blend error:", error);
+      console.error("❌ [BlendPro] Error:", {
+        message: error?.message,
+        details: error
+      });
       
       // Check for specific error types
       if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
@@ -408,6 +454,11 @@ Requirements:
                   src={blendedImage} 
                   alt="Professional blend" 
                   className="w-full h-auto"
+                  onLoad={() => console.log('✅ [BlendPro] Image loaded successfully')}
+                  onError={(e) => {
+                    console.error('❌ [BlendPro] Image failed to load:', e);
+                    toast.error('Failed to display image');
+                  }}
                 />
               </div>
               

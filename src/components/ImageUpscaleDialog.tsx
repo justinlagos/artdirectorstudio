@@ -66,23 +66,36 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     }, 2000);
 
     try {
+      console.log('🔍 [Upscale] Starting upscale process, target size:', targetSize);
+      
       // Get session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        console.error('❌ [Upscale] No session found');
         toast.error("Please log in to continue.");
         setIsUpscaling(false);
         clearInterval(progressInterval);
         return;
       }
 
+      console.log('✅ [Upscale] Session validated');
+
       // Convert file to base64 for edge function
+      console.log('📸 [Upscale] Converting image to base64...');
       const base64Image = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
+        reader.onload = () => {
+          console.log('✅ [Upscale] Image converted, size:', (reader.result as string).length, 'chars');
+          resolve(reader.result as string);
+        };
+        reader.onerror = (error) => {
+          console.error('❌ [Upscale] Failed to read image:', error);
+          reject(error);
+        };
         reader.readAsDataURL(sourceImage.file);
       });
 
+      console.log('🚀 [Upscale] Invoking upscale-image edge function...');
       const { data, error } = await supabase.functions.invoke("upscale-image", {
         body: { image: base64Image, targetSize },
         headers: {
@@ -93,19 +106,55 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (error) throw error;
+      console.log('📦 [Upscale] Response received:', {
+        hasData: !!data,
+        hasError: !!error,
+        dataKeys: data ? Object.keys(data) : [],
+        hasImage: !!data?.image,
+        imageLength: data?.image?.length || 0,
+        imagePrefix: data?.image?.substring(0, 50) || 'N/A'
+      });
 
-      if (data?.image) {
-        setUpscaledImage(data.image);
-        
-        // Auto-save to My Projects
-        await saveToMyProjects(data.image, targetSize);
-        
-        toast.success("Image upscaled successfully!");
+      if (error) {
+        console.error('❌ [Upscale] Edge function error:', error);
+        throw error;
       }
+
+      if (!data) {
+        console.error('❌ [Upscale] No data returned from edge function');
+        toast.error('No response from server');
+        return;
+      }
+
+      if (!data.image) {
+        console.error('❌ [Upscale] Response missing image field. Full response:', data);
+        toast.error('Image generation failed - no image returned');
+        return;
+      }
+
+      // Validate image format
+      let validatedImage = data.image;
+      if (!data.image.startsWith('data:image/')) {
+        console.warn('⚠️ [Upscale] Invalid image format, adding data URI prefix');
+        validatedImage = `data:image/png;base64,${data.image}`;
+      }
+
+      console.log('✅ [Upscale] Image validated, setting state');
+      setUpscaledImage(validatedImage);
+      
+      // Auto-save to My Projects
+      console.log('💾 [Upscale] Saving to My Projects...');
+      await saveToMyProjects(validatedImage, targetSize);
+      
+      console.log('🎉 [Upscale] Upscale completed successfully');
+      toast.success("Image upscaled successfully!");
     } catch (error: any) {
       clearInterval(progressInterval);
-      console.error("Upscale error:", error);
+      console.error("❌ [Upscale] Error occurred:", {
+        message: error?.message,
+        details: error,
+        stack: error?.stack
+      });
       
       // Check for specific error types
       if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
@@ -334,6 +383,19 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
                 <p className="text-xs text-center text-muted-foreground">
                   Drag the slider to compare before and after
                 </p>
+                <img 
+                  src={upscaledImage} 
+                  alt="Upscaled verification" 
+                  className="hidden"
+                  onLoad={() => console.log('✅ [Upscale] Image loaded successfully in UI')}
+                  onError={(e) => {
+                    console.error('❌ [Upscale] Image failed to load in UI:', {
+                      src: upscaledImage?.substring(0, 100),
+                      error: e
+                    });
+                    toast.error('Failed to display upscaled image');
+                  }}
+                />
               </div>
               
               <div className="grid grid-cols-2 gap-2">

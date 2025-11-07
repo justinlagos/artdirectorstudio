@@ -147,25 +147,38 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     }, 2000);
 
     try {
+      console.log('🎨 [Blend] Starting blend process with', images.length, 'images');
+      
       // Get session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        console.error('❌ [Blend] No session found');
         toast.error("Please log in to continue.");
         setIsBlending(false);
         clearInterval(progressInterval);
         return;
       }
 
+      console.log('✅ [Blend] Session validated');
+
       // Convert files to base64 for edge function
+      console.log('📸 [Blend] Converting images to base64...');
       const base64Images = await Promise.all(
-        images.map(img => new Promise<string>((resolve, reject) => {
+        images.map((img, idx) => new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
+          reader.onload = () => {
+            console.log(`✅ [Blend] Image ${idx + 1} converted, size: ${(reader.result as string).length} chars`);
+            resolve(reader.result as string);
+          };
+          reader.onerror = (error) => {
+            console.error(`❌ [Blend] Failed to read image ${idx + 1}:`, error);
+            reject(error);
+          };
           reader.readAsDataURL(img.file);
         }))
       );
 
+      console.log('🚀 [Blend] Invoking blend-images edge function...');
       const { data, error } = await supabase.functions.invoke("blend-images", {
         body: { images: base64Images, instruction },
         headers: {
@@ -176,20 +189,72 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (error) throw error;
+      console.log('📦 [Blend] Response received:', {
+        hasData: !!data,
+        hasError: !!error,
+        dataKeys: data ? Object.keys(data) : [],
+        hasImage: !!data?.image,
+        imageLength: data?.image?.length || 0,
+        imagePrefix: data?.image?.substring(0, 50) || 'N/A'
+      });
 
-      if (data?.image) {
-        setBlendedImage(data.image);
-        
-        // Auto-save to My Projects
-        await saveToMyProjects(data.image, instruction);
-        
-        toast.success("Images blended successfully!");
+      if (error) {
+        console.error('❌ [Blend] Edge function error:', error);
+        throw error;
       }
-    } catch (error) {
+
+      if (!data) {
+        console.error('❌ [Blend] No data returned from edge function');
+        toast.error('No response from server');
+        return;
+      }
+
+      if (!data.image) {
+        console.error('❌ [Blend] Response missing image field. Full response:', data);
+        toast.error('Image generation failed - no image returned');
+        return;
+      }
+
+      // Validate image format
+      let validatedImage = data.image;
+      if (!data.image.startsWith('data:image/')) {
+        console.warn('⚠️ [Blend] Invalid image format, adding data URI prefix');
+        validatedImage = `data:image/png;base64,${data.image}`;
+      }
+
+      console.log('✅ [Blend] Image validated, setting state');
+      setBlendedImage(validatedImage);
+      
+      // Auto-save to My Projects
+      console.log('💾 [Blend] Saving to My Projects...');
+      await saveToMyProjects(validatedImage, instruction);
+      
+      console.log('🎉 [Blend] Blend completed successfully');
+      toast.success("Images blended successfully!");
+    } catch (error: any) {
       clearInterval(progressInterval);
-      console.error("Blend error:", error);
-      toast.error("Failed to blend images. Please try again.");
+      console.error("❌ [Blend] Error occurred:", {
+        message: error?.message,
+        details: error,
+        stack: error?.stack
+      });
+      
+      // Check for specific error types
+      if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
+        toast.error("Rate limit exceeded", {
+          description: "Please wait a minute and try again.",
+          duration: 5000,
+        });
+      } else if (error?.message?.includes('Credits exhausted') || error?.message?.includes('402')) {
+        toast.error("Credits exhausted", {
+          description: "Please add credits to continue.",
+          duration: 7000,
+        });
+      } else {
+        toast.error("Failed to blend images", {
+          description: error?.message || "Please try again.",
+        });
+      }
     } finally {
       setIsBlending(false);
       setTimeout(() => setProgress(0), 1000);
@@ -394,6 +459,14 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                   src={blendedImage} 
                   alt="Blended image" 
                   className="w-full h-auto"
+                  onLoad={() => console.log('✅ [Blend] Image loaded successfully in UI')}
+                  onError={(e) => {
+                    console.error('❌ [Blend] Image failed to load in UI:', {
+                      src: blendedImage?.substring(0, 100),
+                      error: e
+                    });
+                    toast.error('Failed to display blended image');
+                  }}
                 />
                 <div className="absolute top-2 right-2">
                   <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
