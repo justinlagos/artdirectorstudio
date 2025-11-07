@@ -5,15 +5,23 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
   text: string;
   sender: 'user' | 'artie';
   timestamp: Date;
+  attachment?: {
+    type: 'image' | 'document';
+    url: string;
+    name: string;
+    data?: string; // parsed document content or brief analysis
+  };
+  actionChips?: { label: string; action: string }[];
 }
 
 type QuickAction = {
@@ -35,10 +43,17 @@ export const ArtieChat = () => {
   const [showPrompt, setShowPrompt] = useState(false);
   const [hasSeenTooltip, setHasSeenTooltip] = useState(false);
   const [contextualPrompt, setContextualPrompt] = useState("");
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [contextMemory, setContextMemory] = useState<{
+    lastImageUrl?: string;
+    lastAnalysis?: any;
+    briefSummary?: string;
+  }>({});
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi! I'm Artie — Your Creative Collaborator.\n\nI can help you brainstorm ideas, refine visual concepts, analyze images, or guide you through any creative challenge. What are we working on today?",
+      text: "Hi! I'm Artie — Your Creative Collaborator.\n\nI can help you brainstorm ideas, refine visual concepts, analyze images, or guide you through any creative challenge. You can also upload images or creative briefs for me to review.\n\nWhat are we working on today?",
       sender: 'artie',
       timestamp: new Date()
     }
@@ -47,6 +62,7 @@ export const ArtieChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -109,158 +125,236 @@ export const ArtieChat = () => {
     setIsOpen(true);
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Validate file types and sizes
+    const validFiles = files.filter(file => {
+      const isValidType = 
+        file.type.startsWith('image/') ||
+        file.type === 'application/pdf' ||
+        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        file.type === 'application/msword';
+      
+      const isValidSize = file.size <= 20 * 1024 * 1024; // 20MB
+
+      if (!isValidType) {
+        toast({
+          title: "Invalid file type",
+          description: `${file.name} is not supported. Please upload images, PDFs, or Word documents.`,
+          variant: "destructive",
+        });
+      }
+      if (!isValidSize) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 20MB limit.`,
+          variant: "destructive",
+        });
+      }
+
+      return isValidType && isValidSize;
+    });
+
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles]);
+      toast({
+        title: "Files added",
+        description: `${validFiles.length} file(s) ready to upload`,
+      });
+    }
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleChipAction = (action: string) => {
+    setInputValue(action);
+    setTimeout(() => handleSend(), 100);
+  };
+
   const handleSend = async (contextData?: { prompt?: string; analysis?: any; credits?: number }) => {
-    if (!inputValue.trim() || isLoading) return;
+    if ((!inputValue.trim() && uploadedFiles.length === 0) || isLoading) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputValue,
-      sender: 'user',
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue("");
     setIsLoading(true);
+    setIsUploading(true);
 
     try {
-      const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/artie-chat`;
+      // Process uploaded files first
+      const attachments: any[] = [];
       
-      // Build context-aware message if context provided
-      let contextualInput = inputValue;
-      if (contextData) {
-        const contextParts = [];
-        if (contextData.prompt) {
-          contextParts.push(`Current prompt: "${contextData.prompt.slice(0, 200)}..."`);
-        }
-        if (contextData.analysis) {
-          contextParts.push(`Image overview: ${contextData.analysis.image_overview?.slice(0, 150)}`);
-        }
-        if (contextData.credits !== undefined) {
-          contextParts.push(`User has ${contextData.credits} credits remaining`);
-        }
-        if (contextParts.length > 0) {
-          contextualInput = `Context: ${contextParts.join(' | ')}\n\nUser question: ${inputValue}`;
-        }
-      }
-      
-      const response = await fetch(CHAT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          messages: messages
-            .filter(m => m.sender === 'user' || m.sender === 'artie')
-            .slice(-10)
-            .map(m => ({
-              role: m.sender === 'user' ? 'user' : 'assistant',
-              content: m.text
-            }))
-            .concat([{ role: 'user', content: contextualInput }])
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from Artie');
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedText = '';
-      let textBuffer = '';
-      let toolCalls: any[] = [];
-
-      const assistantMessageId = (Date.now() + 1).toString();
-      setMessages(prev => [...prev, {
-        id: assistantMessageId,
-        text: '',
-        sender: 'artie',
-        timestamp: new Date()
-      }]);
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          textBuffer += decoder.decode(value, { stream: true });
+      for (const file of uploadedFiles) {
+        if (file.type.startsWith('image/')) {
+          // Upload image to storage
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const { data: { user } } = await supabase.auth.getUser();
           
-          let newlineIndex: number;
-          while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
-            let line = textBuffer.slice(0, newlineIndex);
-            textBuffer = textBuffer.slice(newlineIndex + 1);
+          if (user) {
+            const filePath = `${user.id}/${fileName}`;
+            const { data, error } = await supabase.storage
+              .from('generated-images')
+              .upload(filePath, file);
 
-            if (line.endsWith('\r')) line = line.slice(0, -1);
-            if (line.startsWith(':') || line.trim() === '') continue;
-            if (!line.startsWith('data: ')) continue;
-
-            const jsonStr = line.slice(6).trim();
-            if (jsonStr === '[DONE]') break;
-
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const delta = parsed.choices?.[0]?.delta;
+            if (!error) {
+              const { data: { publicUrl } } = supabase.storage
+                .from('generated-images')
+                .getPublicUrl(filePath);
               
-              if (delta?.content) {
-                accumulatedText += delta.content;
-                setMessages(prev => 
-                  prev.map(m => 
-                    m.id === assistantMessageId 
-                      ? { ...m, text: accumulatedText }
-                      : m
-                  )
-                );
-              }
+              attachments.push({
+                type: 'image',
+                url: publicUrl,
+                name: file.name
+              });
 
-              if (delta?.tool_calls) {
-                delta.tool_calls.forEach((tc: any) => {
-                  if (!toolCalls[tc.index]) {
-                    toolCalls[tc.index] = {
-                      id: tc.id,
-                      type: tc.type,
-                      function: { name: tc.function?.name || '', arguments: '' }
-                    };
-                  }
-                  if (tc.function?.arguments) {
-                    toolCalls[tc.index].function.arguments += tc.function.arguments;
-                  }
-                });
-              }
-            } catch (e) {
-              // Ignore parse errors
+              // Store in context memory
+              setContextMemory(prev => ({ ...prev, lastImageUrl: publicUrl }));
+            }
+          }
+        } else if (file.type === 'application/pdf' || file.type.includes('word')) {
+          // Parse document
+          const reader = new FileReader();
+          const fileData = await new Promise<string>((resolve) => {
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.readAsDataURL(file);
+          });
+
+          attachments.push({
+            type: 'document',
+            url: fileData,
+            name: file.name,
+            rawFile: file
+          });
+        }
+      }
+
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        text: inputValue || "Please review these files",
+        sender: 'user',
+        timestamp: new Date(),
+        ...(attachments.length > 0 && { 
+          attachment: attachments[0] // For now, show first attachment
+        })
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+      setInputValue("");
+      setUploadedFiles([]);
+      setIsUploading(false);
+
+      try {
+        const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/artie-chat`;
+        
+        // Build context-aware message with attachments
+        let contextualInput = inputValue || "Please review these files";
+        const contextParts = [];
+        
+        // Add file context
+        if (attachments.length > 0) {
+          for (const att of attachments) {
+            if (att.type === 'image') {
+              contextParts.push(`[User uploaded image: ${att.name}]`);
+            } else if (att.type === 'document') {
+              contextParts.push(`[User uploaded document: ${att.name} - analyzing for creative brief content]`);
             }
           }
         }
+        
+        // Add context memory
+        if (contextMemory.briefSummary) {
+          contextParts.push(`Previous brief context: ${contextMemory.briefSummary}`);
+        }
+        if (contextMemory.lastImageUrl && !attachments.some(a => a.type === 'image')) {
+          contextParts.push(`Last image reference: ${contextMemory.lastImageUrl}`);
+        }
 
-        if (toolCalls.length > 0) {
-          for (const toolCall of toolCalls) {
-            if (toolCall.function.name === 'generate_image') {
-              const args = JSON.parse(toolCall.function.arguments);
-              accumulatedText += '\n\n(Generating image...)';
-              setMessages(prev => 
-                prev.map(m => 
-                  m.id === assistantMessageId 
-                    ? { ...m, text: accumulatedText }
-                    : m
-                )
-              );
+        if (contextData) {
+          if (contextData.prompt) {
+            contextParts.push(`Current prompt: "${contextData.prompt.slice(0, 200)}..."`);
+          }
+          if (contextData.analysis) {
+            contextParts.push(`Image overview: ${contextData.analysis.image_overview?.slice(0, 150)}`);
+          }
+          if (contextData.credits !== undefined) {
+            contextParts.push(`User has ${contextData.credits} credits remaining`);
+          }
+        }
+        
+        if (contextParts.length > 0) {
+          contextualInput = `Context: ${contextParts.join(' | ')}\n\nUser message: ${contextualInput}`;
+        }
+        
+        const response = await fetch(CHAT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: messages
+              .filter(m => m.sender === 'user' || m.sender === 'artie')
+              .slice(-10)
+              .map(m => ({
+                role: m.sender === 'user' ? 'user' : 'assistant',
+                content: m.text
+              }))
+              .concat([{ role: 'user', content: contextualInput }]),
+            attachments: attachments,
+            contextMemory: contextMemory
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to get response from Artie');
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedText = '';
+        let textBuffer = '';
+        let toolCalls: any[] = [];
+
+        const assistantMessageId = (Date.now() + 1).toString();
+        setMessages(prev => [...prev, {
+          id: assistantMessageId,
+          text: '',
+          sender: 'artie',
+          timestamp: new Date()
+        }]);
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            textBuffer += decoder.decode(value, { stream: true });
+            
+            let newlineIndex: number;
+            while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+              let line = textBuffer.slice(0, newlineIndex);
+              textBuffer = textBuffer.slice(newlineIndex + 1);
+
+              if (line.endsWith('\r')) line = line.slice(0, -1);
+              if (line.startsWith(':') || line.trim() === '') continue;
+              if (!line.startsWith('data: ')) continue;
+
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]') break;
 
               try {
-                const genResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                  },
-                  body: JSON.stringify({ prompt: args.prompt })
-                });
-
-                const genData = await genResponse.json();
-                if (genData.imageUrl) {
-                  accumulatedText = accumulatedText.replace('(Generating image...)', '');
-                  accumulatedText += `\n\n[Generated Image]\n${genData.imageUrl}`;
+                const parsed = JSON.parse(jsonStr);
+                const delta = parsed.choices?.[0]?.delta;
+                
+                if (delta?.content) {
+                  accumulatedText += delta.content;
                   setMessages(prev => 
                     prev.map(m => 
                       m.id === assistantMessageId 
@@ -269,30 +363,95 @@ export const ArtieChat = () => {
                     )
                   );
                 }
-              } catch (imgError) {
-                console.error('Image generation error:', imgError);
-                accumulatedText = accumulatedText.replace('(Generating image...)', '(Image generation failed)');
+
+                if (delta?.tool_calls) {
+                  delta.tool_calls.forEach((tc: any) => {
+                    if (!toolCalls[tc.index]) {
+                      toolCalls[tc.index] = {
+                        id: tc.id,
+                        type: tc.type,
+                        function: { name: tc.function?.name || '', arguments: '' }
+                      };
+                    }
+                    if (tc.function?.arguments) {
+                      toolCalls[tc.index].function.arguments += tc.function.arguments;
+                    }
+                  });
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          }
+
+          if (toolCalls.length > 0) {
+            for (const toolCall of toolCalls) {
+              if (toolCall.function.name === 'generate_image') {
+                const args = JSON.parse(toolCall.function.arguments);
+                accumulatedText += '\n\n(Generating image...)';
                 setMessages(prev => 
                   prev.map(m => 
                     m.id === assistantMessageId 
                       ? { ...m, text: accumulatedText }
-                        : m
+                      : m
                   )
                 );
+
+                try {
+                  const genResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                    },
+                    body: JSON.stringify({ prompt: args.prompt })
+                  });
+
+                  const genData = await genResponse.json();
+                  if (genData.imageUrl) {
+                    accumulatedText = accumulatedText.replace('(Generating image...)', '');
+                    accumulatedText += `\n\n[Generated Image]\n${genData.imageUrl}`;
+                    setMessages(prev => 
+                      prev.map(m => 
+                        m.id === assistantMessageId 
+                          ? { ...m, text: accumulatedText }
+                          : m
+                      )
+                    );
+                  }
+                } catch (imgError) {
+                  console.error('Image generation error:', imgError);
+                  accumulatedText = accumulatedText.replace('(Generating image...)', '(Image generation failed)');
+                  setMessages(prev => 
+                    prev.map(m => 
+                      m.id === assistantMessageId 
+                        ? { ...m, text: accumulatedText }
+                          : m
+                    )
+                  );
+                }
               }
             }
           }
         }
+      } catch (error) {
+        console.error('Error getting Artie response:', error);
+        toast({
+          title: "Connection Error",
+          description: "Couldn't reach Artie. Please try again.",
+          variant: "destructive",
+        });
+        
+        setMessages(prev => prev.filter(m => m.id !== (Date.now() + 1).toString()));
       }
-    } catch (error) {
-      console.error('Error getting Artie response:', error);
+    } catch (uploadError) {
+      console.error('Error uploading files:', uploadError);
       toast({
-        title: "Connection Error",
-        description: "Couldn't reach Artie. Please try again.",
+        title: "Upload Error",
+        description: "Failed to process uploaded files. Please try again.",
         variant: "destructive",
       });
-      
-      setMessages(prev => prev.filter(m => m.id !== (Date.now() + 1).toString()));
+      setIsUploading(false);
     } finally {
       setIsLoading(false);
     }
@@ -423,27 +582,65 @@ export const ArtieChat = () => {
                       <Sparkles className="h-4 w-4 text-primary" />
                     </div>
                   )}
-                  <div
-                    className={cn(
-                      "rounded-2xl px-4 py-3 shadow-sm",
-                      message.sender === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-br-md'
-                        : 'bg-muted/80 backdrop-blur-sm rounded-bl-md'
-                    )}
-                  >
-                    {message.text.includes('[Generated Image]') ? (
-                      <div className="space-y-2">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {message.text.split('[Generated Image]')[0]}
-                        </p>
-                        <img 
-                          src={message.text.split('[Generated Image]')[1].trim()} 
-                          alt="Generated by Artie"
-                          className="rounded-lg max-w-full h-auto border border-border/50"
-                        />
+                  <div className="space-y-2 w-full">
+                    {/* Attachment Preview */}
+                    {message.attachment && (
+                      <div className="rounded-xl overflow-hidden border border-border/50">
+                        {message.attachment.type === 'image' ? (
+                          <img 
+                            src={message.attachment.url} 
+                            alt={message.attachment.name}
+                            className="w-full h-auto max-h-[200px] object-cover"
+                          />
+                        ) : (
+                          <div className="bg-muted/50 px-3 py-2 flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">{message.attachment.name}</span>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                    )}
+
+                    {/* Message Text */}
+                    <div
+                      className={cn(
+                        "rounded-2xl px-4 py-3 shadow-sm",
+                        message.sender === 'user'
+                          ? 'bg-primary text-primary-foreground rounded-br-md'
+                          : 'bg-muted/80 backdrop-blur-sm rounded-bl-md'
+                      )}
+                    >
+                      {message.text.includes('[Generated Image]') ? (
+                        <div className="space-y-2">
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                            {message.text.split('[Generated Image]')[0]}
+                          </p>
+                          <img 
+                            src={message.text.split('[Generated Image]')[1].trim()} 
+                            alt="Generated by Artie"
+                            className="rounded-lg max-w-full h-auto border border-border/50"
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                      )}
+                    </div>
+
+                    {/* Action Chips */}
+                    {message.actionChips && message.actionChips.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {message.actionChips.map((chip, idx) => (
+                          <Button
+                            key={idx}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleChipAction(chip.action)}
+                            className="text-xs h-7 hover:bg-primary/10 hover:border-primary/50"
+                          >
+                            {chip.label}
+                          </Button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -472,6 +669,31 @@ export const ArtieChat = () => {
 
         {/* Input */}
         <div className="p-5 border-t border-border/50 bg-muted/10">
+          {/* File Upload Preview */}
+          {uploadedFiles.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {uploadedFiles.map((file, index) => (
+                <div 
+                  key={index}
+                  className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2 text-xs border border-border/50"
+                >
+                  {file.type.startsWith('image/') ? (
+                    <ImagePlus className="h-4 w-4 text-primary" />
+                  ) : (
+                    <FileCheck className="h-4 w-4 text-primary" />
+                  )}
+                  <span className="max-w-[120px] truncate">{file.name}</span>
+                  <button
+                    onClick={() => removeFile(index)}
+                    className="ml-1 hover:text-destructive transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -479,13 +701,33 @@ export const ArtieChat = () => {
             }}
             className="flex gap-2"
           >
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.doc,.docx"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              className="h-11 w-11 flex-shrink-0"
+              disabled={isLoading}
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
+
             <div className="relative flex-1">
               <Input
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Type your idea or ask for feedback..."
+                placeholder={isUploading ? "Processing files..." : "Type your idea or ask for feedback..."}
                 className="pr-12 h-11 bg-background border-border/50 focus-visible:ring-primary/50"
-                disabled={isLoading}
+                disabled={isLoading || isUploading}
               />
               {inputValue && (
                 <Badge 
@@ -499,10 +741,10 @@ export const ArtieChat = () => {
             <Button 
               type="submit" 
               size="icon"
-              className="h-11 w-11 shadow-sm"
-              disabled={!inputValue.trim() || isLoading}
+              className="h-11 w-11 shadow-sm flex-shrink-0"
+              disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading || isUploading}
             >
-              {isLoading ? (
+              {isLoading || isUploading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 <Send className="h-5 w-5" />
