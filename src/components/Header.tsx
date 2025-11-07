@@ -26,10 +26,10 @@ export const Header = () => {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center justify-between">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 md:gap-6">
           <Link to="/" className="flex items-center space-x-2 group">
             <Sparkles className="h-6 w-6 transition-all duration-200 stroke-foreground group-hover:stroke-transparent group-hover:fill-primary" />
-            <span className="hidden xs:inline font-display font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white">ArtDirector Studio</span>
+            <span className="hidden sm:inline font-display font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-900 dark:from-white dark:via-zinc-300 dark:to-white">ArtDirector Studio</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -79,18 +79,22 @@ export const Header = () => {
         </div>
 
         {/* Right side controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 md:gap-2">
           {user ? (
             <>
-              <TrialCreditsDisplay />
-              <SubscriptionStatus />
+              <div className="hidden sm:flex items-center gap-2">
+                <TrialCreditsDisplay />
+                <SubscriptionStatus />
+              </div>
               <ThemeToggle />
-              <UserMenu />
+              <div className="hidden sm:block">
+                <UserMenu />
+              </div>
             </>
           ) : (
             <>
               <ThemeToggle />
-              <Button onClick={() => navigate("/auth")} size="sm">
+              <Button onClick={() => navigate("/auth")} size="sm" className="hidden xs:flex">
                 Sign In
               </Button>
             </>
@@ -98,27 +102,36 @@ export const Header = () => {
 
           {/* Mobile Menu */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild className="md:hidden">
+            <SheetTrigger asChild className="sm:hidden">
               <Button variant="ghost" size="icon" className="min-w-[44px] min-h-[44px]">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[320px] sm:w-[340px]">
+            <SheetContent side="right" className="w-[300px]">
               <SheetHeader>
                 <SheetTitle className="text-left">Menu</SheetTitle>
               </SheetHeader>
               
-              <div className="flex flex-col h-full py-6">
+              <div className="flex flex-col h-full py-6 space-y-6">
+                {/* User Info Section */}
+                {user && (
+                  <div className="flex flex-col gap-3 pb-4 border-b border-border">
+                    <UserMenu />
+                    <TrialCreditsDisplay />
+                    <SubscriptionStatus />
+                  </div>
+                )}
+                
                 {/* Main Navigation */}
-                <nav className="flex flex-col space-y-2">
+                <nav className="flex flex-col space-y-1">
                   <Button 
                     variant="ghost" 
                     asChild 
-                    className="justify-start min-h-[56px] text-base"
+                    className="justify-start min-h-[48px]"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <Link to="/">
-                      <Home className="mr-3 h-5 w-5" />
+                      <Home className="mr-3 h-4 w-4" />
                       Studio
                     </Link>
                   </Button>
@@ -126,14 +139,14 @@ export const Header = () => {
                   {user && (
                     <Accordion type="single" collapsible className="w-full">
                       <AccordionItem value="tools" className="border-none">
-                        <AccordionTrigger className="py-4 px-4 hover:no-underline hover:bg-muted/50 rounded-md">
+                        <AccordionTrigger className="py-3 px-3 hover:no-underline hover:bg-muted/50 rounded-md">
                           <div className="flex items-center gap-3">
-                            <Wrench className="h-5 w-5" />
-                            <span className="text-base font-normal">Tools</span>
+                            <Wrench className="h-4 w-4" />
+                            <span className="font-normal">Tools</span>
                           </div>
                         </AccordionTrigger>
-                        <AccordionContent className="pb-2">
-                          <div className="flex flex-col space-y-1 pl-4">
+                        <AccordionContent className="pb-1">
+                          <div className="flex flex-col space-y-0.5 pl-2">
                             <Button 
                               variant="ghost" 
                               className="justify-start min-h-[48px] w-full"
@@ -176,14 +189,26 @@ export const Header = () => {
                   <Button 
                     variant="ghost" 
                     asChild 
-                    className="justify-start min-h-[56px] text-base"
+                    className="justify-start min-h-[48px]"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <Link to="/inspire">
-                      <Sparkles className="mr-3 h-5 w-5" />
+                      <Sparkles className="mr-3 h-4 w-4" />
                       Inspire
                     </Link>
                   </Button>
+                  
+                  {!user && (
+                    <Button 
+                      onClick={() => {
+                        navigate("/auth");
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full min-h-[48px] mt-4"
+                    >
+                      Sign In
+                    </Button>
+                  )}
                 </nav>
                 
               </div>
