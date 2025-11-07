@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Header } from "@/components/Header";
@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Crown, Calendar, CreditCard, Loader2 } from "lucide-react";
+import { Crown, Calendar, CreditCard, Loader2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -113,9 +113,10 @@ const Subscriptions = () => {
                   </div>
                 )}
 
-                {subscription.isPro && (
-                  <>
-                    <Separator />
+                <Separator />
+                
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {subscription.isPro && (
                     <Button 
                       onClick={handleManageSubscription}
                       variant="outline"
@@ -123,10 +124,19 @@ const Subscriptions = () => {
                     >
                       Manage Subscription
                     </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Update payment method, cancel, or change your plan
-                    </p>
-                  </>
+                  )}
+                  <Link to="/subscription-history" className="w-full sm:w-auto">
+                    <Button variant="outline" className="w-full">
+                      <Receipt className="w-4 h-4 mr-2" />
+                      View Billing History
+                    </Button>
+                  </Link>
+                </div>
+                
+                {subscription.isPro && (
+                  <p className="text-xs text-muted-foreground">
+                    Update payment method, cancel, or change your plan
+                  </p>
                 )}
               </>
             )}
