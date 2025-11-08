@@ -314,7 +314,7 @@ const History = () => {
                           size="sm"
                           onClick={() => navigate("/")}
                         >
-                          Use in Studio
+                          Generate in Studio
                         </Button>
                       </div>
                     </div>

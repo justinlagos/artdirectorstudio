@@ -942,7 +942,7 @@ const Inspire = () => {
                       onClick={() => handleUseInStudio(selectedItem)}
                     >
                       <Wand2 className="w-4 h-4 mr-2" />
-                      Use in Studio
+                      Generate in Studio
                     </Button>
                     {user && (
                       <Button 
@@ -1128,7 +1128,7 @@ const Inspire = () => {
                       onClick={() => handleUseInStudio(selectedItem)}
                     >
                       <Wand2 className="w-4 h-4 mr-2" />
-                      Use in Studio
+                      Generate in Studio
                     </Button>
                     {user && (
                       <Button 
