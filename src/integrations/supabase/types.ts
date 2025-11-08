@@ -268,6 +268,7 @@ export type Database = {
           icon: string | null
           id: string
           is_public: boolean | null
+          like_count: number | null
           name: string
           options: Json
           prompt_modifier: string
@@ -282,6 +283,7 @@ export type Database = {
           icon?: string | null
           id?: string
           is_public?: boolean | null
+          like_count?: number | null
           name: string
           options?: Json
           prompt_modifier: string
@@ -296,6 +298,7 @@ export type Database = {
           icon?: string | null
           id?: string
           is_public?: boolean | null
+          like_count?: number | null
           name?: string
           options?: Json
           prompt_modifier?: string
@@ -510,6 +513,35 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      preset_likes: {
+        Row: {
+          created_at: string | null
+          id: string
+          preset_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          preset_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          preset_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "preset_likes_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "custom_generation_presets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pricing_config: {
         Row: {

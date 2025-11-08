@@ -36,6 +36,7 @@ const SubscriptionHistory = lazy(() => import("./pages/SubscriptionHistory"));
 const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const SignedOut = lazy(() => import("./pages/SignedOut"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const PresetGallery = lazy(() => import("./pages/PresetGallery"));
 
 // Lazy load heavy components
 const ArtieChat = lazy(() => import("./components/ArtieChat").then(m => ({ default: m.ArtieChat })));
@@ -79,6 +80,7 @@ const App = () => (
                 <Route path="/subscription-history" element={<SubscriptionHistory />} />
                 <Route path="/billing-history" element={<BillingHistory />} />
                 <Route path="/signed-out" element={<SignedOut />} />
+                <Route path="/presets" element={<PresetGallery />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
