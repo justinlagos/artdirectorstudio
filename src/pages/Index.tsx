@@ -586,6 +586,7 @@ const Index = () => {
                 generatedImages={generatedImages}
                 onDeleteImage={handleDeleteImage}
                 onResultUpdate={handleResultUpdate}
+                imagePreviewUrl={previewUrl || undefined}
               />
             </div>
           )}

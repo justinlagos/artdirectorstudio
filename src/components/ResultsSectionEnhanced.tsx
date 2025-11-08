@@ -28,6 +28,7 @@ interface ResultsSectionProps {
   generatedImages: GeneratedImage[];
   onDeleteImage: (id: string) => void;
   onResultUpdate?: (result: AnalysisResult) => void;
+  imagePreviewUrl?: string;
 }
 
 // Predefined intelligent suggestions for each parameter
@@ -50,7 +51,8 @@ export const ResultsSection = ({
   onGenerateImage,
   generatedImages,
   onDeleteImage,
-  onResultUpdate
+  onResultUpdate,
+  imagePreviewUrl
 }: ResultsSectionProps) => {
   const [userEdits, setUserEdits] = useState<UserEdits>({});
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
@@ -528,30 +530,52 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
 
   return (
     <section className="space-y-8">
-      {/* Intro Note + Insights */}
-      <div className="space-y-6 animate-fade-in">
-        <div className="bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 rounded-xl p-6 ring-1 ring-border/30">
-          <p className="text-center text-muted-foreground text-sm leading-relaxed">
-            We've analyzed your image and set up your creative breakdown. <br className="hidden sm:inline" />
-            You can tweak or regenerate below.
-          </p>
-        </div>
-        
-        <InsightChips insights={extractInsights()} />
-        
-        <QuickTweaksRow analysis={result.analysis} />
-        
-        <GuidedTweaks 
-          analysis={result.analysis}
-          onApplyTweak={handleApplyGuidedTweak}
-          isApplying={isApplyingTweak || isRegenerating}
-        />
-      </div>
+      {/* Split-Screen Workspace Layout */}
+      <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+        {/* Left Side: Image Preview (Sticky on Desktop) */}
+        {imagePreviewUrl && (
+          <div className="lg:sticky lg:top-8 space-y-4">
+            <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-medium ring-1 ring-border/50">
+              <img 
+                src={imagePreviewUrl} 
+                alt="Analyzed image preview"
+                className="w-full h-full object-contain bg-surface-1"
+              />
+            </div>
+            <div className="bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 rounded-xl p-4 ring-1 ring-border/30">
+              <p className="text-center text-muted-foreground text-sm leading-relaxed">
+                Original Image
+              </p>
+            </div>
+          </div>
+        )}
 
-      <Separator className="my-8" />
+        {/* Right Side: Interactive Controls */}
+        <div className="space-y-8">
+          {/* Intro Note + Insights */}
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 rounded-xl p-6 ring-1 ring-border/30">
+              <p className="text-center text-muted-foreground text-sm leading-relaxed">
+                We've analyzed your image and set up your creative breakdown. <br className="hidden sm:inline" />
+                You can tweak or regenerate below.
+              </p>
+            </div>
+            
+            <InsightChips insights={extractInsights()} />
+            
+            <QuickTweaksRow analysis={result.analysis} />
+            
+            <GuidedTweaks 
+              analysis={result.analysis}
+              onApplyTweak={handleApplyGuidedTweak}
+              isApplying={isApplyingTweak || isRegenerating}
+            />
+          </div>
 
-      {/* Full Regeneration Prompt */}
-      <div className="space-y-6">
+          <Separator className="my-8" />
+
+          {/* Full Regeneration Prompt */}
+          <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <h2 className="text-3xl font-display font-bold tracking-tight">
             Full Regeneration Prompt
@@ -613,28 +637,28 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
             />
           </div>
         </div>
-      </div>
+          </div>
 
-      {/* Tools Showcase */}
-      <ToolsShowcase />
+          {/* Tools Showcase */}
+          <ToolsShowcase />
 
-      <Separator className="my-12" />
+          <Separator className="my-12" />
 
-      {/* Visual Prompt Builder */}
-      <div className="animate-fade-in">
-        <PromptBuilder 
-          analysis={result.analysis}
-          onGenerate={(prompt) => {
-            setGenerationPrompt(prompt);
-            setShowGenerationDialog(true);
-          }}
-        />
-      </div>
+          {/* Visual Prompt Builder */}
+          <div className="animate-fade-in">
+            <PromptBuilder 
+              analysis={result.analysis}
+              onGenerate={(prompt) => {
+                setGenerationPrompt(prompt);
+                setShowGenerationDialog(true);
+              }}
+            />
+          </div>
 
-      <Separator className="my-12" />
+          <Separator className="my-12" />
 
-      {/* Comprehensive Analysis */}
-      <div className="space-y-8">
+          {/* Comprehensive Analysis */}
+          <div className="space-y-8">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="text-3xl font-display font-bold tracking-tight">
@@ -676,20 +700,22 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
           </div>
         </div>
 
-        {/* Empty State */}
-        {modifiedCount === 0 && <EmptyStatePrompts />}
-        
-        {/* Tabbed Analysis Interface - Progressive Disclosure */}
-        <AnalysisTabbed
-          analysis={result.analysis}
-          userEdits={userEdits}
-          onEditChange={handleEditChange}
-          adaptiveFields={adaptiveFields}
-          suggestions={SUGGESTIONS}
-        />
+            {/* Empty State */}
+            {modifiedCount === 0 && <EmptyStatePrompts />}
+            
+            {/* Tabbed Analysis Interface - Progressive Disclosure */}
+            <AnalysisTabbed
+              analysis={result.analysis}
+              userEdits={userEdits}
+              onEditChange={handleEditChange}
+              adaptiveFields={adaptiveFields}
+              suggestions={SUGGESTIONS}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Generated Images Gallery */}
+      {/* Generated Images Gallery (Full Width Below Split-Screen) */}
       {generatedImages.length > 0 && (
         <>
           <Separator className="my-12" />
