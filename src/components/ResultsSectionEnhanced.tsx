@@ -251,123 +251,6 @@ export const ResultsSection = ({
     }
   ];
 
-  const actionButtons = (
-    <>
-      <Button
-        className="flex-1 rounded-full h-12 text-base font-semibold shadow-[0_18px_30px_-20px_rgba(0,0,0,0.45)]"
-        onClick={() => {
-          setGenerationPrompt(basePrompt);
-          setShowGenerationDialog(true);
-        }}
-      >
-        Use in Studio
-      </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            className="flex-1 rounded-full h-12 text-base font-semibold"
-          >
-            Download
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onSelect={handleDownloadTxt}>
-            Download as TXT
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleDownloadPdf}>
-            Download as PDF
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleDownloadJson}>
-            Download as JSON
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </>
-  );
-
-  const handleApplyGuidedTweak = async (tweakDescription: string) => {
-    setIsApplyingTweak(true);
-    try {
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to continue.");
-        setIsApplyingTweak(false);
-        return;
-      }
-
-      toast.info("Applying guided tweak with AI...");
-
-      // Call the edge function to apply the tweak
-      const { data, error } = await supabase.functions.invoke("apply-guided-tweak", {
-        body: { 
-          current_prompt: result.full_regeneration_prompt,
-          tweak_description: tweakDescription,
-          analysis: result.analysis
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) {
-        console.error("Guided tweak error:", error);
-        toast.error("Failed to apply tweak. Please try again.");
-        setIsApplyingTweak(false);
-        return;
-      }
-
-      if (!data?.full_regeneration_prompt) {
-        toast.error("Invalid response from AI. Please try again.");
-        setIsApplyingTweak(false);
-        return;
-      }
-
-      // Update the result with the modified prompt and any changed analysis fields
-      const updatedAnalysis = { ...result.analysis };
-      if (data.modified_fields) {
-        Object.entries(data.modified_fields).forEach(([key, value]) => {
-          if (value && key in updatedAnalysis) {
-            updatedAnalysis[key as keyof Analysis] = value as string;
-          }
-        });
-      }
-
-      const updatedResult = {
-        full_regeneration_prompt: data.full_regeneration_prompt,
-        analysis: updatedAnalysis
-      };
-
-      // Call the parent callback to update the result
-      if (onResultUpdate) {
-        onResultUpdate(updatedResult);
-      }
-
-      setIsApplyingTweak(false);
-      toast.success("Tweak applied successfully!");
-      
-      // Trigger pulse animation
-      setPromptPulse(true);
-      setTimeout(() => setPromptPulse(false), 600);
-
-    } catch (error) {
-      console.error("Error applying guided tweak:", error);
-      toast.error("An error occurred while applying the tweak.");
-      setIsApplyingTweak(false);
-    }
-  };
-
-  const handleCopyPrompt = () => {
-    navigator.clipboard.writeText(result.full_regeneration_prompt);
-    toast.success("Prompt copied to clipboard!");
-  };
-
-  const handleCopySection = (content: string, sectionName: string) => {
-    navigator.clipboard.writeText(content);
-    toast.success(`${sectionName} copied to clipboard!`);
-  };
-
   const handleDownloadTxt = () => {
     const timestamp = new Date().toISOString().split('T')[0];
     const content = `AI IMAGE PROMPT RECONSTRUCTION SHEET
@@ -526,6 +409,124 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     
     toast.success("JSON file downloaded!");
   };
+
+  const actionButtons = (
+    <>
+      <Button
+        className="flex-1 rounded-full h-12 text-base font-semibold shadow-[0_18px_30px_-20px_rgba(0,0,0,0.45)]"
+        onClick={() => {
+          setGenerationPrompt(basePrompt);
+          setShowGenerationDialog(true);
+        }}
+      >
+        Use in Studio
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            className="flex-1 rounded-full h-12 text-base font-semibold"
+          >
+            Download
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onSelect={handleDownloadTxt}>
+            Download as TXT
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleDownloadPdf}>
+            Download as PDF
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleDownloadJson}>
+            Download as JSON
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+
+  const handleApplyGuidedTweak = async (tweakDescription: string) => {
+    setIsApplyingTweak(true);
+    try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to continue.");
+        setIsApplyingTweak(false);
+        return;
+      }
+
+      toast.info("Applying guided tweak with AI...");
+
+      // Call the edge function to apply the tweak
+      const { data, error } = await supabase.functions.invoke("apply-guided-tweak", {
+        body: { 
+          current_prompt: result.full_regeneration_prompt,
+          tweak_description: tweakDescription,
+          analysis: result.analysis
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error("Guided tweak error:", error);
+        toast.error("Failed to apply tweak. Please try again.");
+        setIsApplyingTweak(false);
+        return;
+      }
+
+      if (!data?.full_regeneration_prompt) {
+        toast.error("Invalid response from AI. Please try again.");
+        setIsApplyingTweak(false);
+        return;
+      }
+
+      // Update the result with the modified prompt and any changed analysis fields
+      const updatedAnalysis = { ...result.analysis };
+      if (data.modified_fields) {
+        Object.entries(data.modified_fields).forEach(([key, value]) => {
+          if (value && key in updatedAnalysis) {
+            updatedAnalysis[key as keyof Analysis] = value as string;
+          }
+        });
+      }
+
+      const updatedResult = {
+        full_regeneration_prompt: data.full_regeneration_prompt,
+        analysis: updatedAnalysis
+      };
+
+      // Call the parent callback to update the result
+      if (onResultUpdate) {
+        onResultUpdate(updatedResult);
+      }
+
+      setIsApplyingTweak(false);
+      toast.success("Tweak applied successfully!");
+      
+      // Trigger pulse animation
+      setPromptPulse(true);
+      setTimeout(() => setPromptPulse(false), 600);
+
+    } catch (error) {
+      console.error("Error applying guided tweak:", error);
+      toast.error("An error occurred while applying the tweak.");
+      setIsApplyingTweak(false);
+    }
+  };
+
+  const handleCopyPrompt = () => {
+    navigator.clipboard.writeText(result.full_regeneration_prompt);
+    toast.success("Prompt copied to clipboard!");
+  };
+
+  const handleCopySection = (content: string, sectionName: string) => {
+    navigator.clipboard.writeText(content);
+    toast.success(`${sectionName} copied to clipboard!`);
+  };
+
 
   const handleRegenerate = () => {
     onRegenerate(userEdits);
