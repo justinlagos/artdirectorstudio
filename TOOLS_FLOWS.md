@@ -93,7 +93,7 @@ Backend (Supabase Edge Functions)
    )
    ```
 3. **UI Update**: Show analysis view with live prompt editor
-4. **"Use in Studio"**: Opens Generate dialog with:
+4. **"Generate in Studio"**: Opens Studio dialog with:
    ```typescript
    {
      prompt: regeneratedPrompt,
@@ -166,7 +166,7 @@ Backend (Supabase Edge Functions)
      params: { action: 'blend', imageCount: images.length }
    })
    ```
-3. **"Use in Studio"**: Opens Generate with:
+3. **"Generate in Studio"**: Opens Studio with:
    ```typescript
    {
      prompt: `Variation of blended ${imageCount} images`,
@@ -229,7 +229,7 @@ Backend (Supabase Edge Functions)
    })
    ```
 3. **Before/After**: Show slider with original vs upscaled
-4. **"Use in Studio"**: 
+4. **"Generate in Studio"**:
    ```typescript
    {
      prompt: `Variation of upscaled ${targetSize} image`,

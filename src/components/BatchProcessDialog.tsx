@@ -577,7 +577,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
           </Button>
           <Button onClick={handleUseInStudio} className="min-h-[44px]">
             <Wand2 className="w-4 h-4 mr-2" />
-            Use in Studio
+            Generate in Studio
           </Button>
         </>
       )}

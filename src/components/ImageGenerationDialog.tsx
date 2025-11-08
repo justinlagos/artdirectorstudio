@@ -88,7 +88,7 @@ export const ImageGenerationDialog = ({
       
       if (imageUrl) {
         setGeneratedImage(imageUrl);
-        toast.success("Image generated successfully!");
+        toast.success("Your image is ready.");
       }
     } catch (error) {
       clearInterval(progressInterval);
@@ -109,7 +109,7 @@ export const ImageGenerationDialog = ({
     link.click();
     document.body.removeChild(link);
     
-    toast.success("Image downloaded!");
+    toast.success("Image download started.");
   };
 
   const handleCopyPrompt = () => {
@@ -416,7 +416,7 @@ export const ImageGenerationDialog = ({
         <div className="space-y-2">
           <Progress value={progress} className="w-full" />
           <p className="text-sm text-muted-foreground text-center">
-            Generating image... (~15-30 seconds)
+            Working on it… (~15-30 seconds)
           </p>
         </div>
       )}
@@ -445,7 +445,7 @@ export const ImageGenerationDialog = ({
           variant="secondary"
         >
           <Download className="w-4 h-4 mr-2" />
-          Download
+          Download Image
         </Button>
         <Button
           onClick={handleRegenerate}
@@ -453,7 +453,7 @@ export const ImageGenerationDialog = ({
           disabled={isGenerating}
         >
           <Wand2 className="w-4 h-4 mr-2" />
-          {isGenerating ? "Generating..." : "Regenerate"}
+          {isGenerating ? "Working on it…" : "Regenerate"}
         </Button>
       </div>
       <Button
@@ -473,7 +473,7 @@ export const ImageGenerationDialog = ({
       size="lg"
     >
       <Wand2 className="w-4 h-4 mr-2" />
-      {isGenerating ? "Generating..." : "Generate Image (3 Credits)"}
+      {isGenerating ? "Working on it…" : "Start Studio Generation (3 Credits)"}
     </Button>
   );
 
@@ -490,12 +490,12 @@ export const ImageGenerationDialog = ({
       title={
         <>
           <Wand2 className="w-5 h-5" />
-          Generate AI Image
+          Generate in Studio
         </>
       }
       description={
         <>
-          Generate a new image from your prompt. Cost: <span className="font-semibold text-foreground">3 credits</span>
+          Open this prompt in Studio and create instantly. Cost: <span className="font-semibold text-foreground">3 credits</span>
         </>
       }
       contentClassName="pb-6"

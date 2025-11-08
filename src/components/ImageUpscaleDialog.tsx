@@ -436,7 +436,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       <div className="flex flex-col gap-3 sm:flex-row">
         <Button onClick={handleUseInStudio} className="min-h-[48px] w-full sm:flex-1">
           <Wand2 className="w-4 h-4 mr-2" />
-          Use in Studio
+          Generate in Studio
         </Button>
         <Button
           variant="outline"

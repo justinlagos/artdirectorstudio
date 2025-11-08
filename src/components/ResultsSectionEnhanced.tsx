@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Copy,
@@ -12,11 +12,11 @@ import {
   Quote,
   Blend,
   Maximize2,
-  Scan
+  Scan,
+  ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { Analysis, AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
-import { Separator } from "@/components/ui/separator";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
 import { BatchGenerationDialog } from "@/components/BatchGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
@@ -32,12 +32,15 @@ import { PromptBuilder } from "@/components/PromptBuilder";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
 import { supabase } from "@/integrations/supabase/client";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { ImageBlendDialogEnhanced } from "@/components/ImageBlendDialogEnhanced";
 import { ImageUpscaleDialog } from "@/components/ImageUpscaleDialog";
 import { BatchProcessDialog } from "@/components/BatchProcessDialog";
-import jsPDF from "jspdf";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from "@/components/ui/collapsible";
 
 interface ResultsSectionProps {
   result: AnalysisResult;
@@ -81,22 +84,40 @@ export const ResultsSection = ({
   const [modifiedCount, setModifiedCount] = useState(0);
   const [promptPulse, setPromptPulse] = useState(false);
   const [isApplyingTweak, setIsApplyingTweak] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const [showBlendDialog, setShowBlendDialog] = useState(false);
   const [showUpscaleDialog, setShowUpscaleDialog] = useState(false);
   const [showBatchProcessDialog, setShowBatchProcessDialog] = useState(false);
   const [batchProcessMode, setBatchProcessMode] = useState<"analyze" | "upscale">("analyze");
+  const [showQuickAdjustments, setShowQuickAdjustments] = useState(true);
+  const [showGuidedRefinements, setShowGuidedRefinements] = useState(false);
+  const studioButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousBodyOverflow = useRef<string | null>(null);
 
-  // Detect mobile on mount and resize
+  const ensureStudioButtonVisible = () => {
+    if (!studioButtonRef.current || typeof window === 'undefined' || window.innerWidth >= 768) {
+      return;
+    }
+
+    const rect = studioButtonRef.current.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight - 16) {
+      studioButtonRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+    ensureStudioButtonVisible();
+  }, []);
+
+  useEffect(() => {
+    const handleViewportChange = () => ensureStudioButtonVisible();
+
+    window.addEventListener('orientationchange', handleViewportChange);
+    window.addEventListener('resize', handleViewportChange);
+
+    return () => {
+      window.removeEventListener('orientationchange', handleViewportChange);
+      window.removeEventListener('resize', handleViewportChange);
     };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Use adaptive fields hook
@@ -126,6 +147,37 @@ export const ResultsSection = ({
 
     return () => clearTimeout(timeoutId);
   }, [userEdits]);
+
+  useEffect(() => {
+    const hasOverlay = showGenerationDialog ||
+      showBatchGenerationDialog ||
+      showBlendDialog ||
+      showUpscaleDialog ||
+      showBatchProcessDialog;
+
+    if (hasOverlay) {
+      if (previousBodyOverflow.current === null) {
+        previousBodyOverflow.current = document.body.style.overflow;
+      }
+      document.body.style.overflow = 'hidden';
+    } else if (previousBodyOverflow.current !== null) {
+      document.body.style.overflow = previousBodyOverflow.current;
+      previousBodyOverflow.current = null;
+    }
+
+    return () => {
+      if (previousBodyOverflow.current !== null) {
+        document.body.style.overflow = previousBodyOverflow.current;
+        previousBodyOverflow.current = null;
+      }
+    };
+  }, [
+    showGenerationDialog,
+    showBatchGenerationDialog,
+    showBlendDialog,
+    showUpscaleDialog,
+    showBatchProcessDialog
+  ]);
 
   // Live preview with debounced regeneration (2s delay) + pulse animation
   useEffect(() => {
@@ -214,9 +266,8 @@ export const ResultsSection = ({
 
   const handleQuickAction = (modifier: string, label: string) => {
     const updatedPrompt = `${basePrompt}\n\n// ${label}: ${modifier}`;
-    setGenerationPrompt(updatedPrompt);
-    setShowGenerationDialog(true);
-    toast.success(`${label} preset applied to your prompt`);
+    handleOpenStudio(updatedPrompt);
+    toast.success(`${label} preset ready in Studio.`);
   };
 
   const openBatchProcess = (mode: "analyze" | "upscale") => {
@@ -251,199 +302,28 @@ export const ResultsSection = ({
     }
   ];
 
-  const handleDownloadTxt = () => {
-    const timestamp = new Date().toISOString().split('T')[0];
-    const content = `AI IMAGE PROMPT RECONSTRUCTION SHEET
-Generated: ${timestamp}
-
-═══════════════════════════════════════════════════════════════
-
-FULL REGENERATION PROMPT
-
-${result.full_regeneration_prompt}
-
-═══════════════════════════════════════════════════════════════
-
-COMPREHENSIVE ANALYSIS
-
-1. Image Overview
-${result.analysis.image_overview}
-
-2. Subject Description
-${result.analysis.subject_description}
-
-3. Camera & Composition
-${result.analysis.camera_composition}
-
-4. Lighting
-${result.analysis.lighting}
-
-5. Color Palette
-${result.analysis.color_palette}
-
-6. Design Style
-${result.analysis.design_style}
-
-7. Texture & Material
-${result.analysis.texture_material}
-
-8. Mood & Emotion
-${result.analysis.mood_emotion}
-
-9. Background & Environment
-${result.analysis.background_environment}
-
-10. Artistic Medium
-${result.analysis.artistic_medium}
-
-11. Art Direction & Influence
-${result.analysis.art_direction_influence}
-
-12. Intended Use
-${result.analysis.intended_use}
-
-═══════════════════════════════════════════════════════════════
-
-USER EDITS (if any):
-${Object.keys(userEdits).length > 0 ? JSON.stringify(userEdits, null, 2) : 'None'}
-
-═══════════════════════════════════════════════════════════════
-
-Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
-    
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `prompt-reconstruction-${timestamp}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success("TXT file downloaded!");
-  };
-
-  const handleDownloadPdf = () => {
-    const timestamp = new Date().toISOString().split('T')[0];
-    const doc = new jsPDF();
-    const margin = 15;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const maxWidth = pageWidth - 2 * margin;
-    let yPos = margin;
-
-    const addText = (text: string, fontSize = 10, isBold = false) => {
-      doc.setFontSize(fontSize);
-      doc.setFont("helvetica", isBold ? "bold" : "normal");
-      const lines = doc.splitTextToSize(text, maxWidth);
-      
-      lines.forEach((line: string) => {
-        if (yPos > doc.internal.pageSize.getHeight() - margin) {
-          doc.addPage();
-          yPos = margin;
-        }
-        doc.text(line, margin, yPos);
-        yPos += fontSize * 0.5;
-      });
-      yPos += 3;
-    };
-
-    addText("AI IMAGE PROMPT RECONSTRUCTION SHEET", 16, true);
-    addText(`Generated: ${timestamp}`, 9);
-    yPos += 5;
-    
-    addText("FULL REGENERATION PROMPT", 14, true);
-    addText(result.full_regeneration_prompt);
-    yPos += 5;
-    
-    addText("COMPREHENSIVE ANALYSIS", 14, true);
-    
-    const analysisFields = [
-      ["1. Image Overview", result.analysis.image_overview],
-      ["2. Subject Description", result.analysis.subject_description],
-      ["3. Camera & Composition", result.analysis.camera_composition],
-      ["4. Lighting", result.analysis.lighting],
-      ["5. Color Palette", result.analysis.color_palette],
-      ["6. Design Style", result.analysis.design_style],
-      ["7. Texture & Material", result.analysis.texture_material],
-      ["8. Mood & Emotion", result.analysis.mood_emotion],
-      ["9. Background & Environment", result.analysis.background_environment],
-      ["10. Artistic Medium", result.analysis.artistic_medium],
-      ["11. Art Direction & Influence", result.analysis.art_direction_influence],
-      ["12. Intended Use", result.analysis.intended_use],
-    ];
-    
-    analysisFields.forEach(([title, content]) => {
-      addText(title, 11, true);
-      addText(content, 10);
-      yPos += 2;
-    });
-    
-    if (Object.keys(userEdits).length > 0) {
-      addText("USER EDITS", 12, true);
-      addText(JSON.stringify(userEdits, null, 2), 9);
+  const handleDownloadAnalyzedImage = () => {
+    if (!imagePreviewUrl) {
+      toast.info("Upload an image to enable download.");
+      return;
     }
-    
-    doc.save(`prompt-reconstruction-${timestamp}.pdf`);
-    toast.success("PDF downloaded!");
+
+    const link = document.createElement('a');
+    link.href = imagePreviewUrl;
+    link.download = `analysis-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast.success("Image download started.");
   };
 
-  const handleDownloadJson = () => {
-    const timestamp = new Date().toISOString().split('T')[0];
-    const jsonData = {
-      generated: timestamp,
-      full_regeneration_prompt: result.full_regeneration_prompt,
-      analysis: result.analysis,
-      user_edits: userEdits,
-    };
-    
-    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `prompt-reconstruction-${timestamp}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success("JSON file downloaded!");
+  const handleOpenStudio = (promptToUse?: string) => {
+    const targetPrompt = promptToUse ?? basePrompt;
+    setGenerationPrompt(targetPrompt);
+    ensureStudioButtonVisible();
+    setShowGenerationDialog(true);
   };
-
-  const actionButtons = (
-    <>
-      <Button
-        className="flex-1 min-w-0 rounded-full h-11 sm:h-12 text-sm sm:text-base font-semibold shadow-[0_18px_30px_-20px_rgba(0,0,0,0.45)]"
-        onClick={() => {
-          setGenerationPrompt(basePrompt);
-          setShowGenerationDialog(true);
-        }}
-      >
-        <span className="truncate">Use in Studio</span>
-      </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            className="flex-1 min-w-0 rounded-full h-11 sm:h-12 text-sm sm:text-base font-semibold"
-          >
-            <span className="truncate">Download</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48 sm:w-56">
-          <DropdownMenuItem onSelect={handleDownloadTxt}>
-            Download as TXT
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleDownloadPdf}>
-            Download as PDF
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleDownloadJson}>
-            Download as JSON
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </>
-  );
 
   const handleApplyGuidedTweak = async (tweakDescription: string) => {
     setIsApplyingTweak(true);
@@ -456,7 +336,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         return;
       }
 
-      toast.info("Applying guided tweak with AI...");
+      toast.info("Working on it…");
 
       // Call the edge function to apply the tweak
       const { data, error } = await supabase.functions.invoke("apply-guided-tweak", {
@@ -504,7 +384,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       }
 
       setIsApplyingTweak(false);
-      toast.success("Tweak applied successfully!");
+      toast.success("Guided refinement applied.");
       
       // Trigger pulse animation
       setPromptPulse(true);
@@ -512,19 +392,19 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
 
     } catch (error) {
       console.error("Error applying guided tweak:", error);
-      toast.error("An error occurred while applying the tweak.");
+      toast.error("Something went wrong. Try again.");
       setIsApplyingTweak(false);
     }
   };
 
   const handleCopyPrompt = () => {
     navigator.clipboard.writeText(result.full_regeneration_prompt);
-    toast.success("Prompt copied to clipboard!");
+    toast.success("Prompt copied to clipboard.");
   };
 
   const handleCopySection = (content: string, sectionName: string) => {
     navigator.clipboard.writeText(content);
-    toast.success(`${sectionName} copied to clipboard!`);
+    toast.success(`${sectionName} copied to clipboard.`);
   };
 
 
@@ -561,29 +441,26 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
   };
 
   return (
-    <section className="w-full space-y-12 pb-6 md:pb-12">
-      <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] items-start gap-6 md:gap-8 xl:gap-12">
-        <div className="w-full space-y-10">
-          <div className="w-full space-y-10 rounded-[32px] border border-border/40 bg-background/80 p-4 sm:p-8 shadow-[0_45px_120px_-60px_rgba(0,0,0,0.55)] backdrop-blur-xl md:p-10">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div className="space-y-2">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">
-                  Full Generation Prompt
-                </p>
-                <h2 className="text-3xl font-display font-semibold text-foreground sm:text-4xl">
-                  Creative Blueprint
-                </h2>
-                <p className="max-w-2xl text-sm text-muted-foreground">
-                  Everything the AI needs to recreate and elevate your vision.
-                </p>
-              </div>
+    <section className="w-full space-y-12 pb-10 md:pb-16">
+      <div className="space-y-12">
+        <section className="rounded-[32px] border border-border/40 bg-background/80 p-6 sm:p-10 shadow-[0_45px_120px_-60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+          <div className="flex flex-col items-center gap-3 text-center md:items-start md:text-left">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Creative Blueprint</p>
+            <h2 className="text-3xl sm:text-4xl font-display font-semibold text-foreground">Full Generation Prompt</h2>
+            <p className="max-w-2xl text-sm text-muted-foreground md:max-w-3xl">
+              Everything the Studio will reference to bring your idea to life.
+            </p>
+          </div>
+
+          <div className="mt-8 space-y-6">
+            <div className="flex justify-end">
               <Button
                 variant="outline"
                 className="h-10 rounded-full px-5 text-sm font-semibold shadow-[0_12px_30px_-20px_rgba(0,0,0,0.55)]"
                 onClick={handleCopyPrompt}
               >
                 <Copy className="mr-2 h-4 w-4" />
-                Copy prompt
+                Copy to Clipboard
               </Button>
             </div>
 
@@ -593,162 +470,183 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
                   {modifiedCount} parameter{modifiedCount !== 1 ? "s" : ""} tuned
                 </div>
               )}
+
               <div
                 className={cn(
                   "max-h-[360px] w-full overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-2xl border border-border/40 bg-surface-1/70 p-4 sm:p-6 md:p-8 font-mono text-xs sm:text-sm leading-6 sm:leading-7 text-foreground/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-500",
-                  promptPulse && "ring-2 ring-primary/50 shadow-[0_20px_45px_-30px_rgba(59,130,246,0.55)]"
+                  promptPulse && "ring-1 ring-primary/60 shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"
                 )}
               >
                 {basePrompt}
               </div>
             </div>
 
-            <div className="space-y-8">
-              <div className="w-full space-y-3">
-                <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">
-                  Quick Actions
-                </p>
-                <div className="grid w-full gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
-                  {quickActionPresets.map(({ label, icon: Icon, description, modifier }) => (
-                    <Button
-                      key={label}
-                      variant="ghost"
-                      onClick={() => handleQuickAction(modifier, label)}
-                      className="h-auto w-full justify-start gap-2 rounded-xl sm:rounded-2xl border border-border/40 bg-background/40 px-3 sm:px-5 py-3 sm:py-4 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/70"
-                    >
-                      <div className="flex flex-col gap-1 w-full">
-                        <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-foreground">
-                          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
-                          <span className="truncate">{label}</span>
-                        </div>
-                        <span className="text-[10px] sm:text-xs leading-relaxed text-muted-foreground line-clamp-2">
-                          {description}
-                        </span>
-                      </div>
-                    </Button>
-                  ))}
+            <div className="space-y-4">
+              <div className="md:flex md:justify-center">
+                <div className="sticky bottom-6 z-20 w-full md:static md:w-auto">
+                  <Button
+                    ref={studioButtonRef}
+                    className="h-12 w-full rounded-full text-base font-semibold shadow-[0_22px_40px_-24px_rgba(0,0,0,0.65)]"
+                    onClick={() => handleOpenStudio()}
+                  >
+                    Generate in Studio
+                  </Button>
                 </div>
               </div>
+              <p className="text-sm text-muted-foreground text-center md:text-left">
+                Open this prompt in Studio to create or refine your image.
+              </p>
+              <div className="flex flex-col items-center gap-3 text-center md:flex-row md:justify-between md:text-left">
+                <span className="text-xs uppercase tracking-[0.35em] text-muted-foreground/70">
+                  Image analyzed successfully.
+                </span>
+                {imagePreviewUrl && (
+                  <Button
+                    variant="outline"
+                    className="w-full max-w-xs md:w-auto"
+                    onClick={handleDownloadAnalyzedImage}
+                  >
+                    Download Image
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
 
-              <div className="grid w-full gap-4 sm:gap-6 lg:grid-cols-2">
-                <div className="w-full space-y-4 rounded-2xl border border-border/40 bg-background/30 p-4 sm:p-6 backdrop-blur">
-                  <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">
-                    Quick Tools
-                  </p>
-                  <div className="grid w-full grid-cols-2 gap-2 sm:gap-3">
-                    {quickTools.map(({ label, icon: Icon, caption, onClick }) => (
+          <div className="mt-10 space-y-4">
+            <Collapsible open={showQuickAdjustments} onOpenChange={setShowQuickAdjustments}>
+              <div className="rounded-3xl border border-border/30 bg-background/60 p-4 sm:p-6 shadow-[0_25px_70px_-50px_rgba(0,0,0,0.55)]">
+                <CollapsibleTrigger asChild>
+                  <button className="flex w-full items-center justify-between text-left">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/70">Quick Adjustments</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Tune essentials in seconds before you enter Studio.
+                      </p>
+                    </div>
+                    <ChevronDown className={cn("h-5 w-5 transition-transform", showQuickAdjustments && "rotate-180")} />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-4">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {quickActionPresets.map(({ label, icon: Icon, description, modifier }) => (
                       <Button
                         key={label}
                         variant="ghost"
-                        onClick={onClick}
-                        className="h-auto w-full justify-start gap-2 sm:gap-3 rounded-xl sm:rounded-2xl border border-border/30 bg-background/60 px-2 sm:px-4 py-3 sm:py-4 text-left shadow-[0_14px_30px_-28px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/80"
+                        onClick={() => handleQuickAction(modifier, label)}
+                        className="h-auto w-full justify-start rounded-2xl border border-border/40 bg-background/70 px-3 py-3 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/90"
                       >
-                        <div className="flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-primary/10 text-primary">
-                          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs sm:text-sm font-semibold text-foreground truncate">{label}</div>
-                          <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{caption}</div>
+                        <div className="flex w-full items-start gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-foreground">{label}</div>
+                            <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
+                              {description}
+                            </p>
+                          </div>
                         </div>
                       </Button>
                     ))}
                   </div>
-                </div>
-
-                <div className="w-full space-y-6 rounded-2xl border border-border/40 bg-background/30 p-4 sm:p-6 backdrop-blur">
                   <QuickTweaksRow
                     analysis={result.analysis}
                     variant="inline"
                     className="border-none bg-transparent p-0 shadow-none"
                   />
-                  <div className="border-t border-border/30 pt-6">
-                    <GuidedTweaks
-                      analysis={result.analysis}
-                      onApplyTweak={handleApplyGuidedTweak}
-                      isApplying={isApplyingTweak || isRegenerating}
-                    />
-                  </div>
-                </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
+
+            <Collapsible open={showGuidedRefinements} onOpenChange={setShowGuidedRefinements}>
+              <div className="rounded-3xl border border-border/30 bg-background/60 p-4 sm:p-6 shadow-[0_25px_70px_-50px_rgba(0,0,0,0.55)]">
+                <CollapsibleTrigger asChild>
+                  <button className="flex w-full items-center justify-between text-left">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/70">Guided Refinements</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Let AI suggest thoughtful upgrades to your prompt.
+                      </p>
+                    </div>
+                    <ChevronDown className={cn("h-5 w-5 transition-transform", showGuidedRefinements && "rotate-180")} />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4">
+                  <GuidedTweaks
+                    analysis={result.analysis}
+                    onApplyTweak={handleApplyGuidedTweak}
+                    isApplying={isApplyingTweak || isRegenerating}
+                  />
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           </div>
+        </section>
 
+        <section className="rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
+          <div className="flex flex-col gap-2 text-center sm:text-left">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Creative Tools</p>
+            <h3 className="text-xl font-semibold text-foreground">Keep the flow going</h3>
+          </div>
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {quickTools.map(({ label, icon: Icon, caption, onClick }) => (
+              <Button
+                key={label}
+                variant="ghost"
+                onClick={onClick}
+                className="h-auto w-full justify-start gap-3 rounded-2xl border border-border/40 bg-background/70 px-3 py-4 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/90"
+              >
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-foreground truncate">{label}</span>
+                  <span className="block text-xs text-muted-foreground truncate">{caption}</span>
+                </span>
+              </Button>
+            ))}
+          </div>
+        </section>
+
+        {extractInsights().length > 0 && (
           <InsightChips insights={extractInsights()} />
+        )}
 
-          <Separator className="my-10" />
-
-          <ToolsShowcase />
-
-          <Separator className="my-10" />
-
-          <div className="animate-fade-in">
+        <section className="rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
+          <div className="space-y-2 text-center sm:text-left">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Visual Prompt Builder</p>
+            <h3 className="text-xl font-semibold text-foreground">Turn your ideas into generation-ready prompts.</h3>
+            <p className="text-sm text-muted-foreground">
+              Experiment freely and send your favourite combinations straight to Studio.
+            </p>
+          </div>
+          <div className="mt-6">
             <PromptBuilder
               analysis={result.analysis}
-              onGenerate={(prompt) => {
-                setGenerationPrompt(prompt);
-                setShowGenerationDialog(true);
-              }}
+              onGenerate={(prompt) => handleOpenStudio(prompt)}
             />
           </div>
+        </section>
 
-          <Separator className="my-10" />
+        <section className="rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
+          <ToolsShowcase />
+        </section>
 
-          <div className="w-full space-y-8">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 lg:gap-6">
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-display font-semibold text-foreground">
-                  Comprehensive Analysis
-                </h2>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                  Fine-tune individual parameters before regenerating.
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => {
-                      setGenerationPrompt(result.full_regeneration_prompt);
-                      setShowGenerationDialog(true);
-                    }}
-                    className="shadow-sm w-full sm:w-auto"
-                  >
-                    <Wand2 className="mr-2 h-4 w-4" />
-                    Generate Image
-                  </Button>
-                  <CreditCostIndicator cost={3} action="image generation" />
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowBatchGenerationDialog(true)}
-                    className="shadow-xs w-full sm:w-auto"
-                  >
-                    <Grid3x3 className="mr-2 h-4 w-4" />
-                    Batch Generate
-                  </Button>
-                  <CreditCostIndicator cost={3} action="per variation" />
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleRegenerate}
-                    disabled={isRegenerating || Object.keys(userEdits).length === 0}
-                    className="shadow-xs w-full sm:w-auto"
-                  >
-                    <RefreshCw className={cn("mr-2 h-4 w-4", isRegenerating && "animate-spin")} />
-                    Regenerate
-                  </Button>
-                  <CreditCostIndicator cost={1} action="prompt refinement" />
-                </div>
-              </div>
-            </div>
+        <section className="space-y-8 rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-10 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
+          <div className="space-y-2 text-center sm:text-left">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Comprehensive Analysis</p>
+            <h3 className="text-3xl font-display font-semibold text-foreground">
+              AI interpretation of lighting, composition, and mood.
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Explore the fine details before sending your refreshed blueprint back to Studio.
+            </p>
+          </div>
 
-            {modifiedCount === 0 && <EmptyStatePrompts />}
+          {modifiedCount === 0 && <EmptyStatePrompts />}
 
+          <div className="rounded-3xl border border-border/30 bg-background/60 p-4 sm:p-6 shadow-[0_25px_70px_-50px_rgba(0,0,0,0.45)]">
             <AnalysisTabbed
               analysis={result.analysis}
               userEdits={userEdits}
@@ -757,85 +655,67 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
               suggestions={SUGGESTIONS}
             />
           </div>
-        </div>
 
-        <aside className="w-full space-y-6 xl:sticky xl:top-8">
-          <div className="w-full rounded-3xl border border-border/40 bg-background/70 p-4 shadow-[0_35px_80px_-60px_rgba(0,0,0,0.7)] backdrop-blur">
-            {imagePreviewUrl ? (
-              <div className="relative w-full overflow-hidden rounded-2xl border border-border/40 bg-surface-1 p-3 sm:p-4">
-                <img
-                  src={imagePreviewUrl}
-                  alt="Analyzed image preview"
-                  className="max-h-[320px] sm:max-h-[400px] lg:max-h-[480px] w-full rounded-xl object-contain"
-                />
-                <div className="mt-3 sm:mt-4 text-center text-xs uppercase tracking-[0.3em] text-muted-foreground/80">
-                  Original Image
-                </div>
-              </div>
-            ) : (
-              <div className="flex aspect-[4/5] w-full items-center justify-center rounded-2xl border border-dashed border-border/50 bg-background/40 text-sm text-muted-foreground">
-                Preview will appear here
-              </div>
-            )}
+          <div className="flex flex-col gap-3 border-t border-border/30 pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm text-muted-foreground">
+              Apply your adjustments, then refresh the analysis to update the blueprint.
+            </span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRegenerate}
+                disabled={isRegenerating || Object.keys(userEdits).length === 0}
+                className="min-h-[44px] px-6"
+              >
+                <RefreshCw className={cn("mr-2 h-4 w-4", isRegenerating && "animate-spin")} />
+                Refresh Analysis
+              </Button>
+              <CreditCostIndicator cost={1} action="prompt refinement" />
+            </div>
           </div>
-
-          <div className="hidden xl:flex flex-col gap-3">
-            {actionButtons}
-          </div>
-        </aside>
+        </section>
       </div>
 
-      {isMobile && (
-        <div className="fixed inset-x-0 bottom-0 left-0 right-0 z-30 pointer-events-none px-3 pb-safe">
-          <div className="mx-auto flex max-w-2xl items-center gap-2 rounded-2xl border border-border/40 bg-background/98 p-3 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)] backdrop-blur-xl pointer-events-auto mb-20">
-            {actionButtons}
-          </div>
-        </div>
-      )}
-
       {generatedImages.length > 0 && (
-        <>
-          <Separator className="my-12" />
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-display font-bold tracking-tight">
-                Generated Images
-              </h2>
-            </div>
-
-            <Tabs defaultValue="comparison" className="w-full">
-              <TabsList className="grid w-full max-w-md grid-cols-2">
-                <TabsTrigger value="comparison" className="gap-2">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  Comparison
-                </TabsTrigger>
-                <TabsTrigger value="gallery" className="gap-2">
-                  Gallery
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="comparison" className="mt-6">
-                {imagePreviewUrl ? (
-                  <ImageComparisonView
-                    originalImage={imagePreviewUrl}
-                    generatedImages={generatedImages}
-                  />
-                ) : (
-                  <div className="py-8 text-center text-muted-foreground">
-                    Original image not available for comparison
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="gallery" className="mt-6">
-                <GeneratedImagesGallery
-                  images={generatedImages}
-                  onDelete={onDeleteImage}
-                />
-              </TabsContent>
-            </Tabs>
+        <div className="space-y-6 rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-10 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
+          <div className="flex flex-col gap-2 text-center sm:text-left">
+            <h2 className="text-2xl font-display font-bold tracking-tight">Studio Results</h2>
+            <p className="text-sm text-muted-foreground">Review and compare everything you created from this blueprint.</p>
           </div>
-        </>
+
+          <Tabs defaultValue="comparison" className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="comparison" className="gap-2">
+                <SlidersHorizontal className="h-4 w-4" />
+                Comparison
+              </TabsTrigger>
+              <TabsTrigger value="gallery" className="gap-2">
+                Gallery
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="comparison" className="mt-6">
+              {imagePreviewUrl ? (
+                <ImageComparisonView
+                  originalImage={imagePreviewUrl}
+                  generatedImages={generatedImages}
+                />
+              ) : (
+                <div className="py-8 text-center text-muted-foreground">
+                  Original image not available for comparison
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="gallery" className="mt-6">
+              <GeneratedImagesGallery
+                images={generatedImages}
+                onDelete={onDeleteImage}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
       )}
 
       <ImageGenerationDialog

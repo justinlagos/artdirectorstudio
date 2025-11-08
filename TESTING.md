@@ -41,7 +41,7 @@ LOVABLE_API_KEY=your_lovable_api_key
 #### Result Verification ✓
 - [x] Analysis appears immediately in modal
 - [x] Regenerated prompt shown in live editor
-- [x] "Use in Studio" opens Generate modal with analysis data
+- [x] "Generate in Studio" opens Studio modal with analysis data
 - [x] Result saved to `generated_assets` table
 - [x] Appears in History page as newest item
 
@@ -67,7 +67,7 @@ LOVABLE_API_KEY=your_lovable_api_key
 
 #### Result Verification ✓
 - [x] Blended image appears immediately
-- [x] "Use in Studio" opens with blended result as reference
+- [x] "Generate in Studio" opens with blended result as reference
 - [x] "Download" button works with correct filename
 - [x] Result saved to database with source URLs
 - [x] Share functionality works
@@ -93,7 +93,7 @@ LOVABLE_API_KEY=your_lovable_api_key
 #### Result Verification ✓
 - [x] Upscaled image renders immediately
 - [x] Before/after slider functional (if implemented)
-- [x] "Use in Studio" passes upscaled image as reference
+- [x] "Generate in Studio" passes upscaled image as reference
 - [x] "Download" works with target size in filename
 - [x] Original + upscaled URLs both saved
 
@@ -183,7 +183,7 @@ LOVABLE_API_KEY=your_lovable_api_key
 - [x] No layout shifts when progress appears
 - [x] Pull-to-refresh doesn't conflict with Artie button
 - [x] Results render correctly
-- [x] "Use in Studio" works from mobile
+- [x] "Generate in Studio" works from mobile
 
 ### Chrome Android Tests
 - [x] Same as iOS Safari
@@ -276,7 +276,7 @@ Before marking as complete:
 
 ### Functionality
 - [x] Results appear instantly on success
-- [x] "Use in Studio" passes actual result data
+- [x] "Generate in Studio" passes actual result data
 - [x] Download works with correct filenames
 - [x] Share pages work with OpenGraph tags
 - [x] History shows newest items first
