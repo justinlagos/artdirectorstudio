@@ -37,7 +37,7 @@ const DrawerContent = React.forwardRef<
       {...props}
     >
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted shrink-0" />
-      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div className="overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
         {children}
       </div>
     </DrawerPrimitive.Content>
