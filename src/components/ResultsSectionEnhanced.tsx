@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, Download, RefreshCw, Wand2, FileJson, Edit2, SlidersHorizontal } from "lucide-react";
+import { Copy, Download, RefreshCw, Wand2, FileJson, Edit2, SlidersHorizontal, Grid3x3 } from "lucide-react";
 import { toast } from "sonner";
 import { Analysis, AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
 import { Separator } from "@/components/ui/separator";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
+import { BatchGenerationDialog } from "@/components/BatchGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 import { ImageComparisonView } from "@/components/ImageComparisonView";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
@@ -58,6 +59,7 @@ export const ResultsSection = ({
 }: ResultsSectionProps) => {
   const [userEdits, setUserEdits] = useState<UserEdits>({});
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
+  const [showBatchGenerationDialog, setShowBatchGenerationDialog] = useState(false);
   const [generationPrompt, setGenerationPrompt] = useState(result.full_regeneration_prompt);
   const [livePreviewPrompt, setLivePreviewPrompt] = useState(result.full_regeneration_prompt);
   const [previousPrompt, setPreviousPrompt] = useState(result.full_regeneration_prompt);
@@ -688,6 +690,18 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
             </div>
             <div className="flex items-center gap-2">
               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBatchGenerationDialog(true)}
+                className="shadow-xs"
+              >
+                <Grid3x3 className="w-4 h-4 mr-2" />
+                Batch Generate
+              </Button>
+              <CreditCostIndicator cost={3} action="per variation" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
                 variant="secondary"
                 size="sm"
                 onClick={handleRegenerate}
@@ -768,6 +782,14 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         open={showGenerationDialog}
         onOpenChange={setShowGenerationDialog}
         initialPrompt={generationPrompt}
+        onGenerate={onGenerateImage}
+      />
+
+      {/* Batch Generation Dialog */}
+      <BatchGenerationDialog
+        open={showBatchGenerationDialog}
+        onOpenChange={setShowBatchGenerationDialog}
+        basePrompt={result.full_regeneration_prompt}
         onGenerate={onGenerateImage}
       />
     </section>
