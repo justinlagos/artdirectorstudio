@@ -84,6 +84,38 @@ export const ArtieChat = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Emergency escape handler - force close everything on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showGenerationDialog) {
+          setShowGenerationDialog(false);
+          setGenerationPrompt("");
+        } else if (isOpen) {
+          setIsOpen(false);
+        } else if (isMinimized) {
+          setIsMinimized(false);
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, isMinimized, showGenerationDialog]);
+
+  // Prevent body scroll when chat is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   // Show tooltip on first 3 visits
   useEffect(() => {
     const visitCount = parseInt(localStorage.getItem('artie-visits') || '0');
@@ -708,14 +740,16 @@ export const ArtieChat = () => {
     <>
       <FloatingIcon />
       
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 animate-fade-in"
+      {/* Backdrop - Click to close */}
+      <button 
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 animate-fade-in cursor-default"
         onClick={() => setIsOpen(false)}
+        aria-label="Close chat"
+        type="button"
       />
 
       {/* Side Panel Drawer */}
-      <div className="fixed top-0 right-0 h-full w-[90vw] sm:w-[460px] bg-background/95 backdrop-blur-xl border-l border-border shadow-2xl z-50 flex flex-col animate-slide-in-right">
+      <div className="fixed top-0 right-0 h-full w-[90vw] sm:w-[460px] bg-background/95 backdrop-blur-xl border-l border-border shadow-2xl z-50 flex flex-col animate-slide-in-right pointer-events-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-center gap-3">
@@ -964,7 +998,7 @@ export const ArtieChat = () => {
 
       {/* Image Generation Dialog */}
       {showGenerationDialog && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm pointer-events-auto">
           <div className="bg-card border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto p-6">
             <div className="space-y-4">
               <div>
