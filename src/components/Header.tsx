@@ -100,9 +100,9 @@ export const Header = () => {
             </>
           )}
 
-          {/* Mobile Menu */}
+          {/* Mobile Menu - Hidden when user is logged in (BottomNav takes over) */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild className="sm:hidden">
+            <SheetTrigger asChild className={user ? "hidden" : "sm:hidden"}>
               <Button variant="ghost" size="icon" className="min-w-[44px] min-h-[44px]">
                 <Menu className="h-5 w-5" />
               </Button>
