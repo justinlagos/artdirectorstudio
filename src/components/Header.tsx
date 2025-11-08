@@ -46,7 +46,7 @@ export const Header = () => {
                     <ChevronDown className="h-3 w-3 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56 bg-background backdrop-blur-xl z-50">
+                <DropdownMenuContent align="start" className="w-56">
                   <DropdownMenuItem onClick={() => openTool('blend')}>
                     <Layers className="mr-2 h-4 w-4" />
                     <div>

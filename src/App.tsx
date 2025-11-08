@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToolsModalProvider } from "@/contexts/ToolsModalContext";
 import { UnifiedToolsModal } from "@/components/UnifiedToolsModal";
@@ -44,10 +44,38 @@ const TrialWelcomeToast = lazy(() => import("./components/TrialWelcomeToast").th
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  // Global escape handler to force close all Radix UI popper elements
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Force close all Radix UI popper elements (tooltips, dropdowns, popovers)
+        document.querySelectorAll('[data-radix-popper-content-wrapper]').forEach(el => {
+          const portal = el.closest('[data-radix-portal]');
+          if (portal) {
+            // Trigger escape on the content to properly close
+            const content = el.querySelector('[role="tooltip"], [role="menu"], [role="dialog"]');
+            if (content instanceof HTMLElement) {
+              const escapeEvent = new KeyboardEvent('keydown', {
+                key: 'Escape',
+                bubbles: true,
+                cancelable: true
+              });
+              content.dispatchEvent(escapeEvent);
+            }
+          }
+        });
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <TooltipProvider>
+      <TooltipProvider delayDuration={300}>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -98,6 +126,7 @@ const App = () => (
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;

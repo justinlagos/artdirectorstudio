@@ -456,6 +456,27 @@ All colors MUST be HSL.
     z-index: 100;
   }
 
+  /* Z-index hierarchy utilities */
+  .z-tooltip {
+    z-index: 50;
+  }
+
+  .z-dropdown {
+    z-index: 50;
+  }
+
+  .z-dialog {
+    z-index: 55;
+  }
+
+  .z-navigation {
+    z-index: 60;
+  }
+
+  .z-artie-panel {
+    z-index: 45;
+  }
+
   /* Add bottom padding to body on mobile when bottom nav is present */
   @media (max-width: 767px) {
     body {

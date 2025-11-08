@@ -749,7 +749,7 @@ export const ArtieChat = () => {
       />
 
       {/* Side Panel Drawer */}
-      <div className="fixed top-0 right-0 h-full w-[90vw] sm:w-[460px] bg-background/95 backdrop-blur-xl border-l border-border shadow-2xl z-50 flex flex-col animate-slide-in-right pointer-events-auto">
+      <div className="fixed top-0 right-0 h-full w-[90vw] sm:w-[460px] bg-background/95 backdrop-blur-xl border-l border-border shadow-2xl z-artie-panel flex flex-col animate-slide-in-right pointer-events-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-center gap-3">
