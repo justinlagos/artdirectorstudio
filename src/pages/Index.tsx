@@ -119,6 +119,14 @@ const Index = () => {
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
       }
+      // Defensive cleanup: ensure body overflow is reset
+      if (document.body) {
+        console.log('[Index] Cleanup: resetting body overflow on unmount');
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+      }
     };
   }, [previewUrl]);
 

@@ -148,6 +148,24 @@ export const ResultsSection = ({
     return () => clearTimeout(timeoutId);
   }, [userEdits]);
 
+  // Global escape handler to force close all dialogs
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        console.log('[ResultsSection] Escape pressed - closing all dialogs');
+        setShowGenerationDialog(false);
+        setShowBatchGenerationDialog(false);
+        setShowBlendDialog(false);
+        setShowUpscaleDialog(false);
+        setShowBatchProcessDialog(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  // Enhanced body overflow management with defensive cleanup
   useEffect(() => {
     const hasOverlay = showGenerationDialog ||
       showBatchGenerationDialog ||
@@ -155,18 +173,45 @@ export const ResultsSection = ({
       showUpscaleDialog ||
       showBatchProcessDialog;
 
+    console.log('[ResultsSection] Dialog state:', {
+      hasOverlay,
+      showGenerationDialog,
+      showBatchGenerationDialog,
+      showBlendDialog,
+      showUpscaleDialog,
+      showBatchProcessDialog
+    });
+
     if (hasOverlay) {
-      if (previousBodyOverflow.current === null) {
-        previousBodyOverflow.current = document.body.style.overflow;
+      if (previousBodyOverflow.current === null && document.body) {
+        previousBodyOverflow.current = document.body.style.overflow || '';
+        console.log('[ResultsSection] Saving body overflow:', previousBodyOverflow.current);
       }
-      document.body.style.overflow = 'hidden';
-    } else if (previousBodyOverflow.current !== null) {
+      if (document.body) {
+        document.body.style.overflow = 'hidden';
+        console.log('[ResultsSection] Body overflow set to hidden');
+      }
+    } else if (previousBodyOverflow.current !== null && document.body) {
+      console.log('[ResultsSection] Restoring body overflow:', previousBodyOverflow.current);
       document.body.style.overflow = previousBodyOverflow.current;
       previousBodyOverflow.current = null;
+      
+      // Defensive fallback: ensure overflow is restored after 100ms
+      setTimeout(() => {
+        if (document.body && !hasOverlay) {
+          const currentOverflow = document.body.style.overflow;
+          if (currentOverflow === 'hidden') {
+            console.log('[ResultsSection] Defensive cleanup: forcing overflow restore');
+            document.body.style.overflow = '';
+          }
+        }
+      }, 100);
     }
 
     return () => {
-      if (previousBodyOverflow.current !== null) {
+      // Cleanup on unmount
+      if (previousBodyOverflow.current !== null && document.body) {
+        console.log('[ResultsSection] Cleanup: restoring body overflow on unmount');
         document.body.style.overflow = previousBodyOverflow.current;
         previousBodyOverflow.current = null;
       }
