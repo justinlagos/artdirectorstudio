@@ -1,11 +1,13 @@
 import { useCallback } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { OptimizedImage } from "@/components/ui/optimized-image";
+import { getModifierKey } from "@/hooks/useKeyboardShortcuts";
 
 interface UploadSectionProps {
   onFileSelect: (file: File) => void;
@@ -22,6 +24,7 @@ export const UploadSection = ({
 }: UploadSectionProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const modKey = getModifierKey();
 
   const handleAuthCheck = useCallback(() => {
     if (!user) {
@@ -163,14 +166,21 @@ export const UploadSection = ({
       
       {previewUrl && (
         <div className="flex justify-center animate-slide-up">
-          <Button 
-            onClick={onAnalyze}
-            disabled={disabled}
-            size="lg"
-            className="min-w-[240px] h-12 text-base shadow-medium hover:shadow-strong"
-          >
-            Analyze Image
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                onClick={onAnalyze}
+                disabled={disabled}
+                size="lg"
+                className="min-w-[240px] h-12 text-base shadow-medium hover:shadow-strong"
+              >
+                Analyze Image
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Analyze Image ({modKey}+Enter)</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       )}
     </section>

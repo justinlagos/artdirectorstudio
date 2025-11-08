@@ -11,13 +11,17 @@ import { OnboardingPopup } from "@/components/OnboardingPopup";
 import { Footer } from "@/components/Footer";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { KeyboardShortcutsGuide } from "@/components/KeyboardShortcutsGuide";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Sparkles, Wand2, Upload, ArrowRight } from "lucide-react";
+import { Sparkles, Wand2, Upload, ArrowRight, Keyboard } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useKeyboardShortcuts, KeyboardShortcut, getModifierKey } from "@/hooks/useKeyboardShortcuts";
+import { useToolsModal } from "@/contexts/ToolsModalContext";
 import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 
 export interface Analysis {
@@ -62,6 +66,7 @@ export interface GeneratedImage {
 const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { openGenerateDialog } = useToolsModal();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -69,6 +74,7 @@ const Index = () => {
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+  const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
 
   // Pull-to-refresh functionality
   const handleRefresh = async () => {
@@ -116,31 +122,93 @@ const Index = () => {
   }, [previewUrl]);
 
   // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + U - Upload
-      if ((e.metaKey || e.ctrlKey) && e.key === 'u') {
-        e.preventDefault();
+  const modKey = getModifierKey();
+  const shortcuts: KeyboardShortcut[] = [
+    {
+      key: 'u',
+      ctrl: true,
+      callback: () => {
+        if (!user) {
+          navigate("/auth");
+          return;
+        }
         document.querySelector<HTMLInputElement>('input[type="file"]')?.click();
-      }
-      
-      // Cmd/Ctrl + Enter - Analyze (if image is selected)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && selectedFile && !isAnalyzing) {
-        e.preventDefault();
-        handleAnalyze();
-      }
-      
-      // Cmd/Ctrl + K - Copy prompt (if result exists)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k' && result) {
-        e.preventDefault();
-        navigator.clipboard.writeText(result.full_regeneration_prompt);
-        toast.success("Prompt copied!");
-      }
-    };
+      },
+      description: 'Upload new image',
+      category: 'Upload & Analysis'
+    },
+    {
+      key: 'Enter',
+      ctrl: true,
+      callback: () => {
+        if (selectedFile && !isAnalyzing) {
+          handleAnalyze();
+        }
+      },
+      description: 'Analyze image',
+      category: 'Upload & Analysis'
+    },
+    {
+      key: 'g',
+      ctrl: true,
+      callback: () => {
+        if (result && user) {
+          openGenerateDialog({ prompt: result.full_regeneration_prompt, mode: 'generate' });
+        }
+      },
+      description: 'Generate image',
+      category: 'Generation'
+    },
+    {
+      key: 'k',
+      ctrl: true,
+      callback: () => {
+        if (result) {
+          navigator.clipboard.writeText(result.full_regeneration_prompt);
+          toast.success("Prompt copied!");
+        }
+      },
+      description: 'Copy prompt',
+      category: 'Generation'
+    },
+    {
+      key: 'r',
+      ctrl: true,
+      callback: () => {
+        if (result && selectedFile && !isAnalyzing) {
+          handleAnalyze();
+        }
+      },
+      description: 'Regenerate analysis',
+      category: 'Generation'
+    },
+    {
+      key: 'Escape',
+      callback: () => {
+        // Close any open modals/dialogs
+        const closeButtons = document.querySelectorAll('[aria-label="Close"]');
+        if (closeButtons.length > 0) {
+          (closeButtons[0] as HTMLButtonElement).click();
+        }
+      },
+      description: 'Close modal/dialog',
+      category: 'Navigation'
+    },
+    {
+      key: '?',
+      ctrl: true,
+      callback: () => {
+        setShowShortcutsGuide(true);
+      },
+      description: 'Show keyboard shortcuts',
+      category: 'Navigation'
+    }
+  ];
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [selectedFile, isAnalyzing, result]);
+  useKeyboardShortcuts({ 
+    shortcuts, 
+    enabled: !loading 
+  });
 
   if (loading) {
     return (
@@ -628,6 +696,31 @@ const Index = () => {
       </section>
 
       <Footer />
+      
+      {/* Keyboard Shortcuts Guide */}
+      <KeyboardShortcutsGuide 
+        open={showShortcutsGuide} 
+        onOpenChange={setShowShortcutsGuide}
+      />
+      
+      {/* Floating Keyboard Shortcuts Button - Desktop Only */}
+      {user && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowShortcutsGuide(true)}
+              className="hidden md:flex fixed bottom-6 right-6 w-12 h-12 rounded-full shadow-lg hover:shadow-xl transition-all z-40 bg-background/95 backdrop-blur border-border/50"
+            >
+              <Keyboard className="w-5 h-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>Keyboard Shortcuts ({modKey}+?)</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
     </div>
   );
 };
