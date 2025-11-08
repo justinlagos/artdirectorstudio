@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
-import { Wand2, CheckCircle2, Loader2, AlertCircle, Download } from "lucide-react";
+import { Wand2, CheckCircle2, Loader2, AlertCircle, Download, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { GENERATION_PRESETS, GenerationPreset } from "./GenerationPresets";
 import { GenerationOptions } from "./ImageGenerationDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BatchGenerationDialogProps {
   open: boolean;
@@ -41,6 +42,36 @@ export const BatchGenerationDialog = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [results, setResults] = useState<GenerationResult[]>([]);
   const [overallProgress, setOverallProgress] = useState(0);
+  const [allPresets, setAllPresets] = useState<GenerationPreset[]>(GENERATION_PRESETS);
+
+  useEffect(() => {
+    fetchCustomPresets();
+  }, []);
+
+  const fetchCustomPresets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('custom_generation_presets')
+        .select('*')
+        .order('usage_count', { ascending: false });
+
+      if (error) throw error;
+      
+      const customPresetsConverted: GenerationPreset[] = (data || []).map((cp: any) => ({
+        id: cp.id,
+        name: cp.name,
+        description: cp.description,
+        icon: <span className="text-xl">{cp.icon}</span>,
+        category: cp.category,
+        options: cp.options as unknown as GenerationOptions,
+        promptModifier: cp.prompt_modifier
+      }));
+
+      setAllPresets([...GENERATION_PRESETS, ...customPresetsConverted]);
+    } catch (error) {
+      console.error("Error fetching custom presets:", error);
+    }
+  };
 
   const handlePresetToggle = (presetId: string) => {
     setSelectedPresets(prev => {
@@ -55,10 +86,10 @@ export const BatchGenerationDialog = ({
   };
 
   const handleSelectAll = () => {
-    if (selectedPresets.size === GENERATION_PRESETS.length) {
+    if (selectedPresets.size === allPresets.length) {
       setSelectedPresets(new Set());
     } else {
-      setSelectedPresets(new Set(GENERATION_PRESETS.map(p => p.id)));
+      setSelectedPresets(new Set(allPresets.map(p => p.id)));
     }
   };
 
@@ -73,7 +104,7 @@ export const BatchGenerationDialog = ({
 
     // Initialize results
     const initialResults: GenerationResult[] = Array.from(selectedPresets).map(presetId => {
-      const preset = GENERATION_PRESETS.find(p => p.id === presetId)!;
+      const preset = allPresets.find(p => p.id === presetId)!;
       return {
         presetId: preset.id,
         presetName: preset.name,
@@ -85,7 +116,7 @@ export const BatchGenerationDialog = ({
 
     // Generate all images in parallel
     const generationPromises = initialResults.map(async (result, index) => {
-      const preset = GENERATION_PRESETS.find(p => p.id === result.presetId)!;
+      const preset = allPresets.find(p => p.id === result.presetId)!;
       
       // Update status to generating
       setResults(prev => prev.map((r, i) => 
@@ -96,6 +127,26 @@ export const BatchGenerationDialog = ({
         const imageUrl = await onGenerate(result.prompt, preset.options);
         
         if (imageUrl) {
+          // Increment usage count for custom presets
+          if (preset.id.includes('-')) { // Custom presets have UUID format
+            try {
+              const { data } = await supabase
+                .from('custom_generation_presets')
+                .select('usage_count')
+                .eq('id', preset.id)
+                .single();
+              
+              if (data) {
+                await supabase
+                  .from('custom_generation_presets')
+                  .update({ usage_count: (data.usage_count || 0) + 1 })
+                  .eq('id', preset.id);
+              }
+            } catch (e) {
+              console.error("Error incrementing usage:", e);
+            }
+          }
+
           // Update status to success
           setResults(prev => prev.map((r, i) => 
             i === index ? { ...r, status: 'success' as const, imageUrl } : r
@@ -185,7 +236,7 @@ export const BatchGenerationDialog = ({
             
             <ScrollArea className="h-[50vh] pr-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {GENERATION_PRESETS.map(preset => (
+                {allPresets.map(preset => (
                   <Card
                     key={preset.id}
                     className={`p-4 cursor-pointer transition-all ${

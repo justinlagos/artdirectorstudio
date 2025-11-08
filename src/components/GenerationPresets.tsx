@@ -1,7 +1,10 @@
-import { Sparkles, Instagram, Package, Camera, Palette, Newspaper, Store, Users } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Sparkles, Instagram, Package, Camera, Palette, Newspaper, Store, Users, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GenerationOptions } from "./ImageGenerationDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export interface GenerationPreset {
   id: string;
@@ -120,22 +123,75 @@ export const GENERATION_PRESETS: GenerationPreset[] = [
   }
 ];
 
+interface CustomPresetData {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  options: GenerationOptions;
+  prompt_modifier: string;
+}
+
 interface GenerationPresetsProps {
   onSelectPreset: (preset: GenerationPreset) => void;
   disabled?: boolean;
   selectedPresetId?: string | null;
+  onManageCustomPresets?: () => void;
 }
 
 export const GenerationPresets = ({ 
   onSelectPreset, 
   disabled,
-  selectedPresetId 
+  selectedPresetId,
+  onManageCustomPresets
 }: GenerationPresetsProps) => {
+  const [customPresets, setCustomPresets] = useState<CustomPresetData[]>([]);
+  const [isLoadingCustom, setIsLoadingCustom] = useState(true);
+
+  useEffect(() => {
+    fetchCustomPresets();
+  }, []);
+
+  const fetchCustomPresets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('custom_generation_presets')
+        .select('*')
+        .order('usage_count', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setCustomPresets((data || []).map(d => ({
+        ...d,
+        options: d.options as unknown as GenerationOptions
+      })));
+    } catch (error) {
+      console.error("Error fetching custom presets:", error);
+    } finally {
+      setIsLoadingCustom(false);
+    }
+  };
+
+  // Convert custom presets to GenerationPreset format
+  const customPresetsConverted: GenerationPreset[] = customPresets.map(cp => ({
+    id: cp.id,
+    name: cp.name,
+    description: cp.description,
+    icon: <span className="text-xl">{cp.icon}</span>,
+    category: cp.category as any,
+    options: cp.options,
+    promptModifier: cp.prompt_modifier
+  }));
+
+  const allPresets = [...GENERATION_PRESETS, ...customPresetsConverted];
+
   const categories = {
-    portrait: { name: 'Portrait', presets: GENERATION_PRESETS.filter(p => p.category === 'portrait') },
-    product: { name: 'Product', presets: GENERATION_PRESETS.filter(p => p.category === 'product') },
-    professional: { name: 'Professional', presets: GENERATION_PRESETS.filter(p => p.category === 'professional') },
-    creative: { name: 'Creative', presets: GENERATION_PRESETS.filter(p => p.category === 'creative') }
+    custom: { name: 'Your Custom Presets', presets: customPresetsConverted },
+    portrait: { name: 'Portrait', presets: allPresets.filter(p => p.category === 'portrait') },
+    product: { name: 'Product', presets: allPresets.filter(p => p.category === 'product') },
+    professional: { name: 'Professional', presets: allPresets.filter(p => p.category === 'professional') },
+    creative: { name: 'Creative', presets: allPresets.filter(p => p.category === 'creative') }
   };
 
   return (
@@ -143,9 +199,21 @@ export const GenerationPresets = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Generation Presets</h3>
-          <Badge variant="secondary" className="text-xs">
-            One-Click Setup
-          </Badge>
+          <div className="flex gap-2">
+            {onManageCustomPresets && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onManageCustomPresets}
+              >
+                <Plus className="w-3 h-3 mr-2" />
+                Manage Custom
+              </Button>
+            )}
+            <Badge variant="secondary" className="text-xs">
+              One-Click Setup
+            </Badge>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           Choose a preset to automatically configure optimal settings for your use case
@@ -154,6 +222,7 @@ export const GenerationPresets = ({
 
       <div className="space-y-6">
         {Object.entries(categories).map(([key, category]) => (
+          category.presets.length > 0 && (
           <div key={key} className="space-y-3">
             <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               {category.name}
@@ -202,6 +271,7 @@ export const GenerationPresets = ({
               ))}
             </div>
           </div>
+          )
         ))}
       </div>
     </div>

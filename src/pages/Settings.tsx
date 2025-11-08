@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,16 +11,27 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useSubscription } from "@/hooks/useSubscription";
-import { User, Shield, CreditCard, Settings2, Bell, Sparkles, Crown } from "lucide-react";
+import { User, Shield, CreditCard, Settings2, Bell, Sparkles, Crown, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
+import { CustomPresetsManager } from "@/components/CustomPresetsManager";
 
 const Settings = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { theme, setTheme } = useTheme();
   const { subscription } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'profile');
+
+  // Update activeTab when searchParams changes
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
   
   // Profile state
   const [username, setUsername] = useState("");
@@ -211,7 +222,7 @@ const Settings = () => {
             <p className="text-muted-foreground">Manage your account preferences and settings</p>
           </div>
 
-          <Tabs defaultValue="profile" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="glass-strong overflow-x-auto flex-nowrap w-full justify-start">
               <TabsTrigger value="profile" className="gap-2 flex-shrink-0">
                 <User className="w-4 h-4" />
@@ -224,6 +235,10 @@ const Settings = () => {
               <TabsTrigger value="billing" className="gap-2 flex-shrink-0">
                 <CreditCard className="w-4 h-4" />
                 <span className="hidden sm:inline">Plan & Billing</span>
+              </TabsTrigger>
+              <TabsTrigger value="presets" className="gap-2 flex-shrink-0">
+                <Wand2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Custom Presets</span>
               </TabsTrigger>
               <TabsTrigger value="preferences" className="gap-2 flex-shrink-0">
                 <Settings2 className="w-4 h-4" />
@@ -417,6 +432,18 @@ const Settings = () => {
                   </CardContent>
                 </Card>
               </div>
+            </TabsContent>
+
+            <TabsContent value="presets" className="mt-6">
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle>Custom Generation Presets</CardTitle>
+                  <CardDescription>Create and manage your personalized generation presets</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CustomPresetsManager />
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="preferences" className="mt-6">

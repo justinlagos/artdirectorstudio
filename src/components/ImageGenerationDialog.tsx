@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { GenerationPresets, GenerationPreset } from "./GenerationPresets";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ImageGenerationDialogProps {
   open: boolean;
@@ -132,6 +133,11 @@ export const ImageGenerationDialog = ({
     setSelectedPreset(preset);
     setOptions(preset.options);
     
+    // Increment usage count for custom presets
+    if (preset.id.includes('-')) { // Custom presets have UUID format with dashes
+      incrementPresetUsage(preset.id);
+    }
+    
     // Apply preset modifier to the base prompt
     const enhancedPrompt = basePrompt + preset.promptModifier;
     
@@ -142,6 +148,25 @@ export const ImageGenerationDialog = ({
       // If enhanced prompt is too long, just update options without modifier
       setPrompt(basePrompt);
       toast.info(`"${preset.name}" settings applied. Prompt modifier skipped due to length.`);
+    }
+  };
+
+  const incrementPresetUsage = async (presetId: string) => {
+    try {
+      const { data } = await supabase
+        .from('custom_generation_presets')
+        .select('usage_count')
+        .eq('id', presetId)
+        .single();
+      
+      if (data) {
+        await supabase
+          .from('custom_generation_presets')
+          .update({ usage_count: (data.usage_count || 0) + 1 })
+          .eq('id', presetId);
+      }
+    } catch (error) {
+      console.error("Error incrementing usage:", error);
     }
   };
 
@@ -233,6 +258,10 @@ export const ImageGenerationDialog = ({
             onSelectPreset={handlePresetSelect}
             disabled={isGenerating}
             selectedPresetId={selectedPreset?.id}
+            onManageCustomPresets={() => {
+              onOpenChange(false);
+              window.location.href = '/settings?tab=presets';
+            }}
           />
 
           <Separator />
