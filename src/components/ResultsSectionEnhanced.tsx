@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, Download, RefreshCw, Wand2, FileJson, Edit2 } from "lucide-react";
+import { Copy, Download, RefreshCw, Wand2, FileJson, Edit2, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Analysis, AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
 import { Separator } from "@/components/ui/separator";
 import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
+import { ImageComparisonView } from "@/components/ImageComparisonView";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { ChipSelector } from "@/components/ChipSelector";
 import { InsightChips } from "@/components/InsightChips";
@@ -16,6 +17,7 @@ import { EmptyStatePrompts } from "@/components/EmptyStatePrompts";
 import { ToolsShowcase } from "@/components/ToolsShowcase";
 import { AnalysisTabbed } from "@/components/AnalysisTabbed";
 import { PromptBuilder } from "@/components/PromptBuilder";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -719,10 +721,45 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       {generatedImages.length > 0 && (
         <>
           <Separator className="my-12" />
-          <GeneratedImagesGallery 
-            images={generatedImages}
-            onDelete={onDeleteImage}
-          />
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-display font-bold tracking-tight">
+                Generated Images
+              </h2>
+            </div>
+
+            <Tabs defaultValue="comparison" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 max-w-md">
+                <TabsTrigger value="comparison" className="gap-2">
+                  <SlidersHorizontal className="w-4 h-4" />
+                  Comparison
+                </TabsTrigger>
+                <TabsTrigger value="gallery" className="gap-2">
+                  Gallery
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="comparison" className="mt-6">
+                {imagePreviewUrl ? (
+                  <ImageComparisonView
+                    originalImage={imagePreviewUrl}
+                    generatedImages={generatedImages}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Original image not available for comparison
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="gallery" className="mt-6">
+                <GeneratedImagesGallery 
+                  images={generatedImages}
+                  onDelete={onDeleteImage}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
         </>
       )}
 
