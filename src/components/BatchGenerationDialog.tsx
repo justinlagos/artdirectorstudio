@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,11 +7,11 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Wand2, CheckCircle2, Loader2, AlertCircle, Download, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { GENERATION_PRESETS, GenerationPreset } from "./GenerationPresets";
 import { GenerationOptions } from "./ImageGenerationDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { ToolDrawer } from "./ToolDrawer";
 
 interface BatchGenerationDialogProps {
   open: boolean;
@@ -37,7 +35,6 @@ export const BatchGenerationDialog = ({
   basePrompt,
   onGenerate 
 }: BatchGenerationDialogProps) => {
-  const isMobile = useIsMobile();
   const [selectedPresets, setSelectedPresets] = useState<Set<string>>(new Set());
   const [isGenerating, setIsGenerating] = useState(false);
   const [results, setResults] = useState<GenerationResult[]>([]);
@@ -217,8 +214,8 @@ export const BatchGenerationDialog = ({
   const totalCost = selectedPresets.size * 3; // 3 credits per generation
   const successfulGenerations = results.filter(r => r.status === 'success').length;
 
-  const content = (
-    <div className="space-y-6 py-4">
+  const bodyContent = (
+    <div className="space-y-6">
       {/* Selection Phase */}
       {results.length === 0 && (
         <>
@@ -298,6 +295,7 @@ export const BatchGenerationDialog = ({
               onClick={handleGenerate}
               disabled={selectedPresets.size === 0}
               size="lg"
+              className="min-w-[160px] min-h-[44px]"
             >
               <Wand2 className="w-4 h-4 mr-2" />
               Generate All
@@ -401,63 +399,56 @@ export const BatchGenerationDialog = ({
 
           {/* Summary Actions */}
           {!isGenerating && successfulGenerations > 0 && (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleClose}
-              >
-                Close
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleDownloadAll}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Download All ({successfulGenerations})
-              </Button>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              All generations complete. Use the actions below to download results.
+            </p>
           )}
         </>
       )}
     </div>
   );
 
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={handleClose}>
-        <DrawerContent className="max-h-[95dvh]">
-          <DrawerHeader>
-            <DrawerTitle className="flex items-center gap-2">
-              <Wand2 className="w-5 h-5" />
-              Batch Generation
-            </DrawerTitle>
-            <DrawerDescription>
-              Generate multiple variations simultaneously with different presets
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="px-4 pb-4 overflow-y-auto">
-            {content}
-          </div>
-        </DrawerContent>
-      </Drawer>
-    );
-  }
+  const footerContent = !isGenerating && successfulGenerations > 0 ? (
+    <div className="flex flex-col gap-3 sm:flex-row">
+      <Button
+        variant="outline"
+        className="min-h-[44px] w-full sm:flex-1"
+        onClick={handleClose}
+      >
+        Close
+      </Button>
+      <Button
+        className="min-h-[44px] w-full sm:flex-1"
+        onClick={handleDownloadAll}
+      >
+        <Download className="w-4 h-4 mr-2" />
+        Download All ({successfulGenerations})
+      </Button>
+    </div>
+  ) : undefined;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Wand2 className="w-5 h-5" />
-            Batch Generation
-          </DialogTitle>
-          <DialogDescription>
-            Generate multiple variations simultaneously with different presets
-          </DialogDescription>
-        </DialogHeader>
-        {content}
-      </DialogContent>
-    </Dialog>
+    <ToolDrawer
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          onOpenChange(true);
+        } else {
+          handleClose();
+        }
+      }}
+      title={
+        <>
+          <Wand2 className="w-5 h-5" />
+          Batch Generation
+        </>
+      }
+      description="Generate multiple variations simultaneously with different presets"
+      className="sm:max-w-4xl"
+      contentClassName="pb-6"
+      footer={footerContent}
+    >
+      {bodyContent}
+    </ToolDrawer>
   );
 };

@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Download, Blend, X, Upload, Sparkles, FolderOpen, CheckCircle2, Wand2, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
@@ -14,7 +13,7 @@ import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
-import { useModalScrollRestoration } from "@/hooks/useModalScrollRestoration";
+import { ToolDrawer } from "./ToolDrawer";
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -30,7 +29,6 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
   const navigate = useNavigate();
   const toolState = useToolState();
   const { openGenerateDialog } = useToolsModal();
-  useModalScrollRestoration(open);
   const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("Blend these images seamlessly together");
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
@@ -347,20 +345,8 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     };
   }, [images]);
 
-  return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Blend className="w-5 h-5" />
-            Blend Images
-          </DialogTitle>
-          <DialogDescription>
-            Upload 2-4 images to blend them together. Free while subscriptions are being finalized!
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
+  const bodyContent = (
+    <div className="space-y-4">
           {/* Image Upload Area */}
           {images.length < 4 && !blendedImage && (
             <div className="space-y-2">
@@ -493,40 +479,6 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
                 </div>
               </CardContent>
 
-              <CardFooter className="flex-col gap-3 p-6 pt-0">
-                {/* Primary Actions */}
-                <div className="flex gap-2 w-full">
-                  <Button
-                    onClick={handleUseInStudio}
-                    className="flex-1 min-h-[44px]"
-                  >
-                    <Wand2 className="w-4 h-4 mr-2" />
-                    Use in Studio
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleDownload}
-                    className="flex-1 min-h-[44px]"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
-                </div>
-
-                {/* Secondary Action */}
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setBlendedImage(null);
-                    setBlendedAssetId(null);
-                    setImages([]);
-                    setInstruction("Blend these images seamlessly together");
-                  }}
-                  className="w-full"
-                >
-                  Blend New Images
-                </Button>
-              </CardFooter>
             </Card>
           )}
 
@@ -539,21 +491,71 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
               title="Blended Image - Full Resolution"
             />
           )}
-
-          {/* Blend Button */}
-          {images.length >= 2 && !blendedImage && (
-            <Button
-              onClick={handleBlend}
-              disabled={toolState.isProcessing}
-              className="w-full min-h-[44px]"
-              size="lg"
-            >
-              <Blend className="w-4 h-4 mr-2" />
-              {toolState.isProcessing ? "Blending..." : "Blend Images"}
-            </Button>
-          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      );
+
+  const footerContent = blendedImage ? (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button onClick={handleUseInStudio} className="min-h-[48px] w-full sm:flex-1">
+          <Wand2 className="w-4 h-4 mr-2" />
+          Use in Studio
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleDownload}
+          className="min-h-[48px] w-full sm:flex-1"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download
+        </Button>
+      </div>
+      <Button
+        variant="ghost"
+        onClick={() => {
+          setBlendedImage(null);
+          setBlendedAssetId(null);
+          setImages([]);
+          setInstruction("Blend these images seamlessly together");
+        }}
+        className="w-full"
+      >
+        Blend New Images
+      </Button>
+    </div>
+  ) : (
+    <Button
+      onClick={handleBlend}
+      disabled={toolState.isProcessing || images.length < 2}
+      className="w-full min-h-[48px]"
+      size="lg"
+    >
+      <Blend className="w-4 h-4 mr-2" />
+      {toolState.isProcessing ? "Blending..." : "Blend Images"}
+    </Button>
+  );
+
+  return (
+    <ToolDrawer
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          onOpenChange(true);
+        } else {
+          handleClose();
+        }
+      }}
+      title={
+        <>
+          <Blend className="w-5 h-5" />
+          Blend Images
+        </>
+      }
+      description="Upload 2-4 images to blend them together. Free while subscriptions are being finalized!"
+      contentClassName="pb-6"
+      footer={footerContent}
+    >
+      {bodyContent}
+    </ToolDrawer>
   );
 };
