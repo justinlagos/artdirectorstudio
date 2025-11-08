@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Download, Wand2, ChevronDown, Copy, AlertCircle, Square, RectangleHorizontal, RectangleVertical } from "lucide-react";
+import { Download, Wand2, ChevronDown, Copy, AlertCircle, Square, RectangleHorizontal, RectangleVertical, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
@@ -14,6 +14,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useModalScrollRestoration } from "@/hooks/useModalScrollRestoration";
 import { cn } from "@/lib/utils";
+import { GenerationPresets, GenerationPreset } from "./GenerationPresets";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 
 interface ImageGenerationDialogProps {
   open: boolean;
@@ -49,6 +52,8 @@ export const ImageGenerationDialog = ({
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [selectedPreset, setSelectedPreset] = useState<GenerationPreset | null>(null);
+  const [basePrompt, setBasePrompt] = useState(truncatedInitialPrompt);
   const [options, setOptions] = useState<GenerationOptions>({
     quality: 'auto',
     size: '1024x1024',
@@ -123,9 +128,39 @@ export const ImageGenerationDialog = ({
     handleGenerate();
   };
 
+  const handlePresetSelect = (preset: GenerationPreset) => {
+    setSelectedPreset(preset);
+    setOptions(preset.options);
+    
+    // Apply preset modifier to the base prompt
+    const enhancedPrompt = basePrompt + preset.promptModifier;
+    
+    if (enhancedPrompt.length <= MAX_PROMPT_LENGTH) {
+      setPrompt(enhancedPrompt);
+      toast.success(`"${preset.name}" preset applied!`);
+    } else {
+      // If enhanced prompt is too long, just update options without modifier
+      setPrompt(basePrompt);
+      toast.info(`"${preset.name}" settings applied. Prompt modifier skipped due to length.`);
+    }
+  };
+
+  const handleClearPreset = () => {
+    setSelectedPreset(null);
+    setPrompt(basePrompt);
+    setOptions({
+      quality: 'auto',
+      size: '1024x1024',
+      background: 'auto'
+    });
+    toast.info("Preset cleared, returned to custom settings");
+  };
+
   const handleClose = () => {
     setGeneratedImage(null);
     setPrompt(truncatedInitialPrompt);
+    setBasePrompt(truncatedInitialPrompt);
+    setSelectedPreset(null);
     setProgress(0);
     onOpenChange(false);
   };
@@ -137,6 +172,8 @@ export const ImageGenerationDialog = ({
         ? initialPrompt.substring(0, MAX_PROMPT_LENGTH - 3) + '...'
         : initialPrompt;
       setPrompt(newTruncatedPrompt);
+      setBasePrompt(newTruncatedPrompt);
+      setSelectedPreset(null);
       
       if (initialPrompt.length > MAX_PROMPT_LENGTH) {
         toast.info(`Prompt automatically shortened to ${MAX_PROMPT_LENGTH} characters`);
@@ -144,38 +181,119 @@ export const ImageGenerationDialog = ({
     }
   }, [open, initialPrompt]);
 
+  // Update prompt when user edits (track base prompt separately from preset-enhanced)
+  const handlePromptChange = (newValue: string) => {
+    if (newValue.length <= MAX_PROMPT_LENGTH) {
+      setPrompt(newValue);
+      // If user manually edits, update base prompt and clear preset
+      if (selectedPreset) {
+        setBasePrompt(newValue);
+        setSelectedPreset(null);
+        toast.info("Custom edits detected, preset cleared");
+      } else {
+        setBasePrompt(newValue);
+      }
+    } else {
+      toast.error(`Maximum ${MAX_PROMPT_LENGTH} characters allowed`);
+    }
+  };
+
   const content = (
     <div className="space-y-4 py-4">
-      {/* Character Limit Warning */}
-      {prompt.length > MAX_PROMPT_LENGTH * 0.9 && (
-        <Alert variant={prompt.length > MAX_PROMPT_LENGTH ? "destructive" : "default"}>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {prompt.length > MAX_PROMPT_LENGTH 
-              ? `Prompt exceeds maximum length by ${prompt.length - MAX_PROMPT_LENGTH} characters. Please shorten it.`
-              : `Approaching character limit: ${prompt.length}/${MAX_PROMPT_LENGTH}`
-            }
-          </AlertDescription>
-        </Alert>
-      )}
+      <Tabs defaultValue="presets" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="presets">Presets</TabsTrigger>
+          <TabsTrigger value="custom">Custom Prompt</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="presets" className="space-y-4 mt-4">
+          {/* Selected Preset Indicator */}
+          {selectedPreset && (
+            <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="flex-shrink-0">{selectedPreset.icon}</div>
+                <div>
+                  <div className="font-semibold text-sm">{selectedPreset.name}</div>
+                  <div className="text-xs text-muted-foreground">Active preset</div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearPreset}
+                disabled={isGenerating}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Clear
+              </Button>
+            </div>
+          )}
 
-      {/* Prompt Input with AI Enhancement */}
-      <EnhancedPromptEditor
-        value={prompt}
-        onChange={(newValue) => {
-          if (newValue.length <= MAX_PROMPT_LENGTH) {
-            setPrompt(newValue);
-          } else {
-            toast.error(`Maximum ${MAX_PROMPT_LENGTH} characters allowed`);
-          }
-        }}
-        label="Image Prompt"
-        placeholder="Describe the image you want to generate..."
-        disabled={isGenerating}
-      />
+          <GenerationPresets
+            onSelectPreset={handlePresetSelect}
+            disabled={isGenerating}
+            selectedPresetId={selectedPreset?.id}
+          />
 
-      {/* Advanced Options */}
-      <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+          <Separator />
+
+          {/* Base Prompt (shown with presets) */}
+          <div className="space-y-2">
+            <Label>Your Base Prompt</Label>
+            <EnhancedPromptEditor
+              value={basePrompt}
+              onChange={(newValue) => {
+                if (newValue.length <= MAX_PROMPT_LENGTH) {
+                  setBasePrompt(newValue);
+                  if (selectedPreset) {
+                    const enhanced = newValue + selectedPreset.promptModifier;
+                    if (enhanced.length <= MAX_PROMPT_LENGTH) {
+                      setPrompt(enhanced);
+                    } else {
+                      setPrompt(newValue);
+                      toast.info("Preset modifier removed due to length");
+                    }
+                  } else {
+                    setPrompt(newValue);
+                  }
+                }
+              }}
+              placeholder="Describe the image you want to generate..."
+              disabled={isGenerating}
+            />
+            {selectedPreset && (
+              <p className="text-xs text-muted-foreground">
+                ✨ Preset enhancements will be automatically added to your base prompt
+              </p>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="custom" className="space-y-4 mt-4">
+          {/* Character Limit Warning */}
+          {prompt.length > MAX_PROMPT_LENGTH * 0.9 && (
+            <Alert variant={prompt.length > MAX_PROMPT_LENGTH ? "destructive" : "default"}>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {prompt.length > MAX_PROMPT_LENGTH 
+                  ? `Prompt exceeds maximum length by ${prompt.length - MAX_PROMPT_LENGTH} characters. Please shorten it.`
+                  : `Approaching character limit: ${prompt.length}/${MAX_PROMPT_LENGTH}`
+                }
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Prompt Input with AI Enhancement */}
+          <EnhancedPromptEditor
+            value={prompt}
+            onChange={handlePromptChange}
+            label="Image Prompt"
+            placeholder="Describe the image you want to generate..."
+            disabled={isGenerating}
+          />
+
+          {/* Advanced Options */}
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm" className="w-full justify-between min-h-[44px]">
             <span>Advanced Options</span>
@@ -266,8 +384,10 @@ export const ImageGenerationDialog = ({
               </Select>
             </div>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+          </CollapsibleContent>
+          </Collapsible>
+        </TabsContent>
+      </Tabs>
 
       {/* Progress Bar */}
       {isGenerating && (
