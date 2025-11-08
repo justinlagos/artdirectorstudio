@@ -14,6 +14,7 @@ import { QuickTweaksRow } from "@/components/QuickTweaksRow";
 import { GuidedTweaks } from "@/components/GuidedTweaks";
 import { EmptyStatePrompts } from "@/components/EmptyStatePrompts";
 import { ToolsShowcase } from "@/components/ToolsShowcase";
+import { AnalysisTabbed } from "@/components/AnalysisTabbed";
 import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -660,64 +661,14 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         {/* Empty State */}
         {modifiedCount === 0 && <EmptyStatePrompts />}
         
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-          {sections.map((section, index) => {
-            const isExpanded = !isMobile || expandedSection === section.key || expandedSection === null;
-            
-            return (
-              <div 
-                key={index}
-                className={`group relative bg-surface-1 rounded-xl p-6 shadow-xs ring-1 ring-border/30 hover:shadow-medium hover:ring-border/60 transition-all duration-300 space-y-4 ${
-                  isMobile && !isExpanded ? 'opacity-50' : ''
-                }`}
-                onClick={() => toggleSection(section.key)}
-              >
-              {/* Subtle gradient on hover */}
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-primary/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-              
-              <div className="relative flex items-start justify-between gap-2">
-                <h3 className="text-lg font-semibold text-foreground leading-tight">
-                  {section.title}
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleCopySection(section.content, section.title)}
-                  className="shrink-0 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-              
-              <p className="relative text-muted-foreground leading-relaxed text-sm">
-                {section.content}
-              </p>
-
-              {/* Editable Fields */}
-              {isExpanded && section.editFields && section.editFields.length > 0 && (
-                <div className="relative space-y-3 pt-4 border-t border-border/50">
-                  <div className="flex items-center gap-2">
-                    <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Customize
-                    </p>
-                  </div>
-                  {section.editFields.map((field) => (
-                     <ChipSelector
-                      key={field.key}
-                      label={field.label}
-                      value={userEdits[field.key] || ''}
-                      onChange={(value) => handleEditChange(field.key, value)}
-                      options={field.options}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        </div>
-
+        {/* Tabbed Analysis Interface - Progressive Disclosure */}
+        <AnalysisTabbed
+          analysis={result.analysis}
+          userEdits={userEdits}
+          onEditChange={handleEditChange}
+          adaptiveFields={adaptiveFields}
+          suggestions={SUGGESTIONS}
+        />
       </div>
 
       {/* Generated Images Gallery */}
