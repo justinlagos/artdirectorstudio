@@ -12,6 +12,7 @@ import { Footer } from "@/components/Footer";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import { KeyboardShortcutsGuide } from "@/components/KeyboardShortcutsGuide";
+import { FeaturedPresetsCarousel } from "@/components/FeaturedPresetsCarousel";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Sparkles, Wand2, Upload, ArrowRight, Keyboard } from "lucide-react";
@@ -555,6 +556,9 @@ const Index = () => {
           </div>
         </section>
       )}
+
+      {/* Featured Presets Carousel */}
+      <FeaturedPresetsCarousel />
 
       {/* Studio Section - Only for authenticated users */}
       {user && (
