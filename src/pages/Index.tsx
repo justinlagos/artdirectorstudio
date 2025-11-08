@@ -605,108 +605,112 @@ const Index = () => {
         </div>
       )}
 
-      {/* How It Works */}
-      <section className="py-24 px-6 lg:px-8 bg-secondary/30">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
-            How It Works
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                title: "Analyze",
-                description: "Upload your image and let AI understand its composition, style, and elements",
-                icon: (
-                  <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8"/>
-                    <path d="m21 21-4.35-4.35"/>
-                  </svg>
-                ),
-              },
-              {
-                title: "Generate",
-                description: "Create new visuals based on your prompt and refined parameters",
-                icon: (
-                  <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-                    <path d="M5 3v4"/>
-                    <path d="M19 17v4"/>
-                    <path d="M3 5h4"/>
-                    <path d="M17 19h4"/>
-                  </svg>
-                ),
-              },
-              {
-                title: "Refine",
-                description: "Iterate and enhance with precision controls until it's perfect",
-                icon: (
-                  <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
-                    <path d="M2 2l7.586 7.586"/>
-                    <circle cx="11" cy="11" r="2"/>
-                  </svg>
-                ),
-              },
-            ].map((step, index) => (
-              <div key={index} className="glass rounded-2xl p-8 text-center hover-lift transition-all duration-300">
-                <div className="flex items-center justify-center mb-4 text-foreground">{step.icon}</div>
-                <h3 className="text-2xl font-display font-semibold mb-3">{step.title}</h3>
-                <p className="text-muted-foreground">{step.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Trust Section */}
-      <section className="py-24 px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center space-y-6 mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Trusted by Creative Professionals
+      {/* How It Works - Only show when no results */}
+      {!result && (
+        <section className="py-24 px-6 lg:px-8 bg-secondary/30">
+          <div className="max-w-7xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
+              How It Works
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Join thousands of designers and photographers who use ArtDirector Studio
-              to elevate their creative work.
-            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                {
+                  title: "Analyze",
+                  description: "Upload your image and let AI understand its composition, style, and elements",
+                  icon: (
+                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8"/>
+                      <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                  ),
+                },
+                {
+                  title: "Generate",
+                  description: "Create new visuals based on your prompt and refined parameters",
+                  icon: (
+                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                      <path d="M5 3v4"/>
+                      <path d="M19 17v4"/>
+                      <path d="M3 5h4"/>
+                      <path d="M17 19h4"/>
+                    </svg>
+                  ),
+                },
+                {
+                  title: "Refine",
+                  description: "Iterate and enhance with precision controls until it's perfect",
+                  icon: (
+                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                      <path d="M2 2l7.586 7.586"/>
+                      <circle cx="11" cy="11" r="2"/>
+                    </svg>
+                  ),
+                },
+              ].map((step, index) => (
+                <div key={index} className="glass rounded-2xl p-8 text-center hover-lift transition-all duration-300">
+                  <div className="flex items-center justify-center mb-4 text-foreground">{step.icon}</div>
+                  <h3 className="text-2xl font-display font-semibold mb-3">{step.title}</h3>
+                  <p className="text-muted-foreground">{step.description}</p>
+                </div>
+              ))}
+            </div>
           </div>
+        </section>
+      )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="glass rounded-2xl p-8">
-              <div className="text-4xl font-bold mb-2">10K+</div>
-              <div className="text-muted-foreground">Active Users</div>
+      {/* Trust Section - Only show when no results */}
+      {!result && (
+        <section className="py-24 px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center space-y-6 mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold">
+                Trusted by Creative Professionals
+              </h2>
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                Join thousands of designers and photographers who use ArtDirector Studio
+                to elevate their creative work.
+              </p>
             </div>
-            <div className="glass rounded-2xl p-8">
-              <div className="text-4xl font-bold mb-2">100K+</div>
-              <div className="text-muted-foreground">Images Analyzed</div>
-            </div>
-            <div className="glass rounded-2xl p-8">
-              <div className="text-4xl font-bold mb-2">4.9★</div>
-              <div className="text-muted-foreground">User Rating</div>
-            </div>
-          </div>
 
-          <div className="text-center mt-12">
-            {user ? (
-              <Button size="lg" className="gap-2" onClick={() => {
-                const studioSection = document.getElementById("studio-section");
-                if (studioSection) {
-                  studioSection.scrollIntoView({ behavior: "smooth" });
-                }
-              }}>
-                <Sparkles className="w-5 h-5" />
-                Start Analyzing Now
-              </Button>
-            ) : (
-              <Button size="lg" className="gap-2" onClick={() => navigate("/auth")}>
-                <Sparkles className="w-5 h-5" />
-                Start Analyzing for Free
-              </Button>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+              <div className="glass rounded-2xl p-8">
+                <div className="text-4xl font-bold mb-2">10K+</div>
+                <div className="text-muted-foreground">Active Users</div>
+              </div>
+              <div className="glass rounded-2xl p-8">
+                <div className="text-4xl font-bold mb-2">100K+</div>
+                <div className="text-muted-foreground">Images Analyzed</div>
+              </div>
+              <div className="glass rounded-2xl p-8">
+                <div className="text-4xl font-bold mb-2">4.9★</div>
+                <div className="text-muted-foreground">User Rating</div>
+              </div>
+            </div>
+
+            <div className="text-center mt-12">
+              {user ? (
+                <Button size="lg" className="gap-2" onClick={() => {
+                  const studioSection = document.getElementById("studio-section");
+                  if (studioSection) {
+                    studioSection.scrollIntoView({ behavior: "smooth" });
+                  }
+                }}>
+                  <Sparkles className="w-5 h-5" />
+                  Start Analyzing Now
+                </Button>
+              ) : (
+                <Button size="lg" className="gap-2" onClick={() => navigate("/auth")}>
+                  <Sparkles className="w-5 h-5" />
+                  Start Analyzing for Free
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <Footer />
       

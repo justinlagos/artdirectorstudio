@@ -88,8 +88,6 @@ export const ResultsSection = ({
   const [showUpscaleDialog, setShowUpscaleDialog] = useState(false);
   const [showBatchProcessDialog, setShowBatchProcessDialog] = useState(false);
   const [batchProcessMode, setBatchProcessMode] = useState<"analyze" | "upscale">("analyze");
-  const [showQuickAdjustments, setShowQuickAdjustments] = useState(true);
-  const [showGuidedRefinements, setShowGuidedRefinements] = useState(false);
   const studioButtonRef = useRef<HTMLButtonElement | null>(null);
   const previousBodyOverflow = useRef<string | null>(null);
 
@@ -280,40 +278,7 @@ export const ResultsSection = ({
     }));
   };
 
-  const quickActionPresets = [
-    {
-      label: "Enhance",
-      icon: Sparkles,
-      description: "Add cinematic depth and richer detail",
-      modifier: "Enhance lighting contrast, increase micro-detail, and sharpen subject focus"
-    },
-    {
-      label: "Simplify",
-      icon: Feather,
-      description: "Minimal composition and clean storytelling",
-      modifier: "Simplify composition with a clean background and minimal supporting elements"
-    },
-    {
-      label: "Artistic",
-      icon: Palette,
-      description: "Painterly character and stylized finishes",
-      modifier: "Infuse artistic brushwork, painterly textures, and expressive color accents"
-    },
-    {
-      label: "Reword",
-      icon: Quote,
-      description: "Refined phrasing for clarity",
-      modifier: "Rewrite the prompt for clarity, narrative flow, and precise language"
-    }
-  ];
-
   const basePrompt = livePreviewPrompt || result.full_regeneration_prompt;
-
-  const handleQuickAction = (modifier: string, label: string) => {
-    const updatedPrompt = `${basePrompt}\n\n// ${label}: ${modifier}`;
-    handleOpenStudio(updatedPrompt);
-    toast.success(`${label} preset ready in Studio.`);
-  };
 
   const openBatchProcess = (mode: "analyze" | "upscale") => {
     setBatchProcessMode(mode);
@@ -346,22 +311,6 @@ export const ResultsSection = ({
       onClick: () => openBatchProcess("analyze")
     }
   ];
-
-  const handleDownloadAnalyzedImage = () => {
-    if (!imagePreviewUrl) {
-      toast.info("Upload an image to enable download.");
-      return;
-    }
-
-    const link = document.createElement('a');
-    link.href = imagePreviewUrl;
-    link.download = `analysis-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    toast.success("Image download started.");
-  };
 
   const handleOpenStudio = (promptToUse?: string) => {
     const targetPrompt = promptToUse ?? basePrompt;
@@ -526,7 +475,17 @@ export const ResultsSection = ({
               </div>
             </div>
 
-            <div className="space-y-4">
+            {/* Guided Refinements Section - Always Visible, Compact on Mobile */}
+            <div className="mt-6">
+              <GuidedTweaks
+                analysis={result.analysis}
+                onApplyTweak={handleApplyGuidedTweak}
+                isApplying={isApplyingTweak || isRegenerating}
+              />
+            </div>
+
+            {/* Generate in Studio Button */}
+            <div className="space-y-4 mt-8">
               <div className="md:flex md:justify-center">
                 <div className="sticky bottom-6 z-20 w-full md:static md:w-auto">
                   <Button
@@ -541,142 +500,18 @@ export const ResultsSection = ({
               <p className="text-sm text-muted-foreground text-center md:text-left">
                 Open this prompt in Studio to create or refine your image.
               </p>
-              <div className="flex flex-col items-center gap-3 text-center md:flex-row md:justify-between md:text-left">
+              <div className="flex flex-col items-center gap-3 text-center md:flex-row md:justify-center md:text-left">
                 <span className="text-xs uppercase tracking-[0.35em] text-muted-foreground/70">
-                  Image analyzed successfully.
+                  Image analyzed successfully
                 </span>
-                {imagePreviewUrl && (
-                  <Button
-                    variant="outline"
-                    className="w-full max-w-xs md:w-auto"
-                    onClick={handleDownloadAnalyzedImage}
-                  >
-                    Download Image
-                  </Button>
-                )}
               </div>
             </div>
-          </div>
-
-          <div className="mt-10 space-y-4">
-            <Collapsible open={showQuickAdjustments} onOpenChange={setShowQuickAdjustments}>
-              <div className="rounded-3xl border border-border/30 bg-background/60 p-4 sm:p-6 shadow-[0_25px_70px_-50px_rgba(0,0,0,0.55)]">
-                <CollapsibleTrigger asChild>
-                  <button className="flex w-full items-center justify-between text-left">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/70">Quick Adjustments</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Tune essentials in seconds before you enter Studio.
-                      </p>
-                    </div>
-                    <ChevronDown className={cn("h-5 w-5 transition-transform", showQuickAdjustments && "rotate-180")} />
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 pt-4">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {quickActionPresets.map(({ label, icon: Icon, description, modifier }) => (
-                      <Button
-                        key={label}
-                        variant="ghost"
-                        onClick={() => handleQuickAction(modifier, label)}
-                        className="h-auto w-full justify-start rounded-2xl border border-border/40 bg-background/70 px-3 py-3 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/90"
-                      >
-                        <div className="flex w-full items-start gap-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <Icon className="h-4 w-4" />
-                          </span>
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold text-foreground">{label}</div>
-                            <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
-                              {description}
-                            </p>
-                          </div>
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
-                  <QuickTweaksRow
-                    analysis={result.analysis}
-                    variant="inline"
-                    className="border-none bg-transparent p-0 shadow-none"
-                  />
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-
-            <Collapsible open={showGuidedRefinements} onOpenChange={setShowGuidedRefinements}>
-              <div className="rounded-3xl border border-border/30 bg-background/60 p-4 sm:p-6 shadow-[0_25px_70px_-50px_rgba(0,0,0,0.55)]">
-                <CollapsibleTrigger asChild>
-                  <button className="flex w-full items-center justify-between text-left">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/70">Guided Refinements</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Let AI suggest thoughtful upgrades to your prompt.
-                      </p>
-                    </div>
-                    <ChevronDown className={cn("h-5 w-5 transition-transform", showGuidedRefinements && "rotate-180")} />
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-4">
-                  <GuidedTweaks
-                    analysis={result.analysis}
-                    onApplyTweak={handleApplyGuidedTweak}
-                    isApplying={isApplyingTweak || isRegenerating}
-                  />
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
-          <div className="flex flex-col gap-2 text-center sm:text-left">
-            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Creative Tools</p>
-            <h3 className="text-xl font-semibold text-foreground">Keep the flow going</h3>
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {quickTools.map(({ label, icon: Icon, caption, onClick }) => (
-              <Button
-                key={label}
-                variant="ghost"
-                onClick={onClick}
-                className="h-auto w-full justify-start gap-3 rounded-2xl border border-border/40 bg-background/70 px-3 py-4 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/90"
-              >
-                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-foreground truncate">{label}</span>
-                  <span className="block text-xs text-muted-foreground truncate">{caption}</span>
-                </span>
-              </Button>
-            ))}
           </div>
         </section>
 
         {extractInsights().length > 0 && (
           <InsightChips insights={extractInsights()} />
         )}
-
-        <section className="rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
-          <div className="space-y-2 text-center sm:text-left">
-            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Visual Prompt Builder</p>
-            <h3 className="text-xl font-semibold text-foreground">Turn your ideas into generation-ready prompts.</h3>
-            <p className="text-sm text-muted-foreground">
-              Experiment freely and send your favourite combinations straight to Studio.
-            </p>
-          </div>
-          <div className="mt-6">
-            <PromptBuilder
-              analysis={result.analysis}
-              onGenerate={(prompt) => handleOpenStudio(prompt)}
-            />
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
-          <ToolsShowcase />
-        </section>
 
         <section className="space-y-8 rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-10 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
           <div className="space-y-2 text-center sm:text-left">
@@ -762,6 +597,32 @@ export const ResultsSection = ({
           </Tabs>
         </div>
       )}
+
+      {/* Quick Tools Section - Moved to End */}
+      <section className="rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
+        <div className="flex flex-col gap-2 text-center sm:text-left">
+          <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Creative Tools</p>
+          <h3 className="text-xl font-semibold text-foreground">Keep the flow going</h3>
+        </div>
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {quickTools.map(({ label, icon: Icon, caption, onClick }) => (
+            <Button
+              key={label}
+              variant="ghost"
+              onClick={onClick}
+              className="h-auto w-full justify-start gap-3 rounded-2xl border border-border/40 bg-background/70 px-3 py-4 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/90"
+            >
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-foreground truncate">{label}</span>
+                <span className="block text-xs text-muted-foreground truncate">{caption}</span>
+              </span>
+            </Button>
+          ))}
+        </div>
+      </section>
 
       <ImageGenerationDialog
         open={showGenerationDialog}

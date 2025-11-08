@@ -87,32 +87,35 @@ export const GuidedTweaks = ({ analysis, onApplyTweak, isApplying }: GuidedTweak
   if (suggestions.length === 0) return null;
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="space-y-3 md:space-y-4">
+      <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground">
-            Guided Tweaks
+          <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
+          <h3 className="text-xs md:text-sm font-semibold text-foreground">
+            AI-Powered Refinements
           </h3>
         </div>
-        <CreditCostIndicator cost={1} action="AI tweak" />
+        <CreditCostIndicator cost={1} action="tweak" className="text-xs" />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
         {suggestions.map((suggestion, index) => (
           <div
             key={index}
-            className="group relative bg-gradient-to-r from-accent/30 to-accent/10 rounded-lg p-4 ring-1 ring-border/40 hover:ring-primary/40 transition-all hover:shadow-sm animate-scale-in"
-            style={{ animationDelay: `${index * 100}ms` }}
+            className="group relative bg-gradient-to-r from-accent/20 to-accent/5 rounded-lg 
+                       p-2.5 md:p-4 
+                       ring-1 ring-border/30 
+                       hover:ring-primary/40 
+                       transition-all"
           >
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm text-foreground leading-relaxed flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-xs md:text-sm text-foreground leading-snug md:leading-relaxed flex-1">
                 {suggestion.text}
               </p>
               <Button
                 size="sm"
                 variant="ghost"
-                className="shrink-0 h-7 px-3 text-xs font-medium hover:bg-primary/10 hover:text-primary"
+                className="shrink-0 h-6 md:h-7 px-2 md:px-3 text-[10px] md:text-xs"
                 onClick={() => onApplyTweak(suggestion.action)}
                 disabled={isApplying}
               >

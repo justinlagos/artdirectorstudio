@@ -174,9 +174,9 @@ export const AnalysisTabbed = ({
               <AccordionItem 
                 key={section.key} 
                 value={section.key}
-                className="border border-border/50 rounded-lg px-4 bg-card hover:border-primary/30 transition-colors"
+                className="border border-border/50 rounded-lg px-4 bg-card hover:border-primary/30 transition-colors pointer-events-auto"
               >
-                <AccordionTrigger className="hover:no-underline py-4">
+                <AccordionTrigger className="hover:no-underline py-4 cursor-pointer">
                   <div className="flex items-center gap-3 text-left">
                     <Badge variant="secondary" className="text-xs">
                       {index + 1}
@@ -249,9 +249,9 @@ export const AnalysisTabbed = ({
               <AccordionItem 
                 key={section.key} 
                 value={section.key}
-                className="border border-border/50 rounded-lg px-4 bg-card hover:border-primary/30 transition-colors"
+                className="border border-border/50 rounded-lg px-4 bg-card hover:border-primary/30 transition-colors pointer-events-auto"
               >
-                <AccordionTrigger className="hover:no-underline py-4">
+                <AccordionTrigger className="hover:no-underline py-4 cursor-pointer">
                   <div className="flex items-center gap-3 text-left">
                     <Badge variant="secondary" className="text-xs">
                       {index + 1}
