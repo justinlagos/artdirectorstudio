@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck, Zap } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck, Zap, Minimize2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,7 @@ export const ArtieChat = () => {
   const { openTool } = useToolsModal();
   const { balance, refetch: refetchCredits } = useCredits();
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [hasSeenTooltip, setHasSeenTooltip] = useState(false);
   const [contextualPrompt, setContextualPrompt] = useState("");
@@ -97,7 +98,7 @@ export const ArtieChat = () => {
 
   // Contextual prompts based on page and inactivity
   useEffect(() => {
-    if (isOpen) return;
+    if (isOpen || isMinimized) return;
 
     // Clear existing timer
     if (inactivityTimer.current) {
@@ -130,10 +131,25 @@ export const ArtieChat = () => {
         clearTimeout(inactivityTimer.current);
       }
     };
-  }, [location.pathname, isOpen]);
+  }, [location.pathname, isOpen, isMinimized]);
 
   const handleQuickAction = (action: QuickAction) => {
     setInputValue(action.prompt);
+    setIsMinimized(false);
+    setIsOpen(true);
+  };
+
+  const handleMinimize = () => {
+    setIsMinimized(true);
+    setIsOpen(false);
+    toast({
+      title: "Artie minimized",
+      description: "Click the icon to restore",
+    });
+  };
+
+  const handleRestore = () => {
+    setIsMinimized(false);
     setIsOpen(true);
   };
 
@@ -646,7 +662,7 @@ export const ArtieChat = () => {
   const FloatingIcon = () => (
     <div className="fixed bottom-6 right-4 md:bottom-8 md:right-6 z-40 pointer-events-auto">
       {/* Contextual prompt bubble */}
-      {showPrompt && contextualPrompt && (
+      {showPrompt && contextualPrompt && !isMinimized && (
         <div 
           className="absolute bottom-full right-0 mb-3 animate-slide-up pointer-events-auto"
           onClick={() => {
@@ -662,17 +678,18 @@ export const ArtieChat = () => {
       )}
 
       {/* Animated Artie icon */}
-      <Tooltip open={!hasSeenTooltip && !isOpen} delayDuration={300}>
+      <Tooltip open={!hasSeenTooltip && !isOpen && !isMinimized} delayDuration={300}>
         <TooltipTrigger asChild>
           <button
-            onClick={() => setIsOpen(true)}
-            aria-label="Open Artie AI Assistant"
+            onClick={() => isMinimized ? handleRestore() : setIsOpen(true)}
+            aria-label={isMinimized ? "Restore Artie" : "Open Artie AI Assistant"}
             className={cn(
               "relative h-14 w-14 md:h-16 md:w-16 rounded-full shadow-strong transition-all duration-300",
               "bg-gradient-to-br from-primary to-primary/80",
               "hover:scale-110 hover:shadow-2xl",
               "flex items-center justify-center group",
-              !isOpen && "animate-glow-pulse"
+              !isOpen && !isMinimized && "animate-glow-pulse",
+              isMinimized && "ring-2 ring-primary ring-offset-2 ring-offset-background"
             )}
           >
             {/* Glow ring */}
@@ -683,12 +700,15 @@ export const ArtieChat = () => {
               <Sparkles className="h-6 w-6 md:h-7 md:w-7 text-primary-foreground transition-transform group-hover:rotate-12" />
             </div>
 
-            {/* Breathing indicator */}
-            <div className="absolute -top-1 -right-1 h-3 w-3 md:h-4 md:w-4 rounded-full bg-green-500 border-2 border-background animate-pulse" />
+            {/* Status indicator */}
+            <div className={cn(
+              "absolute -top-1 -right-1 h-3 w-3 md:h-4 md:w-4 rounded-full border-2 border-background",
+              isMinimized ? "bg-amber-500 animate-bounce" : "bg-green-500 animate-pulse"
+            )} />
           </button>
         </TooltipTrigger>
         <TooltipContent side="left" className="text-sm max-w-[180px] md:max-w-[200px] mr-2" sideOffset={8}>
-          <p className="font-medium">Need creative help? Try Artie.</p>
+          <p className="font-medium">{isMinimized ? "Click to restore Artie" : "Need creative help? Try Artie."}</p>
         </TooltipContent>
       </Tooltip>
     </div>
@@ -725,14 +745,31 @@ export const ArtieChat = () => {
               <p className="text-xs text-muted-foreground">Your Creative Collaborator</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsOpen(false)}
-            className="hover:bg-muted/50"
-          >
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleMinimize}
+                  className="hover:bg-muted/50"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Minimize</p>
+              </TooltipContent>
+            </Tooltip>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsOpen(false)}
+              className="hover:bg-muted/50"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Quick Actions */}
