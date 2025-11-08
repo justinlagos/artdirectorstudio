@@ -7,12 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck, Zap, Minimize2 } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { useCredits } from "@/hooks/useCredits";
-import { useState as useImageGenerationState } from "react";
 
 interface Message {
   id: string;
@@ -142,8 +141,7 @@ export const ArtieChat = () => {
   const handleMinimize = () => {
     setIsMinimized(true);
     setIsOpen(false);
-    toast({
-      title: "Artie minimized",
+    toast.success("Artie minimized", {
       description: "Click the icon to restore",
     });
   };
@@ -168,17 +166,13 @@ export const ArtieChat = () => {
       const isValidSize = file.size <= 20 * 1024 * 1024; // 20MB
 
       if (!isValidType) {
-        toast({
-          title: "Invalid file type",
+        toast.error("Invalid file type", {
           description: `${file.name} is not supported. Please upload images, PDFs, or Word documents.`,
-          variant: "destructive",
         });
       }
       if (!isValidSize) {
-        toast({
-          title: "File too large",
+        toast.error("File too large", {
           description: `${file.name} exceeds 20MB limit.`,
-          variant: "destructive",
         });
       }
 
@@ -187,8 +181,7 @@ export const ArtieChat = () => {
 
     if (validFiles.length > 0) {
       setUploadedFiles(prev => [...prev, ...validFiles]);
-      toast({
-        title: "Files added",
+      toast.success("Files added", {
         description: `${validFiles.length} file(s) ready to upload`,
       });
     }
@@ -541,10 +534,8 @@ export const ArtieChat = () => {
                     )
                   );
                   
-                  toast({
-                    title: "Image generation failed",
+                  toast.error("Image generation failed", {
                     description: errorMessage,
-                    variant: "destructive",
                   });
                 }
               } else if (toolCall.function.name === 'edit_image') {
@@ -625,10 +616,8 @@ export const ArtieChat = () => {
                     )
                   );
                   
-                  toast({
-                    title: "Image editing failed",
+                  toast.error("Image editing failed", {
                     description: errorMessage,
-                    variant: "destructive",
                   });
                 }
               }
@@ -637,20 +626,16 @@ export const ArtieChat = () => {
         }
       } catch (error) {
         console.error('Error getting Artie response:', error);
-        toast({
-          title: "Connection Error",
+        toast.error("Connection Error", {
           description: "Couldn't reach Artie. Please try again.",
-          variant: "destructive",
         });
         
         setMessages(prev => prev.filter(m => m.id !== (Date.now() + 1).toString()));
       }
     } catch (uploadError) {
       console.error('Error uploading files:', uploadError);
-      toast({
-        title: "Upload Error",
+      toast.error("Upload Error", {
         description: "Failed to process uploaded files. Please try again.",
-        variant: "destructive",
       });
       setIsUploading(false);
     } finally {
@@ -1010,7 +995,7 @@ export const ArtieChat = () => {
                 <Button
                   onClick={async () => {
                     if (!generationPrompt.trim()) {
-                      toast({ title: "Please enter a prompt", variant: "destructive" });
+                      toast.error("Please enter a prompt");
                       return;
                     }
 
@@ -1046,17 +1031,15 @@ export const ArtieChat = () => {
                             ? { ...m, text: `Generated successfully! 🎨\n\n![Generated Image](${data.imageUrl})`, attachment: { type: 'image' as const, url: data.imageUrl, name: 'Generated' } }
                             : m
                         ));
-                        toast({ title: "Image generated successfully!" });
+                        toast.success("Image generated successfully!");
                         refetchCredits();
                       } else {
                         throw new Error(data.error || 'Generation failed');
                       }
                     } catch (error: any) {
                       console.error('Generation error:', error);
-                      toast({ 
-                        title: "Generation failed", 
+                      toast.error("Generation failed", {
                         description: error.message,
-                        variant: "destructive" 
                       });
                     }
                     

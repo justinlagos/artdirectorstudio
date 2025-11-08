@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { mapErrorMessage, TOOL_ERROR_MESSAGES } from "@/lib/toolErrorMessages";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
+import { useModalScrollRestoration } from "@/hooks/useModalScrollRestoration";
 
 interface BatchProcessDialogProps {
   open: boolean;
@@ -37,6 +38,7 @@ type OperationType = 'analyze' | 'upscale';
 export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogProps) => {
   const navigate = useNavigate();
   const { openGenerateDialog } = useToolsModal();
+  useModalScrollRestoration(open);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [operation, setOperation] = useState<OperationType>('upscale');
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');

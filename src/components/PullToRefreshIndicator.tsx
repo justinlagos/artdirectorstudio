@@ -18,7 +18,7 @@ export const PullToRefreshIndicator = ({
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center pointer-events-none transition-transform duration-200"
+      className="fixed top-0 left-0 right-0 z-30 flex items-center justify-center pointer-events-none transition-transform duration-200"
       style={{
         transform: `translateY(${isRefreshing ? '60px' : Math.min(pullDistance, 60)}px)`,
       }}

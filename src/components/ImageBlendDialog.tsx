@@ -14,6 +14,7 @@ import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
+import { useModalScrollRestoration } from "@/hooks/useModalScrollRestoration";
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -29,6 +30,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
   const navigate = useNavigate();
   const toolState = useToolState();
   const { openGenerateDialog } = useToolsModal();
+  useModalScrollRestoration(open);
   const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("Blend these images seamlessly together");
   const [blendedImage, setBlendedImage] = useState<string | null>(null);

@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useModalScrollRestoration } from "@/hooks/useModalScrollRestoration";
 import { cn } from "@/lib/utils";
 
 interface ImageGenerationDialogProps {
@@ -36,6 +37,7 @@ export const ImageGenerationDialog = ({
   onGenerate 
 }: ImageGenerationDialogProps) => {
   const isMobile = useIsMobile();
+  useModalScrollRestoration(open);
   
   // Truncate initial prompt if it's too long
   const truncatedInitialPrompt = initialPrompt.length > MAX_PROMPT_LENGTH 

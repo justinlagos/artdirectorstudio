@@ -15,6 +15,7 @@ import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
+import { useModalScrollRestoration } from "@/hooks/useModalScrollRestoration";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -30,6 +31,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
   const navigate = useNavigate();
   const toolState = useToolState();
   const { openGenerateDialog } = useToolsModal();
+  useModalScrollRestoration(open);
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);

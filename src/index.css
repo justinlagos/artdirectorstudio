@@ -378,4 +378,32 @@ All colors MUST be HSL.
   .will-change-opacity {
     will-change: opacity;
   }
+
+  /* Modal scroll optimization */
+  [role="dialog"], 
+  [data-vaul-drawer] {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Prevent body scroll when modal is open */
+  body.modal-open {
+    overflow: hidden !important;
+    position: fixed;
+    width: 100%;
+  }
+
+  /* Fix iOS Safari bottom padding issue */
+  @supports (height: 100dvh) {
+    .mobile-modal-content {
+      max-height: 95dvh;
+    }
+  }
+
+  /* Ensure buttons stay tappable during scroll */
+  [role="dialog"] button,
+  [data-vaul-drawer] button {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
