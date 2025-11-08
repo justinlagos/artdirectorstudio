@@ -119,11 +119,11 @@ export const ImageComparisonView = ({
               </>
             )}
 
-            {/* Fullscreen Button */}
+            {/* Fullscreen Button - Hidden on Mobile */}
             <Button
               variant="secondary"
               size="icon"
-              className="absolute bottom-4 right-4 z-20 shadow-strong"
+              className="absolute bottom-4 right-4 z-20 shadow-strong hidden md:flex"
               onClick={() => setShowFullscreen(true)}
             >
               <Maximize2 className="w-4 h-4" />

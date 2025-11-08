@@ -485,22 +485,22 @@ export const ResultsSection = ({
             </div>
 
             {/* Generate in Studio Button */}
-            <div className="space-y-4 mt-8">
-              <div className="md:flex md:justify-center">
+            <div className="space-y-5 mt-8">
+              <div className="flex justify-center">
                 <div className="sticky bottom-6 z-20 w-full md:static md:w-auto">
                   <Button
                     ref={studioButtonRef}
-                    className="h-12 w-full rounded-full text-base font-semibold shadow-[0_22px_40px_-24px_rgba(0,0,0,0.65)]"
+                    className="h-12 w-full rounded-full text-base font-semibold shadow-[0_22px_40px_-24px_rgba(0,0,0,0.65)] md:w-auto md:px-12"
                     onClick={() => handleOpenStudio()}
                   >
                     Generate in Studio
                   </Button>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground text-center md:text-left">
-                Open this prompt in Studio to create or refine your image.
+              <p className="text-sm text-muted-foreground text-center">
+                Open this prompt in Studio to create or refine your image
               </p>
-              <div className="flex flex-col items-center gap-3 text-center md:flex-row md:justify-center md:text-left">
+              <div className="flex flex-col items-center gap-3 text-center">
                 <span className="text-xs uppercase tracking-[0.35em] text-muted-foreground/70">
                   Image analyzed successfully
                 </span>
