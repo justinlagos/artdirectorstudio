@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Download, Maximize2, Upload, Sparkles, FolderOpen, CheckCircle2, Wand2, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +14,7 @@ import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
-import { useModalScrollRestoration } from "@/hooks/useModalScrollRestoration";
+import { ToolDrawer } from "./ToolDrawer";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -31,7 +30,6 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
   const navigate = useNavigate();
   const toolState = useToolState();
   const { openGenerateDialog } = useToolsModal();
-  useModalScrollRestoration(open);
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
@@ -260,20 +258,8 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     };
   }, [sourceImage]);
 
-  return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Maximize2 className="w-5 h-5" />
-            Upscale Image
-          </DialogTitle>
-          <DialogDescription>
-            Upscale your image to higher resolution. Free while subscriptions are being finalized!
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
+  const bodyContent = (
+    <div className="space-y-4">
           {/* Image Upload */}
           {!sourceImage && (
             <div className="space-y-2">
@@ -430,40 +416,6 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
                 </div>
               </CardContent>
 
-              <CardFooter className="flex-col gap-3 p-6 pt-0">
-                {/* Primary Actions */}
-                <div className="flex gap-2 w-full">
-                  <Button
-                    onClick={handleUseInStudio}
-                    className="flex-1 min-h-[44px]"
-                  >
-                    <Wand2 className="w-4 h-4 mr-2" />
-                    Use in Studio
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleDownload}
-                    className="flex-1 min-h-[44px]"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
-                </div>
-
-                {/* Secondary Action */}
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setUpscaledImage(null);
-                    setUpscaledAssetId(null);
-                    setSourceImage(null);
-                    setTargetSize("1536x1536");
-                  }}
-                  className="w-full"
-                >
-                  Upscale New Image
-                </Button>
-              </CardFooter>
             </Card>
           )}
 
@@ -476,21 +428,74 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
               title={zoomImage === 'before' ? 'Original Image' : `Upscaled Image (${targetSize})`}
             />
           )}
-
-          {/* Upscale Button */}
-          {sourceImage && !upscaledImage && (
-            <Button
-              onClick={handleUpscale}
-              disabled={toolState.isProcessing}
-              className="w-full min-h-[44px]"
-              size="lg"
-            >
-              <Maximize2 className="w-4 h-4 mr-2" />
-              {toolState.isProcessing ? "Upscaling..." : "Upscale Image"}
-            </Button>
-          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      );
+
+  const footerContent = upscaledImage ? (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button onClick={handleUseInStudio} className="min-h-[48px] w-full sm:flex-1">
+          <Wand2 className="w-4 h-4 mr-2" />
+          Use in Studio
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleDownload}
+          className="min-h-[48px] w-full sm:flex-1"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download
+        </Button>
+      </div>
+      <Button
+        variant="ghost"
+        onClick={() => {
+          setUpscaledImage(null);
+          setUpscaledAssetId(null);
+          if (sourceImage) {
+            URL.revokeObjectURL(sourceImage.preview);
+          }
+          setSourceImage(null);
+          setTargetSize("1536x1536");
+        }}
+        className="w-full"
+      >
+        Upscale Another Image
+      </Button>
+    </div>
+  ) : (
+    <Button
+      onClick={handleUpscale}
+      disabled={toolState.isProcessing || !sourceImage}
+      className="w-full min-h-[48px]"
+      size="lg"
+    >
+      <Maximize2 className="w-4 h-4 mr-2" />
+      {toolState.isProcessing ? "Upscaling..." : "Upscale Image"}
+    </Button>
+  );
+
+  return (
+    <ToolDrawer
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          onOpenChange(true);
+        } else {
+          handleClose();
+        }
+      }}
+      title={
+        <>
+          <Maximize2 className="w-5 h-5" />
+          Upscale Image
+        </>
+      }
+      description="Upscale your image to higher resolution. Free while subscriptions are being finalized!"
+      contentClassName="pb-6"
+      footer={footerContent}
+    >
+      {bodyContent}
+    </ToolDrawer>
   );
 };

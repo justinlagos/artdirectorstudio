@@ -1,7 +1,5 @@
 import { useState } from "react";
 import * as React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,13 +9,11 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { useModalScrollRestoration } from "@/hooks/useModalScrollRestoration";
-import { cn } from "@/lib/utils";
 import { GenerationPresets, GenerationPreset } from "./GenerationPresets";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
+import { ToolDrawer } from "./ToolDrawer";
 
 interface ImageGenerationDialogProps {
   open: boolean;
@@ -40,9 +36,6 @@ export const ImageGenerationDialog = ({
   initialPrompt,
   onGenerate 
 }: ImageGenerationDialogProps) => {
-  const isMobile = useIsMobile();
-  useModalScrollRestoration(open);
-  
   // Truncate initial prompt if it's too long
   const truncatedInitialPrompt = initialPrompt.length > MAX_PROMPT_LENGTH 
     ? initialPrompt.substring(0, MAX_PROMPT_LENGTH - 3) + '...'
@@ -223,8 +216,8 @@ export const ImageGenerationDialog = ({
     }
   };
 
-  const content = (
-    <div className="space-y-4 py-4">
+  const bodyContent = (
+    <div className="space-y-4">
       <Tabs defaultValue="presets" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="presets">Presets</TabsTrigger>
@@ -432,85 +425,83 @@ export const ImageGenerationDialog = ({
       {generatedImage && (
         <div className="space-y-4 pt-4 border-t">
           <div className="relative rounded-lg overflow-hidden bg-muted">
-            <img 
-              src={generatedImage} 
-              alt="Generated image" 
+            <img
+              src={generatedImage}
+              alt="Generated image"
               className="w-full h-auto"
               loading="lazy"
             />
           </div>
-          
-          <div className="flex gap-2">
-            <Button
-              onClick={handleDownload}
-              className="flex-1 min-h-[44px]"
-              variant="secondary"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </Button>
-            <Button
-              onClick={handleRegenerate}
-              className="flex-1 min-h-[44px]"
-              disabled={isGenerating}
-            >
-              <Wand2 className="w-4 h-4 mr-2" />
-              Regenerate
-            </Button>
-          </div>
         </div>
-      )}
-
-      {/* Generate Button */}
-      {!generatedImage && (
-        <Button
-          onClick={handleGenerate}
-          disabled={isGenerating || !prompt.trim() || prompt.length > MAX_PROMPT_LENGTH}
-          className="w-full min-h-[44px]"
-          size="lg"
-        >
-          <Wand2 className="w-4 h-4 mr-2" />
-          {isGenerating ? "Generating..." : "Generate Image (3 Credits)"}
-        </Button>
       )}
     </div>
   );
-
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={handleClose}>
-        <DrawerContent className="max-h-[95dvh] overflow-y-auto">
-          <DrawerHeader>
-            <DrawerTitle className="flex items-center gap-2">
-              <Wand2 className="w-5 h-5" />
-              Generate AI Image
-            </DrawerTitle>
-            <DrawerDescription>
-              Generate a new image from your prompt. Cost: <span className="font-semibold text-foreground">3 credits</span>
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="px-4 pb-4">
-            {content}
-          </div>
-        </DrawerContent>
-      </Drawer>
-    );
-  }
+  const footerContent = generatedImage ? (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button
+          onClick={handleDownload}
+          className="min-h-[48px] w-full sm:flex-1"
+          variant="secondary"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download
+        </Button>
+        <Button
+          onClick={handleRegenerate}
+          className="min-h-[48px] w-full sm:flex-1"
+          disabled={isGenerating}
+        >
+          <Wand2 className="w-4 h-4 mr-2" />
+          {isGenerating ? "Generating..." : "Regenerate"}
+        </Button>
+      </div>
+      <Button
+        variant="outline"
+        onClick={handleCopyPrompt}
+        className="min-h-[44px] w-full"
+      >
+        <Copy className="w-4 h-4 mr-2" />
+        Copy Prompt
+      </Button>
+    </div>
+  ) : (
+    <Button
+      onClick={handleGenerate}
+      disabled={isGenerating || !prompt.trim() || prompt.length > MAX_PROMPT_LENGTH}
+      className="w-full min-h-[48px]"
+      size="lg"
+    >
+      <Wand2 className="w-4 h-4 mr-2" />
+      {isGenerating ? "Generating..." : "Generate Image (3 Credits)"}
+    </Button>
+  );
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Wand2 className="w-5 h-5" />
-            Generate AI Image
-          </DialogTitle>
-          <DialogDescription>
-            Generate a new image from your prompt. Cost: <span className="font-semibold text-foreground">3 credits</span>
-          </DialogDescription>
-        </DialogHeader>
-        {content}
-      </DialogContent>
-    </Dialog>
+    <ToolDrawer
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          onOpenChange(true);
+        } else {
+          handleClose();
+        }
+      }}
+      title={
+        <>
+          <Wand2 className="w-5 h-5" />
+          Generate AI Image
+        </>
+      }
+      description={
+        <>
+          Generate a new image from your prompt. Cost: <span className="font-semibold text-foreground">3 credits</span>
+        </>
+      }
+      contentClassName="pb-6"
+      footer={footerContent}
+    >
+      {bodyContent}
+    </ToolDrawer>
   );
 };

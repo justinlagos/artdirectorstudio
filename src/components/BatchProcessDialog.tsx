@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { mapErrorMessage, TOOL_ERROR_MESSAGES } from "@/lib/toolErrorMessages";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
-import { useModalScrollRestoration } from "@/hooks/useModalScrollRestoration";
+import { ToolDrawer } from "./ToolDrawer";
 
 interface BatchProcessDialogProps {
   open: boolean;
@@ -38,7 +37,6 @@ type OperationType = 'analyze' | 'upscale';
 export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogProps) => {
   const navigate = useNavigate();
   const { openGenerateDialog } = useToolsModal();
-  useModalScrollRestoration(open);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [operation, setOperation] = useState<OperationType>('upscale');
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
@@ -369,17 +367,8 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     };
   }, []);
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Batch Image Processing
-            <Badge variant="secondary">{stats.total} items</Badge>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto space-y-4 py-4">
+  const bodyContent = (
+    <div className="space-y-4">
           {/* Settings */}
           <Card>
             <CardContent className="p-4 space-y-4">
@@ -562,61 +551,87 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
             ))}
           </Tabs>
         </div>
+      );
 
-        {/* Actions */}
-        <div className="flex gap-2 pt-4 border-t">
-          {!isProcessing && stats.completed > 0 && (
-            <Button variant="outline" onClick={clearCompleted}>
-              <Trash2 className="w-4 h-4 mr-2" />
-              Clear Completed
-            </Button>
-          )}
-          
-          {stats.completed > 0 && (
-            <>
-              <Button variant="outline" onClick={handleViewAll}>
-                <Eye className="w-4 h-4 mr-2" />
-                View All Results
-              </Button>
-              <Button onClick={handleUseInStudio} className="min-h-[44px]">
-                <Wand2 className="w-4 h-4 mr-2" />
-                Use in Studio
-              </Button>
-            </>
-          )}
+  const footerContent = (
+    <div className="flex flex-wrap items-center gap-2">
+      {!isProcessing && stats.completed > 0 && (
+        <Button variant="outline" onClick={clearCompleted} className="min-h-[44px]">
+          <Trash2 className="w-4 h-4 mr-2" />
+          Clear Completed
+        </Button>
+      )}
 
-          <div className="flex-1" />
+      {stats.completed > 0 && (
+        <>
+          <Button variant="outline" onClick={handleViewAll} className="min-h-[44px]">
+            <Eye className="w-4 h-4 mr-2" />
+            View All Results
+          </Button>
+          <Button onClick={handleUseInStudio} className="min-h-[44px]">
+            <Wand2 className="w-4 h-4 mr-2" />
+            Use in Studio
+          </Button>
+        </>
+      )}
 
-          {isProcessing && !isPaused && (
-            <Button variant="outline" onClick={handlePause}>
-              Pause
-            </Button>
-          )}
+      <div className="flex-1 min-w-[120px]" />
 
-          {!isProcessing && isPaused && stats.pending > 0 && (
-            <Button onClick={handleResume} className="min-w-[140px]">
-              Resume Processing
-            </Button>
-          )}
+      {isProcessing && !isPaused && (
+        <Button variant="outline" onClick={handlePause} className="min-h-[44px]">
+          <Pause className="w-4 h-4 mr-2" />
+          Pause
+        </Button>
+      )}
 
-          {!isProcessing && !isPaused && (
-            <Button
-              onClick={processQueue}
-              disabled={stats.pending === 0}
-              className="min-w-[140px] min-h-[44px]"
-            >
-              Process {stats.pending} Image{stats.pending !== 1 ? 's' : ''}
-            </Button>
-          )}
+      {!isProcessing && isPaused && stats.pending > 0 && (
+        <Button onClick={handleResume} className="min-w-[140px] min-h-[44px]">
+          <Play className="w-4 h-4 mr-2" />
+          Resume Processing
+        </Button>
+      )}
 
-          {isProcessing && !isPaused && (
-            <Button disabled className="min-w-[140px] min-h-[44px]">
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Processing {currentIndex + 1}/{stats.total}
-            </Button>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      {!isProcessing && !isPaused && (
+        <Button
+          onClick={processQueue}
+          disabled={stats.pending === 0}
+          className="min-w-[160px] min-h-[44px]"
+        >
+          Process {stats.pending || 0} Image{stats.pending !== 1 ? 's' : ''}
+        </Button>
+      )}
+
+      {isProcessing && !isPaused && (
+        <Button disabled className="min-w-[160px] min-h-[44px]">
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          Processing {currentIndex + 1}/{stats.total}
+        </Button>
+      )}
+    </div>
+  );
+
+  return (
+    <ToolDrawer
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          onOpenChange(true);
+        } else {
+          onOpenChange(false);
+        }
+      }}
+      title={
+        <>
+          Batch Image Processing
+          <Badge variant="secondary">{stats.total} items</Badge>
+        </>
+      }
+      description="Upload, queue, and monitor analyze or upscale jobs in one place."
+      className="sm:max-w-5xl"
+      contentClassName="pb-6"
+      footer={footerContent}
+    >
+      {bodyContent}
+    </ToolDrawer>
   );
 };
