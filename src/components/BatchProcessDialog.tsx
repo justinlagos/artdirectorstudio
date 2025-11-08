@@ -17,6 +17,7 @@ import { ToolDrawer } from "./ToolDrawer";
 interface BatchProcessDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialOperation?: OperationType;
 }
 
 interface QueueItem {
@@ -34,7 +35,7 @@ interface QueueItem {
 
 type OperationType = 'analyze' | 'upscale';
 
-export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogProps) => {
+export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: BatchProcessDialogProps) => {
   const navigate = useNavigate();
   const { openGenerateDialog } = useToolsModal();
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -51,6 +52,12 @@ export const BatchProcessDialog = ({ open, onOpenChange }: BatchProcessDialogPro
     completed: queue.filter(item => item.status === 'completed').length,
     failed: queue.filter(item => item.status === 'failed').length,
   };
+
+  useEffect(() => {
+    if (open && initialOperation) {
+      setOperation(initialOperation);
+    }
+  }, [open, initialOperation]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);

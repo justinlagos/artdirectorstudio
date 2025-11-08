@@ -1,12 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { User, Palette, Sun, Brush } from "lucide-react";
 import { Analysis } from "@/pages/Index";
+import { cn } from "@/lib/utils";
 
 interface QuickTweaksRowProps {
   analysis: Analysis;
+  variant?: "card" | "inline";
+  className?: string;
 }
 
-export const QuickTweaksRow = ({ analysis }: QuickTweaksRowProps) => {
+export const QuickTweaksRow = ({ analysis, variant = "card", className }: QuickTweaksRowProps) => {
   // Extract key insights from analysis
   const extractSubjectTag = (description: string): string => {
     const words = description.toLowerCase().split(' ');
@@ -76,21 +79,39 @@ export const QuickTweaksRow = ({ analysis }: QuickTweaksRowProps) => {
   ];
 
   return (
-    <div className="bg-surface-1/50 rounded-xl p-6 ring-1 ring-border/30 animate-fade-in">
+    <div
+      className={cn(
+        "animate-fade-in",
+        variant === "inline"
+          ? "rounded-2xl border border-border/40 bg-background/30 p-5 backdrop-blur"
+          : "bg-surface-1/50 rounded-xl p-6 ring-1 ring-border/30",
+        className
+      )}
+    >
       <div className="flex items-center gap-2 mb-4">
         <div className="h-1 w-1 rounded-full bg-primary animate-pulse" />
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        <h3
+          className={cn(
+            "text-sm font-semibold uppercase tracking-wide",
+            variant === "inline" ? "text-foreground/70" : "text-muted-foreground"
+          )}
+        >
           Quick Tweaks
         </h3>
       </div>
-      
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {categories.map((category, index) => {
           const Icon = category.icon;
           return (
             <div
               key={index}
-              className="flex items-center gap-3 p-3 rounded-lg bg-background/50 hover:bg-background transition-colors animate-scale-in"
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-lg transition-colors animate-scale-in",
+                variant === "inline"
+                  ? "bg-background/50 hover:bg-background/80"
+                  : "bg-background/50 hover:bg-background"
+              )}
               style={{ animationDelay: `${index * 100}ms` }}
             >
               <div className="shrink-0 p-2 rounded-lg bg-accent/50">
