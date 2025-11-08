@@ -413,24 +413,24 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
   const actionButtons = (
     <>
       <Button
-        className="flex-1 rounded-full h-12 text-base font-semibold shadow-[0_18px_30px_-20px_rgba(0,0,0,0.45)]"
+        className="flex-1 min-w-0 rounded-full h-11 sm:h-12 text-sm sm:text-base font-semibold shadow-[0_18px_30px_-20px_rgba(0,0,0,0.45)]"
         onClick={() => {
           setGenerationPrompt(basePrompt);
           setShowGenerationDialog(true);
         }}
       >
-        Use in Studio
+        <span className="truncate">Use in Studio</span>
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
-            className="flex-1 rounded-full h-12 text-base font-semibold"
+            className="flex-1 min-w-0 rounded-full h-11 sm:h-12 text-sm sm:text-base font-semibold"
           >
-            Download
+            <span className="truncate">Download</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="w-48 sm:w-56">
           <DropdownMenuItem onSelect={handleDownloadTxt}>
             Download as TXT
           </DropdownMenuItem>
@@ -561,10 +561,10 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
   };
 
   return (
-    <section className="space-y-12 pb-28">
-      <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] items-start gap-8 xl:gap-12">
-        <div className="space-y-10">
-          <div className="space-y-10 rounded-[32px] border border-border/40 bg-background/80 p-8 shadow-[0_45px_120px_-60px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-10">
+    <section className="w-full space-y-12 pb-6 md:pb-12">
+      <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] items-start gap-6 md:gap-8 xl:gap-12">
+        <div className="w-full space-y-10">
+          <div className="w-full space-y-10 rounded-[32px] border border-border/40 bg-background/80 p-4 sm:p-8 shadow-[0_45px_120px_-60px_rgba(0,0,0,0.55)] backdrop-blur-xl md:p-10">
             <div className="flex flex-wrap items-start justify-between gap-6">
               <div className="space-y-2">
                 <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">
@@ -595,7 +595,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
               )}
               <div
                 className={cn(
-                  "max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-border/40 bg-surface-1/70 p-6 font-mono text-sm leading-7 text-foreground/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-500 sm:p-8 sm:text-base",
+                  "max-h-[360px] w-full overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-2xl border border-border/40 bg-surface-1/70 p-4 sm:p-6 md:p-8 font-mono text-xs sm:text-sm leading-6 sm:leading-7 text-foreground/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-500",
                   promptPulse && "ring-2 ring-primary/50 shadow-[0_20px_45px_-30px_rgba(59,130,246,0.55)]"
                 )}
               >
@@ -604,56 +604,58 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
             </div>
 
             <div className="space-y-8">
-              <div className="space-y-3">
+              <div className="w-full space-y-3">
                 <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">
                   Quick Actions
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid w-full gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
                   {quickActionPresets.map(({ label, icon: Icon, description, modifier }) => (
                     <Button
                       key={label}
                       variant="ghost"
                       onClick={() => handleQuickAction(modifier, label)}
-                      className="h-auto justify-start gap-2 rounded-2xl border border-border/40 bg-background/40 px-5 py-4 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/70"
+                      className="h-auto w-full justify-start gap-2 rounded-xl sm:rounded-2xl border border-border/40 bg-background/40 px-3 sm:px-5 py-3 sm:py-4 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/70"
                     >
-                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <Icon className="h-4 w-4 text-primary" />
-                        {label}
+                      <div className="flex flex-col gap-1 w-full">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-foreground">
+                          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+                          <span className="truncate">{label}</span>
+                        </div>
+                        <span className="text-[10px] sm:text-xs leading-relaxed text-muted-foreground line-clamp-2">
+                          {description}
+                        </span>
                       </div>
-                      <span className="text-xs leading-relaxed text-muted-foreground">
-                        {description}
-                      </span>
                     </Button>
                   ))}
                 </div>
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-4 rounded-2xl border border-border/40 bg-background/30 p-6 backdrop-blur">
+              <div className="grid w-full gap-4 sm:gap-6 lg:grid-cols-2">
+                <div className="w-full space-y-4 rounded-2xl border border-border/40 bg-background/30 p-4 sm:p-6 backdrop-blur">
                   <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">
                     Quick Tools
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid w-full grid-cols-2 gap-2 sm:gap-3">
                     {quickTools.map(({ label, icon: Icon, caption, onClick }) => (
                       <Button
                         key={label}
                         variant="ghost"
                         onClick={onClick}
-                        className="h-auto justify-start gap-3 rounded-2xl border border-border/30 bg-background/60 px-4 py-4 text-left shadow-[0_14px_30px_-28px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/80"
+                        className="h-auto w-full justify-start gap-2 sm:gap-3 rounded-xl sm:rounded-2xl border border-border/30 bg-background/60 px-2 sm:px-4 py-3 sm:py-4 text-left shadow-[0_14px_30px_-28px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/80"
                       >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                          <Icon className="h-5 w-5" />
+                        <div className="flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-primary/10 text-primary">
+                          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                         </div>
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">{label}</div>
-                          <div className="text-xs text-muted-foreground">{caption}</div>
+                        <div className="min-w-0">
+                          <div className="text-xs sm:text-sm font-semibold text-foreground truncate">{label}</div>
+                          <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{caption}</div>
                         </div>
                       </Button>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-6 rounded-2xl border border-border/40 bg-background/30 p-6 backdrop-blur">
+                <div className="w-full space-y-6 rounded-2xl border border-border/40 bg-background/30 p-4 sm:p-6 backdrop-blur">
                   <QuickTweaksRow
                     analysis={result.analysis}
                     variant="inline"
@@ -691,18 +693,18 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
 
           <Separator className="my-10" />
 
-          <div className="space-y-8">
-            <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="w-full space-y-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 lg:gap-6">
               <div>
-                <h2 className="text-3xl font-display font-semibold text-foreground">
+                <h2 className="text-2xl sm:text-3xl font-display font-semibold text-foreground">
                   Comprehensive Analysis
                 </h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                   Fine-tune individual parameters before regenerating.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <Button
                     variant="default"
                     size="sm"
@@ -710,32 +712,32 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
                       setGenerationPrompt(result.full_regeneration_prompt);
                       setShowGenerationDialog(true);
                     }}
-                    className="shadow-sm"
+                    className="shadow-sm w-full sm:w-auto"
                   >
                     <Wand2 className="mr-2 h-4 w-4" />
                     Generate Image
                   </Button>
                   <CreditCostIndicator cost={3} action="image generation" />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setShowBatchGenerationDialog(true)}
-                    className="shadow-xs"
+                    className="shadow-xs w-full sm:w-auto"
                   >
                     <Grid3x3 className="mr-2 h-4 w-4" />
                     Batch Generate
                   </Button>
                   <CreditCostIndicator cost={3} action="per variation" />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={handleRegenerate}
                     disabled={isRegenerating || Object.keys(userEdits).length === 0}
-                    className="shadow-xs"
+                    className="shadow-xs w-full sm:w-auto"
                   >
                     <RefreshCw className={cn("mr-2 h-4 w-4", isRegenerating && "animate-spin")} />
                     Regenerate
@@ -757,21 +759,21 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
           </div>
         </div>
 
-        <aside className="space-y-6 xl:sticky xl:top-8">
-          <div className="rounded-3xl border border-border/40 bg-background/70 p-4 shadow-[0_35px_80px_-60px_rgba(0,0,0,0.7)] backdrop-blur">
+        <aside className="w-full space-y-6 xl:sticky xl:top-8">
+          <div className="w-full rounded-3xl border border-border/40 bg-background/70 p-4 shadow-[0_35px_80px_-60px_rgba(0,0,0,0.7)] backdrop-blur">
             {imagePreviewUrl ? (
-              <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-surface-1 p-4">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-border/40 bg-surface-1 p-3 sm:p-4">
                 <img
                   src={imagePreviewUrl}
                   alt="Analyzed image preview"
-                  className="max-h-[480px] w-full rounded-xl object-contain"
+                  className="max-h-[320px] sm:max-h-[400px] lg:max-h-[480px] w-full rounded-xl object-contain"
                 />
-                <div className="mt-4 text-center text-xs uppercase tracking-[0.3em] text-muted-foreground/80">
+                <div className="mt-3 sm:mt-4 text-center text-xs uppercase tracking-[0.3em] text-muted-foreground/80">
                   Original Image
                 </div>
               </div>
             ) : (
-              <div className="flex aspect-[4/5] w-full items-center justify-center rounded-2xl border border-dashed border-border/50 bg-background/40 text-muted-foreground">
+              <div className="flex aspect-[4/5] w-full items-center justify-center rounded-2xl border border-dashed border-border/50 bg-background/40 text-sm text-muted-foreground">
                 Preview will appear here
               </div>
             )}
@@ -784,8 +786,8 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       </div>
 
       {isMobile && (
-        <div className="fixed inset-x-0 bottom-4 z-40 px-4">
-          <div className="mx-auto flex max-w-2xl items-center gap-3 rounded-2xl border border-border/40 bg-background/95 p-4 shadow-[0_35px_80px_-55px_rgba(0,0,0,0.75)] backdrop-blur-lg">
+        <div className="fixed inset-x-0 bottom-0 left-0 right-0 z-30 pointer-events-none px-3 pb-safe">
+          <div className="mx-auto flex max-w-2xl items-center gap-2 rounded-2xl border border-border/40 bg-background/98 p-3 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)] backdrop-blur-xl pointer-events-auto mb-20">
             {actionButtons}
           </div>
         </div>

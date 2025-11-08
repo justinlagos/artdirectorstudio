@@ -562,7 +562,7 @@ const Index = () => {
 
       {/* Studio Section - Only for authenticated users */}
       {user && (
-        <div id="studio-section" className="max-w-7xl mx-auto px-6 lg:px-8 pb-16 space-y-8">
+        <div id="studio-section" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 md:pb-16 space-y-6 md:space-y-8">
           <OnboardingPopup />
           
           <UploadSection
@@ -581,7 +581,7 @@ const Index = () => {
           {showProgressiveFeedback && <ProgressiveAnalysisFeedback />}
           
           {result && analysisComplete && (
-            <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+            <div className="w-full animate-fade-in" style={{ animationDelay: '200ms' }}>
               <ResultsSection 
                 result={result} 
                 onRegenerate={handleRegenerate}
@@ -716,7 +716,7 @@ const Index = () => {
               variant="outline"
               size="icon"
               onClick={() => setShowShortcutsGuide(true)}
-              className="hidden md:flex fixed bottom-6 right-6 w-12 h-12 rounded-full shadow-lg hover:shadow-xl transition-all z-40 bg-background/95 backdrop-blur border-border/50"
+              className="hidden md:flex fixed bottom-6 right-6 w-12 h-12 rounded-full shadow-lg hover:shadow-xl transition-all z-30 bg-background/95 backdrop-blur border-border/50"
             >
               <Keyboard className="w-5 h-5" />
             </Button>
