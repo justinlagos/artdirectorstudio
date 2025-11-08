@@ -122,7 +122,7 @@ export const UploadSection = ({
         className="group relative border-2 border-dashed border-border/60 rounded-2xl p-16 text-center hover:border-foreground/30 hover:bg-accent/20 transition-all duration-300 cursor-pointer overflow-hidden"
       >
         {/* Gradient background on hover */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
         
         <input
           type="file"

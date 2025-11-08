@@ -194,7 +194,7 @@ export const ImageComparisonView = ({
                         className="w-full h-full object-cover"
                       />
                       {selectedIndex === index && (
-                        <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-primary/10 flex items-center justify-center pointer-events-none">
                           <Badge className="text-xs">
                             {index + 1}
                           </Badge>

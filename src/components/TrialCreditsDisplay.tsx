@@ -93,7 +93,7 @@ export const TrialCreditsDisplay = () => {
     <>
       <div className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/5 transition-all duration-200 ${isUpdating ? 'scale-105' : ''}`}>
         {isUpdating && (
-          <div className="absolute inset-0 rounded-lg bg-primary/30 animate-pulse" />
+          <div className="absolute inset-0 rounded-lg bg-primary/30 animate-pulse pointer-events-none" />
         )}
         <Sparkles className={`relative w-4 h-4 text-primary ${isUpdating ? 'animate-pulse' : ''}`} />
         <span className={`relative text-sm font-medium ${isUpdating ? 'animate-pulse' : ''}`}>

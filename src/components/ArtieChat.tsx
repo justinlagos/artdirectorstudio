@@ -710,7 +710,7 @@ export const ArtieChat = () => {
             )}
           >
             {/* Glow ring */}
-            <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
+            <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse pointer-events-none" />
             
             {/* Icon with subtle animation */}
             <div className="relative">

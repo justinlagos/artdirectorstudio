@@ -5,10 +5,10 @@ export const LoadingState = () => {
     <div className="flex flex-col items-center justify-center py-24 space-y-8">
       <div className="relative">
         {/* Animated rings */}
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-20 h-20 rounded-full border-2 border-primary/20 animate-ping" />
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-16 h-16 rounded-full border-2 border-primary/40 animate-pulse" />
         </div>
         

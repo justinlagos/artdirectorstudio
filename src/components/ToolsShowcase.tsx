@@ -86,7 +86,7 @@ export const ToolsShowcase = () => {
             className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-border/50 hover:border-primary/30 bg-card overflow-hidden"
             onClick={tool.action}
           >
-            <div className={`absolute inset-0 bg-gradient-to-br ${tool.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+            <div className={`absolute inset-0 bg-gradient-to-br ${tool.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
             <CardContent className="relative p-5 flex flex-col items-start gap-3">
               <div className="p-2.5 rounded-lg bg-gradient-to-br from-background/80 to-background/60 border border-border/50 group-hover:border-primary/30 transition-colors">
                 <tool.icon className="w-5 h-5 text-foreground group-hover:text-primary transition-colors" />
@@ -120,7 +120,7 @@ export const ToolsShowcase = () => {
               className="flex-shrink-0 w-[280px] snap-center hover:shadow-lg transition-all duration-300 cursor-pointer border-border/50 active:scale-95 bg-card overflow-hidden"
               onClick={tool.action}
             >
-              <div className={`absolute inset-0 bg-gradient-to-br ${tool.gradient} opacity-50`} />
+              <div className={`absolute inset-0 bg-gradient-to-br ${tool.gradient} opacity-50 pointer-events-none`} />
               <CardContent className="relative p-5 flex flex-col items-start gap-3 h-full">
                 <div className="p-2.5 rounded-lg bg-gradient-to-br from-background/80 to-background/60 border border-border/50">
                   <tool.icon className="w-5 h-5 text-foreground" />

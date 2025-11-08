@@ -35,7 +35,7 @@ export const CreditBalance = () => {
             : 'bg-card/50 border-border/50 hover:bg-card/80'
         } ${isUpdating ? 'scale-105' : ''}`}>
           {isUpdating && (
-            <div className="absolute inset-0 rounded-lg bg-primary/20 animate-pulse" />
+            <div className="absolute inset-0 rounded-lg bg-primary/20 animate-pulse pointer-events-none" />
           )}
           <Coins className={`relative w-3.5 h-3.5 ${isLowBalance ? 'text-destructive' : 'text-muted-foreground'} ${isUpdating ? 'animate-pulse' : ''}`} strokeWidth={1.5} />
           <span className={`relative text-xs font-medium tracking-wide ${isUpdating ? 'animate-pulse' : ''}`}>

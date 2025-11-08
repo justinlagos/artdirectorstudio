@@ -371,7 +371,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         </div>
         
         <div className="relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
           <div className="relative bg-surface-1 rounded-2xl p-8 shadow-subtle ring-1 ring-border/50 hover:shadow-medium hover:ring-border transition-all duration-300">
             <Textarea
               value={result.full_regeneration_prompt}

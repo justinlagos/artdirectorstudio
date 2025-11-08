@@ -38,7 +38,7 @@ export const ProgressiveAnalysisFeedback = ({ onComplete }: ProgressiveAnalysisF
       <div className="flex items-center justify-center mb-8">
         <div className="relative">
           <Loader2 className="w-12 h-12 text-primary animate-spin" />
-          <div className="absolute inset-0 bg-primary/20 blur-xl animate-pulse" />
+          <div className="absolute inset-0 bg-primary/20 blur-xl animate-pulse pointer-events-none" />
         </div>
       </div>
       
