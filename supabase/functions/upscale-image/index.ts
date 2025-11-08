@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { validateImageData, validateTargetSize } from '../_shared/validation.ts';
 import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
+import { fetchWithRetry } from '../_shared/retry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -112,8 +113,14 @@ serve(async (req) => {
           timestamp: new Date().toISOString()
         }));
         return new Response(
-          JSON.stringify(cached.response),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ ...cached.response, cached: true }),
+          { 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'X-Idempotency-Key': idempotencyKey
+            } 
+          }
         );
       }
     }
@@ -137,46 +144,54 @@ serve(async (req) => {
 
     console.log(JSON.stringify({
       requestId,
-      action: 'api_call',
-      model: 'google/gemini-2.5-flash-image',
+      action: 'api_call_start',
+      provider: 'lovable-ai-gateway',
+      model: 'google/gemini-2.5-flash-image-preview',
       timestamp: new Date().toISOString()
     }));
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+    const response = await fetchWithRetry(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image-preview",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: upscalePrompt
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: image }
+                }
+              ]
+            }
+          ],
+          modalities: ["image", "text"]
+        })
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: upscalePrompt
-              },
-              {
-                type: "image_url",
-                image_url: { url: image }
-              }
-            ]
-          }
-        ],
-        modalities: ["image", "text"]
-      })
-    });
+      { maxRetries: 1, delayMs: 2000, timeoutMs: 45000 }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
+      const duration = Date.now() - startTime;
       
       console.error(JSON.stringify({
         requestId,
         action: 'api_error',
-        status: response.status,
-        statusText: response.statusText,
+        provider: 'lovable-ai-gateway',
+        providerStatus: response.status,
+        errorCode: response.status >= 500 ? 'SERVER_ERROR' : 'CLIENT_ERROR',
+        duration_ms: duration,
         errorBody: errorText.substring(0, 500),
         timestamp: new Date().toISOString()
       }));
@@ -234,12 +249,18 @@ serve(async (req) => {
     console.log(JSON.stringify({
       requestId,
       action: 'upscale_success',
-      duration,
+      userId,
+      provider: 'lovable-ai-gateway',
+      providerStatus: 200,
+      duration_ms: duration,
       timestamp: new Date().toISOString(),
       imageLength: upscaledImageUrl?.length || 0
     }));
 
-    const result = { image: upscaledImageUrl };
+    const result = { 
+      image: upscaledImageUrl,
+      thumbnail: upscaledImageUrl // For now, same as image. TODO: Generate actual thumbnail
+    };
 
     // Cache response for idempotency
     if (idempotencyKey) {

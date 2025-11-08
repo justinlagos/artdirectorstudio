@@ -5,6 +5,13 @@ import { toast } from 'sonner';
 export type ToolType = 'blend' | 'upscale' | 'batch' | 'generate';
 export type ToolState = 'idle' | 'loading' | 'success' | 'error';
 
+export interface GenerateInput {
+  prompt: string;
+  referenceImage?: string;
+  analysisData?: any;
+  mode?: 'generate' | 'variation';
+}
+
 interface ToolInputs {
   blend?: {
     image1?: File;
@@ -22,9 +29,7 @@ interface ToolInputs {
     operation?: string;
     prompt?: string;
   };
-  generate?: {
-    prompt?: string;
-  };
+  generate?: GenerateInput;
 }
 
 interface ToolsModalContextType {
@@ -41,7 +46,7 @@ interface ToolsModalContextType {
   setErrorMessage: (message: string | null) => void;
   updateInputs: (tool: ToolType, data: any) => void;
   clearInputs: (tool: ToolType) => void;
-  openGenerateDialog: (prompt: string) => void;
+  openGenerateDialog: (input: string | GenerateInput) => void;
 }
 
 const ToolsModalContext = createContext<ToolsModalContextType | undefined>(undefined);
@@ -123,8 +128,20 @@ export const ToolsModalProvider = ({ children }: { children: ReactNode }) => {
     setInputs(prev => ({ ...prev, [tool]: {} }));
   };
 
-  const openGenerateDialog = (prompt: string) => {
-    setGeneratePrompt(prompt);
+  const openGenerateDialog = (input: string | GenerateInput) => {
+    // Support both string (legacy) and GenerateInput object
+    const generateData: GenerateInput = typeof input === 'string' 
+      ? { prompt: input, mode: 'generate' }
+      : input;
+    
+    setGeneratePrompt(generateData.prompt);
+    
+    // Store full generate data in inputs
+    setInputs(prev => ({
+      ...prev,
+      generate: generateData
+    }));
+    
     // Close current tool modal if open
     if (isOpen) {
       closeTool();

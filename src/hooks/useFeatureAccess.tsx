@@ -11,6 +11,7 @@ export interface FeatureAccessResult {
   requiresUpgrade: boolean;
   dailyLimit?: number;
   dailyUsage?: number;
+  bypass?: boolean; // Pro/Enterprise users bypass all credit/usage checks
 }
 
 export const useFeatureAccess = () => {
@@ -66,6 +67,7 @@ export const useFeatureAccess = () => {
     if (tier === 'enterprise') {
       return {
         canAccess: true,
+        bypass: true,
         reason: "Unlimited access",
         tier: 'enterprise',
         requiresUpgrade: false,
@@ -76,6 +78,7 @@ export const useFeatureAccess = () => {
     if (tier === 'pro' || subscription.isPro) {
       return {
         canAccess: true,
+        bypass: true,
         reason: "Unlimited access",
         tier: 'pro',
         requiresUpgrade: false,
@@ -87,6 +90,7 @@ export const useFeatureAccess = () => {
       if (dailyUsage >= dailyLimit) {
         return {
           canAccess: false,
+          bypass: false,
           reason: "You've reached your daily 10 generations. Upgrade to Pro for unlimited access.",
           tier: 'starter',
           requiresUpgrade: true,
@@ -96,6 +100,7 @@ export const useFeatureAccess = () => {
       }
       return {
         canAccess: true,
+        bypass: false,
         reason: `${dailyLimit - dailyUsage} generations remaining today`,
         tier: 'starter',
         remaining: dailyLimit - dailyUsage,
@@ -109,6 +114,7 @@ export const useFeatureAccess = () => {
     if (freeCredits > 0) {
       return {
         canAccess: true,
+        bypass: false,
         reason: `${freeCredits} free credits remaining`,
         tier: 'free',
         remaining: freeCredits,
@@ -119,6 +125,7 @@ export const useFeatureAccess = () => {
     // Out of trial credits
     return {
       canAccess: false,
+      bypass: false,
       reason: "Your free credits are used up. Choose a plan to keep creating.",
       tier: 'free',
       requiresUpgrade: true,

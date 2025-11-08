@@ -58,9 +58,9 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           allowed: true,
+          bypass: true,
           tier: 'enterprise',
-          reason: 'Unlimited access',
-          bypass: true
+          reason: 'Unlimited access'
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -71,9 +71,9 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           allowed: true,
+          bypass: true,
           tier: 'pro',
-          reason: 'Unlimited access',
-          bypass: true
+          reason: 'Unlimited access'
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -107,9 +107,12 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             allowed: false,
+            bypass: false,
             tier: 'starter',
             reason: "You've reached your daily 10 generations. Upgrade to Pro for unlimited access.",
-            upgrade_required: true
+            upgrade_required: true,
+            daily_usage: profile.daily_usage,
+            daily_limit: profile.daily_limit
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -150,9 +153,12 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           allowed: true,
+          bypass: false,
           tier: 'starter',
           reason: `${profile.daily_limit - newUsage} remaining today`,
           remaining: profile.daily_limit - newUsage,
+          daily_usage: newUsage,
+          daily_limit: profile.daily_limit,
           deducted: 1
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -188,6 +194,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           allowed: true,
+          bypass: false,
           tier: 'free',
           reason: `${newBalance} free credits remaining`,
           remaining: newBalance,
@@ -201,6 +208,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         allowed: false,
+        bypass: false,
         tier: 'free',
         reason: "Your free credits are used up. Choose a plan to keep creating.",
         upgrade_required: true

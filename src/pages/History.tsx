@@ -112,11 +112,17 @@ const History = () => {
   // Filter assets based on search and type
   const filteredAssets = assets.filter((asset) => {
     const analysisData = asset.analysis_data as Record<string, any> | null;
+    const params = asset.params as Record<string, any> | null;
     const matchesSearch = searchQuery === "" || 
       asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       analysisData?.image_overview?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesType = filterType === "all" || asset.type === filterType;
+    // Batch filter: check if this is a batch item
+    const isBatch = params?.batchItem === true || params?.batch === true;
+    const matchesType = 
+      filterType === "all" || 
+      asset.type === filterType ||
+      (filterType === "batch" && isBatch);
     
     return matchesSearch && matchesType;
   });
@@ -187,6 +193,7 @@ const History = () => {
                   Prompts
                 </div>
               </SelectItem>
+              <SelectItem value="batch">Batch Results</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -273,13 +280,14 @@ const History = () => {
                     </div>
                   </div>
 
-                  {/* Image */}
+                  {/* Image with lazy loading */}
                   {asset.image_url && (
                     <div className="rounded-xl overflow-hidden border border-border/50 bg-muted flex items-center justify-center min-h-[200px]">
                       <img 
-                        src={asset.image_url} 
+                        src={asset.image_url}
                         alt="Generated content" 
                         className="w-full h-full object-contain max-h-[400px]"
+                        loading="lazy"
                       />
                     </div>
                   )}
