@@ -13,6 +13,7 @@ import { InsightChips } from "@/components/InsightChips";
 import { QuickTweaksRow } from "@/components/QuickTweaksRow";
 import { GuidedTweaks } from "@/components/GuidedTweaks";
 import { EmptyStatePrompts } from "@/components/EmptyStatePrompts";
+import { ToolsShowcase } from "@/components/ToolsShowcase";
 import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -610,6 +611,9 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
           </div>
         </div>
       </div>
+
+      {/* Tools Showcase */}
+      <ToolsShowcase />
 
       <Separator className="my-12" />
 

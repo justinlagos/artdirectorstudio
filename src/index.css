@@ -406,4 +406,14 @@ All colors MUST be HSL.
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Hide scrollbar for horizontal scroll */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
