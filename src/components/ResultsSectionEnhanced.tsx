@@ -513,7 +513,7 @@ export const ResultsSection = ({
           <InsightChips insights={extractInsights()} />
         )}
 
-        <section className="space-y-8 rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-10 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
+        <section className="space-y-8 rounded-3xl border border-border/40 bg-background p-6 sm:p-10 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)]">
           <div className="space-y-2 text-center sm:text-left">
             <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Comprehensive Analysis</p>
             <h3 className="text-3xl font-display font-semibold text-foreground">
@@ -526,7 +526,7 @@ export const ResultsSection = ({
 
           {modifiedCount === 0 && <EmptyStatePrompts />}
 
-          <div className="rounded-3xl border border-border/30 bg-background/60 p-4 sm:p-6 shadow-[0_25px_70px_-50px_rgba(0,0,0,0.45)]">
+          <div className="rounded-3xl border border-border/30 bg-card p-4 sm:p-6 shadow-[0_25px_70px_-50px_rgba(0,0,0,0.45)]">
             <AnalysisTabbed
               analysis={result.analysis}
               userEdits={userEdits}
