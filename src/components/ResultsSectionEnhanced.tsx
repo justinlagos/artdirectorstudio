@@ -15,6 +15,7 @@ import { GuidedTweaks } from "@/components/GuidedTweaks";
 import { EmptyStatePrompts } from "@/components/EmptyStatePrompts";
 import { ToolsShowcase } from "@/components/ToolsShowcase";
 import { AnalysisTabbed } from "@/components/AnalysisTabbed";
+import { PromptBuilder } from "@/components/PromptBuilder";
 import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
 import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
@@ -53,6 +54,7 @@ export const ResultsSection = ({
 }: ResultsSectionProps) => {
   const [userEdits, setUserEdits] = useState<UserEdits>({});
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
+  const [generationPrompt, setGenerationPrompt] = useState(result.full_regeneration_prompt);
   const [livePreviewPrompt, setLivePreviewPrompt] = useState(result.full_regeneration_prompt);
   const [previousPrompt, setPreviousPrompt] = useState(result.full_regeneration_prompt);
   const [modifiedCount, setModifiedCount] = useState(0);
@@ -618,6 +620,19 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
 
       <Separator className="my-12" />
 
+      {/* Visual Prompt Builder */}
+      <div className="animate-fade-in">
+        <PromptBuilder 
+          analysis={result.analysis}
+          onGenerate={(prompt) => {
+            setGenerationPrompt(prompt);
+            setShowGenerationDialog(true);
+          }}
+        />
+      </div>
+
+      <Separator className="my-12" />
+
       {/* Comprehensive Analysis */}
       <div className="space-y-8">
         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -634,7 +649,10 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => setShowGenerationDialog(true)}
+                onClick={() => {
+                  setGenerationPrompt(result.full_regeneration_prompt);
+                  setShowGenerationDialog(true);
+                }}
                 className="shadow-sm"
               >
                 <Wand2 className="w-4 h-4 mr-2" />
@@ -686,7 +704,7 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
       <ImageGenerationDialog
         open={showGenerationDialog}
         onOpenChange={setShowGenerationDialog}
-        initialPrompt={result.full_regeneration_prompt}
+        initialPrompt={generationPrompt}
         onGenerate={onGenerateImage}
       />
     </section>
