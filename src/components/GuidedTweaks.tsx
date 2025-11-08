@@ -102,7 +102,7 @@ export const GuidedTweaks = ({ analysis, onApplyTweak, isApplying }: GuidedTweak
         {suggestions.map((suggestion, index) => (
           <div
             key={index}
-            className="group relative bg-gradient-to-r from-accent/20 to-accent/5 rounded-lg 
+            className="group relative bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg 
                        p-2.5 md:p-4 
                        ring-1 ring-border/30 
                        hover:ring-primary/40 

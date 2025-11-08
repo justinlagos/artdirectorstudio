@@ -437,7 +437,7 @@ export const ResultsSection = ({
   return (
     <section className="w-full space-y-12 pb-10 md:pb-16">
       <div className="space-y-12">
-        <section className="rounded-[32px] border border-border/40 bg-background/80 p-6 sm:p-10 shadow-[0_45px_120px_-60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+        <section className="rounded-[32px] border border-border/40 bg-background p-6 sm:p-10 shadow-[0_45px_120px_-60px_rgba(0,0,0,0.55)]">
           <div className="flex flex-col items-center gap-3 text-center md:items-start md:text-left">
             <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Creative Blueprint</p>
             <h2 className="text-3xl sm:text-4xl font-display font-semibold text-foreground">Full Generation Prompt</h2>
@@ -558,7 +558,7 @@ export const ResultsSection = ({
       </div>
 
       {generatedImages.length > 0 && (
-        <div className="space-y-6 rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-10 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
+        <div className="space-y-6 rounded-3xl border border-border/40 bg-background p-6 sm:p-10 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)]">
           <div className="flex flex-col gap-2 text-center sm:text-left">
             <h2 className="text-2xl font-display font-bold tracking-tight">Studio Results</h2>
             <p className="text-sm text-muted-foreground">Review and compare everything you created from this blueprint.</p>
@@ -599,7 +599,7 @@ export const ResultsSection = ({
       )}
 
       {/* Quick Tools Section - Moved to End */}
-      <section className="rounded-3xl border border-border/40 bg-background/70 p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] backdrop-blur-lg">
+      <section className="rounded-3xl border border-border/40 bg-background p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)]">
         <div className="flex flex-col gap-2 text-center sm:text-left">
           <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Creative Tools</p>
           <h3 className="text-xl font-semibold text-foreground">Keep the flow going</h3>
@@ -610,7 +610,7 @@ export const ResultsSection = ({
               key={label}
               variant="ghost"
               onClick={onClick}
-              className="h-auto w-full justify-start gap-3 rounded-2xl border border-border/40 bg-background/70 px-3 py-4 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/90"
+              className="h-auto w-full justify-start gap-3 rounded-2xl border border-border/40 bg-background px-3 py-4 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-card"
             >
               <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Icon className="h-5 w-5" />
