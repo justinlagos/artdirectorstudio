@@ -113,7 +113,7 @@ export const GeneratedImagesGallery = ({ images, onDelete }: GeneratedImagesGall
                     sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     widths={[320, 640, 1024]}
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center pointer-events-none">
                     <Maximize2 className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </div>

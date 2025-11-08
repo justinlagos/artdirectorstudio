@@ -130,7 +130,7 @@ export const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
                 key={index}
                 className="group hover:shadow-md transition-all duration-300 border-border/50 hover:border-primary/30 overflow-hidden"
               >
-                <div className={`absolute inset-0 bg-gradient-to-br from-${insight.color}/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+                <div className={`absolute inset-0 bg-gradient-to-br from-${insight.color}/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
                 <CardContent className="relative p-5">
                   <div className="flex items-start gap-3 mb-3">
                     <div className={`p-2 rounded-lg bg-${insight.color}/10 border border-${insight.color}/20`}>
