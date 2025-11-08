@@ -1,7 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Copy, Download, RefreshCw, Wand2, FileJson, Edit2, SlidersHorizontal, Grid3x3 } from "lucide-react";
+import {
+  Copy,
+  RefreshCw,
+  Wand2,
+  SlidersHorizontal,
+  Grid3x3,
+  Sparkles,
+  Feather,
+  Palette,
+  Quote,
+  Blend,
+  Maximize2,
+  Scan
+} from "lucide-react";
 import { toast } from "sonner";
 import { Analysis, AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
 import { Separator } from "@/components/ui/separator";
@@ -10,7 +22,6 @@ import { BatchGenerationDialog } from "@/components/BatchGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 import { ImageComparisonView } from "@/components/ImageComparisonView";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
-import { ChipSelector } from "@/components/ChipSelector";
 import { InsightChips } from "@/components/InsightChips";
 import { QuickTweaksRow } from "@/components/QuickTweaksRow";
 import { GuidedTweaks } from "@/components/GuidedTweaks";
@@ -21,6 +32,11 @@ import { PromptBuilder } from "@/components/PromptBuilder";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAdaptiveFields } from "@/hooks/useAdaptiveFields";
 import { supabase } from "@/integrations/supabase/client";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { ImageBlendDialogEnhanced } from "@/components/ImageBlendDialogEnhanced";
+import { ImageUpscaleDialog } from "@/components/ImageUpscaleDialog";
+import { BatchProcessDialog } from "@/components/BatchProcessDialog";
 import jsPDF from "jspdf";
 
 interface ResultsSectionProps {
@@ -62,12 +78,14 @@ export const ResultsSection = ({
   const [showBatchGenerationDialog, setShowBatchGenerationDialog] = useState(false);
   const [generationPrompt, setGenerationPrompt] = useState(result.full_regeneration_prompt);
   const [livePreviewPrompt, setLivePreviewPrompt] = useState(result.full_regeneration_prompt);
-  const [previousPrompt, setPreviousPrompt] = useState(result.full_regeneration_prompt);
   const [modifiedCount, setModifiedCount] = useState(0);
   const [promptPulse, setPromptPulse] = useState(false);
   const [isApplyingTweak, setIsApplyingTweak] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showBlendDialog, setShowBlendDialog] = useState(false);
+  const [showUpscaleDialog, setShowUpscaleDialog] = useState(false);
+  const [showBatchProcessDialog, setShowBatchProcessDialog] = useState(false);
+  const [batchProcessMode, setBatchProcessMode] = useState<"analyze" | "upscale">("analyze");
 
   // Detect mobile on mount and resize
   useEffect(() => {
@@ -112,7 +130,6 @@ export const ResultsSection = ({
   // Live preview with debounced regeneration (2s delay) + pulse animation
   useEffect(() => {
     if (Object.keys(userEdits).length === 0) {
-      setPreviousPrompt(livePreviewPrompt);
       setLivePreviewPrompt(result.full_regeneration_prompt);
       setModifiedCount(0);
       return;
@@ -126,8 +143,6 @@ export const ResultsSection = ({
     setTimeout(() => setPromptPulse(false), 600);
 
     const timeoutId = setTimeout(() => {
-      setPreviousPrompt(livePreviewPrompt);
-      
       // Generate live preview by merging edits into prompt
       let preview = result.full_regeneration_prompt;
       
@@ -167,6 +182,109 @@ export const ResultsSection = ({
       [field]: value
     }));
   };
+
+  const quickActionPresets = [
+    {
+      label: "Enhance",
+      icon: Sparkles,
+      description: "Add cinematic depth and richer detail",
+      modifier: "Enhance lighting contrast, increase micro-detail, and sharpen subject focus"
+    },
+    {
+      label: "Simplify",
+      icon: Feather,
+      description: "Minimal composition and clean storytelling",
+      modifier: "Simplify composition with a clean background and minimal supporting elements"
+    },
+    {
+      label: "Artistic",
+      icon: Palette,
+      description: "Painterly character and stylized finishes",
+      modifier: "Infuse artistic brushwork, painterly textures, and expressive color accents"
+    },
+    {
+      label: "Reword",
+      icon: Quote,
+      description: "Refined phrasing for clarity",
+      modifier: "Rewrite the prompt for clarity, narrative flow, and precise language"
+    }
+  ];
+
+  const basePrompt = livePreviewPrompt || result.full_regeneration_prompt;
+
+  const handleQuickAction = (modifier: string, label: string) => {
+    const updatedPrompt = `${basePrompt}\n\n// ${label}: ${modifier}`;
+    setGenerationPrompt(updatedPrompt);
+    setShowGenerationDialog(true);
+    toast.success(`${label} preset applied to your prompt`);
+  };
+
+  const openBatchProcess = (mode: "analyze" | "upscale") => {
+    setBatchProcessMode(mode);
+    setShowBatchProcessDialog(true);
+  };
+
+  const quickTools = [
+    {
+      label: "Blend",
+      icon: Blend,
+      caption: "Merge inspirations",
+      onClick: () => setShowBlendDialog(true)
+    },
+    {
+      label: "Upscale",
+      icon: Maximize2,
+      caption: "Sharpen resolution",
+      onClick: () => setShowUpscaleDialog(true)
+    },
+    {
+      label: "Batch",
+      icon: Grid3x3,
+      caption: "Generate variations",
+      onClick: () => setShowBatchGenerationDialog(true)
+    },
+    {
+      label: "Analyze",
+      icon: Scan,
+      caption: "Re-run diagnostics",
+      onClick: () => openBatchProcess("analyze")
+    }
+  ];
+
+  const actionButtons = (
+    <>
+      <Button
+        className="flex-1 rounded-full h-12 text-base font-semibold shadow-[0_18px_30px_-20px_rgba(0,0,0,0.45)]"
+        onClick={() => {
+          setGenerationPrompt(basePrompt);
+          setShowGenerationDialog(true);
+        }}
+      >
+        Use in Studio
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            className="flex-1 rounded-full h-12 text-base font-semibold"
+          >
+            Download
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onSelect={handleDownloadTxt}>
+            Download as TXT
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleDownloadPdf}>
+            Download as PDF
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleDownloadJson}>
+            Download as JSON
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
 
   const handleApplyGuidedTweak = async (tweakDescription: string) => {
     setIsApplyingTweak(true);
@@ -413,97 +531,6 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     onRegenerate(userEdits);
   };
 
-  const toggleSection = (key: string) => {
-    if (!isMobile) return;
-    setExpandedSection(expandedSection === key ? null : key);
-  };
-
-  const sections = [
-    { 
-      title: "1. Image Overview", 
-      content: result.analysis.image_overview,
-      key: "image_overview" as const
-    },
-    { 
-      title: "2. Subject Description", 
-      content: result.analysis.subject_description,
-      key: "subject_description" as const,
-      editFields: adaptiveFields.showHumanFields ? [
-        { label: "Gender", key: "subject_gender" as keyof UserEdits, options: SUGGESTIONS.subject_gender },
-        { label: "Ethnicity/Skin Tone", key: "subject_ethnicity" as keyof UserEdits, options: SUGGESTIONS.subject_ethnicity }
-      ] : []
-    },
-    { 
-      title: "3. Camera & Composition", 
-      content: result.analysis.camera_composition,
-      key: "camera_composition" as const,
-      editFields: [
-        { label: "Camera Type", key: "camera_type" as keyof UserEdits, options: SUGGESTIONS.camera_type, helpText: "Choose the camera type that defines the look and feel" }
-      ]
-    },
-    { 
-      title: "4. Lighting", 
-      content: result.analysis.lighting,
-      key: "lighting" as const,
-      editFields: [
-        { label: "Lighting Type", key: "lighting_type" as keyof UserEdits, options: SUGGESTIONS.lighting_type, helpText: "Select the dominant light source and direction" }
-      ]
-    },
-    { 
-      title: "5. Color Palette", 
-      content: result.analysis.color_palette,
-      key: "color_palette" as const,
-      editFields: [
-        { label: "Dominant Color 1", key: "dominant_color_1" as keyof UserEdits, options: SUGGESTIONS.dominant_color_1, helpText: "Primary color that defines the image mood" },
-        { label: "Dominant Color 2", key: "dominant_color_2" as keyof UserEdits, options: SUGGESTIONS.dominant_color_2, helpText: "Secondary accent color for color harmony" }
-      ]
-    },
-    { 
-      title: "6. Design Style", 
-      content: result.analysis.design_style,
-      key: "design_style" as const,
-      editFields: [
-        { label: "Art Style", key: "art_style" as keyof UserEdits, options: SUGGESTIONS.art_style, helpText: "Visual aesthetic and artistic direction" }
-      ]
-    },
-    { 
-      title: "7. Texture & Material", 
-      content: result.analysis.texture_material,
-      key: "texture_material" as const
-    },
-    { 
-      title: "8. Mood & Emotion", 
-      content: result.analysis.mood_emotion,
-      key: "mood_emotion" as const
-    },
-    { 
-      title: "9. Background & Environment", 
-      content: result.analysis.background_environment,
-      key: "background_environment" as const,
-      editFields: [
-        { label: "Background Type", key: "background_type" as keyof UserEdits, options: SUGGESTIONS.background_type, helpText: "Environment or backdrop behind the subject" }
-      ]
-    },
-    { 
-      title: "10. Artistic Medium", 
-      content: result.analysis.artistic_medium,
-      key: "artistic_medium" as const
-    },
-    { 
-      title: "11. Art Direction & Influence", 
-      content: result.analysis.art_direction_influence,
-      key: "art_direction_influence" as const
-    },
-    { 
-      title: "12. Intended Use", 
-      content: result.analysis.intended_use,
-      key: "intended_use" as const,
-      editFields: [
-        { label: "Intended Platform", key: "intended_platform" as keyof UserEdits, options: SUGGESTIONS.intended_platform, helpText: "Where this image will be published" }
-      ]
-    },
-  ];
-
   // Extract key insights for chips
   const extractInsights = (): string[] => {
     const insights: string[] = [];
@@ -533,124 +560,126 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
   };
 
   return (
-    <section className="space-y-8">
-      {/* Split-Screen Workspace Layout */}
-      <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-        {/* Left Side: Image Preview (Sticky on Desktop) */}
-        {imagePreviewUrl && (
-          <div className="lg:sticky lg:top-8 space-y-4">
-            <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-medium ring-1 ring-border/50">
-              <img 
-                src={imagePreviewUrl} 
-                alt="Analyzed image preview"
-                className="w-full h-full object-contain bg-surface-1"
-              />
+    <section className="space-y-12 pb-28">
+      <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] items-start gap-8 xl:gap-12">
+        <div className="space-y-10">
+          <div className="space-y-10 rounded-[32px] border border-border/40 bg-background/80 p-8 shadow-[0_45px_120px_-60px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-6">
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">
+                  Full Generation Prompt
+                </p>
+                <h2 className="text-3xl font-display font-semibold text-foreground sm:text-4xl">
+                  Creative Blueprint
+                </h2>
+                <p className="max-w-2xl text-sm text-muted-foreground">
+                  Everything the AI needs to recreate and elevate your vision.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="h-10 rounded-full px-5 text-sm font-semibold shadow-[0_12px_30px_-20px_rgba(0,0,0,0.55)]"
+                onClick={handleCopyPrompt}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy prompt
+              </Button>
             </div>
-            <div className="bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 rounded-xl p-4 ring-1 ring-border/30">
-              <p className="text-center text-muted-foreground text-sm leading-relaxed">
-                Original Image
-              </p>
+
+            <div className="relative">
+              {modifiedCount > 0 && (
+                <div className="absolute -top-3 right-4 z-10 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground shadow-lg">
+                  {modifiedCount} parameter{modifiedCount !== 1 ? "s" : ""} tuned
+                </div>
+              )}
+              <div
+                className={cn(
+                  "max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-border/40 bg-surface-1/70 p-6 font-mono text-sm leading-7 text-foreground/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-500 sm:p-8 sm:text-base",
+                  promptPulse && "ring-2 ring-primary/50 shadow-[0_20px_45px_-30px_rgba(59,130,246,0.55)]"
+                )}
+              >
+                {basePrompt}
+              </div>
+            </div>
+
+            <div className="space-y-8">
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">
+                  Quick Actions
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {quickActionPresets.map(({ label, icon: Icon, description, modifier }) => (
+                    <Button
+                      key={label}
+                      variant="ghost"
+                      onClick={() => handleQuickAction(modifier, label)}
+                      className="h-auto justify-start gap-2 rounded-2xl border border-border/40 bg-background/40 px-5 py-4 text-left shadow-[0_18px_35px_-32px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/70"
+                    >
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Icon className="h-4 w-4 text-primary" />
+                        {label}
+                      </div>
+                      <span className="text-xs leading-relaxed text-muted-foreground">
+                        {description}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="space-y-4 rounded-2xl border border-border/40 bg-background/30 p-6 backdrop-blur">
+                  <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">
+                    Quick Tools
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {quickTools.map(({ label, icon: Icon, caption, onClick }) => (
+                      <Button
+                        key={label}
+                        variant="ghost"
+                        onClick={onClick}
+                        className="h-auto justify-start gap-3 rounded-2xl border border-border/30 bg-background/60 px-4 py-4 text-left shadow-[0_14px_30px_-28px_rgba(0,0,0,0.7)] hover:border-primary/40 hover:bg-background/80"
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">{label}</div>
+                          <div className="text-xs text-muted-foreground">{caption}</div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-6 rounded-2xl border border-border/40 bg-background/30 p-6 backdrop-blur">
+                  <QuickTweaksRow
+                    analysis={result.analysis}
+                    variant="inline"
+                    className="border-none bg-transparent p-0 shadow-none"
+                  />
+                  <div className="border-t border-border/30 pt-6">
+                    <GuidedTweaks
+                      analysis={result.analysis}
+                      onApplyTweak={handleApplyGuidedTweak}
+                      isApplying={isApplyingTweak || isRegenerating}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        )}
 
-        {/* Right Side: Interactive Controls */}
-        <div className="space-y-8">
-          {/* Intro Note + Insights */}
-          <div className="space-y-6 animate-fade-in">
-            <div className="bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 rounded-xl p-6 ring-1 ring-border/30">
-              <p className="text-center text-muted-foreground text-sm leading-relaxed">
-                We've analyzed your image and set up your creative breakdown. <br className="hidden sm:inline" />
-                You can tweak or regenerate below.
-              </p>
-            </div>
-            
-            <InsightChips insights={extractInsights()} />
-            
-            <QuickTweaksRow analysis={result.analysis} />
-            
-            <GuidedTweaks 
-              analysis={result.analysis}
-              onApplyTweak={handleApplyGuidedTweak}
-              isApplying={isApplyingTweak || isRegenerating}
-            />
-          </div>
+          <InsightChips insights={extractInsights()} />
 
-          <Separator className="my-8" />
+          <Separator className="my-10" />
 
-          {/* Full Regeneration Prompt */}
-          <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-3xl font-display font-bold tracking-tight">
-            Full Regeneration Prompt
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleCopyPrompt}
-              className="shadow-xs"
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Copy
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleDownloadTxt}
-              className="shadow-xs"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              TXT
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleDownloadPdf}
-              className="shadow-xs"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              PDF
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleDownloadJson}
-              className="shadow-xs"
-            >
-              <FileJson className="w-4 h-4 mr-2" />
-              JSON
-            </Button>
-          </div>
-        </div>
-        
-        <div className="relative group">
-          {modifiedCount > 0 && (
-            <div className="absolute -top-2 right-4 z-10 px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full shadow-md animate-fade-in">
-              {modifiedCount} parameter{modifiedCount !== 1 ? 's' : ''} modified
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className={`relative bg-surface-1 rounded-2xl p-8 shadow-subtle ring-1 ring-border/50 hover:shadow-medium hover:ring-border transition-all duration-300 ${
-            promptPulse ? 'animate-pulse ring-primary/50' : ''
-          }`}>
-            <Textarea
-              value={livePreviewPrompt}
-              readOnly
-              className="min-h-[180px] resize-none bg-transparent border-0 focus-visible:ring-0 text-base leading-relaxed transition-all duration-300"
-            />
-          </div>
-        </div>
-          </div>
-
-          {/* Tools Showcase */}
           <ToolsShowcase />
 
-          <Separator className="my-12" />
+          <Separator className="my-10" />
 
-          {/* Visual Prompt Builder */}
           <div className="animate-fade-in">
-            <PromptBuilder 
+            <PromptBuilder
               analysis={result.analysis}
               onGenerate={(prompt) => {
                 setGenerationPrompt(prompt);
@@ -659,67 +688,64 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
             />
           </div>
 
-          <Separator className="my-12" />
+          <Separator className="my-10" />
 
-          {/* Comprehensive Analysis */}
           <div className="space-y-8">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h2 className="text-3xl font-display font-bold tracking-tight">
-              Comprehensive Analysis
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Tweak parameters below to regenerate with custom settings
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => {
-                  setGenerationPrompt(result.full_regeneration_prompt);
-                  setShowGenerationDialog(true);
-                }}
-                className="shadow-sm"
-              >
-                <Wand2 className="w-4 h-4 mr-2" />
-                Generate Image
-              </Button>
-              <CreditCostIndicator cost={3} action="image generation" />
+            <div className="flex flex-wrap items-center justify-between gap-6">
+              <div>
+                <h2 className="text-3xl font-display font-semibold text-foreground">
+                  Comprehensive Analysis
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Fine-tune individual parameters before regenerating.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      setGenerationPrompt(result.full_regeneration_prompt);
+                      setShowGenerationDialog(true);
+                    }}
+                    className="shadow-sm"
+                  >
+                    <Wand2 className="mr-2 h-4 w-4" />
+                    Generate Image
+                  </Button>
+                  <CreditCostIndicator cost={3} action="image generation" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBatchGenerationDialog(true)}
+                    className="shadow-xs"
+                  >
+                    <Grid3x3 className="mr-2 h-4 w-4" />
+                    Batch Generate
+                  </Button>
+                  <CreditCostIndicator cost={3} action="per variation" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleRegenerate}
+                    disabled={isRegenerating || Object.keys(userEdits).length === 0}
+                    className="shadow-xs"
+                  >
+                    <RefreshCw className={cn("mr-2 h-4 w-4", isRegenerating && "animate-spin")} />
+                    Regenerate
+                  </Button>
+                  <CreditCostIndicator cost={1} action="prompt refinement" />
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowBatchGenerationDialog(true)}
-                className="shadow-xs"
-              >
-                <Grid3x3 className="w-4 h-4 mr-2" />
-                Batch Generate
-              </Button>
-              <CreditCostIndicator cost={3} action="per variation" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleRegenerate}
-                disabled={isRegenerating || Object.keys(userEdits).length === 0}
-                className="shadow-xs"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
-                Regenerate
-              </Button>
-              <CreditCostIndicator cost={1} action="prompt refinement" />
-            </div>
-          </div>
-        </div>
 
-            {/* Empty State */}
             {modifiedCount === 0 && <EmptyStatePrompts />}
-            
-            {/* Tabbed Analysis Interface - Progressive Disclosure */}
+
             <AnalysisTabbed
               analysis={result.analysis}
               userEdits={userEdits}
@@ -729,9 +755,41 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
             />
           </div>
         </div>
+
+        <aside className="space-y-6 xl:sticky xl:top-8">
+          <div className="rounded-3xl border border-border/40 bg-background/70 p-4 shadow-[0_35px_80px_-60px_rgba(0,0,0,0.7)] backdrop-blur">
+            {imagePreviewUrl ? (
+              <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-surface-1 p-4">
+                <img
+                  src={imagePreviewUrl}
+                  alt="Analyzed image preview"
+                  className="max-h-[480px] w-full rounded-xl object-contain"
+                />
+                <div className="mt-4 text-center text-xs uppercase tracking-[0.3em] text-muted-foreground/80">
+                  Original Image
+                </div>
+              </div>
+            ) : (
+              <div className="flex aspect-[4/5] w-full items-center justify-center rounded-2xl border border-dashed border-border/50 bg-background/40 text-muted-foreground">
+                Preview will appear here
+              </div>
+            )}
+          </div>
+
+          <div className="hidden xl:flex flex-col gap-3">
+            {actionButtons}
+          </div>
+        </aside>
       </div>
 
-      {/* Generated Images Gallery (Full Width Below Split-Screen) */}
+      {isMobile && (
+        <div className="fixed inset-x-0 bottom-4 z-40 px-4">
+          <div className="mx-auto flex max-w-2xl items-center gap-3 rounded-2xl border border-border/40 bg-background/95 p-4 shadow-[0_35px_80px_-55px_rgba(0,0,0,0.75)] backdrop-blur-lg">
+            {actionButtons}
+          </div>
+        </div>
+      )}
+
       {generatedImages.length > 0 && (
         <>
           <Separator className="my-12" />
@@ -743,16 +801,16 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
             </div>
 
             <Tabs defaultValue="comparison" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsList className="grid w-full max-w-md grid-cols-2">
                 <TabsTrigger value="comparison" className="gap-2">
-                  <SlidersHorizontal className="w-4 h-4" />
+                  <SlidersHorizontal className="h-4 w-4" />
                   Comparison
                 </TabsTrigger>
                 <TabsTrigger value="gallery" className="gap-2">
                   Gallery
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="comparison" className="mt-6">
                 {imagePreviewUrl ? (
                   <ImageComparisonView
@@ -760,14 +818,14 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
                     generatedImages={generatedImages}
                   />
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="py-8 text-center text-muted-foreground">
                     Original image not available for comparison
                   </div>
                 )}
               </TabsContent>
-              
+
               <TabsContent value="gallery" className="mt-6">
-                <GeneratedImagesGallery 
+                <GeneratedImagesGallery
                   images={generatedImages}
                   onDelete={onDeleteImage}
                 />
@@ -777,7 +835,6 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         </>
       )}
 
-      {/* Image Generation Dialog */}
       <ImageGenerationDialog
         open={showGenerationDialog}
         onOpenChange={setShowGenerationDialog}
@@ -785,12 +842,27 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         onGenerate={onGenerateImage}
       />
 
-      {/* Batch Generation Dialog */}
       <BatchGenerationDialog
         open={showBatchGenerationDialog}
         onOpenChange={setShowBatchGenerationDialog}
         basePrompt={result.full_regeneration_prompt}
         onGenerate={onGenerateImage}
+      />
+
+      <ImageBlendDialogEnhanced
+        open={showBlendDialog}
+        onOpenChange={setShowBlendDialog}
+      />
+
+      <ImageUpscaleDialog
+        open={showUpscaleDialog}
+        onOpenChange={setShowUpscaleDialog}
+      />
+
+      <BatchProcessDialog
+        open={showBatchProcessDialog}
+        onOpenChange={setShowBatchProcessDialog}
+        initialOperation={batchProcessMode}
       />
     </section>
   );
