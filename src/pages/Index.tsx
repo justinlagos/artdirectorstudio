@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -23,7 +23,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useKeyboardShortcuts, KeyboardShortcut, getModifierKey } from "@/hooks/useKeyboardShortcuts";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
-import type { GenerationOptions } from "@/components/ImageGenerationDialog";
+import { ImageGenerationDialog, type GenerationOptions } from "@/components/ImageGenerationDialog";
+import { LandingFeaturedInspire } from "@/components/LandingFeaturedInspire";
 
 export interface Analysis {
   image_overview: string;
@@ -67,6 +68,7 @@ export interface GeneratedImage {
 const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { openGenerateDialog } = useToolsModal();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -76,6 +78,8 @@ const Index = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
+  const [studioPrefill, setStudioPrefill] = useState<{ prompt: string; imageUrl?: string } | null>(null);
+  const [showStudioPrefillDialog, setShowStudioPrefillDialog] = useState(false);
 
   // Pull-to-refresh functionality
   const handleRefresh = async () => {
@@ -112,6 +116,15 @@ const Index = () => {
       }
     }
   }, [user, loading]);
+
+  useEffect(() => {
+    const state = location.state as { studioPrefill?: { prompt: string; imageUrl?: string } } | null;
+    if (state?.studioPrefill) {
+      setStudioPrefill(state.studioPrefill);
+      setShowStudioPrefillDialog(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   // Cleanup on unmount - MUST be before early returns
   useEffect(() => {
@@ -711,6 +724,25 @@ const Index = () => {
           </div>
         </section>
       )}
+
+      <section className="px-6 pb-20 pt-10 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl">
+          <LandingFeaturedInspire />
+        </div>
+      </section>
+
+      <ImageGenerationDialog
+        open={showStudioPrefillDialog}
+        onOpenChange={(open) => {
+          setShowStudioPrefillDialog(open);
+          if (!open) {
+            setStudioPrefill(null);
+          }
+        }}
+        initialPrompt={studioPrefill?.prompt ?? ""}
+        initialReferenceImage={studioPrefill?.imageUrl}
+        onGenerate={handleGenerateImage}
+      />
 
       <Footer />
       

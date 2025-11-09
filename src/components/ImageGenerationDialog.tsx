@@ -22,6 +22,7 @@ interface ImageGenerationDialogProps {
   onOpenChange: (open: boolean) => void;
   initialPrompt: string;
   onGenerate: (prompt: string, options: GenerationOptions) => Promise<string | null>;
+  initialReferenceImage?: string | null;
 }
 
 export interface GenerationOptions {
@@ -32,11 +33,12 @@ export interface GenerationOptions {
 
 const MAX_PROMPT_LENGTH = 2000;
 
-export const ImageGenerationDialog = ({ 
-  open, 
-  onOpenChange, 
+export const ImageGenerationDialog = ({
+  open,
+  onOpenChange,
   initialPrompt,
-  onGenerate 
+  onGenerate,
+  initialReferenceImage,
 }: ImageGenerationDialogProps) => {
   // Truncate initial prompt if it's too long
   const truncatedInitialPrompt = initialPrompt.length > MAX_PROMPT_LENGTH 
@@ -58,6 +60,7 @@ export const ImageGenerationDialog = ({
   const isMobile = useIsMobile();
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const [presetsExpanded, setPresetsExpanded] = useState(false); // Collapsed by default
+  const [referenceImage, setReferenceImage] = useState<string | null>(initialReferenceImage ?? null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -200,24 +203,26 @@ export const ImageGenerationDialog = ({
     setBasePrompt(truncatedInitialPrompt);
     setSelectedPreset(null);
     setProgress(0);
+    setReferenceImage(initialReferenceImage ?? null);
     onOpenChange(false);
   };
 
   // Update prompt when initialPrompt changes and dialog opens
   React.useEffect(() => {
     if (open) {
-      const newTruncatedPrompt = initialPrompt.length > MAX_PROMPT_LENGTH 
+      const newTruncatedPrompt = initialPrompt.length > MAX_PROMPT_LENGTH
         ? initialPrompt.substring(0, MAX_PROMPT_LENGTH - 3) + '...'
         : initialPrompt;
       setPrompt(newTruncatedPrompt);
       setBasePrompt(newTruncatedPrompt);
       setSelectedPreset(null);
-      
+      setReferenceImage(initialReferenceImage ?? null);
+
       if (initialPrompt.length > MAX_PROMPT_LENGTH) {
         toast.info(`Prompt automatically shortened to ${MAX_PROMPT_LENGTH} characters`);
       }
     }
-  }, [open, initialPrompt]);
+  }, [open, initialPrompt, initialReferenceImage]);
 
   // Update prompt when user edits (track base prompt separately from preset-enhanced)
   const handlePromptChange = (newValue: string) => {
@@ -238,6 +243,25 @@ export const ImageGenerationDialog = ({
 
   const bodyContent = (
     <div className="space-y-4">
+      {referenceImage && (
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-muted/30 shadow">
+          <img
+            src={referenceImage}
+            alt="Reference inspiration"
+            className="w-full object-cover"
+          />
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">Reference image</p>
+              <p className="text-xs text-muted-foreground">Remix this Inspire project in Studio.</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setReferenceImage(null)}>
+              Remove
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Tabs defaultValue="presets" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="presets">Presets</TabsTrigger>

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { LogOut, Sparkles, GraduationCap, LogIn } from "lucide-react";
+import { LogOut, Sparkles, GraduationCap, LogIn, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -37,13 +37,22 @@ const SignedOut = () => {
             <GraduationCap className="w-4 h-4" />
             Learn More
           </Button>
-          <Button 
-            onClick={() => navigate("/auth")} 
+          <Button
+            onClick={() => navigate("/auth")}
             className="w-full gap-2"
             size="lg"
           >
             <LogIn className="w-4 h-4" />
             Sign In Again
+          </Button>
+          <Button
+            onClick={() => navigate("/")}
+            className="w-full gap-2"
+            size="lg"
+            variant="secondary"
+          >
+            <Home className="w-4 h-4" />
+            Back to Home
           </Button>
         </CardContent>
       </Card>
