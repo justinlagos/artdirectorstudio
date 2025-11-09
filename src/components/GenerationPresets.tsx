@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { Sparkles, Instagram, Package, Camera, Palette, Newspaper, Store, Users, Plus, ChevronDown } from "lucide-react";
+import { Sparkles, Instagram, Package, Camera, Palette, Newspaper, Store, Users, Plus, Search, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GenerationOptions } from "./ImageGenerationDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export interface GenerationPreset {
   id: string;
@@ -150,6 +152,8 @@ export const GenerationPresets = ({
 }: GenerationPresetsProps) => {
   const [customPresets, setCustomPresets] = useState<CustomPresetData[]>([]);
   const [isLoadingCustom, setIsLoadingCustom] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('portrait');
+  const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -190,150 +194,194 @@ export const GenerationPresets = ({
   const allPresets = [...GENERATION_PRESETS, ...customPresetsConverted];
 
   const categories = {
-    custom: { name: 'Your Custom Presets', presets: customPresetsConverted },
-    portrait: { name: 'Portrait', presets: allPresets.filter(p => p.category === 'portrait') },
-    product: { name: 'Product', presets: allPresets.filter(p => p.category === 'product') },
-    professional: { name: 'Professional', presets: allPresets.filter(p => p.category === 'professional') },
-    creative: { name: 'Creative', presets: allPresets.filter(p => p.category === 'creative') }
+    custom: { name: 'Custom', icon: <Plus className="w-4 h-4" />, presets: customPresetsConverted },
+    portrait: { name: 'Portrait', icon: <Users className="w-4 h-4" />, presets: allPresets.filter(p => p.category === 'portrait') },
+    product: { name: 'Product', icon: <Package className="w-4 h-4" />, presets: allPresets.filter(p => p.category === 'product') },
+    professional: { name: 'Professional', icon: <Camera className="w-4 h-4" />, presets: allPresets.filter(p => p.category === 'professional') },
+    creative: { name: 'Creative', icon: <Palette className="w-4 h-4" />, presets: allPresets.filter(p => p.category === 'creative') }
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-muted-foreground">Quick Presets</h3>
-          <div className="flex gap-2">
-            {onManageCustomPresets && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onManageCustomPresets}
-                className="h-7 text-xs"
-              >
-                <Plus className="w-3 h-3 mr-1.5" />
-                Manage
-              </Button>
-            )}
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          One-click setup for common styles
-        </p>
-      </div>
+  const selectedPreset = allPresets.find(p => p.id === selectedPresetId);
+  const currentCategory = categories[selectedCategory as keyof typeof categories];
 
+  // Mobile: Horizontal chip selector with category presets below
+  if (isMobile) {
+    return (
       <div className="space-y-3">
-        {Object.entries(categories).map(([key, category]) => (
-          category.presets.length > 0 && (
-          <div key={key}>
-            {isMobile ? (
-              <Collapsible defaultOpen={false}>
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-2 px-1 hover:bg-accent/5 rounded-md transition-colors">
-                  <h4 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
-                    {category.name}
-                  </h4>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform ui-open:rotate-180" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="grid grid-cols-1 gap-1.5">
-                    {category.presets.map((preset) => (
-                      <Button
-                        key={preset.id}
-                        variant={selectedPresetId === preset.id ? "default" : "outline"}
-                        className="h-auto p-2 justify-start text-left"
-                        onClick={() => onSelectPreset(preset)}
-                        disabled={disabled}
-                      >
-                        <div className="flex items-start gap-2 w-full">
-                          <div className="flex-shrink-0 mt-0.5">
-                            <div className="w-3.5 h-3.5 flex items-center justify-center">
-                              {preset.icon}
-                            </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm mb-0.5 flex items-center gap-1.5">
-                              {preset.name}
-                              {selectedPresetId === preset.id && (
-                                <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
-                                  Active
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex gap-1.5 mt-1">
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                                {preset.options.quality}
-                              </Badge>
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                                {preset.options.size.split('x')[0] === preset.options.size.split('x')[1] 
-                                  ? 'Square' 
-                                  : parseInt(preset.options.size.split('x')[0]) > parseInt(preset.options.size.split('x')[1])
-                                    ? 'Landscape'
-                                    : 'Portrait'
-                                }
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      </Button>
-                    ))}
+        {/* Horizontal category chips */}
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+          {Object.entries(categories).map(([key, category]) => (
+            category.presets.length > 0 && (
+              <Button
+                key={key}
+                variant={selectedCategory === key ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(key)}
+                disabled={disabled}
+                className="flex-shrink-0 h-8 px-3 gap-1.5"
+              >
+                {category.icon}
+                <span className="text-xs font-medium">{category.name}</span>
+              </Button>
+            )
+          ))}
+        </div>
+
+        {/* Selected category's presets */}
+        {currentCategory && currentCategory.presets.length > 0 && (
+          <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
+            {currentCategory.presets.map((preset) => (
+              <Button
+                key={preset.id}
+                variant={selectedPresetId === preset.id ? "default" : "outline"}
+                className="h-auto w-full p-2.5 justify-start text-left"
+                onClick={() => onSelectPreset(preset)}
+                disabled={disabled}
+              >
+                <div className="flex items-center gap-2 w-full">
+                  <div className="flex-shrink-0">
+                    <div className="w-4 h-4 flex items-center justify-center">
+                      {preset.icon}
+                    </div>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{preset.name}</div>
+                    <div className="flex gap-1.5 mt-1">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                        {preset.options.size.split('x')[0] === preset.options.size.split('x')[1] 
+                          ? 'Square' 
+                          : parseInt(preset.options.size.split('x')[0]) > parseInt(preset.options.size.split('x')[1])
+                            ? 'Landscape'
+                            : 'Portrait'
+                        }
+                      </Badge>
+                    </div>
+                  </div>
+                  {selectedPresetId === preset.id && (
+                    <Check className="w-4 h-4 flex-shrink-0" />
+                  )}
+                </div>
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {/* Manage Custom Presets Link */}
+        {onManageCustomPresets && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onManageCustomPresets}
+            className="w-full h-8 text-xs"
+          >
+            <Plus className="w-3 h-3 mr-1.5" />
+            Manage Custom Presets
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop: Searchable dropdown/combobox
+  return (
+    <div className="space-y-3">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between h-auto py-2.5 px-3"
+            disabled={disabled}
+          >
+            {selectedPreset ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 flex items-center justify-center">
+                  {selectedPreset.icon}
+                </div>
+                <span className="font-medium">{selectedPreset.name}</span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 ml-1">
+                  {selectedPreset.options.size.split('x')[0] === selectedPreset.options.size.split('x')[1] 
+                    ? 'Square' 
+                    : parseInt(selectedPreset.options.size.split('x')[0]) > parseInt(selectedPreset.options.size.split('x')[1])
+                      ? 'Landscape'
+                      : 'Portrait'
+                  }
+                </Badge>
+              </div>
             ) : (
-              <div className="space-y-2">
-                <h4 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
-                  {category.name}
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {category.presets.map((preset) => (
-                    <Button
-                      key={preset.id}
-                      variant={selectedPresetId === preset.id ? "default" : "outline"}
-                      className="h-auto p-2.5 justify-start text-left"
-                      onClick={() => onSelectPreset(preset)}
-                      disabled={disabled}
-                    >
-                      <div className="flex items-start gap-2 w-full">
-                        <div className="flex-shrink-0 mt-0.5">
-                          <div className="w-4 h-4 flex items-center justify-center">
+              <span className="text-muted-foreground">Select a preset...</span>
+            )}
+            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[400px] p-0 bg-background border-border z-50" align="start">
+          <Command>
+            <CommandInput placeholder="Search presets..." className="h-9" />
+            <CommandList>
+              <CommandEmpty>No preset found.</CommandEmpty>
+              {Object.entries(categories).map(([key, category]) => (
+                category.presets.length > 0 && (
+                  <CommandGroup key={key} heading={category.name}>
+                    {category.presets.map((preset) => (
+                      <CommandItem
+                        key={preset.id}
+                        value={`${preset.name} ${preset.description}`}
+                        onSelect={() => {
+                          onSelectPreset(preset);
+                          setOpen(false);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
                             {preset.icon}
                           </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm mb-0.5 flex items-center gap-1.5">
-                            {preset.name}
-                            {selectedPresetId === preset.id && (
-                              <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
-                                Active
-                              </Badge>
-                            )}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm">{preset.name}</div>
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              {preset.description}
+                            </div>
                           </div>
-                          <div className="text-[10px] text-muted-foreground line-clamp-1">
-                            {preset.description}
-                          </div>
-                          <div className="flex gap-1.5 mt-1.5">
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                              {preset.options.quality}
-                            </Badge>
+                          <div className="flex gap-1 flex-shrink-0">
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
                               {preset.options.size.split('x')[0] === preset.options.size.split('x')[1] 
-                                ? 'Square' 
+                                ? 'Sq' 
                                 : parseInt(preset.options.size.split('x')[0]) > parseInt(preset.options.size.split('x')[1])
-                                  ? 'Landscape'
-                                  : 'Portrait'
+                                  ? 'Land'
+                                  : 'Port'
                               }
                             </Badge>
                           </div>
                         </div>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          )
-        ))}
-      </div>
+                        <Check
+                          className={cn(
+                            "ml-2 h-4 w-4 flex-shrink-0",
+                            selectedPresetId === preset.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )
+              ))}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {/* Manage Custom Presets Link */}
+      {onManageCustomPresets && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onManageCustomPresets}
+          className="w-full h-8 text-xs"
+        >
+          <Plus className="w-3 h-3 mr-1.5" />
+          Manage Custom Presets
+        </Button>
+      )}
     </div>
   );
 };
