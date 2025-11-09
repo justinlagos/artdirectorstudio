@@ -25,28 +25,23 @@ serve(async (req) => {
       );
     }
 
-    // Extract and decode JWT to get user ID
     const token = authHeader.replace('Bearer ', '');
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      console.error("Invalid JWT format");
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+    if (userError || !userData?.user) {
+      console.error("Unable to resolve user from token", userError);
       return new Response(
-        JSON.stringify({ error: "Invalid token format" }),
+        JSON.stringify({ error: "Unauthorized: invalid session" }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Decode the payload (second part of JWT)
-    const payload = JSON.parse(atob(parts[1]));
-    const userId = payload.sub;
-    
-    if (!userId) {
-      console.error("No user ID in JWT");
-      return new Response(
-        JSON.stringify({ error: "Invalid token: no user ID" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const userId = userData.user.id;
 
     console.log("Authenticated user:", userId);
 
@@ -187,12 +182,6 @@ serve(async (req) => {
 
     console.log("Image generated successfully, base64 length:", generatedImageUrl.length);
 
-    // Initialize Supabase client with service role for database operations
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // Upload to storage instead of saving base64 to database
     let finalImageUrl = generatedImageUrl;
     let assetData = null;
@@ -248,8 +237,7 @@ serve(async (req) => {
       console.log("Saved to database:", assetData.id);
     } catch (error) {
       console.error("Failed to save image:", error);
-      // Return base64 as fallback but log error
-      finalImageUrl = generatedImageUrl;
+      throw error;
     }
 
     return new Response(
