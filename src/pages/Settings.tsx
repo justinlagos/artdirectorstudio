@@ -25,6 +25,10 @@ const Settings = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'profile');
 
+  // Extract preset data from URL
+  const presetDataFromUrl = searchParams.get('data');
+  const initialPresetData = presetDataFromUrl ? JSON.parse(decodeURIComponent(presetDataFromUrl)) : null;
+
   // Update activeTab when searchParams changes
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -441,7 +445,7 @@ const Settings = () => {
                   <CardDescription>Create and manage your personalized generation presets</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <CustomPresetsManager />
+                  <CustomPresetsManager initialData={initialPresetData} />
                 </CardContent>
               </Card>
             </TabsContent>

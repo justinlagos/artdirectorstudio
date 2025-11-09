@@ -36,28 +36,13 @@ const DrawerContent = React.forwardRef<
       <DrawerPrimitive.Content
         ref={ref}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 mt-24 flex flex-col rounded-t-[10px] border bg-background max-h-[95dvh]",
+          "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto max-h-[96dvh] flex-col rounded-t-[10px] border bg-background",
           className,
         )}
         {...props}
       >
         <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted shrink-0" />
-        <div className="relative">
-          <div 
-            ref={scrollRef}
-            className="overflow-y-auto overscroll-contain" 
-            style={{ WebkitOverflowScrolling: 'touch' }}
-          >
-            {children}
-          </div>
-          {/* Bottom fade indicator */}
-          <div 
-            className={cn(
-              "pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent transition-opacity duration-300",
-              showBottomFade ? "opacity-100" : "opacity-0"
-            )}
-          />
-        </div>
+        {children}
       </DrawerPrimitive.Content>
     </DrawerPortal>
   );
@@ -70,7 +55,7 @@ const DrawerHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 DrawerHeader.displayName = "DrawerHeader";
 
 const DrawerFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("mt-auto flex flex-col gap-2 p-4", className)} {...props} />
+  <div className={cn("mt-auto flex flex-col gap-2 p-4 shrink-0", className)} {...props} />
 );
 DrawerFooter.displayName = "DrawerFooter";
 

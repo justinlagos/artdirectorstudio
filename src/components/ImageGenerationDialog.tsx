@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { GenerationPresets, GenerationPreset } from "./GenerationPresets";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { ToolDrawer } from "./ToolDrawer";
 
@@ -225,43 +226,12 @@ export const ImageGenerationDialog = ({
         </TabsList>
         
         <TabsContent value="presets" className="space-y-4 mt-4">
-          {/* Selected Preset Indicator */}
-          {selectedPreset && (
-            <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-lg">
-              <div className="flex items-center gap-2">
-                <div className="flex-shrink-0">{selectedPreset.icon}</div>
-                <div>
-                  <div className="font-semibold text-sm">{selectedPreset.name}</div>
-                  <div className="text-xs text-muted-foreground">Active preset</div>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearPreset}
-                disabled={isGenerating}
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Clear
-              </Button>
+          {/* Base Prompt - Moved to Top for Prominence */}
+          <div className="space-y-2 p-4 bg-accent/5 border border-accent/20 rounded-xl">
+            <div className="flex items-center gap-2">
+              <Label className="text-base font-semibold">Your Base Prompt</Label>
+              <Badge variant="secondary" className="text-xs">Primary</Badge>
             </div>
-          )}
-
-          <GenerationPresets
-            onSelectPreset={handlePresetSelect}
-            disabled={isGenerating}
-            selectedPresetId={selectedPreset?.id}
-            onManageCustomPresets={() => {
-              onOpenChange(false);
-              window.location.href = '/settings?tab=presets';
-            }}
-          />
-
-          <Separator />
-
-          {/* Base Prompt (shown with presets) */}
-          <div className="space-y-2">
-            <Label>Your Base Prompt</Label>
             <EnhancedPromptEditor
               value={basePrompt}
               onChange={(newValue) => {
@@ -285,10 +255,50 @@ export const ImageGenerationDialog = ({
             />
             {selectedPreset && (
               <p className="text-xs text-muted-foreground">
-                ✨ Preset enhancements will be automatically added to your base prompt
+                ✨ Preset enhancements will be automatically added
               </p>
             )}
           </div>
+
+          <Separator />
+
+          {/* Selected Preset Indicator */}
+          {selectedPreset && (
+            <div className="flex items-center justify-between p-2.5 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="flex-shrink-0 w-4 h-4">{selectedPreset.icon}</div>
+                <div>
+                  <div className="font-medium text-sm">{selectedPreset.name}</div>
+                  <div className="text-xs text-muted-foreground">Active preset</div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearPreset}
+                disabled={isGenerating}
+                className="h-8"
+              >
+                <RotateCcw className="w-3 h-3 mr-1.5" />
+                Clear
+              </Button>
+            </div>
+          )}
+
+          <GenerationPresets
+            onSelectPreset={handlePresetSelect}
+            disabled={isGenerating}
+            selectedPresetId={selectedPreset?.id}
+            onManageCustomPresets={() => {
+              const presetData = {
+                options: options,
+                prompt_modifier: selectedPreset?.promptModifier || '',
+                base_prompt: basePrompt
+              };
+              onOpenChange(false);
+              window.location.href = `/settings?tab=presets&data=${encodeURIComponent(JSON.stringify(presetData))}`;
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="custom" className="space-y-4 mt-4">
@@ -487,6 +497,7 @@ export const ImageGenerationDialog = ({
           handleClose();
         }
       }}
+      stickyFooterOnMobile={true}
       title={
         <>
           <Wand2 className="w-5 h-5" />

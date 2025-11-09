@@ -195,68 +195,68 @@ export const GenerationPresets = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <div className="space-y-4">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Generation Presets</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">Quick Presets</h3>
           <div className="flex gap-2">
             {onManageCustomPresets && (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={onManageCustomPresets}
+                className="h-7 text-xs"
               >
-                <Plus className="w-3 h-3 mr-2" />
-                Manage Custom
+                <Plus className="w-3 h-3 mr-1.5" />
+                Manage
               </Button>
             )}
-            <Badge variant="secondary" className="text-xs">
-              One-Click Setup
-            </Badge>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Choose a preset to automatically configure optimal settings for your use case
+        <p className="text-xs text-muted-foreground">
+          One-click setup for common styles
         </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {Object.entries(categories).map(([key, category]) => (
           category.presets.length > 0 && (
-          <div key={key} className="space-y-3">
-            <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          <div key={key} className="space-y-2">
+            <h4 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
               {category.name}
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {category.presets.map((preset) => (
                 <Button
                   key={preset.id}
                   variant={selectedPresetId === preset.id ? "default" : "outline"}
-                  className="h-auto p-4 justify-start text-left"
+                  className="h-auto p-2.5 justify-start text-left"
                   onClick={() => onSelectPreset(preset)}
                   disabled={disabled}
                 >
-                  <div className="flex items-start gap-3 w-full">
+                  <div className="flex items-start gap-2 w-full">
                     <div className="flex-shrink-0 mt-0.5">
-                      {preset.icon}
+                      <div className="w-4 h-4 flex items-center justify-center">
+                        {preset.icon}
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold mb-1 flex items-center gap-2">
+                      <div className="font-medium text-sm mb-0.5 flex items-center gap-1.5">
                         {preset.name}
                         {selectedPresetId === preset.id && (
-                          <Badge variant="secondary" className="text-xs py-0 px-2">
+                          <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
                             Active
                           </Badge>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground line-clamp-2">
+                      <div className="text-[10px] text-muted-foreground line-clamp-1">
                         {preset.description}
                       </div>
-                      <div className="flex gap-2 mt-2 text-xs">
-                        <Badge variant="outline" className="text-xs">
+                      <div className="flex gap-1.5 mt-1.5">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
                           {preset.options.quality}
                         </Badge>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
                           {preset.options.size.split('x')[0] === preset.options.size.split('x')[1] 
                             ? 'Square' 
                             : parseInt(preset.options.size.split('x')[0]) > parseInt(preset.options.size.split('x')[1])

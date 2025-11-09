@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,11 @@ interface CustomPresetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   preset?: CustomPreset | null;
+  initialData?: {
+    options: GenerationOptions;
+    prompt_modifier: string;
+    base_prompt?: string;
+  };
   onSave: () => void;
 }
 
@@ -36,6 +42,7 @@ export const CustomPresetDialog = ({
   open, 
   onOpenChange, 
   preset,
+  initialData,
   onSave 
 }: CustomPresetDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -44,14 +51,33 @@ export const CustomPresetDialog = ({
     description: preset?.description || '',
     icon: preset?.icon || '✨',
     category: preset?.category || 'custom',
-    options: preset?.options || {
+    options: initialData?.options || preset?.options || {
       quality: 'auto',
       size: '1024x1024',
       background: 'auto'
     },
-    prompt_modifier: preset?.prompt_modifier || '',
+    prompt_modifier: initialData?.prompt_modifier || preset?.prompt_modifier || '',
     is_public: preset?.is_public || false
   });
+
+  // Update form when preset or initialData changes
+  React.useEffect(() => {
+    if (preset || initialData) {
+      setFormData({
+        name: preset?.name || '',
+        description: preset?.description || (initialData?.base_prompt ? `Based on: ${initialData.base_prompt.substring(0, 50)}...` : ''),
+        icon: preset?.icon || '✨',
+        category: preset?.category || 'custom',
+        options: initialData?.options || preset?.options || {
+          quality: 'auto',
+          size: '1024x1024',
+          background: 'auto'
+        },
+        prompt_modifier: initialData?.prompt_modifier || preset?.prompt_modifier || '',
+        is_public: preset?.is_public || false
+      });
+    }
+  }, [preset, initialData]);
 
   const handleSave = async () => {
     // Validation

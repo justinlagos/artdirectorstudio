@@ -38,12 +38,28 @@ interface CustomPreset {
   created_at: string;
 }
 
-export const CustomPresetsManager = () => {
+interface CustomPresetsManagerProps {
+  initialData?: {
+    options: GenerationOptions;
+    prompt_modifier: string;
+    base_prompt?: string;
+  };
+}
+
+export const CustomPresetsManager = ({ initialData }: CustomPresetsManagerProps) => {
   const [presets, setPresets] = useState<CustomPreset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingPreset, setEditingPreset] = useState<CustomPreset | null>(null);
   const [deletingPresetId, setDeletingPresetId] = useState<string | null>(null);
+  const [presetInitialData, setPresetInitialData] = useState(initialData);
+
+  // Auto-open create dialog if initialData is provided
+  useEffect(() => {
+    if (presetInitialData) {
+      setShowCreateDialog(true);
+    }
+  }, [presetInitialData]);
 
   const fetchPresets = async () => {
     setIsLoading(true);
@@ -263,12 +279,15 @@ export const CustomPresetsManager = () => {
           if (!open) {
             setShowCreateDialog(false);
             setEditingPreset(null);
+            setPresetInitialData(undefined);
           }
         }}
         preset={editingPreset}
+        initialData={presetInitialData}
         onSave={() => {
           fetchPresets();
           setEditingPreset(null);
+          setPresetInitialData(undefined);
         }}
       />
 
