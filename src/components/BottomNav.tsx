@@ -56,8 +56,14 @@ export const BottomNav = () => {
       label: "Artie",
       icon: MessageSquare,
       action: () => {
+        // Try button click first (for desktop compatibility)
         const artieButton = document.querySelector('[aria-label="Chat with Artie"]') as HTMLButtonElement;
-        if (artieButton) artieButton.click();
+        if (artieButton) {
+          artieButton.click();
+        } else {
+          // Fallback for mobile - dispatch custom event
+          window.dispatchEvent(new CustomEvent('openArtieChat'));
+        }
       },
       isActive: () => false
     },

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { useCredits } from "@/hooks/useCredits";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Message {
   id: string;
@@ -45,6 +46,7 @@ export const ArtieChat = () => {
   const location = useLocation();
   const { openTool } = useToolsModal();
   const { balance, refetch: refetchCredits } = useCredits();
+  const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -83,6 +85,17 @@ export const ArtieChat = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Custom event listener for mobile bottom nav
+  useEffect(() => {
+    const handleOpenArtie = () => {
+      setIsOpen(true);
+      setIsMinimized(false);
+    };
+    
+    window.addEventListener('openArtieChat', handleOpenArtie);
+    return () => window.removeEventListener('openArtieChat', handleOpenArtie);
+  }, []);
 
   // Emergency escape handler - force close everything on Escape key
   useEffect(() => {
@@ -699,7 +712,7 @@ export const ArtieChat = () => {
         <TooltipTrigger asChild>
           <button
             onClick={() => isMinimized ? handleRestore() : setIsOpen(true)}
-            aria-label={isMinimized ? "Restore Artie" : "Open Artie AI Assistant"}
+            aria-label="Chat with Artie"
             className={cn(
               "relative h-14 w-14 md:h-16 md:w-16 rounded-full shadow-strong transition-all duration-300",
               "bg-gradient-to-br from-primary to-primary/80",
@@ -731,6 +744,11 @@ export const ArtieChat = () => {
     </div>
   );
 
+  // Hide floating button on mobile when closed
+  if (!isOpen && isMobile) {
+    return null;
+  }
+
   if (!isOpen) {
     return <FloatingIcon />;
   }
@@ -738,7 +756,7 @@ export const ArtieChat = () => {
   // Side panel drawer
   return (
     <>
-      <FloatingIcon />
+      {!isMobile && <FloatingIcon />}
       
       {/* Backdrop - Click to close */}
       <button 
