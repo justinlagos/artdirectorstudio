@@ -67,12 +67,18 @@ export const ImageGenerationDialog = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [progress, setProgress] = useState(0);
   const [presetsExpanded, setPresetsExpanded] = useState(false);
+  const [generationStage, setGenerationStage] = useState<string>("");
+  const [generationTime, setGenerationTime] = useState<number>(0);
+  const [lastError, setLastError] = useState<string | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const generationStartTime = useRef<number>(0);
 
   useEffect(() => {
     if (!isGenerateModalOpen) {
       setIsGenerating(false);
       setProgress(0);
+      setGenerationStage("");
+      setLastError(null);
       return;
     }
 
@@ -81,6 +87,9 @@ export const ImageGenerationDialog = () => {
     setSelectedPreset(null);
     setGeneratedImage(null);
     setProgress(0);
+    setGenerationStage("");
+    setGenerationTime(0);
+    setLastError(null);
     setShowAdvanced(false);
     setPresetsExpanded(false);
     setReferenceImage(storeImage ?? null);
@@ -109,26 +118,54 @@ export const ImageGenerationDialog = () => {
     setIsGenerating(true);
     setProgress(0);
     setGeneratedImage(null);
+    setLastError(null);
+    generationStartTime.current = Date.now();
+
+    // Simulate generation stages for better UX
+    setGenerationStage("Initializing...");
+    setProgress(10);
 
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
+        if (prev < 30) {
+          setGenerationStage("Processing your prompt...");
+        } else if (prev < 60) {
+          setGenerationStage("AI is creating your image...");
+        } else if (prev < 85) {
+          setGenerationStage("Adding final touches...");
+        }
+        
         if (prev >= 90) {
           clearInterval(progressInterval);
           return 90;
         }
-        return prev + 10;
+        return prev + 8;
       });
-    }, 1500);
+    }, 1200);
 
     try {
       const imageUrl = await generator(prompt, options);
 
       clearInterval(progressInterval);
       setProgress(100);
+      setGenerationStage("Complete!");
+
+      const totalTime = Math.round((Date.now() - generationStartTime.current) / 1000);
+      setGenerationTime(totalTime);
 
       if (imageUrl) {
         setGeneratedImage(imageUrl);
-        toast.success("Your image is ready.");
+        
+        // Enhanced success feedback
+        toast.success(
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">✨ Image generated successfully!</span>
+            <span className="text-xs text-muted-foreground">
+              Generated in {totalTime}s • {options.size} • {options.quality}
+            </span>
+          </div>,
+          { duration: 4000 }
+        );
 
         if (isMobile) {
           setTimeout(() => {
@@ -141,45 +178,87 @@ export const ImageGenerationDialog = () => {
       }
     } catch (error) {
       clearInterval(progressInterval);
+      setProgress(0);
+      setGenerationStage("");
       console.error("Generation error:", error);
       
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      setLastError(errorMessage);
       
-      // Show appropriate toast based on error type with actionable guidance
+      // Enhanced error handling with more context
       if (errorMessage.toLowerCase().includes("rate limit")) {
-        toast.error("Too many requests. Please wait a minute and try again.", {
-          duration: 5000,
-        });
+        toast.error(
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">Rate limit exceeded</span>
+            <span className="text-xs">Please wait a moment before trying again</span>
+          </div>,
+          { duration: 5000 }
+        );
       } else if (errorMessage.toLowerCase().includes("credits") || errorMessage.toLowerCase().includes("exhausted")) {
-        toast.error("Credits exhausted. Please add credits to continue.", {
-          duration: 5000,
-          action: {
-            label: "Add Credits",
-            onClick: () => window.location.href = "/subscriptions",
-          },
-        });
+        toast.error(
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">Insufficient credits</span>
+            <span className="text-xs">Add more credits to continue generating images</span>
+          </div>,
+          {
+            duration: 6000,
+            action: {
+              label: "Add Credits",
+              onClick: () => window.location.href = "/subscriptions",
+            },
+          }
+        );
       } else if (errorMessage.toLowerCase().includes("sign in") || errorMessage.toLowerCase().includes("log in")) {
-        toast.error("Please sign in to generate images.", {
-          duration: 5000,
-          action: {
-            label: "Sign In",
-            onClick: () => window.location.href = "/auth",
-          },
-        });
+        toast.error(
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">Authentication required</span>
+            <span className="text-xs">Please sign in to generate images</span>
+          </div>,
+          {
+            duration: 5000,
+            action: {
+              label: "Sign In",
+              onClick: () => window.location.href = "/auth",
+            },
+          }
+        );
       } else if (errorMessage.toLowerCase().includes("access denied") || errorMessage.toLowerCase().includes("upgrade")) {
-        toast.error(errorMessage, {
-          duration: 5000,
-          action: {
-            label: "Upgrade",
-            onClick: () => window.location.href = "/subscriptions",
-          },
-        });
+        toast.error(
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">Upgrade required</span>
+            <span className="text-xs">{errorMessage}</span>
+          </div>,
+          {
+            duration: 5000,
+            action: {
+              label: "View Plans",
+              onClick: () => window.location.href = "/subscriptions",
+            },
+          }
+        );
+      } else if (errorMessage.toLowerCase().includes("network") || errorMessage.toLowerCase().includes("connection")) {
+        toast.error(
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">Connection error</span>
+            <span className="text-xs">Check your internet connection and try again</span>
+          </div>,
+          { duration: 5000 }
+        );
       } else {
-        toast.error(errorMessage || "Failed to generate image. Please try again.");
+        toast.error(
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">Generation failed</span>
+            <span className="text-xs">{errorMessage || "An unexpected error occurred"}</span>
+          </div>,
+          { duration: 5000 }
+        );
       }
     } finally {
       setIsGenerating(false);
-      setTimeout(() => setProgress(0), 1000);
+      setTimeout(() => {
+        setProgress(0);
+        setGenerationStage("");
+      }, 2000);
     }
   };
 
@@ -203,6 +282,12 @@ export const ImageGenerationDialog = () => {
 
   const handleRegenerate = () => {
     setGeneratedImage(null);
+    setLastError(null);
+    handleGenerate();
+  };
+
+  const handleRetry = () => {
+    setLastError(null);
     handleGenerate();
   };
 
@@ -524,18 +609,52 @@ export const ImageGenerationDialog = () => {
       </Tabs>
 
       {isGenerating && (
-        <div className="space-y-2">
+        <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-foreground">{generationStage}</p>
+            <span className="text-xs text-muted-foreground">{progress}%</span>
+          </div>
           <Progress value={progress} className="w-full" />
-          <p className="text-center text-sm text-muted-foreground">Generating image...</p>
+          <p className="text-xs text-muted-foreground text-center">
+            This usually takes 8-15 seconds
+          </p>
         </div>
+      )}
+
+      {lastError && !isGenerating && (
+        <Alert variant="destructive" className="border-destructive/50">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <p className="font-semibold">Generation failed</p>
+              <p className="text-sm mt-1">{lastError}</p>
+            </div>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleRetry}
+              className="shrink-0"
+            >
+              <RotateCcw className="mr-1.5 h-3 w-3" />
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
       {generatedImage && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-4">
             <div className="flex items-center gap-2">
               <Wand2 className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Generation complete</span>
+              <div>
+                <span className="font-semibold block">Generation complete!</span>
+                {generationTime > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    Completed in {generationTime}s
+                  </span>
+                )}
+              </div>
             </div>
             <Badge variant="secondary" className="gap-1">
               AI Generated
@@ -550,9 +669,20 @@ export const ImageGenerationDialog = () => {
             />
           </div>
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Generated on {new Date().toLocaleString()}</span>
-            <span>{options.size}</span>
+          <div className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/10 p-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-foreground">Image Details</span>
+              <div className="flex gap-3 text-xs text-muted-foreground">
+                <span>{options.size}</span>
+                <span>•</span>
+                <span className="capitalize">{options.quality} quality</span>
+                <span>•</span>
+                <span className="capitalize">{options.background} BG</span>
+              </div>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {new Date().toLocaleTimeString()}
+            </span>
           </div>
         </div>
       )}
