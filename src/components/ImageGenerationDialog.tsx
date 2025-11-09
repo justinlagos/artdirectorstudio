@@ -57,6 +57,7 @@ export const ImageGenerationDialog = ({
   });
   const isMobile = useIsMobile();
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const [presetsExpanded, setPresetsExpanded] = useState(false); // Collapsed by default
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -155,6 +156,11 @@ export const ImageGenerationDialog = ({
       // If enhanced prompt is too long, just update options without modifier
       setPrompt(basePrompt);
       toast.info(`"${preset.name}" settings applied. Prompt modifier skipped due to length.`);
+    }
+    
+    // Auto-collapse presets on mobile after selection
+    if (isMobile) {
+      setPresetsExpanded(false);
     }
   };
 
@@ -298,20 +304,37 @@ export const ImageGenerationDialog = ({
             </div>
           )}
 
-          <GenerationPresets
-            onSelectPreset={handlePresetSelect}
-            disabled={isGenerating}
-            selectedPresetId={selectedPreset?.id}
-            onManageCustomPresets={() => {
-              const presetData = {
-                options: options,
-                prompt_modifier: selectedPreset?.promptModifier || '',
-                base_prompt: basePrompt
-              };
-              onOpenChange(false);
-              window.location.href = `/settings?tab=presets&data=${encodeURIComponent(JSON.stringify(presetData))}`;
-            }}
-          />
+          {/* Collapsible Quick Presets Section */}
+          <Collapsible open={presetsExpanded} onOpenChange={setPresetsExpanded}>
+            <CollapsibleTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="w-full justify-between min-h-[44px] mb-3"
+                disabled={isGenerating}
+              >
+                <span className="font-medium">
+                  {presetsExpanded ? "Hide Quick Presets" : "Browse Quick Presets"}
+                </span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${presetsExpanded ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <GenerationPresets
+                onSelectPreset={handlePresetSelect}
+                disabled={isGenerating}
+                selectedPresetId={selectedPreset?.id}
+                onManageCustomPresets={() => {
+                  const presetData = {
+                    options: options,
+                    prompt_modifier: selectedPreset?.promptModifier || '',
+                    base_prompt: basePrompt
+                  };
+                  onOpenChange(false);
+                  window.location.href = `/settings?tab=presets&data=${encodeURIComponent(JSON.stringify(presetData))}`;
+                }}
+              />
+            </CollapsibleContent>
+          </Collapsible>
         </TabsContent>
 
         <TabsContent value="custom" className="space-y-4 mt-4">
@@ -525,7 +548,7 @@ export const ImageGenerationDialog = ({
           Open this prompt in Studio and create instantly. Cost: <span className="font-semibold text-foreground">3 credits</span>
         </>
       }
-      contentClassName="pb-6"
+      contentClassName="pb-8 md:pb-6"
       footer={footerContent}
     >
       {bodyContent}
