@@ -6,10 +6,11 @@ import { Copy, Download, RefreshCw, Wand2, FileJson } from "lucide-react";
 import { toast } from "sonner";
 import { AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
 import { Separator } from "@/components/ui/separator";
-import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
+import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import jsPDF from "jspdf";
+import { openStudioWithPrompt } from "@/lib/studio";
 
 interface ResultsSectionProps {
   result: AnalysisResult;
@@ -29,7 +30,6 @@ export const ResultsSection = ({
   onDeleteImage
 }: ResultsSectionProps) => {
   const [userEdits, setUserEdits] = useState<UserEdits>({});
-  const [showGenerationDialog, setShowGenerationDialog] = useState(false);
 
   // Load edits from local storage on mount
   useEffect(() => {
@@ -395,7 +395,12 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => setShowGenerationDialog(true)}
+                onClick={() =>
+                  openStudioWithPrompt({
+                    basePrompt: result.full_regeneration_prompt,
+                    meta: { source: "analysis-basic" },
+                  })
+                }
                 className="shadow-sm"
               >
                 <Wand2 className="w-4 h-4 mr-2" />
@@ -483,13 +488,6 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
         </>
       )}
 
-      {/* Image Generation Dialog */}
-      <ImageGenerationDialog
-        open={showGenerationDialog}
-        onOpenChange={setShowGenerationDialog}
-        initialPrompt={result.full_regeneration_prompt}
-        onGenerate={onGenerateImage}
-      />
     </section>
   );
 };

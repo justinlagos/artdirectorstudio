@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useInspireFeed } from "@/hooks/useInspireFeed";
 import type { InspireProject } from "@/types/inspire";
+import { openStudioWithPrompt } from "@/lib/studio";
 import {
   ArrowUpRight,
   Calendar,
@@ -118,40 +119,41 @@ const Inspire = () => {
 
   const heroImage = useMemo(() => projects[0]?.asset?.image_url ?? null, [projects]);
 
-  const handleUseInStudio = (project: InspireProject, options?: { fromQuery?: boolean }) => {
-    if (!user) {
-      setGuestDialogOpen(true);
-      if (!options?.fromQuery) {
-        const params = new URLSearchParams(location.search);
-        params.set("project", project.id);
-        params.set("action", "studio");
-        navigate({ pathname: location.pathname, search: params.toString() }, { replace: false });
+  const handleUseInStudio = useCallback(
+    (project: InspireProject, options?: { fromQuery?: boolean }) => {
+      if (!project) return;
+
+      if (!user) {
+        setGuestDialogOpen(true);
+        if (!options?.fromQuery) {
+          const params = new URLSearchParams(location.search);
+          params.set("project", project.id);
+          params.set("action", "studio");
+          navigate({ pathname: location.pathname, search: params.toString() }, { replace: false });
+        }
+        return;
       }
-      return;
-    }
 
-    const params = new URLSearchParams(location.search);
-    params.delete("action");
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+      const currentParams = new URLSearchParams(location.search);
+      const nextParams = new URLSearchParams(currentParams.toString());
+      if (nextParams.has("project")) {
+        nextParams.delete("project");
+      }
+      if (nextParams.has("action")) {
+        nextParams.delete("action");
+      }
+      if (location.search !== "" && nextParams.toString() !== currentParams.toString()) {
+        navigate({ pathname: location.pathname, search: nextParams.toString() }, { replace: true });
+      }
 
-    // Use unified Studio helper for consistent behavior
-    import("@/lib/studio").then(({ openStudioWithPrompt }) => {
       openStudioWithPrompt({
         basePrompt: project.asset?.prompt ?? "",
         imageUrl: project.asset?.image_url ?? undefined,
+        meta: { source: "inspire" },
       });
-    });
-
-    // Also maintain navigation state for backward compatibility
-    navigate("/", {
-      state: {
-        studioPrefill: {
-          prompt: project.asset?.prompt ?? "",
-          imageUrl: project.asset?.image_url ?? undefined,
-        },
-      },
-    });
-  };
+    },
+    [location.pathname, location.search, navigate, user]
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -181,11 +183,10 @@ const Inspire = () => {
   }, [projects]);
 
   useEffect(() => {
-    if (queuedStudioAction.current && selectedProject) {
-      handleUseInStudio(selectedProject, { fromQuery: true });
-      queuedStudioAction.current = false;
-    }
-  }, [selectedProject, handleUseInStudio]);
+    if (!queuedStudioAction.current || !selectedProject) return;
+    queuedStudioAction.current = false;
+    handleUseInStudio(selectedProject, { fromQuery: true });
+  }, [handleUseInStudio, selectedProject]);
 
   useEffect(() => {
     if (!selectedProject) return;

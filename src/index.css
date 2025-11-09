@@ -231,6 +231,21 @@ All colors MUST be HSL.
   }
 }
 
+@layer components {
+  .studio-modal-wrapper {
+    @apply flex flex-col max-h-[100dvh] w-full;
+  }
+
+  .studio-modal-body {
+    @apply flex-1 overflow-y-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .studio-modal-footer {
+    @apply sticky bottom-0 z-10 border-t border-border/80 bg-background/95;
+  }
+}
+
 @layer utilities {
   /* Glass morphism effect */
   .glass {

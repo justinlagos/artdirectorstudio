@@ -1,0 +1,134 @@
+import { useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { GenerationOptions } from "@/components/ImageGenerationDialog";
+
+export type StudioGenerator = (
+  prompt: string,
+  options: GenerationOptions
+) => Promise<string | null>;
+
+const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
+  const trimmedPrompt = prompt.trim();
+  if (!trimmedPrompt) {
+    throw new Error("Prompt is required for generation.");
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    throw new Error("Please log in to continue.");
+  }
+
+  const { data, error } = await supabase.functions.invoke("generate-image", {
+    body: {
+      prompt: trimmedPrompt,
+      quality: options.quality,
+      size: options.size,
+      background: options.background,
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+  });
+
+  if (error) {
+    const message = error.message || "Failed to generate image. Please try again.";
+
+    if (message.toLowerCase().includes("rate limit")) {
+      throw new Error("Too many requests. Please wait a moment and try again.");
+    }
+
+    if (message.toLowerCase().includes("credits")) {
+      throw new Error("AI service temporarily unavailable. Please try again later.");
+    }
+
+    throw new Error(message);
+  }
+
+  if (!data?.image) {
+    throw new Error("Failed to generate image. Please try again.");
+  }
+
+  return data.image as string;
+};
+
+export interface StudioStoreState {
+  prompt: string;
+  imageUrl?: string;
+  meta: Record<string, unknown> | null;
+  generator: StudioGenerator | null;
+  setPrompt: (prompt: string) => void;
+  setImage: (imageUrl?: string) => void;
+  setMeta: (meta?: Record<string, unknown>) => void;
+  setGenerator: (generator: StudioGenerator | null) => void;
+  reset: () => void;
+}
+
+type StudioStoreSelector<T> = (state: StudioStoreState) => T;
+
+type PartialState =
+  | Partial<StudioStoreState>
+  | ((state: StudioStoreState) => Partial<StudioStoreState>);
+
+const listeners = new Set<() => void>();
+let state: StudioStoreState;
+
+const notify = () => {
+  listeners.forEach((listener) => listener());
+};
+
+const setState = (partial: PartialState) => {
+  const partialState =
+    typeof partial === "function" ? partial(state) : partial;
+
+  state = {
+    ...state,
+    ...partialState,
+  };
+
+  notify();
+};
+
+state = {
+  prompt: "",
+  imageUrl: undefined,
+  meta: null,
+  generator: defaultStudioGenerator,
+  setPrompt: (prompt: string) => setState({ prompt }),
+  setImage: (imageUrl?: string) => setState({ imageUrl }),
+  setMeta: (meta?: Record<string, unknown>) => setState({ meta: meta ?? null }),
+  setGenerator: (generator: StudioGenerator | null) =>
+    setState({ generator: generator ?? defaultStudioGenerator }),
+  reset: () => setState({ prompt: "", imageUrl: undefined, meta: null }),
+};
+
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
+type UseStudioStore = {
+  <T>(selector: StudioStoreSelector<T>): T;
+  getState: () => StudioStoreState;
+  setState: (partial: PartialState) => void;
+  subscribe: (listener: () => void) => () => void;
+};
+
+const useStudioStoreBase = <T,>(selector: StudioStoreSelector<T>): T =>
+  useSyncExternalStore(
+    subscribe,
+    () => selector(state),
+    () => selector(state)
+  );
+
+export const useStudioStore = useStudioStoreBase as UseStudioStore;
+
+useStudioStore.getState = () => state;
+useStudioStore.setState = setState;
+useStudioStore.subscribe = subscribe;
+
+export { defaultStudioGenerator };

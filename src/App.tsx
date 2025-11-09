@@ -8,6 +8,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToolsModalProvider } from "@/contexts/ToolsModalContext";
 import { UnifiedToolsModal } from "@/components/UnifiedToolsModal";
+import { ImageGenerationDialog } from "@/components/ImageGenerationDialog";
 import { LoadingState } from "@/components/LoadingState";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
@@ -113,6 +114,7 @@ const App = () => {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
+            <ImageGenerationDialog />
             <UnifiedToolsModal />
             <BottomNav />
             <OnlineStatusIndicator />

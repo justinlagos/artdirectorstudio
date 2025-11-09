@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,11 +22,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useKeyboardShortcuts, KeyboardShortcut, getModifierKey } from "@/hooks/useKeyboardShortcuts";
-import { useToolsModal } from "@/contexts/ToolsModalContext";
-import { ImageGenerationDialog, type GenerationOptions } from "@/components/ImageGenerationDialog";
+import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 import { LandingFeaturedInspire } from "@/components/LandingFeaturedInspire";
 import { GuestActionDialog } from "@/components/GuestActionDialog";
 import type { InspireProject } from "@/types/inspire";
+import { openStudioWithPrompt } from "@/lib/studio";
+import { useStudioStore } from "@/store/studioStore";
 
 export interface Analysis {
   image_overview: string;
@@ -71,7 +72,6 @@ const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { openGenerateDialog } = useToolsModal();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -80,8 +80,6 @@ const Index = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
-  const [studioPrefill, setStudioPrefill] = useState<{ prompt: string; imageUrl?: string } | null>(null);
-  const [showStudioPrefillDialog, setShowStudioPrefillDialog] = useState(false);
   const [landingGuestDialogOpen, setLandingGuestDialogOpen] = useState(false);
 
   // Pull-to-refresh functionality
@@ -123,28 +121,13 @@ const Index = () => {
   useEffect(() => {
     const state = location.state as { studioPrefill?: { prompt: string; imageUrl?: string } } | null;
     if (state?.studioPrefill) {
-      setStudioPrefill(state.studioPrefill);
-      setShowStudioPrefillDialog(true);
+      openStudioWithPrompt({
+        basePrompt: state.studioPrefill.prompt,
+        imageUrl: state.studioPrefill.imageUrl,
+      });
       navigate(location.pathname, { replace: true });
     }
   }, [location, navigate]);
-
-  // Listen for unified studio generation events from anywhere in the app
-  useEffect(() => {
-    const handleOpenStudio = (e: CustomEvent) => {
-      const { prompt, imageUrl, meta } = e.detail;
-      setStudioPrefill({
-        prompt: prompt || "",
-        imageUrl: imageUrl || undefined,
-      });
-      setShowStudioPrefillDialog(true);
-    };
-
-    window.addEventListener('open-studio-generation', handleOpenStudio as EventListener);
-    return () => {
-      window.removeEventListener('open-studio-generation', handleOpenStudio as EventListener);
-    };
-  }, []);
 
   // Cleanup on unmount - MUST be before early returns
   useEffect(() => {
@@ -195,7 +178,11 @@ const Index = () => {
       ctrl: true,
       callback: () => {
         if (result && user) {
-          openGenerateDialog({ prompt: result.full_regeneration_prompt, mode: 'generate' });
+          openStudioWithPrompt({
+            basePrompt: result.full_regeneration_prompt,
+            imageUrl: previewUrl ?? undefined,
+            meta: { source: 'analysis-shortcut' },
+          });
         }
       },
       description: 'Generate image',
@@ -260,25 +247,17 @@ const Index = () => {
       return;
     }
 
-    setStudioPrefill({
-      prompt: project.asset?.prompt ?? "",
+    openStudioWithPrompt({
+      basePrompt: project.asset?.prompt ?? "",
       imageUrl: project.asset?.image_url ?? undefined,
+      meta: { source: "landing" },
     });
-    setShowStudioPrefillDialog(true);
   };
 
   const handleLandingGuestSignIn = () => {
     setLandingGuestDialogOpen(false);
     navigate("/auth");
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   const handleFileSelect = (file: File) => {
     if (!user) {
@@ -405,7 +384,11 @@ const Index = () => {
     }
   };
 
-  const handleGenerateImage = async (prompt: string, options: GenerationOptions, retryCount = 0): Promise<string | null> => {
+  const handleGenerateImage = useCallback(async (
+    prompt: string,
+    options: GenerationOptions,
+    retryCount = 0
+  ): Promise<string | null> => {
     try {
       // Get session token
       const { data: { session } } = await supabase.auth.getSession();
@@ -471,10 +454,17 @@ const Index = () => {
           }, 1000);
         });
       }
-      
+
       return null;
     }
-  };
+  }, [setGeneratedImages]);
+
+  const setGenerator = useStudioStore((state) => state.setGenerator);
+
+  useEffect(() => {
+    setGenerator(handleGenerateImage);
+    return () => setGenerator(null);
+  }, [handleGenerateImage, setGenerator]);
 
   const handleDeleteImage = (id: string) => {
     setGeneratedImages(prev => prev.filter(img => img.id !== id));
@@ -483,6 +473,14 @@ const Index = () => {
   const handleResultUpdate = (updatedResult: AnalysisResult) => {
     setResult(updatedResult);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -770,19 +768,6 @@ const Index = () => {
           <LandingFeaturedInspire onUseInStudio={handleLandingUseInStudio} />
         </div>
       </section>
-
-      <ImageGenerationDialog
-        open={showStudioPrefillDialog}
-        onOpenChange={(open) => {
-          setShowStudioPrefillDialog(open);
-          if (!open) {
-            setStudioPrefill(null);
-          }
-        }}
-        initialPrompt={studioPrefill?.prompt ?? ""}
-        initialReferenceImage={studioPrefill?.imageUrl}
-        onGenerate={handleGenerateImage}
-      />
 
       <Footer />
       

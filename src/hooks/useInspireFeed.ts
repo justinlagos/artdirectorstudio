@@ -44,6 +44,8 @@ export const useInspireFeed = ({
   const pageRef = useRef(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const pendingIdsRef = useRef<Set<string>>(new Set());
+  const debounceRef = useRef<number | null>(null);
 
   const resetAbortController = useCallback(() => {
     if (abortRef.current) {
@@ -119,6 +121,51 @@ export const useInspireFeed = ({
     }
   }, [fetchPage, hasMore, isLoadingMore]);
 
+  const processPendingUpdates = useCallback(async () => {
+    if (!pendingIdsRef.current.size) {
+      return;
+    }
+
+    const ids = Array.from(pendingIdsRef.current);
+    pendingIdsRef.current.clear();
+
+    await Promise.all(
+      ids.map(async (targetId) => {
+        try {
+          const fresh = await fetchInspireProjectById(targetId);
+          if (fresh && matchesInspireFilter(fresh, filter)) {
+            setProjects((prev) => {
+              const filtered = prev.filter((item) => item.id !== fresh.id);
+              return sortInspireProjects([...filtered, fresh]);
+            });
+          } else {
+            setProjects((prev) => prev.filter((item) => item.id !== targetId));
+          }
+        } catch (err) {
+          console.error("Realtime sync failed", err);
+        }
+      })
+    );
+  }, [filter]);
+
+  const schedulePendingFlush = useCallback(() => {
+    if (typeof window === "undefined") {
+      void processPendingUpdates();
+      return;
+    }
+
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = window.setTimeout(() => {
+      processPendingUpdates().catch((error) => {
+        console.error("Failed to refresh Inspire project after realtime update", error);
+      });
+      debounceRef.current = null;
+    }, 150);
+  }, [processPendingUpdates]);
+
   useEffect(() => {
     refresh();
 
@@ -135,35 +182,22 @@ export const useInspireFeed = ({
       detachRealtimeChannel(channelRef.current);
     }
 
-    const channel = subscribeToInspireTable(realtimeKey, async (payload) => {
+    const channel = subscribeToInspireTable(realtimeKey, (payload) => {
       const newRow = payload.new as InspireProject | null;
       const oldRow = payload.old as InspireProject | null;
 
       if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-        const targetId = newRow?.id;
+        const targetId = newRow?.id ?? oldRow?.id;
         if (!targetId) return;
-
-        try {
-          const fresh = await fetchInspireProjectById(targetId);
-          if (fresh && matchesInspireFilter(fresh, filter)) {
-            setProjects((prev) => {
-              const filtered = prev.filter((item) => item.id !== fresh.id);
-              return sortInspireProjects([...filtered, fresh]);
-            });
-          } else if (fresh === null) {
-            setProjects((prev) => prev.filter((item) => item.id !== targetId));
-          } else if (!matchesInspireFilter(fresh, filter)) {
-            setProjects((prev) => prev.filter((item) => item.id !== targetId));
-          }
-        } catch (err) {
-          console.error("Realtime sync failed", err);
-        }
+        pendingIdsRef.current.add(targetId);
+        schedulePendingFlush();
         return;
       }
 
       if (payload.eventType === "DELETE") {
         const deletedId = oldRow?.id ?? payload.old?.id;
         if (deletedId) {
+          pendingIdsRef.current.delete(deletedId);
           setProjects((prev) => prev.filter((item) => item.id !== deletedId));
         }
       }
@@ -173,8 +207,13 @@ export const useInspireFeed = ({
 
     return () => {
       detachRealtimeChannel(channel);
+      pendingIdsRef.current.clear();
+      if (typeof window !== "undefined" && debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
     };
-  }, [filter, realtimeKey]);
+  }, [filter, realtimeKey, schedulePendingFlush]);
 
   const memoisedProjects = useMemo(() => sortInspireProjects(projects), [projects]);
 
