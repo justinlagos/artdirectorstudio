@@ -484,12 +484,6 @@ const Index = () => {
         </div>
       </section>
 
-      <section className="px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-7xl">
-          <LandingFeaturedInspire />
-        </div>
-      </section>
-
       {/* What You Can Do Section - Only for non-authenticated users */}
       {!user && (
         <section className="py-16 px-6 lg:px-8 bg-secondary/30">
@@ -730,6 +724,12 @@ const Index = () => {
           </div>
         </section>
       )}
+
+      <section className="px-6 lg:px-8 pb-16">
+        <div className="mx-auto w-full max-w-7xl">
+          <LandingFeaturedInspire />
+        </div>
+      </section>
 
       <ImageGenerationDialog
         open={showStudioPrefillDialog}
