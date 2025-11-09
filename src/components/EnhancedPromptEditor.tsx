@@ -52,18 +52,19 @@ export const EnhancedPromptEditor = ({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Label>{label}</Label>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1.5">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => handleImprove('enhance')}
             disabled={disabled || isImproving || !value.trim()}
             title="Enhance with more details"
+            className="h-8 px-2.5 text-xs"
           >
-            <Sparkles className="w-3 h-3 mr-1" />
-            Enhance
+            <Sparkles className="w-3 h-3 sm:mr-1" />
+            <span className="ml-1">Enhance</span>
           </Button>
           <Button
             variant="ghost"
@@ -71,9 +72,10 @@ export const EnhancedPromptEditor = ({
             onClick={() => handleImprove('simplify')}
             disabled={disabled || isImproving || !value.trim()}
             title="Simplify and make concise"
+            className="h-8 px-2.5 text-xs"
           >
-            <Zap className="w-3 h-3 mr-1" />
-            Simplify
+            <Zap className="w-3 h-3 sm:mr-1" />
+            <span className="ml-1">Simplify</span>
           </Button>
           <Button
             variant="ghost"
@@ -81,9 +83,10 @@ export const EnhancedPromptEditor = ({
             onClick={() => handleImprove('artistic')}
             disabled={disabled || isImproving || !value.trim()}
             title="Add artistic style and flair"
+            className="h-8 px-2.5 text-xs"
           >
-            <Palette className="w-3 h-3 mr-1" />
-            Artistic
+            <Palette className="w-3 h-3 sm:mr-1" />
+            <span className="ml-1">Artistic</span>
           </Button>
         </div>
       </div>

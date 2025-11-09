@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { Sparkles, Instagram, Package, Camera, Palette, Newspaper, Store, Users, Plus } from "lucide-react";
+import { Sparkles, Instagram, Package, Camera, Palette, Newspaper, Store, Users, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GenerationOptions } from "./ImageGenerationDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface GenerationPreset {
   id: string;
@@ -148,6 +150,7 @@ export const GenerationPresets = ({
 }: GenerationPresetsProps) => {
   const [customPresets, setCustomPresets] = useState<CustomPresetData[]>([]);
   const [isLoadingCustom, setIsLoadingCustom] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchCustomPresets();
@@ -218,58 +221,115 @@ export const GenerationPresets = ({
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {Object.entries(categories).map(([key, category]) => (
           category.presets.length > 0 && (
-          <div key={key} className="space-y-2">
-            <h4 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
-              {category.name}
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {category.presets.map((preset) => (
-                <Button
-                  key={preset.id}
-                  variant={selectedPresetId === preset.id ? "default" : "outline"}
-                  className="h-auto p-2.5 justify-start text-left"
-                  onClick={() => onSelectPreset(preset)}
-                  disabled={disabled}
-                >
-                  <div className="flex items-start gap-2 w-full">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <div className="w-4 h-4 flex items-center justify-center">
-                        {preset.icon}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm mb-0.5 flex items-center gap-1.5">
-                        {preset.name}
-                        {selectedPresetId === preset.id && (
-                          <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
-                            Active
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground line-clamp-1">
-                        {preset.description}
-                      </div>
-                      <div className="flex gap-1.5 mt-1.5">
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                          {preset.options.quality}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                          {preset.options.size.split('x')[0] === preset.options.size.split('x')[1] 
-                            ? 'Square' 
-                            : parseInt(preset.options.size.split('x')[0]) > parseInt(preset.options.size.split('x')[1])
-                              ? 'Landscape'
-                              : 'Portrait'
-                          }
-                        </Badge>
-                      </div>
-                    </div>
+          <div key={key}>
+            {isMobile ? (
+              <Collapsible defaultOpen={false}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-2 px-1 hover:bg-accent/5 rounded-md transition-colors">
+                  <h4 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
+                    {category.name}
+                  </h4>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform ui-open:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {category.presets.map((preset) => (
+                      <Button
+                        key={preset.id}
+                        variant={selectedPresetId === preset.id ? "default" : "outline"}
+                        className="h-auto p-2 justify-start text-left"
+                        onClick={() => onSelectPreset(preset)}
+                        disabled={disabled}
+                      >
+                        <div className="flex items-start gap-2 w-full">
+                          <div className="flex-shrink-0 mt-0.5">
+                            <div className="w-3.5 h-3.5 flex items-center justify-center">
+                              {preset.icon}
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm mb-0.5 flex items-center gap-1.5">
+                              {preset.name}
+                              {selectedPresetId === preset.id && (
+                                <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
+                                  Active
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex gap-1.5 mt-1">
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                                {preset.options.quality}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                                {preset.options.size.split('x')[0] === preset.options.size.split('x')[1] 
+                                  ? 'Square' 
+                                  : parseInt(preset.options.size.split('x')[0]) > parseInt(preset.options.size.split('x')[1])
+                                    ? 'Landscape'
+                                    : 'Portrait'
+                                }
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </Button>
+                    ))}
                   </div>
-                </Button>
-              ))}
-            </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ) : (
+              <div className="space-y-2">
+                <h4 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
+                  {category.name}
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {category.presets.map((preset) => (
+                    <Button
+                      key={preset.id}
+                      variant={selectedPresetId === preset.id ? "default" : "outline"}
+                      className="h-auto p-2.5 justify-start text-left"
+                      onClick={() => onSelectPreset(preset)}
+                      disabled={disabled}
+                    >
+                      <div className="flex items-start gap-2 w-full">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className="w-4 h-4 flex items-center justify-center">
+                            {preset.icon}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm mb-0.5 flex items-center gap-1.5">
+                            {preset.name}
+                            {selectedPresetId === preset.id && (
+                              <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
+                                Active
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground line-clamp-1">
+                            {preset.description}
+                          </div>
+                          <div className="flex gap-1.5 mt-1.5">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                              {preset.options.quality}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                              {preset.options.size.split('x')[0] === preset.options.size.split('x')[1] 
+                                ? 'Square' 
+                                : parseInt(preset.options.size.split('x')[0]) > parseInt(preset.options.size.split('x')[1])
+                                  ? 'Landscape'
+                                  : 'Portrait'
+                              }
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           )
         ))}

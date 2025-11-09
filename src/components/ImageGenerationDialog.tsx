@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { ToolDrawer } from "./ToolDrawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ImageGenerationDialogProps {
   open: boolean;
@@ -54,6 +55,8 @@ export const ImageGenerationDialog = ({
     size: '1024x1024',
     background: 'auto'
   });
+  const isMobile = useIsMobile();
+  const imageContainerRef = useRef<HTMLDivElement>(null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -90,6 +93,16 @@ export const ImageGenerationDialog = ({
       if (imageUrl) {
         setGeneratedImage(imageUrl);
         toast.success("Your image is ready.");
+        
+        // Auto-scroll to image on mobile
+        if (isMobile) {
+          setTimeout(() => {
+            imageContainerRef.current?.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+          }, 200);
+        }
       }
     } catch (error) {
       clearInterval(progressInterval);
@@ -434,11 +447,14 @@ export const ImageGenerationDialog = ({
       {/* Generated Image */}
       {generatedImage && (
         <div className="space-y-4 pt-4 border-t">
-          <div className="relative rounded-lg overflow-hidden bg-muted">
+          <div 
+            ref={imageContainerRef}
+            className="relative rounded-lg overflow-hidden bg-muted max-h-[50vh] md:max-h-none"
+          >
             <img
               src={generatedImage}
               alt="Generated image"
-              className="w-full h-auto"
+              className="w-full h-auto object-contain"
               loading="lazy"
             />
           </div>
