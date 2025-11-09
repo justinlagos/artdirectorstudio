@@ -1,10 +1,13 @@
-import { supabase } from "@/integrations/supabase/client";
 import type {
   PostgrestError,
   RealtimeChannel,
   RealtimePostgresChangesPayload,
+  SupabaseClient,
 } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { supabaseAnon } from "@/lib/publicSupabaseClient";
 import type { InspireProject } from "@/types/inspire";
+import type { Database } from "@/integrations/supabase/types";
 
 export type InspireFilter = "all" | "featured" | "staff_pick";
 
@@ -34,6 +37,19 @@ const SELECT_COLUMNS = `
     username
   )
 `;
+
+const resolveInspireClient = async (): Promise<SupabaseClient<Database>> => {
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      return supabase;
+    }
+  } catch (error) {
+    console.warn("Falling back to anon Supabase client for Inspire fetch", error);
+  }
+
+  return supabaseAnon;
+};
 
 export const qualifiesForPublicInspire = (project: InspireProject | null | undefined) => {
   if (!project || project.is_deleted) {
@@ -86,7 +102,9 @@ export const fetchInspireProjects = async ({
   abortSignal,
 }: FetchInspireOptions = {}) => {
   try {
-    let query = supabase
+    const client = await resolveInspireClient();
+
+    let query = client
       .from("shared_assets")
       .select(SELECT_COLUMNS, { count: "exact" })
       .eq("is_deleted", false);
@@ -138,7 +156,9 @@ export const fetchInspireProjects = async ({
 };
 
 export const fetchInspireProjectById = async (id: string) => {
-  const { data, error } = await supabase
+  const client = await resolveInspireClient();
+
+  const { data, error } = await client
     .from("shared_assets")
     .select(SELECT_COLUMNS)
     .eq("id", id)

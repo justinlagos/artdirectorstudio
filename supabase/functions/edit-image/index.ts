@@ -25,25 +25,22 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      console.error("[EDIT-IMAGE] Invalid JWT format");
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+    if (userError || !userData?.user) {
+      console.error("[EDIT-IMAGE] Unable to resolve user from token", userError);
       return new Response(
-        JSON.stringify({ error: "Invalid token format" }),
+        JSON.stringify({ error: "Unauthorized: invalid session" }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const payload = JSON.parse(atob(parts[1]));
-    const userId = payload.sub;
-    
-    if (!userId) {
-      console.error("[EDIT-IMAGE] No user ID in JWT");
-      return new Response(
-        JSON.stringify({ error: "Invalid token: no user ID" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const userId = userData.user.id;
 
     console.log("[EDIT-IMAGE] Authenticated user:", userId);
 
@@ -195,12 +192,6 @@ serve(async (req) => {
 
     console.log("[EDIT-IMAGE] Image edited successfully, base64 length:", editedImageUrl.length);
 
-    // Initialize Supabase client with service role
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // Upload to storage
     let finalImageUrl = editedImageUrl;
     let assetData = null;
@@ -257,8 +248,7 @@ serve(async (req) => {
       console.log("[EDIT-IMAGE] Saved to database:", assetData.id);
     } catch (error) {
       console.error("[EDIT-IMAGE] Failed to save image:", error);
-      // Return base64 as fallback
-      finalImageUrl = editedImageUrl;
+      throw error;
     }
 
     return new Response(
