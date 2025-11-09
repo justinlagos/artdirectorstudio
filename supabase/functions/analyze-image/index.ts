@@ -26,7 +26,13 @@ serve(async (req) => {
         action: 'auth_missing',
         timestamp: new Date().toISOString()
       }));
-      return createErrorResponse(ERROR_MESSAGES.INVALID_INPUT, 401).response;
+      const { response } = createErrorResponse(
+        ERROR_MESSAGES.INVALID_INPUT,
+        401,
+        'auth_required',
+        requestId
+      );
+      return response;
     }
 
     // Extract and decode JWT to get user ID
@@ -38,7 +44,13 @@ serve(async (req) => {
         action: 'invalid_token',
         timestamp: new Date().toISOString()
       }));
-      return createErrorResponse("Invalid token format", 401).response;
+      const { response } = createErrorResponse(
+        "Invalid token format",
+        401,
+        'invalid_token',
+        requestId
+      );
+      return response;
     }
 
     const payload = JSON.parse(atob(parts[1]));
@@ -50,7 +62,13 @@ serve(async (req) => {
         action: 'no_user_id',
         timestamp: new Date().toISOString()
       }));
-      return createErrorResponse("Invalid token: no user ID", 401).response;
+      const { response } = createErrorResponse(
+        "Invalid token: no user ID",
+        401,
+        'no_user_id',
+        requestId
+      );
+      return response;
     }
 
     console.log(JSON.stringify({
@@ -79,10 +97,14 @@ serve(async (req) => {
         reason: accessResult.reason,
         timestamp: new Date().toISOString()
       }));
-      return createErrorResponse(
+      const { response } = createErrorResponse(
         accessResult.reason || ERROR_MESSAGES.INVALID_INPUT,
-        403
-      ).response;
+        403,
+        'access_denied',
+        requestId,
+        { tier: accessResult.tier }
+      );
+      return response;
     }
 
     console.log(JSON.stringify({
@@ -103,7 +125,13 @@ serve(async (req) => {
         error: validation.error,
         timestamp: new Date().toISOString()
       }));
-      return createErrorResponse(validation.error!, 400).response;
+      const { response } = createErrorResponse(
+        validation.error!,
+        400,
+        'validation_error',
+        requestId
+      );
+      return response;
     }
 
     // Check idempotency
@@ -134,7 +162,13 @@ serve(async (req) => {
         action: 'config_error',
         timestamp: new Date().toISOString()
       }));
-      return createErrorResponse("AI service not configured", 500).response;
+      const { response } = createErrorResponse(
+        "AI service not configured",
+        500,
+        'config_error',
+        requestId
+      );
+      return response;
     }
 
     console.log(JSON.stringify({
@@ -158,9 +192,18 @@ serve(async (req) => {
 
 Analyze the uploaded image in extreme detail across 12 professional categories. Be specific, technical, and actionable.
 
-You MUST respond with ONLY a valid JSON object (no other text) in this exact format:
+CRITICAL: You MUST respond with ONLY a valid JSON object. Do not include any markdown formatting, code blocks, or explanatory text.
+
+Rules for JSON output:
+1. Use only straight double quotes (") for strings, never curved quotes
+2. Do not use newlines inside string values - use spaces instead
+3. Do not use trailing commas
+4. Escape any special characters in strings
+5. Keep each field value as a single continuous string
+
+Respond with ONLY this exact JSON structure:
 {
-  "full_regeneration_prompt": "A comprehensive 150-200 word single-paragraph prompt suitable for Midjourney, DALL-E, etc.",
+  "full_regeneration_prompt": "A comprehensive 150-200 word single-paragraph prompt suitable for Midjourney or DALL-E. Keep it all in one line with no line breaks.",
   "analysis": {
     "image_overview": "High-level technical description of image quality and production method",
     "subject_description": "Detailed description of the main subject including physical features, clothing, pose, expression",
@@ -207,7 +250,14 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
       }));
 
       const errorMessage = mapAIError(response.status, errorText);
-      return createErrorResponse(errorMessage, response.status).response;
+      const { response: errorResponse } = createErrorResponse(
+        errorMessage,
+        response.status,
+        response.status === 429 ? 'rate_limit' : 'ai_error',
+        requestId,
+        { aiStatus: response.status }
+      );
+      return errorResponse;
     }
 
     const data = await response.json();
@@ -225,13 +275,28 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
         action: 'no_content',
         timestamp: new Date().toISOString()
       }));
-      return createErrorResponse("Invalid AI response", 500).response;
+      const { response } = createErrorResponse(
+        "Invalid AI response - no content returned",
+        500,
+        'no_content',
+        requestId
+      );
+      return response;
     }
 
     // Parse the JSON from the AI response
     let analysisData;
     try {
       let cleanContent = messageContent;
+      
+      // Log first 500 chars for debugging
+      console.log(JSON.stringify({
+        requestId,
+        action: 'raw_response_preview',
+        content: messageContent.substring(0, 500),
+        length: messageContent.length,
+        timestamp: new Date().toISOString()
+      }));
       
       // Remove markdown code blocks
       cleanContent = cleanContent.replace(/```json\n?/g, '').replace(/\n?```/g, '');
@@ -242,21 +307,54 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
         cleanContent = jsonMatch[0];
       }
       
-      cleanContent = cleanContent.trim();
+      // Additional sanitization
+      cleanContent = cleanContent
+        .trim()
+        // Fix common JSON issues from AI responses
+        .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+        .replace(/\n/g, ' ') // Replace newlines in strings with spaces
+        .replace(/\r/g, ''); // Remove carriage returns
+      
+      console.log(JSON.stringify({
+        requestId,
+        action: 'cleaned_json_preview',
+        content: cleanContent.substring(0, 500),
+        timestamp: new Date().toISOString()
+      }));
+      
       analysisData = JSON.parse(cleanContent);
       
       // Validate the structure
       if (!analysisData.full_regeneration_prompt || !analysisData.analysis) {
         throw new Error("Missing required fields in response");
       }
+      
+      console.log(JSON.stringify({
+        requestId,
+        action: 'parse_success',
+        hasPrompt: !!analysisData.full_regeneration_prompt,
+        hasAnalysis: !!analysisData.analysis,
+        timestamp: new Date().toISOString()
+      }));
     } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Unknown';
       console.error(JSON.stringify({
         requestId,
         action: 'parse_failed',
-        error: e instanceof Error ? e.message : 'Unknown',
+        error: errorMessage,
+        contentLength: messageContent?.length || 0,
         timestamp: new Date().toISOString()
       }));
-      return createErrorResponse("Failed to parse AI analysis", 500).response;
+      
+      const { response } = createErrorResponse(
+        "Failed to parse AI analysis. The AI returned malformed data. Please try again.",
+        500,
+        'parse_error',
+        requestId,
+        { parseError: errorMessage }
+      );
+      return response;
     }
 
     const duration = Date.now() - startTime;
@@ -287,16 +385,21 @@ You MUST respond with ONLY a valid JSON object (no other text) in this exact for
 
   } catch (error) {
     const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown';
     console.error(JSON.stringify({
       requestId,
       action: 'analyze_error',
-      error: error instanceof Error ? error.message : 'Unknown',
+      error: errorMessage,
       duration,
       timestamp: new Date().toISOString()
     }));
-    return createErrorResponse(
+    const { response } = createErrorResponse(
       ERROR_MESSAGES.PROCESSING_FAILED,
-      500
-    ).response;
+      500,
+      'server_error',
+      requestId,
+      { duration, error: errorMessage }
+    );
+    return response;
   }
 });
