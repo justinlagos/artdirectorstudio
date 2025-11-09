@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck, Zap, Minimize2 } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck, Zap, Minimize2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,9 +23,11 @@ interface Message {
     type: 'image' | 'document';
     url: string;
     name: string;
-    data?: string; // parsed document content or brief analysis
+    data?: string;
   };
   actionChips?: { label: string; action: string }[];
+  error?: boolean;
+  retryPayload?: any;
 }
 
 type QuickAction = {
@@ -64,22 +66,72 @@ export const ArtieChat = () => {
   const [generationOptions, setGenerationOptions] = useState<any>({});
   const [pendingAction, setPendingAction] = useState<{ type: string; data: any } | null>(null);
   const [showCreditConfirm, setShowCreditConfirm] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
+  const [messages, setMessages] = useState<Message[]>(() => {
+    // Try to restore from sessionStorage
+    const saved = sessionStorage.getItem('artie-conversation');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+      } catch {
+        // Fallback to welcome message
+      }
+    }
+    return [{
       id: '1',
       text: "Hi! I'm Artie — Your Creative Collaborator.\n\nI can help you brainstorm ideas, refine visual concepts, analyze images, or guide you through any creative challenge. You can also upload images or creative briefs for me to review, and I can create variations of your images.\n\nWhat are we working on today?",
       sender: 'artie',
       timestamp: new Date()
-    }
-  ]);
+    }];
+  });
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatBodyRef = useRef<HTMLDivElement>(null);
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Save conversation to sessionStorage
+  useEffect(() => {
+    if (messages.length > 1) {
+      sessionStorage.setItem('artie-conversation', JSON.stringify(messages));
+    }
+  }, [messages]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '40px';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = Math.min(scrollHeight, 120) + 'px';
+    }
+  }, [inputValue]);
+
+  // Online/offline detection
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("You're back online");
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.error("You're offline");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
   };
 
   useEffect(() => {
@@ -316,6 +368,8 @@ export const ArtieChat = () => {
       setUploadedFiles([]);
       setIsUploading(false);
 
+      let assistantMessageId = '';
+      
       try {
         const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/artie-chat`;
         
@@ -358,6 +412,8 @@ export const ArtieChat = () => {
           contextualInput = `Context: ${contextParts.join(' | ')}\n\nUser message: ${contextualInput}`;
         }
         
+        const assistantMessageId = (Date.now() + 1).toString();
+        
         const response = await fetch(CHAT_URL, {
           method: 'POST',
           headers: {
@@ -388,7 +444,6 @@ export const ArtieChat = () => {
         let textBuffer = '';
         let toolCalls: any[] = [];
 
-        const assistantMessageId = (Date.now() + 1).toString();
         setMessages(prev => [...prev, {
           id: assistantMessageId,
           text: '',
@@ -670,18 +725,45 @@ export const ArtieChat = () => {
           }
         }
       } catch (error) {
-        console.error('Error getting Artie response:', error);
-        toast.error("Connection Error", {
-          description: "Couldn't reach Artie. Please try again.",
+        console.error('[ARTIE] Chat error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        // Add error message with retry capability
+        const errorMsg: Message = {
+          id: (Date.now() + 2).toString(),
+          text: `❌ ${errorMessage === 'Failed to get response from Artie' 
+            ? 'Temporary issue connecting to Artie. Please retry.' 
+            : `Error: ${errorMessage}`}`,
+          sender: 'artie',
+          timestamp: new Date(),
+          error: true,
+          retryPayload: contextData
+        };
+        
+        setMessages(prev => {
+          // Remove temporary loading message
+          const filtered = prev.filter(m => m.id !== assistantMessageId);
+          return [...filtered, errorMsg];
         });
         
-        setMessages(prev => prev.filter(m => m.id !== (Date.now() + 1).toString()));
+        toast.error("Connection Error", {
+          description: "Couldn't reach Artie. Check your connection and retry.",
+          action: {
+            label: "Retry",
+            onClick: () => handleSend(contextData)
+          }
+        });
       }
     } catch (uploadError) {
-      console.error('Error uploading files:', uploadError);
-      toast.error("Upload Error", {
-        description: "Failed to process uploaded files. Please try again.",
+      console.error('[ARTIE] Upload error:', uploadError);
+      const errorMessage = uploadError instanceof Error ? uploadError.message : 'Unknown error';
+      
+      toast.error("Upload Failed", {
+        description: errorMessage.includes('storage') 
+          ? "Storage error. Check file size and format." 
+          : "Failed to process files. Please try again.",
       });
+      
       setIsUploading(false);
     } finally {
       setIsLoading(false);
@@ -767,19 +849,24 @@ export const ArtieChat = () => {
       />
 
       {/* Side Panel Drawer */}
-      <div className="fixed top-0 right-0 h-full w-[90vw] sm:w-[460px] bg-background/95 backdrop-blur-xl border-l border-border shadow-2xl z-artie-panel flex flex-col animate-slide-in-right pointer-events-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
+      <div className="fixed top-0 right-0 h-full w-[90vw] sm:w-[460px] md:w-[520px] bg-background border-l border-border shadow-strong z-artie-panel flex flex-col animate-slide-in-right pointer-events-auto">
+        {/* Header - Fixed 56-64px */}
+        <div className="h-14 md:h-16 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b border-border bg-surface-1">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-md">
-                <Sparkles className="h-5 w-5 text-primary-foreground" />
+              <div className="h-9 w-9 md:h-10 md:w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-subtle">
+                <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-primary-foreground" />
               </div>
-              <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+              <div className={cn(
+                "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 md:h-3 md:w-3 rounded-full border-2 border-background",
+                isOnline ? "bg-green-500" : "bg-destructive"
+              )} />
             </div>
             <div>
-              <h3 className="font-bold text-lg">Artie</h3>
-              <p className="text-xs text-muted-foreground">Your Creative Collaborator</p>
+              <h3 className="font-semibold text-base md:text-lg">Artie</h3>
+              <p className="text-[10px] md:text-xs text-muted-foreground">
+                {isOnline ? "Creative Collaborator" : "Offline"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -789,37 +876,52 @@ export const ArtieChat = () => {
                   variant="ghost"
                   size="icon"
                   onClick={handleMinimize}
-                  className="hover:bg-muted/50"
+                  className="h-8 w-8 hover:bg-muted"
                 >
                   <Minimize2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>
-                <p>Minimize</p>
-              </TooltipContent>
+              <TooltipContent>Minimize</TooltipContent>
             </Tooltip>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsOpen(false)}
-              className="hover:bg-muted/50"
+              className="h-8 w-8 hover:bg-muted"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="px-5 py-4 border-b border-border/50 bg-muted/20">
-          <p className="text-xs font-medium text-muted-foreground mb-3">Quick Actions</p>
-          <div className="flex flex-wrap gap-2">
+        {/* Quick Actions - Collapsible */}
+        <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-surface-2">
+          <p className="text-[10px] md:text-xs font-medium text-muted-foreground mb-2 md:mb-3">Quick Actions</p>
+          {/* Desktop: 2-row grid, Mobile: horizontal scroll */}
+          <div className="hidden md:grid md:grid-cols-2 md:gap-2">
             {quickActions.map((action) => (
               <Button
                 key={action.label}
                 variant="outline"
                 size="sm"
                 onClick={() => handleQuickAction(action)}
-                className="gap-2 text-xs h-8 hover:bg-primary/10 hover:border-primary/50 transition-all"
+                className="justify-start gap-2 text-xs h-10 hover:bg-accent transition-colors"
+                disabled={!isOnline}
+              >
+                <action.icon className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{action.label}</span>
+              </Button>
+            ))}
+          </div>
+          <div className="flex md:hidden gap-2 overflow-x-auto scrollbar-hide snap-x snap-mandatory">
+            {quickActions.map((action) => (
+              <Button
+                key={action.label}
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickAction(action)}
+                className="flex-shrink-0 snap-start gap-2 text-xs h-9 hover:bg-accent"
+                disabled={!isOnline}
               >
                 <action.icon className="h-3.5 w-3.5" />
                 {action.label}
@@ -828,124 +930,137 @@ export const ArtieChat = () => {
           </div>
         </div>
 
-        {/* Messages */}
-        <ScrollArea className="flex-1 px-5">
-          <div className="space-y-4 py-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
-              >
-                <div className="flex items-end gap-2 max-w-[85%]">
-                  {message.sender === 'artie' && (
-                    <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 mb-1">
-                      <Sparkles className="h-4 w-4 text-primary" />
+        {/* Chat Body - Scrollable with proper spacing */}
+        <div 
+          ref={chatBodyRef}
+          className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-5 space-y-3 md:space-y-4 overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={cn(
+                "flex animate-fade-in",
+                message.sender === 'user' ? 'justify-end' : 'justify-start'
+              )}
+            >
+              <div className={cn(
+                "flex items-end gap-2 max-w-[85%]",
+                message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
+              )}>
+                {message.sender === 'artie' && (
+                  <div className="h-6 w-6 md:h-7 md:w-7 rounded-lg bg-surface-3 flex items-center justify-center flex-shrink-0 mb-1">
+                    <Sparkles className="h-3 w-3 md:h-3.5 md:w-3.5 text-primary" />
+                  </div>
+                )}
+                <div className="space-y-2 w-full">
+                  {/* Attachment Preview */}
+                  {message.attachment && (
+                    <div className="rounded-xl overflow-hidden border border-border">
+                      {message.attachment.type === 'image' ? (
+                        <img 
+                          src={message.attachment.url} 
+                          alt={message.attachment.name}
+                          className="w-full h-auto max-h-[180px] md:max-h-[200px] object-cover"
+                        />
+                      ) : (
+                        <div className="bg-surface-3 px-3 py-2 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground truncate">{message.attachment.name}</span>
+                        </div>
+                      )}
                     </div>
                   )}
-                  <div className="space-y-2 w-full">
-                    {/* Attachment Preview */}
-                    {message.attachment && (
-                      <div className="rounded-xl overflow-hidden border border-border/50">
-                        {message.attachment.type === 'image' ? (
-                          <img 
-                            src={message.attachment.url} 
-                            alt={message.attachment.name}
-                            className="w-full h-auto max-h-[200px] object-cover"
-                          />
-                        ) : (
-                          <div className="bg-muted/50 px-3 py-2 flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">{message.attachment.name}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
 
-                    {/* Message Text */}
-                    <div
-                      className={cn(
-                        "rounded-2xl px-4 py-3 shadow-sm",
-                        message.sender === 'user'
-                          ? 'bg-primary text-primary-foreground rounded-br-md'
-                          : 'bg-muted/80 backdrop-blur-sm rounded-bl-md'
-                      )}
+                  {/* Message Text */}
+                  <div
+                    className={cn(
+                      "rounded-2xl px-3 py-2.5 md:px-4 md:py-3 shadow-xs",
+                      message.sender === 'user'
+                        ? 'bg-primary text-primary-foreground rounded-br-sm'
+                        : message.error 
+                        ? 'bg-destructive/10 border border-destructive/20 rounded-bl-sm'
+                        : 'bg-surface-3 rounded-bl-sm'
+                    )}
+                  >
+                    <p className="text-[13px] md:text-sm leading-relaxed whitespace-pre-wrap" style={{ lineHeight: '1.6' }}>
+                      {message.text}
+                    </p>
+                  </div>
+
+                  {/* Retry Button for Errors */}
+                  {message.error && message.retryPayload && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSend(message.retryPayload)}
+                      className="text-xs h-7 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
-                      {message.text.includes('[Generated Image]') ? (
-                        <div className="space-y-2">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                            {message.text.split('[Generated Image]')[0]}
-                          </p>
-                          <img 
-                            src={message.text.split('[Generated Image]')[1].trim()} 
-                            alt="Generated by Artie"
-                            className="rounded-lg max-w-full h-auto border border-border/50"
-                          />
-                        </div>
-                      ) : (
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
-                      )}
-                    </div>
+                      <RefreshCw className="h-3 w-3" />
+                      Retry
+                    </Button>
+                  )}
 
-                    {/* Action Chips */}
-                    {message.actionChips && message.actionChips.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {message.actionChips.map((chip, idx) => (
-                          <Button
-                            key={idx}
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleChipAction(chip.action)}
-                            className="text-xs h-7 hover:bg-primary/10 hover:border-primary/50"
-                          >
-                            {chip.label}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
+                  {/* Action Chips */}
+                  {message.actionChips && message.actionChips.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 md:gap-2">
+                      {message.actionChips.map((chip, idx) => (
+                        <Button
+                          key={idx}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleChipAction(chip.action)}
+                          className="text-xs h-7 hover:bg-accent hover:border-primary/20"
+                        >
+                          {chip.label}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {/* Typing Indicator */}
+          {isLoading && (
+            <div className="flex justify-start animate-fade-in">
+              <div className="flex items-end gap-2">
+                <div className="h-6 w-6 md:h-7 md:w-7 rounded-lg bg-surface-3 flex items-center justify-center flex-shrink-0 mb-1">
+                  <Sparkles className="h-3 w-3 md:h-3.5 md:w-3.5 text-primary animate-pulse" />
+                </div>
+                <div className="bg-surface-3 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-2 shadow-xs">
+                  <div className="flex gap-1">
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start animate-fade-in">
-                <div className="flex items-end gap-2">
-                  <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 mb-1">
-                    <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-                  </div>
-                  <div className="bg-muted/80 backdrop-blur-sm rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-2 shadow-sm">
-                    <div className="flex gap-1">
-                      <div className="h-2 w-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="h-2 w-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="h-2 w-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                    <span className="text-xs text-muted-foreground ml-1">Thinking...</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
-        {/* Input */}
-        <div className="p-5 border-t border-border/50 bg-muted/10">
+        {/* Input Bar - Sticky bottom with elevation */}
+        <div className="flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)]">
           {/* File Upload Preview */}
           {uploadedFiles.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-2">
+            <div className="mb-2 md:mb-3 flex flex-wrap gap-1.5 md:gap-2">
               {uploadedFiles.map((file, index) => (
                 <div 
                   key={index}
-                  className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2 text-xs border border-border/50"
+                  className="flex items-center gap-1.5 bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs border border-border"
                 >
                   {file.type.startsWith('image/') ? (
-                    <ImagePlus className="h-4 w-4 text-primary" />
+                    <ImagePlus className="h-3.5 w-3.5 text-primary" />
                   ) : (
-                    <FileCheck className="h-4 w-4 text-primary" />
+                    <FileCheck className="h-3.5 w-3.5 text-primary" />
                   )}
-                  <span className="max-w-[120px] truncate">{file.name}</span>
+                  <span className="max-w-[100px] truncate text-[11px]">{file.name}</span>
                   <button
                     onClick={() => removeFile(index)}
-                    className="ml-1 hover:text-destructive transition-colors"
+                    className="ml-0.5 hover:text-destructive transition-colors"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -975,34 +1090,40 @@ export const ArtieChat = () => {
               variant="ghost"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
-              className="h-11 w-11 flex-shrink-0"
-              disabled={isLoading}
+              className="h-10 w-10 flex-shrink-0 hover:bg-accent"
+              disabled={isLoading || !isOnline}
             >
               <Paperclip className="h-5 w-5" />
             </Button>
 
-            <div className="relative flex-1">
-              <Input
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder={isUploading ? "Processing files..." : "Type your idea or ask for feedback..."}
-                className="pr-12 h-11 bg-background border-border/50 focus-visible:ring-primary/50"
-                disabled={isLoading || isUploading}
-              />
-              {inputValue && (
-                <Badge 
-                  variant="secondary" 
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-2 py-0.5"
-                >
-                  ↵ Send
-                </Badge>
-              )}
-            </div>
+            <Textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  const form = e.currentTarget.closest('form');
+                  if (form) form.requestSubmit();
+                }
+              }}
+              placeholder={
+                !isOnline 
+                  ? "You're offline..." 
+                  : isUploading 
+                  ? "Processing files..." 
+                  : "Ask Artie or describe what you're working on..."
+              }
+              className="flex-1 min-h-[40px] max-h-[120px] py-2.5 px-3 resize-none bg-background border-input focus-visible:ring-ring text-sm leading-relaxed"
+              disabled={isLoading || isUploading || !isOnline}
+              rows={1}
+            />
+
             <Button 
               type="submit" 
               size="icon"
-              className="h-11 w-11 shadow-sm flex-shrink-0"
-              disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading || isUploading}
+              className="h-10 w-10 shadow-subtle flex-shrink-0"
+              disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading || isUploading || !isOnline}
             >
               {isLoading || isUploading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
