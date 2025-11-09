@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { fetchWithRetry } from '../_shared/retry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,14 +46,18 @@ serve(async (req) => {
     console.log("[EDIT-IMAGE] Authenticated user:", userId);
 
     // Check feature access
-    const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
+    const accessResponse = await fetchWithRetry(
+      `${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'edit_image' }),
       },
-      body: JSON.stringify({ action: 'edit_image' }),
-    });
+      { maxRetries: 1, delayMs: 1000, timeoutMs: 10000 }
+    );
 
     const accessResult = await accessResponse.json();
     
@@ -123,34 +128,38 @@ serve(async (req) => {
 
     // Call Lovable AI Gateway with image editing
     console.log("[EDIT-IMAGE] Calling Lovable AI Gateway for image editing...");
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `${instruction}. Generate with aspect ratio ${aspectRatio}.`
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: imageUrl
+    const aiResponse = await fetchWithRetry(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image-preview",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `${instruction}. Generate with aspect ratio ${aspectRatio}.`
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: imageUrl
+                  }
                 }
-              }
-            ]
-          }
-        ],
-        modalities: ["image", "text"]
-      }),
-    });
+              ]
+            }
+          ],
+          modalities: ["image", "text"]
+        }),
+      },
+      { maxRetries: 2, delayMs: 2000, timeoutMs: 60000 }
+    );
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();

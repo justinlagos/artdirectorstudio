@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { fetchWithRetry } from '../_shared/retry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,14 +47,18 @@ serve(async (req) => {
     console.log("Authenticated user:", userId);
 
     // Check feature access before processing
-    const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
+    const accessResponse = await fetchWithRetry(
+      `${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'generate_image' }),
       },
-      body: JSON.stringify({ action: 'generate_image' }),
-    });
+      { maxRetries: 1, delayMs: 1000, timeoutMs: 10000 }
+    );
 
     const accessResult = await accessResponse.json();
     
@@ -124,23 +129,27 @@ serve(async (req) => {
 
     // Call Lovable AI Gateway with Nano banana model
     console.log("Calling Lovable AI Gateway...");
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+    const aiResponse = await fetchWithRetry(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image-preview",
+          messages: [
+            {
+              role: "user",
+              content: `Generate an image with aspect ratio ${aspectRatio}. ${prompt}`
+            }
+          ],
+          modalities: ["image", "text"]
+        }),
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: `Generate an image with aspect ratio ${aspectRatio}. ${prompt}`
-          }
-        ],
-        modalities: ["image", "text"]
-      }),
-    });
+      { maxRetries: 2, delayMs: 2000, timeoutMs: 60000 }
+    );
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();

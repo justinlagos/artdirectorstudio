@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.77.0';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { fetchWithRetry } from '../_shared/retry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -152,18 +153,20 @@ serve(async (req) => {
       ...user_edits
     };
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a professional AI prompt engineer. Given an image analysis with user edits, synthesize an improved, coherent Full Regeneration Prompt.
+    const response = await fetchWithRetry(
+      'https://ai.gateway.lovable.dev/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a professional AI prompt engineer. Given an image analysis with user edits, synthesize an improved, coherent Full Regeneration Prompt.
 
 The prompt should:
 - Be 150-200 words in a single flowing paragraph
@@ -177,18 +180,20 @@ You MUST respond with ONLY a valid JSON object in this format:
   "full_regeneration_prompt": "your regenerated prompt here",
   "analysis": { ...the same analysis object passed in... }
 }`
-          },
-          {
-            role: 'user',
-            content: `Here is the updated image analysis with user edits. Generate an improved Full Regeneration Prompt that incorporates these details naturally:
+            },
+            {
+              role: 'user',
+              content: `Here is the updated image analysis with user edits. Generate an improved Full Regeneration Prompt that incorporates these details naturally:
 
 ${JSON.stringify(mergedAnalysis, null, 2)}
 
 Return ONLY the JSON object, no markdown, no extra text.`
-          }
-        ],
-      }),
-    });
+            }
+          ],
+        }),
+      },
+      { maxRetries: 2, delayMs: 2000, timeoutMs: 45000 }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
