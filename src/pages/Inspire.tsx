@@ -85,6 +85,9 @@ const Inspire = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [recentlyUpdatedIds, setRecentlyUpdatedIds] = useState<Set<string>>(new Set());
+  const [similarWorks, setSimilarWorks] = useState<InspireItem[]>([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
+  const [similarAnalysisSummary, setSimilarAnalysisSummary] = useState<{styles?: string[], moods?: string[]} | null>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
   
   const ITEMS_PER_PAGE = 24;
@@ -92,6 +95,13 @@ const Inspire = () => {
   useEffect(() => {
     fetchInspireItems();
   }, []);
+
+  // Fetch similar works when user is logged in
+  useEffect(() => {
+    if (user) {
+      fetchSimilarWorks();
+    }
+  }, [user]);
 
   // Real-time subscription for inspire updates (admin approvals/changes)
   useEffect(() => {
@@ -315,6 +325,58 @@ const Inspire = () => {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+    }
+  };
+
+  const fetchSimilarWorks = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingSimilar(true);
+      console.log('[Inspire] Fetching similar works...');
+      
+      const { data, error } = await supabase.functions.invoke('get-similar-works', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
+      });
+
+      if (error) {
+        console.error('[Inspire] Error fetching similar works:', error);
+        toast.error("Failed to load recommendations");
+        return;
+      }
+
+      console.log('[Inspire] Similar works data:', data);
+      
+      if (data?.recommendations) {
+        // Add user interaction flags
+        const [likesRes, bookmarksRes, followsRes] = await Promise.all([
+          supabase.from("asset_likes").select("shared_asset_id").eq("user_id", user.id),
+          supabase.from("asset_bookmarks").select("shared_asset_id").eq("user_id", user.id),
+          supabase.from("user_follows").select("following_id").eq("follower_id", user.id)
+        ]);
+
+        const likedIds = new Set(likesRes.data?.map(l => l.shared_asset_id) || []);
+        const bookmarkedIds = new Set(bookmarksRes.data?.map(b => b.shared_asset_id) || []);
+        const followingIds = new Set(followsRes.data?.map(f => f.following_id) || []);
+
+        const enrichedRecommendations = data.recommendations.map((item: InspireItem) => ({
+          ...item,
+          isLiked: likedIds.has(item.id),
+          isBookmarked: bookmarkedIds.has(item.id),
+          isFollowing: followingIds.has(item.profile.id)
+        }));
+
+        setSimilarWorks(enrichedRecommendations);
+        setSimilarAnalysisSummary(data.analysis_summary);
+        console.log('[Inspire] Set similar works:', enrichedRecommendations.length);
+      }
+    } catch (error) {
+      console.error('[Inspire] Error in fetchSimilarWorks:', error);
+      toast.error("Failed to load personalized recommendations");
+    } finally {
+      setLoadingSimilar(false);
     }
   };
 
@@ -801,21 +863,67 @@ const Inspire = () => {
 
             {user && (
               <TabsContent value="similar" className="mt-8">
-                <InspireGrid 
-                  items={filteredItems.filter(i => i.isFollowing).slice(0, 24)} 
-                  onItemClick={setSelectedItem}
-                  onLike={handleLike}
-                  onBookmark={handleBookmark}
-                  onFollow={handleFollow}
-                  onRemix={handleRemix}
-                  onFeatureToggle={handleFeatureToggle}
-                  onStaffPickToggle={handleStaffPickToggle}
-                  onDelete={handleDelete}
-                  getCreatorName={getCreatorName}
-                  formatDate={formatDate}
-                  isAdmin={isAdmin}
-                  recentlyUpdatedIds={recentlyUpdatedIds}
-                />
+                <div className="space-y-6">
+                  {similarAnalysisSummary && (
+                    <div className="glass p-6 rounded-2xl space-y-3 animate-fade-in">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Sparkles className="w-4 h-4" />
+                        <span>Based on your creative style</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {similarAnalysisSummary.styles?.map((style, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs">
+                            {style}
+                          </Badge>
+                        ))}
+                        {similarAnalysisSummary.moods?.map((mood, i) => (
+                          <Badge key={i} variant="outline" className="text-xs">
+                            {mood}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {loadingSimilar ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[...Array(6)].map((_, i) => (
+                        <Skeleton key={i} className="h-80" />
+                      ))}
+                    </div>
+                  ) : similarWorks.length > 0 ? (
+                    <InspireGrid 
+                      items={similarWorks} 
+                      onItemClick={setSelectedItem}
+                      onLike={handleLike}
+                      onBookmark={handleBookmark}
+                      onFollow={handleFollow}
+                      onRemix={handleRemix}
+                      onFeatureToggle={handleFeatureToggle}
+                      onStaffPickToggle={handleStaffPickToggle}
+                      onDelete={handleDelete}
+                      getCreatorName={getCreatorName}
+                      formatDate={formatDate}
+                      isAdmin={isAdmin}
+                      recentlyUpdatedIds={recentlyUpdatedIds}
+                    />
+                  ) : (
+                    <div className="text-center py-16 space-y-4">
+                      <div className="rounded-full bg-primary/10 w-16 h-16 mx-auto flex items-center justify-center">
+                        <Sparkles className="w-8 h-8 text-primary" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-semibold">Create to discover</h3>
+                        <p className="text-muted-foreground max-w-md mx-auto">
+                          Generate a few images first, and we'll find similar works that match your creative style
+                        </p>
+                      </div>
+                      <Button onClick={() => navigate("/")} className="mt-4">
+                        Start Creating
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             )}
           </Tabs>

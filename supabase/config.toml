@@ -38,3 +38,6 @@ verify_jwt = true
 
 [functions.subscription-webhook]
 verify_jwt = false
+
+[functions.get-similar-works]
+verify_jwt = true
