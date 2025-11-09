@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openStudioWithPrompt } from "@/lib/studio";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -475,10 +476,24 @@ Requirements:
                 </Button>
                 <Button
                   onClick={() => {
+                    openStudioWithPrompt({
+                      basePrompt: instruction || "Create a variation of this blended composition",
+                      imageUrl: blendedImage || undefined,
+                    });
+                    handleClose();
+                  }}
+                  className="flex-1"
+                  variant="default"
+                >
+                  Generate in Studio
+                </Button>
+                <Button
+                  onClick={() => {
                     setBlendedImage(null);
                     setImages([]);
                   }}
                   className="flex-1"
+                  variant="outline"
                 >
                   <Blend className="w-4 h-4 mr-2" />
                   New Blend

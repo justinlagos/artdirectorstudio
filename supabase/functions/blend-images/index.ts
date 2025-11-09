@@ -70,9 +70,12 @@ serve(async (req) => {
       return createErrorResponse(imagesValidation.error!, 400).response;
     }
 
-    const instructionValidation = validateInstruction(instruction);
-    if (!instructionValidation.valid) {
-      return createErrorResponse(instructionValidation.error!, 400).response;
+    // Instruction is now optional - validate only if provided
+    if (instruction) {
+      const instructionValidation = validateInstruction(instruction);
+      if (!instructionValidation.valid) {
+        return createErrorResponse(instructionValidation.error!, 400).response;
+      }
     }
 
     if (idempotencyKey) {
@@ -106,7 +109,10 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const enhancedInstruction = `${instruction}. Create a seamless blend that feels unified and cohesive.`;
+    // Use provided instruction or create a safe default
+    const enhancedInstruction = instruction?.trim() 
+      ? `${instruction}. Create a seamless blend that feels unified and cohesive.`
+      : 'Blend these images into a cohesive visual that respects shared color harmony and lighting. Create a seamless, professional result.';
 
     const content: any[] = [{ type: "text", text: enhancedInstruction }];
     for (const img of images) {

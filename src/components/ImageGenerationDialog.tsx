@@ -242,7 +242,7 @@ export const ImageGenerationDialog = ({
   };
 
   const bodyContent = (
-    <div className="space-y-4">
+    <div className="space-y-4" data-studio-modal-body>
       {referenceImage && (
         <div className="overflow-hidden rounded-2xl border border-border/60 bg-muted/30 shadow">
           <img

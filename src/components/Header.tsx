@@ -7,7 +7,7 @@ import { UserMenu } from "./UserMenu";
 import { SubscriptionStatus } from "./SubscriptionStatus";
 import { TrialCreditsDisplay } from "./TrialCreditsDisplay";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { Menu, Sparkles, Home, BarChart3, Layers, Maximize2, ImageIcon, Wrench, ChevronDown, Palette } from "lucide-react";
+import { Menu, Sparkles, Home, Layers, Maximize2, ImageIcon, Wrench, ChevronDown, Palette } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,

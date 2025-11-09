@@ -129,6 +129,23 @@ const Index = () => {
     }
   }, [location, navigate]);
 
+  // Listen for unified studio generation events from anywhere in the app
+  useEffect(() => {
+    const handleOpenStudio = (e: CustomEvent) => {
+      const { prompt, imageUrl, meta } = e.detail;
+      setStudioPrefill({
+        prompt: prompt || "",
+        imageUrl: imageUrl || undefined,
+      });
+      setShowStudioPrefillDialog(true);
+    };
+
+    window.addEventListener('open-studio-generation', handleOpenStudio as EventListener);
+    return () => {
+      window.removeEventListener('open-studio-generation', handleOpenStudio as EventListener);
+    };
+  }, []);
+
   // Cleanup on unmount - MUST be before early returns
   useEffect(() => {
     return () => {

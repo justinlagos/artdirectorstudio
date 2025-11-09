@@ -72,8 +72,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/signed-out");
+    try {
+      // Clear any pending toasts or overlays
+      const toasts = document.querySelectorAll('[data-sonner-toast]');
+      toasts.forEach(toast => toast.remove());
+      
+      // Clear body overflow lock
+      if (document.body) {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+      }
+
+      // Clear any modal states
+      const modals = document.querySelectorAll('[role="dialog"]');
+      modals.forEach(modal => {
+        const backdrop = modal.parentElement;
+        if (backdrop) backdrop.remove();
+      });
+
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      
+      // Clear local state
+      setUser(null);
+      setSession(null);
+      
+      // Navigate to signed-out page immediately
+      navigate("/signed-out", { replace: true });
+    } catch (error) {
+      console.error("Sign out error:", error);
+      // Still navigate even if there's an error
+      navigate("/signed-out", { replace: true });
+    }
   };
 
   return (

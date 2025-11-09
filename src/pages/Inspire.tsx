@@ -134,6 +134,15 @@ const Inspire = () => {
     params.delete("action");
     navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
 
+    // Use unified Studio helper for consistent behavior
+    import("@/lib/studio").then(({ openStudioWithPrompt }) => {
+      openStudioWithPrompt({
+        basePrompt: project.asset?.prompt ?? "",
+        imageUrl: project.asset?.image_url ?? undefined,
+      });
+    });
+
+    // Also maintain navigation state for backward compatibility
     navigate("/", {
       state: {
         studioPrefill: {
