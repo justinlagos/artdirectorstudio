@@ -42,9 +42,7 @@ const truncatePrompt = (value: string) =>
 
 export const ImageGenerationDialog = () => {
   const isMobile = useIsMobile();
-  const { isGenerateModalOpen } = useModalStore((state) => ({
-    isGenerateModalOpen: state.isGenerateModalOpen,
-  }));
+  const isGenerateModalOpen = useModalStore((state) => state.isGenerateModalOpen);
 
   const storePrompt = useStudioStore((state) => state.prompt);
   const storeImage = useStudioStore((state) => state.imageUrl);
@@ -509,9 +507,8 @@ export const ImageGenerationDialog = () => {
             </Badge>
           </div>
 
-          <div className="rounded-lg bg-muted/30 p-2">
+          <div ref={imageContainerRef} className="rounded-lg bg-muted/30 p-2">
             <img
-              ref={imageContainerRef}
               src={generatedImage}
               alt="Generated result"
               className="mx-auto h-auto max-h-[600px] w-full object-contain"

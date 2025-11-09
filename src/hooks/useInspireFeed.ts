@@ -101,9 +101,13 @@ export const useInspireFeed = ({
 
   const refresh = useCallback(async () => {
     pageRef.current = 0;
+    setHasMore(true);
+    setError(null);
     setIsInitialLoading(true);
     try {
       await fetchPage(0, false);
+    } catch (err) {
+      console.error('[useInspireFeed] Refresh error:', err);
     } finally {
       setIsInitialLoading(false);
     }
@@ -167,7 +171,12 @@ export const useInspireFeed = ({
   }, [processPendingUpdates]);
 
   useEffect(() => {
-    refresh();
+    pageRef.current = 0;
+    setIsInitialLoading(true);
+    
+    fetchPage(0, false).finally(() => {
+      setIsInitialLoading(false);
+    });
 
     return () => {
       pageRef.current = 0;
@@ -175,7 +184,7 @@ export const useInspireFeed = ({
         abortRef.current.abort();
       }
     };
-  }, [filter, pageSize, refresh]);
+  }, [filter, pageSize]);
 
   useEffect(() => {
     if (channelRef.current) {

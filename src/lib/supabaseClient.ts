@@ -89,6 +89,10 @@ export const fetchInspireProjects = async ({
   to = 23,
   abortSignal,
 }: FetchInspireOptions = {}) => {
+  if (abortSignal?.aborted) {
+    return { data: [], count: 0, error: null } as const;
+  }
+
   try {
     let query = inspireClient
       .from("shared_assets")

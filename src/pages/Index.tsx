@@ -120,14 +120,14 @@ const Index = () => {
 
   useEffect(() => {
     const state = location.state as { studioPrefill?: { prompt: string; imageUrl?: string } } | null;
-    if (state?.studioPrefill) {
+    if (state?.studioPrefill && user) {
       openStudioWithPrompt({
         basePrompt: state.studioPrefill.prompt,
         imageUrl: state.studioPrefill.imageUrl,
       });
-      navigate(location.pathname, { replace: true });
+      navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location, navigate]);
+  }, [location.pathname, user]);
 
   // Cleanup on unmount - MUST be before early returns
   useEffect(() => {

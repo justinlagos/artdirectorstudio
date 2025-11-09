@@ -57,7 +57,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       : "Blend these images into a cohesive visual that respects shared color and lighting.";
     const hints = styles
       .map((id) => BLEND_STYLE_PRESETS.find((preset) => preset.id === id)?.hint)
-      .filter((hint): hint is string => Boolean(hint));
+      .filter((hint) => Boolean(hint)) as string[];
     const combined = hints.length ? `${base}. ${hints.join(". ")}` : base;
     return `${combined}. Create a seamless blend that feels unified and cohesive.`;
   };
