@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { AnalysisSkeleton } from "@/components/skeletons/AnalysisSkeleton";
 
 interface ProgressiveAnalysisFeedbackProps {
   onComplete?: () => void;
@@ -28,25 +28,20 @@ export const ProgressiveAnalysisFeedback = ({ onComplete }: ProgressiveAnalysisF
     const timer = setTimeout(() => {
       setVisibleSteps(prev => [...prev, currentStep]);
       setCurrentStep(prev => prev + 1);
-    }, 400); // Each step appears after 400ms
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [currentStep, onComplete]);
 
   return (
-    <div className="max-w-2xl mx-auto py-16 space-y-4">
-      <div className="flex items-center justify-center mb-8">
-        <div className="relative">
-          <Loader2 className="w-12 h-12 text-primary animate-spin" />
-          <div className="absolute inset-0 bg-primary/20 blur-xl animate-pulse pointer-events-none" />
-        </div>
-      </div>
+    <div className="max-w-4xl mx-auto py-8 space-y-8">
+      <AnalysisSkeleton />
       
       <div className="space-y-2">
         {analysisSteps.map((step, index) => (
           <div
             key={index}
-            className={`text-center text-lg transition-all duration-500 ${
+            className={`text-center text-base transition-all duration-500 ${
               visibleSteps.includes(index)
                 ? 'opacity-100 translate-y-0'
                 : 'opacity-0 translate-y-4'

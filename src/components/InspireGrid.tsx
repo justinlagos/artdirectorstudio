@@ -2,6 +2,7 @@ import { forwardRef } from "react";
 import { InspireCard } from "@/components/InspireCard";
 import type { InspireProject } from "@/types/inspire";
 import { Button } from "@/components/ui/button";
+import { InspireGridSkeleton } from "@/components/skeletons/InspireCardSkeleton";
 
 interface InspireGridProps {
   projects: InspireProject[];
@@ -34,13 +35,7 @@ export const InspireGrid = forwardRef<HTMLDivElement, InspireGridProps>(
 
     return (
       <div className="space-y-12">
-        {showSkeletons && (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="h-80 animate-pulse rounded-3xl bg-muted/60" />
-            ))}
-          </div>
-        )}
+        {showSkeletons && <InspireGridSkeleton count={12} />}
 
         {!showSkeletons && projects.length > 0 && (
           <div className="columns-1 gap-6 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5">

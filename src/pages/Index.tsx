@@ -29,6 +29,7 @@ import type { InspireProject } from "@/types/inspire";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { useStudioStore } from "@/store/studioStore";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PageSkeleton } from "@/components/skeletons/PageSkeleton";
 
 export interface Analysis {
   image_overview: string;
@@ -476,11 +477,7 @@ const Index = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (

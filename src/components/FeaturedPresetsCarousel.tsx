@@ -8,6 +8,7 @@ import { Heart, Copy, TrendingUp, Star, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { GenerationOptions } from "@/components/ImageGenerationDialog";
 import { toast } from "sonner";
+import { PresetCarouselSkeleton } from "@/components/skeletons/PresetCarouselSkeleton";
 
 interface FeaturedPreset {
   id: string;
@@ -182,15 +183,7 @@ export const FeaturedPresetsCarousel = ({ onClone }: FeaturedPresetsCarouselProp
   );
 
   if (isLoading) {
-    return (
-      <div className="py-16 px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PresetCarouselSkeleton />;
   }
 
   if (staffPicks.length === 0 && trending.length === 0) {
