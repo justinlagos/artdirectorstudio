@@ -130,6 +130,11 @@ const InspireCardComponent = ({
               className="h-10 w-10 rounded-full bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:scale-105"
               onClick={(event) => {
                 event.stopPropagation();
+                if (onUseInStudio) {
+                  onUseInStudio(project);
+                  return;
+                }
+
                 openStudioWithPrompt({
                   basePrompt: project.asset?.prompt ?? "",
                   imageUrl: project.asset?.image_url ?? undefined,

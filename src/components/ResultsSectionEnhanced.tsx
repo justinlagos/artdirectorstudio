@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Analysis, AnalysisResult, UserEdits, GeneratedImage } from "@/pages/Index";
-import { ImageGenerationDialog, GenerationOptions } from "@/components/ImageGenerationDialog";
+import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 import { BatchGenerationDialog } from "@/components/BatchGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 import { ImageComparisonView } from "@/components/ImageComparisonView";
@@ -41,6 +41,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from "@/components/ui/collapsible";
+import { openStudioWithPrompt } from "@/lib/studio";
 
 interface ResultsSectionProps {
   result: AnalysisResult;
@@ -66,9 +67,9 @@ const SUGGESTIONS = {
   intended_platform: ["Instagram", "Print magazine", "Website hero", "Portfolio", "Social media ad", "Billboard", "Product catalog", "Art gallery"]
 };
 
-export const ResultsSection = ({ 
-  result, 
-  onRegenerate, 
+export const ResultsSection = ({
+  result,
+  onRegenerate,
   isRegenerating,
   onGenerateImage,
   generatedImages,
@@ -77,9 +78,7 @@ export const ResultsSection = ({
   imagePreviewUrl
 }: ResultsSectionProps) => {
   const [userEdits, setUserEdits] = useState<UserEdits>({});
-  const [showGenerationDialog, setShowGenerationDialog] = useState(false);
   const [showBatchGenerationDialog, setShowBatchGenerationDialog] = useState(false);
-  const [generationPrompt, setGenerationPrompt] = useState(result.full_regeneration_prompt);
   const [livePreviewPrompt, setLivePreviewPrompt] = useState(result.full_regeneration_prompt);
   const [modifiedCount, setModifiedCount] = useState(0);
   const [promptPulse, setPromptPulse] = useState(false);
@@ -151,7 +150,6 @@ export const ResultsSection = ({
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         console.log('[ResultsSection] Escape pressed - closing all dialogs');
-        setShowGenerationDialog(false);
         setShowBatchGenerationDialog(false);
         setShowBlendDialog(false);
         setShowUpscaleDialog(false);
@@ -165,15 +163,13 @@ export const ResultsSection = ({
 
   // Enhanced body overflow management with defensive cleanup
   useEffect(() => {
-    const hasOverlay = showGenerationDialog ||
-      showBatchGenerationDialog ||
+    const hasOverlay = showBatchGenerationDialog ||
       showBlendDialog ||
       showUpscaleDialog ||
       showBatchProcessDialog;
 
     console.log('[ResultsSection] Dialog state:', {
       hasOverlay,
-      showGenerationDialog,
       showBatchGenerationDialog,
       showBlendDialog,
       showUpscaleDialog,
@@ -214,13 +210,7 @@ export const ResultsSection = ({
         previousBodyOverflow.current = null;
       }
     };
-  }, [
-    showGenerationDialog,
-    showBatchGenerationDialog,
-    showBlendDialog,
-    showUpscaleDialog,
-    showBatchProcessDialog
-  ]);
+  }, [showBatchGenerationDialog, showBlendDialog, showUpscaleDialog, showBatchProcessDialog]);
 
   // Live preview with debounced regeneration (2s delay) + pulse animation
   useEffect(() => {
@@ -314,9 +304,12 @@ export const ResultsSection = ({
 
   const handleOpenStudio = (promptToUse?: string) => {
     const targetPrompt = promptToUse ?? basePrompt;
-    setGenerationPrompt(targetPrompt);
     ensureStudioButtonVisible();
-    setShowGenerationDialog(true);
+    openStudioWithPrompt({
+      basePrompt: targetPrompt,
+      imageUrl: imagePreviewUrl ?? undefined,
+      meta: { source: "analysis" },
+    });
   };
 
   const handleApplyGuidedTweak = async (tweakDescription: string) => {
@@ -650,13 +643,6 @@ export const ResultsSection = ({
           ))}
         </div>
       </section>
-
-      <ImageGenerationDialog
-        open={showGenerationDialog}
-        onOpenChange={setShowGenerationDialog}
-        initialPrompt={generationPrompt}
-        onGenerate={onGenerateImage}
-      />
 
       <BatchGenerationDialog
         open={showBatchGenerationDialog}

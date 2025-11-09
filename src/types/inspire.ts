@@ -30,6 +30,7 @@ export interface InspireProject {
   featured: boolean | null;
   staff_pick: boolean | null;
   is_inspire_approved?: boolean | null;
+  is_public?: boolean | null;
   is_deleted?: boolean | null;
   tags: InspireProjectTags | null | Record<string, any>;
   user_id: string;

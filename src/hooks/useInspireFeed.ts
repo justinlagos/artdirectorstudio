@@ -44,6 +44,8 @@ export const useInspireFeed = ({
   const pageRef = useRef(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const pendingIdsRef = useRef<Set<string>>(new Set());
+  const debounceRef = useRef<number | null>(null);
 
   const resetAbortController = useCallback(() => {
     if (abortRef.current) {
@@ -60,6 +62,12 @@ export const useInspireFeed = ({
       map.set(item.id, item);
     });
     return Array.from(map.values());
+  }, []);
+
+  const realtimeRowMatchesPublicFilter = useCallback((row: Partial<InspireProject> | null | undefined) => {
+    if (!row) return false;
+    if (row.is_public === false) return false;
+    return Boolean(row.is_inspire_approved || row.featured || row.staff_pick);
   }, []);
 
   const fetchPage = useCallback(
@@ -119,6 +127,51 @@ export const useInspireFeed = ({
     }
   }, [fetchPage, hasMore, isLoadingMore]);
 
+  const processPendingUpdates = useCallback(async () => {
+    if (!pendingIdsRef.current.size) {
+      return;
+    }
+
+    const ids = Array.from(pendingIdsRef.current);
+    pendingIdsRef.current.clear();
+
+    await Promise.all(
+      ids.map(async (targetId) => {
+        try {
+          const fresh = await fetchInspireProjectById(targetId);
+          if (fresh && matchesInspireFilter(fresh, filter)) {
+            setProjects((prev) => {
+              const filtered = prev.filter((item) => item.id !== fresh.id);
+              return sortInspireProjects([...filtered, fresh]);
+            });
+          } else {
+            setProjects((prev) => prev.filter((item) => item.id !== targetId));
+          }
+        } catch (err) {
+          console.error("Realtime sync failed", err);
+        }
+      })
+    );
+  }, [filter]);
+
+  const schedulePendingFlush = useCallback(() => {
+    if (typeof window === "undefined") {
+      void processPendingUpdates();
+      return;
+    }
+
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = window.setTimeout(() => {
+      processPendingUpdates().catch((error) => {
+        console.error("Failed to refresh Inspire project after realtime update", error);
+      });
+      debounceRef.current = null;
+    }, 150);
+  }, [processPendingUpdates]);
+
   useEffect(() => {
     refresh();
 
@@ -135,28 +188,58 @@ export const useInspireFeed = ({
       detachRealtimeChannel(channelRef.current);
     }
 
-    const channel = subscribeToInspireTable(realtimeKey, async (payload) => {
-      const newRow = payload.new as InspireProject | null;
-      const oldRow = payload.old as InspireProject | null;
+    const channel = subscribeToInspireTable(realtimeKey, (payload) => {
+      const newRow = payload.new as Partial<InspireProject> | null;
+      const oldRow = payload.old as Partial<InspireProject> | null;
 
-      if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+      if (payload.eventType === "UPDATE") {
+        const targetId = newRow?.id ?? oldRow?.id;
+        if (!targetId) return;
+
+        let handled = false;
+
+        setProjects((prev) => {
+          const index = prev.findIndex((item) => item.id === targetId);
+
+          if (index === -1) {
+            return prev;
+          }
+
+          const current = prev[index];
+          const merged: InspireProject = {
+            ...current,
+            ...newRow,
+          };
+
+          if (!qualifiesForPublicInspire(merged) || !matchesInspireFilter(merged, filter)) {
+            handled = true;
+            const without = prev.filter((item) => item.id !== targetId);
+            return without;
+          }
+
+          handled = true;
+          const copy = [...prev];
+          copy[index] = merged;
+          return sortInspireProjects(copy);
+        });
+
+        if (!handled && realtimeRowMatchesPublicFilter(newRow)) {
+          pendingIdsRef.current.add(targetId);
+          schedulePendingFlush();
+        } else if (!realtimeRowMatchesPublicFilter(newRow)) {
+          pendingIdsRef.current.delete(targetId);
+        }
+
+        return;
+      }
+
+      if (payload.eventType === "INSERT") {
         const targetId = newRow?.id;
         if (!targetId) return;
 
-        try {
-          const fresh = await fetchInspireProjectById(targetId);
-          if (fresh && matchesInspireFilter(fresh, filter)) {
-            setProjects((prev) => {
-              const filtered = prev.filter((item) => item.id !== fresh.id);
-              return sortInspireProjects([...filtered, fresh]);
-            });
-          } else if (fresh === null) {
-            setProjects((prev) => prev.filter((item) => item.id !== targetId));
-          } else if (!matchesInspireFilter(fresh, filter)) {
-            setProjects((prev) => prev.filter((item) => item.id !== targetId));
-          }
-        } catch (err) {
-          console.error("Realtime sync failed", err);
+        if (realtimeRowMatchesPublicFilter(newRow)) {
+          pendingIdsRef.current.add(targetId);
+          schedulePendingFlush();
         }
         return;
       }
@@ -164,6 +247,7 @@ export const useInspireFeed = ({
       if (payload.eventType === "DELETE") {
         const deletedId = oldRow?.id ?? payload.old?.id;
         if (deletedId) {
+          pendingIdsRef.current.delete(deletedId);
           setProjects((prev) => prev.filter((item) => item.id !== deletedId));
         }
       }
@@ -173,8 +257,13 @@ export const useInspireFeed = ({
 
     return () => {
       detachRealtimeChannel(channel);
+      pendingIdsRef.current.clear();
+      if (typeof window !== "undefined" && debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
     };
-  }, [filter, realtimeKey]);
+  }, [filter, realtimeKey, schedulePendingFlush, realtimeRowMatchesPublicFilter]);
 
   const memoisedProjects = useMemo(() => sortInspireProjects(projects), [projects]);
 
