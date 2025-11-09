@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Upload, X, CheckCircle2, Clock, AlertCircle, Loader2, Eye, Download, Trash2, Pause, Play, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,7 +35,7 @@ interface QueueItem {
   startTime?: number;
 }
 
-type OperationType = 'analyze' | 'upscale';
+type OperationType = 'analyze' | 'upscale' | 'generate' | 'blend';
 
 export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: BatchProcessDialogProps) => {
   const navigate = useNavigate();
@@ -41,6 +43,8 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [operation, setOperation] = useState<OperationType>('upscale');
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
+  const [generatePrompt, setGeneratePrompt] = useState('');
+  const [blendInstruction, setBlendInstruction] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -62,8 +66,17 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
-    if (queue.length + files.length > 10) {
-      toast.error(TOOL_ERROR_MESSAGES.BATCH_FILE_COUNT);
+    // Blend requires exactly 2 images, others allow up to 10
+    const maxFiles = operation === 'blend' ? 2 : 10;
+    const requiredFiles = operation === 'blend' ? 2 : 1;
+    
+    if (operation === 'blend' && queue.length + files.length !== 2) {
+      toast.error('Blend requires exactly 2 images. Please upload 2 images.');
+      return;
+    }
+    
+    if (queue.length + files.length > maxFiles) {
+      toast.error(`Maximum ${maxFiles} image${maxFiles > 1 ? 's' : ''} allowed for ${operation} operation.`);
       return;
     }
 
@@ -73,7 +86,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       preview: URL.createObjectURL(file),
       status: 'pending',
       progress: 0,
-      idempotencyKey: crypto.randomUUID(), // Pre-generate for idempotency
+      idempotencyKey: crypto.randomUUID(),
     }));
 
     setQueue(prev => [...prev, ...newItems]);
@@ -146,6 +159,62 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     if (!data) throw new Error("No analysis returned");
 
     return data;
+  };
+
+  const processGenerate = async (item: QueueItem): Promise<string> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Please sign in to use this feature.");
+
+    if (!generatePrompt?.trim()) {
+      throw new Error("Please enter a prompt for generation");
+    }
+
+    const { data, error } = await supabase.functions.invoke("generate-image", {
+      body: { 
+        prompt: generatePrompt,
+        quality: 'auto',
+        size: '1024x1024',
+        idempotencyKey: item.idempotencyKey 
+      },
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+
+    if (error) throw error;
+    if (!data?.image) throw new Error("No image returned");
+
+    return data.image;
+  };
+
+  const processBlend = async (): Promise<string> => {
+    if (queue.length !== 2) {
+      throw new Error("Blend requires exactly 2 images");
+    }
+
+    const images = await Promise.all(
+      queue.map(item => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(item.file);
+      }))
+    );
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Please sign in to use this feature.");
+
+    const { data, error } = await supabase.functions.invoke("blend-images", {
+      body: { 
+        images,
+        instruction: blendInstruction || 'Blend these images seamlessly',
+        idempotencyKey: crypto.randomUUID()
+      },
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+
+    if (error) throw error;
+    if (!data?.image) throw new Error("No blended image returned");
+
+    return data.image;
   };
 
   const saveToDatabase = async (
@@ -235,9 +304,81 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       return;
     }
 
+    if (operation === 'generate' && !generatePrompt?.trim()) {
+      toast.error("Please enter a prompt for generation");
+      return;
+    }
+
+    if (operation === 'blend' && queue.length !== 2) {
+      toast.error("Blend requires exactly 2 images");
+      return;
+    }
+
     setIsProcessing(true);
     setIsPaused(false);
 
+    // Special handling for blend - process all at once
+    if (operation === 'blend') {
+      setCurrentIndex(0);
+      const itemStartTime = Date.now();
+      
+      // Mark all as processing
+      setQueue(prev => prev.map(q => ({ ...q, status: 'processing' as const, progress: 10 })));
+
+      try {
+        const progressInterval = setInterval(() => {
+          setQueue(prev => prev.map(q => 
+            q.progress < 90 ? { ...q, progress: q.progress + 10 } : q
+          ));
+        }, 2000);
+
+        const result = await processBlend();
+        const duration = Date.now() - itemStartTime;
+        
+        // Get original images as base64
+        const originalImages = await Promise.all(
+          queue.map(item => new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(item.file);
+          }))
+        );
+        
+        const assetId = await saveToDatabase(
+          result, 
+          'blend', 
+          'blended', 
+          JSON.stringify(originalImages), 
+          duration
+        );
+
+        clearInterval(progressInterval);
+
+        // Mark all as completed with same result
+        setQueue(prev => prev.map(q => ({ 
+          ...q, 
+          status: 'completed' as const, 
+          progress: 100, 
+          result, 
+          assetId 
+        })));
+
+        toast.success("Blend completed successfully!");
+      } catch (error: any) {
+        console.error('Blend failed:', error);
+        const errorMsg = mapErrorMessage(error);
+        setQueue(prev => prev.map(q => ({ 
+          ...q, 
+          status: 'failed' as const, 
+          error: errorMsg 
+        })));
+      }
+
+      setIsProcessing(false);
+      return;
+    }
+
+    // Standard processing for other operations
     const startIndex = isPaused ? currentIndex : 0;
     if (!isPaused) setCurrentIndex(0);
 
@@ -251,7 +392,6 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       const itemStartTime = Date.now();
       item.startTime = itemStartTime;
       
-      // Update to processing
       setQueue(prev => prev.map((q, idx) => 
         idx === i ? { ...q, status: 'processing', progress: 10 } : q
       ));
@@ -268,42 +408,34 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         let result: string | any;
         let assetId: string;
 
+        const reader = new FileReader();
+        const originalBase64 = await new Promise<string>((resolve) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(item.file);
+        });
+
         if (operation === 'upscale') {
           result = await processUpscale(item);
           const duration = Date.now() - itemStartTime;
-          
-          // Convert to base64 for source storage
-          const reader = new FileReader();
-          const originalBase64 = await new Promise<string>((resolve) => {
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(item.file);
-          });
-          
           assetId = await saveToDatabase(result, 'upscale', targetSize, originalBase64, duration);
-        } else {
-          // Analyze
+        } else if (operation === 'analyze') {
           result = await processAnalyze(item);
           const duration = Date.now() - itemStartTime;
-          
-          const reader = new FileReader();
-          const originalBase64 = await new Promise<string>((resolve) => {
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(item.file);
-          });
-          
           assetId = await saveToDatabase('', 'analyze', '', originalBase64, duration, result);
+        } else if (operation === 'generate') {
+          result = await processGenerate(item);
+          const duration = Date.now() - itemStartTime;
+          assetId = await saveToDatabase(result, 'generate', '1024x1024', originalBase64, duration);
         }
 
         clearInterval(progressInterval);
 
-        // Update to completed
         setQueue(prev => prev.map((q, idx) => 
           idx === i 
             ? { ...q, status: 'completed', progress: 100, result, assetId } 
             : q
         ));
 
-        // Small delay between items
         await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (error: any) {
@@ -384,13 +516,18 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
                   <label className="text-sm font-medium mb-2 block">Operation</label>
                   <Select
                     value={operation}
-                    onValueChange={(value) => setOperation(value as OperationType)}
+                    onValueChange={(value) => {
+                      setOperation(value as OperationType);
+                      setQueue([]); // Clear queue when changing operation
+                    }}
                     disabled={isProcessing}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="generate">Generate from Prompt</SelectItem>
+                      <SelectItem value="blend">Blend 2 Images</SelectItem>
                       <SelectItem value="upscale">Upscale All</SelectItem>
                       <SelectItem value="analyze">Analyze All</SelectItem>
                     </SelectContent>
@@ -417,13 +554,46 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
                 )}
               </div>
 
+              {/* Prompt for Generate */}
+              {operation === 'generate' && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Generation Prompt</label>
+                  <Textarea
+                    value={generatePrompt}
+                    onChange={(e) => setGeneratePrompt(e.target.value)}
+                    placeholder="Enter a prompt to generate images for each uploaded reference..."
+                    disabled={isProcessing}
+                    className="min-h-[100px]"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    This prompt will be used to generate an image for each uploaded reference image.
+                  </p>
+                </div>
+              )}
+
+              {/* Instruction for Blend */}
+              {operation === 'blend' && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Blend Instruction (Optional)</label>
+                  <Input
+                    value={blendInstruction}
+                    onChange={(e) => setBlendInstruction(e.target.value)}
+                    placeholder="e.g., 'Merge with cinematic lighting'"
+                    disabled={isProcessing}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Upload exactly 2 images to blend them together.
+                  </p>
+                </div>
+              )}
+
               {/* Upload Button */}
               {!isProcessing && (
                 <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
                   <input
                     type="file"
                     accept="image/*"
-                    multiple
+                    multiple={operation !== 'blend'}
                     onChange={handleFileUpload}
                     className="hidden"
                     id="batch-upload"
@@ -431,7 +601,9 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
                   <label htmlFor="batch-upload" className="cursor-pointer min-h-[44px] flex flex-col items-center justify-center">
                     <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      Click to add images (up to 10 total)
+                      {operation === 'blend' 
+                        ? 'Click to upload exactly 2 images' 
+                        : 'Click to add images (up to 10 total)'}
                     </p>
                   </label>
                 </div>
@@ -633,7 +805,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
           <Badge variant="secondary">{stats.total} items</Badge>
         </>
       }
-      description="Upload, queue, and monitor analyze or upscale jobs in one place."
+      description="Upload, queue, and monitor multiple image operations: Generate, Blend, Upscale, or Analyze."
       className="sm:max-w-5xl"
       contentClassName="pb-6"
       footer={footerContent}
