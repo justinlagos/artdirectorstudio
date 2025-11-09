@@ -51,7 +51,15 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
     
     // Use the error mapping utility to get user-friendly message
     const friendlyMessage = mapErrorMessage(errorData);
-    throw new Error(friendlyMessage);
+    
+    // Create enriched error with request ID for debugging
+    const enrichedError = new Error(friendlyMessage);
+    (enrichedError as any).requestId = errorData?.requestId;
+    (enrichedError as any).errorType = errorData?.errorType;
+    (enrichedError as any).details = errorData?.details;
+    (enrichedError as any).retryable = errorData?.retryable;
+    
+    throw enrichedError;
   }
 
   if (!data?.image) {

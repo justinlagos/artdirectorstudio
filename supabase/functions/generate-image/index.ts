@@ -31,7 +31,8 @@ serve(async (req) => {
       const { response } = createErrorResponse(
         "Please sign in to generate images",
         401,
-        'auth_required'
+        'auth_required',
+        requestId
       );
       return response;
     }
@@ -49,7 +50,8 @@ serve(async (req) => {
       const { response } = createErrorResponse(
         "Invalid or expired session. Please sign in again.",
         401,
-        'invalid_session'
+        'invalid_session',
+        requestId
       );
       return response;
     }
@@ -95,7 +97,9 @@ serve(async (req) => {
       const { response } = createErrorResponse(
         accessResult.reason || "Access denied. Please upgrade your plan.",
         403,
-        'access_denied'
+        'access_denied',
+        requestId,
+        { tier: accessResult.tier }
       );
       return response;
     }
@@ -126,7 +130,8 @@ serve(async (req) => {
       const { response } = createErrorResponse(
         "Prompt is required to generate an image",
         400,
-        'validation_error'
+        'validation_error',
+        requestId
       );
       return response;
     }
@@ -136,7 +141,8 @@ serve(async (req) => {
       const { response } = createErrorResponse(
         ERROR_MESSAGES.INVALID_INPUT,
         400,
-        'validation_error'
+        'validation_error',
+        requestId
       );
       return response;
     }
@@ -146,7 +152,9 @@ serve(async (req) => {
       const { response } = createErrorResponse(
         "Prompt too short. Please provide at least 3 characters describing what you want to generate.",
         400,
-        'validation_error'
+        'validation_error',
+        requestId,
+        { promptLength: prompt.length }
       );
       return response;
     }
@@ -156,7 +164,9 @@ serve(async (req) => {
       const { response } = createErrorResponse(
         `Prompt too long (${prompt.length} characters). Maximum 2000 characters allowed. Try being more concise.`,
         400,
-        'validation_error'
+        'validation_error',
+        requestId,
+        { promptLength: prompt.length }
       );
       return response;
     }
@@ -168,7 +178,8 @@ serve(async (req) => {
       const { response } = createErrorResponse(
         "AI service not configured. Please contact support.",
         500,
-        'config_error'
+        'config_error',
+        requestId
       );
       return response;
     }
@@ -212,7 +223,9 @@ serve(async (req) => {
         aiResponse.status,
         aiResponse.status === 429 ? 'rate_limit' : 
         aiResponse.status === 402 ? 'credits_exhausted' : 
-        'ai_error'
+        'ai_error',
+        requestId,
+        { duration: aiCallDuration, aiStatus: aiResponse.status }
       );
       return response;
     }
@@ -231,7 +244,8 @@ serve(async (req) => {
       const { response } = createErrorResponse(
         ERROR_MESSAGES.PROCESSING_FAILED,
         500,
-        'no_image_data'
+        'no_image_data',
+        requestId
       );
       return response;
     }
@@ -261,7 +275,16 @@ serve(async (req) => {
 
       if (uploadError) {
         console.error(`[${requestId}] Storage upload error:`, uploadError);
-        throw uploadError;
+        const { response } = createErrorResponse(
+          uploadError.message?.includes('quota') 
+            ? 'Storage quota exceeded. Please contact support.'
+            : 'Failed to save image to storage. Please try again.',
+          500,
+          'storage_error',
+          requestId,
+          { uploadError: uploadError.message }
+        );
+        return response;
       }
 
       const storageDuration = Date.now() - storageStart;
@@ -275,6 +298,7 @@ serve(async (req) => {
 
       // Save metadata to database
       const dbStart = Date.now();
+      console.log(`[${requestId}] Saving to database...`);
       const { data: savedAsset, error: assetError } = await supabaseAdmin
         .from('generated_assets')
         .insert({
@@ -293,18 +317,36 @@ serve(async (req) => {
 
       if (assetError) {
         console.error(`[${requestId}] Database save error:`, assetError);
-        throw assetError;
+        const { response } = createErrorResponse(
+          assetError.message?.includes('duplicate') 
+            ? 'Duplicate generation detected. Please try again.'
+            : 'Failed to save image metadata. The image was generated but not saved.',
+          500,
+          'database_error',
+          requestId,
+          { dbError: assetError.message }
+        );
+        return response;
       }
 
       const dbDuration = Date.now() - dbStart;
       assetData = savedAsset;
-      console.log(`[${requestId}] Database save complete (${dbDuration}ms): ${assetData.id}`);
+      console.log(`[${requestId}] Database save complete (${dbDuration}ms)`);
+      console.log(`[${requestId}] Asset details:`, { 
+        assetId: assetData.id, 
+        hasImageUrl: !!assetData.image_url,
+        hasPrompt: !!assetData.prompt,
+        userId: assetData.user_id
+      });
     } catch (error) {
       console.error(`[${requestId}] Failed to save image:`, error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const { response } = createErrorResponse(
         "Failed to save generated image. Please try again.",
         500,
-        'storage_error'
+        'storage_error',
+        requestId,
+        { saveError: errorMessage }
       );
       return response;
     }
@@ -339,10 +381,13 @@ serve(async (req) => {
     const totalDuration = Date.now() - startTime;
     console.error(`[${requestId}] Error in generate-image function (${totalDuration}ms):`, error);
     
+    const errorMessage = error instanceof Error ? error.message : ERROR_MESSAGES.PROCESSING_FAILED;
     const { response } = createErrorResponse(
-      error instanceof Error ? error.message : ERROR_MESSAGES.PROCESSING_FAILED,
+      errorMessage,
       500,
-      'server_error'
+      'server_error',
+      requestId,
+      { duration: totalDuration }
     );
     return response;
   }

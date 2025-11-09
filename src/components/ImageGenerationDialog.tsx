@@ -183,22 +183,28 @@ export const ImageGenerationDialog = () => {
       console.error("Generation error:", error);
       
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      setLastError(errorMessage);
+      const requestId = (error as any)?.requestId;
+      const errorType = (error as any)?.errorType;
+      
+      // Store error with request ID for display
+      setLastError(requestId ? `${errorMessage} (Request ID: ${requestId})` : errorMessage);
       
       // Enhanced error handling with more context
       if (errorMessage.toLowerCase().includes("rate limit")) {
         toast.error(
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <span className="font-semibold">Rate limit exceeded</span>
             <span className="text-xs">Please wait a moment before trying again</span>
+            {requestId && <span className="text-xs text-muted-foreground font-mono">Request ID: {requestId}</span>}
           </div>,
           { duration: 5000 }
         );
       } else if (errorMessage.toLowerCase().includes("credits") || errorMessage.toLowerCase().includes("exhausted")) {
         toast.error(
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <span className="font-semibold">Insufficient credits</span>
             <span className="text-xs">Add more credits to continue generating images</span>
+            {requestId && <span className="text-xs text-muted-foreground font-mono">Request ID: {requestId}</span>}
           </div>,
           {
             duration: 6000,
@@ -210,9 +216,10 @@ export const ImageGenerationDialog = () => {
         );
       } else if (errorMessage.toLowerCase().includes("sign in") || errorMessage.toLowerCase().includes("log in")) {
         toast.error(
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <span className="font-semibold">Authentication required</span>
             <span className="text-xs">Please sign in to generate images</span>
+            {requestId && <span className="text-xs text-muted-foreground font-mono">Request ID: {requestId}</span>}
           </div>,
           {
             duration: 5000,
@@ -224,9 +231,10 @@ export const ImageGenerationDialog = () => {
         );
       } else if (errorMessage.toLowerCase().includes("access denied") || errorMessage.toLowerCase().includes("upgrade")) {
         toast.error(
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <span className="font-semibold">Upgrade required</span>
             <span className="text-xs">{errorMessage}</span>
+            {requestId && <span className="text-xs text-muted-foreground font-mono">Request ID: {requestId}</span>}
           </div>,
           {
             duration: 5000,
@@ -238,17 +246,19 @@ export const ImageGenerationDialog = () => {
         );
       } else if (errorMessage.toLowerCase().includes("network") || errorMessage.toLowerCase().includes("connection")) {
         toast.error(
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <span className="font-semibold">Connection error</span>
             <span className="text-xs">Check your internet connection and try again</span>
+            {requestId && <span className="text-xs text-muted-foreground font-mono">Request ID: {requestId}</span>}
           </div>,
           { duration: 5000 }
         );
       } else {
         toast.error(
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <span className="font-semibold">Generation failed</span>
             <span className="text-xs">{errorMessage || "An unexpected error occurred"}</span>
+            {requestId && <span className="text-xs text-muted-foreground font-mono">Request ID: {requestId}</span>}
           </div>,
           { duration: 5000 }
         );

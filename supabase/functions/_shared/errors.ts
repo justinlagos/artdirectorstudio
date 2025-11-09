@@ -15,6 +15,9 @@ export interface ErrorResponse {
   error: string;
   errorType?: string;
   retryAfter?: number;
+  requestId?: string;
+  details?: Record<string, unknown>;
+  retryable?: boolean;
 }
 
 /**
@@ -23,11 +26,16 @@ export interface ErrorResponse {
 export function createErrorResponse(
   message: string,
   status: number = 500,
-  errorType?: string
+  errorType?: string,
+  requestId?: string,
+  details?: Record<string, unknown>
 ): { response: Response; errorData: ErrorResponse } {
   const errorData: ErrorResponse = {
     error: message,
-    ...(errorType && { errorType })
+    ...(errorType && { errorType }),
+    ...(requestId && { requestId }),
+    ...(details && { details }),
+    retryable: status >= 500 || status === 429
   };
 
   const response = new Response(
