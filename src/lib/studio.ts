@@ -1,54 +1,41 @@
-/**
- * Unified Studio Generation Flow
- * Opens the Generate in Studio modal with prefilled prompt and image across the entire app
- */
+import { useModalStore } from "@/store/modalStore";
+import { useStudioStore } from "@/store/studioStore";
 
 export interface OpenStudioOptions {
   basePrompt: string;
   imageUrl?: string;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
-/**
- * Opens the Studio generation modal with prefilled content
- * This function should be called from React components
- */
-export function openStudioWithPrompt(options: OpenStudioOptions): void {
-  const { basePrompt, imageUrl, meta } = options;
+export function openStudioWithPrompt({
+  basePrompt,
+  imageUrl,
+  meta,
+}: OpenStudioOptions): void {
+  const studioState = useStudioStore.getState();
+  const modalState = useModalStore.getState();
 
-  // Dispatch custom event to trigger modal opening
-  // This approach avoids direct store coupling and works across component boundaries
-  const event = new CustomEvent('open-studio-generation', {
-    detail: {
-      prompt: basePrompt || '',
-      imageUrl: imageUrl || null,
-      meta: meta || {},
-    },
-  });
+  studioState.setPrompt(basePrompt || "");
+  studioState.setImage(imageUrl || "");
+  if (meta) {
+    studioState.setMeta(meta);
+  } else {
+    studioState.setMeta(undefined);
+  }
 
-  window.dispatchEvent(event);
+  modalState.openGenerateModal();
 
-  // Ensure modal content is scrolled to top for CTA visibility
   requestAnimationFrame(() => {
-    const modalBody = document.querySelector('[data-studio-modal-body]');
+    const modalBody = document.querySelector<HTMLElement>(".studio-modal-body");
     if (modalBody) {
       modalBody.scrollTop = 0;
     }
   });
 }
 
-/**
- * Hook into this event listener to open the modal from any component
- * Example usage in a parent component:
- * 
- * useEffect(() => {
- *   const handleOpenStudio = (e: CustomEvent) => {
- *     setGenerationPrompt(e.detail.prompt);
- *     setReferenceImage(e.detail.imageUrl);
- *     setShowGenerationDialog(true);
- *   };
- *   
- *   window.addEventListener('open-studio-generation', handleOpenStudio);
- *   return () => window.removeEventListener('open-studio-generation', handleOpenStudio);
- * }, []);
- */
+export function closeStudioModal(): void {
+  const modalState = useModalStore.getState();
+  const studioState = useStudioStore.getState();
+  modalState.closeGenerateModal();
+  studioState.reset();
+}

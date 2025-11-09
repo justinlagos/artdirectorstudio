@@ -9,6 +9,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const STYLE_HINTS: Record<string, string> = {
+  modern: "Modern minimal aesthetic",
+  cinematic: "Cinematic lighting and depth",
+  editorial: "Editorial magazine composition",
+  dreamlike: "Ethereal dreamlike atmosphere",
+  "high-contrast": "High contrast dramatic tones",
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -63,8 +71,8 @@ serve(async (req) => {
       ).response;
     }
 
-    const { images, instruction, idempotencyKey } = await req.json();
-    
+    const { images, instruction, stylePresets, idempotencyKey } = await req.json();
+
     const imagesValidation = validateImages(images, 2, 4);
     if (!imagesValidation.valid) {
       return createErrorResponse(imagesValidation.error!, 400).response;
@@ -109,12 +117,29 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    // Use provided instruction or create a safe default
-    const enhancedInstruction = instruction?.trim() 
-      ? `${instruction}. Create a seamless blend that feels unified and cohesive.`
-      : 'Blend these images into a cohesive visual that respects shared color harmony and lighting. Create a seamless, professional result.';
+    const trimmedInstruction = typeof instruction === 'string' ? instruction.trim() : '';
+    const presetList = Array.isArray(stylePresets)
+      ? stylePresets.filter((preset: unknown): preset is string => typeof preset === 'string')
+      : [];
+    const presetHints = presetList
+      .map((preset) => STYLE_HINTS[preset] ?? null)
+      .filter((hint): hint is string => Boolean(hint));
 
-    const content: any[] = [{ type: "text", text: enhancedInstruction }];
+    const baseInstruction = trimmedInstruction.length
+      ? trimmedInstruction
+      : 'Blend these images into a cohesive visual that respects shared color and lighting.';
+
+    const combinedInstruction = presetHints.length
+      ? `${baseInstruction}. ${presetHints.join('. ')}`
+      : baseInstruction;
+
+    const enhancedInstruction = `${combinedInstruction}. Create a seamless blend that feels unified and cohesive.`;
+
+    type BlendContentEntry =
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } };
+
+    const content: BlendContentEntry[] = [{ type: "text", text: enhancedInstruction }];
     for (const img of images) {
       content.push({ type: "image_url", image_url: { url: img } });
     }
@@ -161,7 +186,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    let blendedImageUrl = 
+    const blendedImageUrl =
       data.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
       data.choices?.[0]?.message?.content ||
       data.images?.[0]?.url ||

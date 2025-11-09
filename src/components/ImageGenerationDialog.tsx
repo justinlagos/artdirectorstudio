@@ -1,10 +1,19 @@
-import { useState, useEffect, useRef } from "react";
-import * as React from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Download, Wand2, ChevronDown, Copy, AlertCircle, Square, RectangleHorizontal, RectangleVertical, RotateCcw } from "lucide-react";
+import {
+  Download,
+  Wand2,
+  ChevronDown,
+  Copy,
+  AlertCircle,
+  Square,
+  RectangleHorizontal,
+  RectangleVertical,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
@@ -16,51 +25,71 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { ToolDrawer } from "./ToolDrawer";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-interface ImageGenerationDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  initialPrompt: string;
-  onGenerate: (prompt: string, options: GenerationOptions) => Promise<string | null>;
-  initialReferenceImage?: string | null;
-}
+import { useModalStore } from "@/store/modalStore";
+import { useStudioStore } from "@/store/studioStore";
+import { closeStudioModal } from "@/lib/studio";
 
 export interface GenerationOptions {
-  quality: 'high' | 'medium' | 'low' | 'auto';
-  size: '1024x1024' | '1536x1024' | '1024x1536';
-  background: 'transparent' | 'opaque' | 'auto';
+  quality: "high" | "medium" | "low" | "auto";
+  size: "1024x1024" | "1536x1024" | "1024x1536";
+  background: "transparent" | "opaque" | "auto";
 }
 
 const MAX_PROMPT_LENGTH = 2000;
 
-export const ImageGenerationDialog = ({
-  open,
-  onOpenChange,
-  initialPrompt,
-  onGenerate,
-  initialReferenceImage,
-}: ImageGenerationDialogProps) => {
-  // Truncate initial prompt if it's too long
-  const truncatedInitialPrompt = initialPrompt.length > MAX_PROMPT_LENGTH 
-    ? initialPrompt.substring(0, MAX_PROMPT_LENGTH - 3) + '...'
-    : initialPrompt;
-    
+const truncatePrompt = (value: string) =>
+  value.length > MAX_PROMPT_LENGTH ? `${value.slice(0, MAX_PROMPT_LENGTH - 3)}...` : value;
+
+export const ImageGenerationDialog = () => {
+  const isMobile = useIsMobile();
+  const { isGenerateModalOpen } = useModalStore((state) => ({
+    isGenerateModalOpen: state.isGenerateModalOpen,
+  }));
+
+  const storePrompt = useStudioStore((state) => state.prompt);
+  const storeImage = useStudioStore((state) => state.imageUrl);
+  const setStorePrompt = useStudioStore((state) => state.setPrompt);
+  const setStoreImage = useStudioStore((state) => state.setImage);
+  const generator = useStudioStore((state) => state.generator);
+
+  const truncatedInitialPrompt = useMemo(() => truncatePrompt(storePrompt ?? ""), [storePrompt]);
+
   const [prompt, setPrompt] = useState(truncatedInitialPrompt);
+  const [basePrompt, setBasePrompt] = useState(truncatedInitialPrompt);
+  const [selectedPreset, setSelectedPreset] = useState<GenerationPreset | null>(null);
+  const [options, setOptions] = useState<GenerationOptions>({
+    quality: "auto",
+    size: "1024x1024",
+    background: "auto",
+  });
+  const [referenceImage, setReferenceImage] = useState<string | null>(storeImage ?? null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [selectedPreset, setSelectedPreset] = useState<GenerationPreset | null>(null);
-  const [basePrompt, setBasePrompt] = useState(truncatedInitialPrompt);
-  const [options, setOptions] = useState<GenerationOptions>({
-    quality: 'auto',
-    size: '1024x1024',
-    background: 'auto'
-  });
-  const isMobile = useIsMobile();
+  const [presetsExpanded, setPresetsExpanded] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
-  const [presetsExpanded, setPresetsExpanded] = useState(false); // Collapsed by default
-  const [referenceImage, setReferenceImage] = useState<string | null>(initialReferenceImage ?? null);
+
+  useEffect(() => {
+    if (!isGenerateModalOpen) {
+      setIsGenerating(false);
+      setProgress(0);
+      return;
+    }
+
+    setPrompt(truncatedInitialPrompt);
+    setBasePrompt(truncatedInitialPrompt);
+    setSelectedPreset(null);
+    setGeneratedImage(null);
+    setProgress(0);
+    setShowAdvanced(false);
+    setPresetsExpanded(false);
+    setReferenceImage(storeImage ?? null);
+
+    if (storePrompt.length > MAX_PROMPT_LENGTH) {
+      toast.info(`Prompt automatically shortened to ${MAX_PROMPT_LENGTH} characters`);
+    }
+  }, [isGenerateModalOpen, truncatedInitialPrompt, storeImage, storePrompt]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -73,13 +102,17 @@ export const ImageGenerationDialog = ({
       return;
     }
 
+    if (!generator) {
+      toast.error("Generation is currently unavailable.");
+      return;
+    }
+
     setIsGenerating(true);
     setProgress(0);
     setGeneratedImage(null);
 
-    // Simulate progress
     const progressInterval = setInterval(() => {
-      setProgress(prev => {
+      setProgress((prev) => {
         if (prev >= 90) {
           clearInterval(progressInterval);
           return 90;
@@ -89,21 +122,20 @@ export const ImageGenerationDialog = ({
     }, 1500);
 
     try {
-      const imageUrl = await onGenerate(prompt, options);
-      
+      const imageUrl = await generator(prompt, options);
+
       clearInterval(progressInterval);
       setProgress(100);
-      
+
       if (imageUrl) {
         setGeneratedImage(imageUrl);
         toast.success("Your image is ready.");
-        
-        // Auto-scroll to image on mobile
+
         if (isMobile) {
           setTimeout(() => {
-            imageContainerRef.current?.scrollIntoView({ 
-              behavior: 'smooth', 
-              block: 'center' 
+            imageContainerRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
             });
           }, 200);
         }
@@ -111,6 +143,7 @@ export const ImageGenerationDialog = ({
     } catch (error) {
       clearInterval(progressInterval);
       console.error("Generation error:", error);
+      toast.error("Failed to generate image. Please try again.");
     } finally {
       setIsGenerating(false);
       setTimeout(() => setProgress(0), 1000);
@@ -119,14 +152,14 @@ export const ImageGenerationDialog = ({
 
   const handleDownload = () => {
     if (!generatedImage) return;
-    
-    const link = document.createElement('a');
+
+    const link = document.createElement("a");
     link.href = generatedImage;
     link.download = `generated-image-${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     toast.success("Image download started.");
   };
 
@@ -140,95 +173,66 @@ export const ImageGenerationDialog = ({
     handleGenerate();
   };
 
-  const handlePresetSelect = (preset: GenerationPreset) => {
-    setSelectedPreset(preset);
-    setOptions(preset.options);
-    
-    // Increment usage count for custom presets
-    if (preset.id.includes('-')) { // Custom presets have UUID format with dashes
-      incrementPresetUsage(preset.id);
-    }
-    
-    // Apply preset modifier to the base prompt
-    const enhancedPrompt = basePrompt + preset.promptModifier;
-    
-    if (enhancedPrompt.length <= MAX_PROMPT_LENGTH) {
-      setPrompt(enhancedPrompt);
-      toast.success(`"${preset.name}" preset applied!`);
-    } else {
-      // If enhanced prompt is too long, just update options without modifier
-      setPrompt(basePrompt);
-      toast.info(`"${preset.name}" settings applied. Prompt modifier skipped due to length.`);
-    }
-    
-    // Auto-collapse presets on mobile after selection
-    if (isMobile) {
-      setPresetsExpanded(false);
-    }
-  };
-
   const incrementPresetUsage = async (presetId: string) => {
     try {
       const { data } = await supabase
-        .from('custom_generation_presets')
-        .select('usage_count')
-        .eq('id', presetId)
+        .from("custom_generation_presets")
+        .select("usage_count")
+        .eq("id", presetId)
         .single();
-      
+
       if (data) {
         await supabase
-          .from('custom_generation_presets')
+          .from("custom_generation_presets")
           .update({ usage_count: (data.usage_count || 0) + 1 })
-          .eq('id', presetId);
+          .eq("id", presetId);
       }
     } catch (error) {
       console.error("Error incrementing usage:", error);
     }
   };
 
+  const handlePresetSelect = (preset: GenerationPreset) => {
+    setSelectedPreset(preset);
+    setOptions(preset.options);
+
+    if (preset.id.includes("-")) {
+      incrementPresetUsage(preset.id);
+    }
+
+    const enhancedPrompt = basePrompt + preset.promptModifier;
+
+    if (enhancedPrompt.length <= MAX_PROMPT_LENGTH) {
+      setPrompt(enhancedPrompt);
+      setStorePrompt(enhancedPrompt);
+      toast.success(`"${preset.name}" preset applied!`);
+    } else {
+      setPrompt(basePrompt);
+      setStorePrompt(basePrompt);
+      toast.info(`"${preset.name}" settings applied. Prompt modifier skipped due to length.`);
+    }
+
+    if (isMobile) {
+      setPresetsExpanded(false);
+    }
+  };
+
   const handleClearPreset = () => {
     setSelectedPreset(null);
     setPrompt(basePrompt);
+    setStorePrompt(basePrompt);
     setOptions({
-      quality: 'auto',
-      size: '1024x1024',
-      background: 'auto'
+      quality: "auto",
+      size: "1024x1024",
+      background: "auto",
     });
     toast.info("Preset cleared, returned to custom settings");
   };
 
-  const handleClose = () => {
-    setGeneratedImage(null);
-    setPrompt(truncatedInitialPrompt);
-    setBasePrompt(truncatedInitialPrompt);
-    setSelectedPreset(null);
-    setProgress(0);
-    setReferenceImage(initialReferenceImage ?? null);
-    onOpenChange(false);
-  };
-
-  // Update prompt when initialPrompt changes and dialog opens
-  React.useEffect(() => {
-    if (open) {
-      const newTruncatedPrompt = initialPrompt.length > MAX_PROMPT_LENGTH
-        ? initialPrompt.substring(0, MAX_PROMPT_LENGTH - 3) + '...'
-        : initialPrompt;
-      setPrompt(newTruncatedPrompt);
-      setBasePrompt(newTruncatedPrompt);
-      setSelectedPreset(null);
-      setReferenceImage(initialReferenceImage ?? null);
-
-      if (initialPrompt.length > MAX_PROMPT_LENGTH) {
-        toast.info(`Prompt automatically shortened to ${MAX_PROMPT_LENGTH} characters`);
-      }
-    }
-  }, [open, initialPrompt, initialReferenceImage]);
-
-  // Update prompt when user edits (track base prompt separately from preset-enhanced)
   const handlePromptChange = (newValue: string) => {
     if (newValue.length <= MAX_PROMPT_LENGTH) {
       setPrompt(newValue);
-      // If user manually edits, update base prompt and clear preset
+      setStorePrompt(newValue);
       if (selectedPreset) {
         setBasePrompt(newValue);
         setSelectedPreset(null);
@@ -241,21 +245,56 @@ export const ImageGenerationDialog = ({
     }
   };
 
+  const handleBasePromptChange = (newValue: string) => {
+    if (newValue.length <= MAX_PROMPT_LENGTH) {
+      setBasePrompt(newValue);
+      if (selectedPreset) {
+        const enhanced = newValue + selectedPreset.promptModifier;
+        if (enhanced.length <= MAX_PROMPT_LENGTH) {
+          setPrompt(enhanced);
+          setStorePrompt(enhanced);
+        } else {
+          setPrompt(newValue);
+          setStorePrompt(newValue);
+          toast.info("Preset modifier removed due to length");
+        }
+      } else {
+        setPrompt(newValue);
+        setStorePrompt(newValue);
+      }
+    }
+  };
+
+  const handleClose = () => {
+    closeStudioModal();
+    setPrompt("");
+    setBasePrompt("");
+    setReferenceImage(null);
+    setSelectedPreset(null);
+    setGeneratedImage(null);
+    setProgress(0);
+    setShowAdvanced(false);
+    setPresetsExpanded(false);
+  };
+
   const bodyContent = (
-    <div className="space-y-4" data-studio-modal-body>
+    <div className="space-y-4">
       {referenceImage && (
         <div className="overflow-hidden rounded-2xl border border-border/60 bg-muted/30 shadow">
-          <img
-            src={referenceImage}
-            alt="Reference inspiration"
-            className="w-full object-cover"
-          />
+          <img src={referenceImage} alt="Reference inspiration" className="w-full object-cover" />
           <div className="flex items-center justify-between gap-4 px-4 py-3">
             <div>
               <p className="text-sm font-medium text-foreground">Reference image</p>
               <p className="text-xs text-muted-foreground">Remix this Inspire project in Studio.</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setReferenceImage(null)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setReferenceImage(null);
+                setStoreImage(undefined);
+              }}
+            >
               Remove
             </Button>
           </div>
@@ -267,51 +306,34 @@ export const ImageGenerationDialog = ({
           <TabsTrigger value="presets">Presets</TabsTrigger>
           <TabsTrigger value="custom">Custom Prompt</TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="presets" className="space-y-4 mt-4">
-          {/* Base Prompt - Moved to Top for Prominence */}
-          <div className="space-y-2 p-4 bg-accent/5 border border-accent/20 rounded-xl">
+
+        <TabsContent value="presets" className="mt-4 space-y-4">
+          <div className="space-y-2 rounded-xl border border-accent/20 bg-accent/5 p-4">
             <div className="flex items-center gap-2">
               <Label className="text-base font-semibold">Your Base Prompt</Label>
-              <Badge variant="secondary" className="text-xs">Primary</Badge>
+              <Badge variant="secondary" className="text-xs">
+                Primary
+              </Badge>
             </div>
             <EnhancedPromptEditor
               value={basePrompt}
-              onChange={(newValue) => {
-                if (newValue.length <= MAX_PROMPT_LENGTH) {
-                  setBasePrompt(newValue);
-                  if (selectedPreset) {
-                    const enhanced = newValue + selectedPreset.promptModifier;
-                    if (enhanced.length <= MAX_PROMPT_LENGTH) {
-                      setPrompt(enhanced);
-                    } else {
-                      setPrompt(newValue);
-                      toast.info("Preset modifier removed due to length");
-                    }
-                  } else {
-                    setPrompt(newValue);
-                  }
-                }
-              }}
+              onChange={handleBasePromptChange}
               placeholder="Describe the image you want to generate..."
               disabled={isGenerating}
             />
             {selectedPreset && (
-              <p className="text-xs text-muted-foreground">
-                ✨ Preset enhancements will be automatically added
-              </p>
+              <p className="text-xs text-muted-foreground">✨ Preset enhancements will be automatically added</p>
             )}
           </div>
 
           <Separator />
 
-          {/* Selected Preset Indicator */}
           {selectedPreset && (
-            <div className="flex items-center justify-between p-2.5 bg-primary/5 border border-primary/20 rounded-lg">
+            <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-2.5">
               <div className="flex items-center gap-2">
-                <div className="flex-shrink-0 w-4 h-4">{selectedPreset.icon}</div>
+                <div className="h-4 w-4 flex-shrink-0">{selectedPreset.icon}</div>
                 <div>
-                  <div className="font-medium text-sm">{selectedPreset.name}</div>
+                  <div className="text-sm font-medium">{selectedPreset.name}</div>
                   <div className="text-xs text-muted-foreground">Active preset</div>
                 </div>
               </div>
@@ -322,24 +344,21 @@ export const ImageGenerationDialog = ({
                 disabled={isGenerating}
                 className="h-8"
               >
-                <RotateCcw className="w-3 h-3 mr-1.5" />
+                <RotateCcw className="mr-1.5 h-3 w-3" />
                 Clear
               </Button>
             </div>
           )}
 
-          {/* Collapsible Quick Presets Section */}
           <Collapsible open={presetsExpanded} onOpenChange={setPresetsExpanded}>
             <CollapsibleTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="w-full justify-between min-h-[44px] mb-3"
-                disabled={isGenerating}
-              >
+              <Button variant="outline" className="mb-3 min-h-[44px] w-full justify-between" disabled={isGenerating}>
                 <span className="font-medium">
                   {presetsExpanded ? "Hide Quick Presets" : "Browse Quick Presets"}
                 </span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${presetsExpanded ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${presetsExpanded ? "rotate-180" : ""}`}
+                />
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -349,33 +368,31 @@ export const ImageGenerationDialog = ({
                 selectedPresetId={selectedPreset?.id}
                 onManageCustomPresets={() => {
                   const presetData = {
-                    options: options,
-                    prompt_modifier: selectedPreset?.promptModifier || '',
-                    base_prompt: basePrompt
+                    options,
+                    prompt_modifier: selectedPreset?.promptModifier || "",
+                    base_prompt: basePrompt,
                   };
-                  onOpenChange(false);
-                  window.location.href = `/settings?tab=presets&data=${encodeURIComponent(JSON.stringify(presetData))}`;
+                  window.location.href = `/settings?tab=presets&data=${encodeURIComponent(
+                    JSON.stringify(presetData)
+                  )}`;
                 }}
               />
             </CollapsibleContent>
           </Collapsible>
         </TabsContent>
 
-        <TabsContent value="custom" className="space-y-4 mt-4">
-          {/* Character Limit Warning */}
+        <TabsContent value="custom" className="mt-4 space-y-4">
           {prompt.length > MAX_PROMPT_LENGTH * 0.9 && (
             <Alert variant={prompt.length > MAX_PROMPT_LENGTH ? "destructive" : "default"}>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                {prompt.length > MAX_PROMPT_LENGTH 
+                {prompt.length > MAX_PROMPT_LENGTH
                   ? `Prompt exceeds maximum length by ${prompt.length - MAX_PROMPT_LENGTH} characters. Please shorten it.`
-                  : `Approaching character limit: ${prompt.length}/${MAX_PROMPT_LENGTH}`
-                }
+                  : `Approaching character limit: ${prompt.length}/${MAX_PROMPT_LENGTH}`}
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Prompt Input with AI Enhancement */}
           <EnhancedPromptEditor
             value={prompt}
             onChange={handlePromptChange}
@@ -384,195 +401,181 @@ export const ImageGenerationDialog = ({
             disabled={isGenerating}
           />
 
-          {/* Advanced Options */}
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="w-full justify-between min-h-[44px]">
-            <span>Advanced Options</span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4 pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="quality">Quality</Label>
-              <Select
-                value={options.quality}
-                onValueChange={(value) => setOptions(prev => ({ ...prev, quality: value as any }))}
-                disabled={isGenerating}
-              >
-                <SelectTrigger id="quality" className="min-h-[44px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="min-h-[44px] w-full justify-between">
+                <span>Advanced Options</span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`}
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="quality">Quality</Label>
+                  <Select
+                    value={options.quality}
+                    onValueChange={(value: GenerationOptions["quality"]) =>
+                      setOptions((prev) => ({ ...prev, quality: value }))
+                    }
+                  >
+                    <SelectTrigger id="quality">
+                      <SelectValue placeholder="Select quality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Aspect Ratio</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant={options.size === "1024x1024" ? "default" : "outline"}
-                  className="flex flex-col items-center gap-1 h-auto py-3 min-h-[44px]"
-                  onClick={() => setOptions(prev => ({ ...prev, size: "1024x1024" }))}
-                  disabled={isGenerating}
-                >
-                  <Square className="w-5 h-5" />
-                  <div className="text-xs">
-                    <div className="font-semibold">Square</div>
-                    <div className="text-muted-foreground hidden sm:block">1024×1024</div>
-                  </div>
-                </Button>
-                <Button
-                  type="button"
-                  variant={options.size === "1536x1024" ? "default" : "outline"}
-                  className="flex flex-col items-center gap-1 h-auto py-3 min-h-[44px]"
-                  onClick={() => setOptions(prev => ({ ...prev, size: "1536x1024" }))}
-                  disabled={isGenerating}
-                >
-                  <RectangleHorizontal className="w-5 h-5" />
-                  <div className="text-xs">
-                    <div className="font-semibold">Landscape</div>
-                    <div className="text-muted-foreground hidden sm:block">1536×1024</div>
-                  </div>
-                </Button>
-                <Button
-                  type="button"
-                  variant={options.size === "1024x1536" ? "default" : "outline"}
-                  className="flex flex-col items-center gap-1 h-auto py-3 min-h-[44px]"
-                  onClick={() => setOptions(prev => ({ ...prev, size: "1024x1536" }))}
-                  disabled={isGenerating}
-                >
-                  <RectangleVertical className="w-5 h-5" />
-                  <div className="text-xs">
-                    <div className="font-semibold">Portrait</div>
-                    <div className="text-muted-foreground hidden sm:block">1024×1536</div>
-                  </div>
-                </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="size">Aspect Ratio</Label>
+                  <Select
+                    value={options.size}
+                    onValueChange={(value: GenerationOptions["size"]) =>
+                      setOptions((prev) => ({ ...prev, size: value }))
+                    }
+                  >
+                    <SelectTrigger id="size">
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1024x1024">
+                        <div className="flex items-center gap-2">
+                          <Square className="h-4 w-4" />
+                          Square
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="1536x1024">
+                        <div className="flex items-center gap-2">
+                          <RectangleHorizontal className="h-4 w-4" />
+                          Landscape
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="1024x1536">
+                        <div className="flex items-center gap-2">
+                          <RectangleVertical className="h-4 w-4" />
+                          Portrait
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="background">Background</Label>
+                  <Select
+                    value={options.background}
+                    onValueChange={(value: GenerationOptions["background"]) =>
+                      setOptions((prev) => ({ ...prev, background: value }))
+                    }
+                  >
+                    <SelectTrigger id="background">
+                      <SelectValue placeholder="Select background" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto</SelectItem>
+                      <SelectItem value="transparent">Transparent</SelectItem>
+                      <SelectItem value="opaque">Opaque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="background">Background</Label>
-              <Select
-                value={options.background}
-                onValueChange={(value) => setOptions(prev => ({ ...prev, background: value as any }))}
-                disabled={isGenerating}
-              >
-                <SelectTrigger id="background" className="min-h-[44px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="opaque">Opaque</SelectItem>
-                  <SelectItem value="transparent">Transparent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          </CollapsibleContent>
+            </CollapsibleContent>
           </Collapsible>
         </TabsContent>
       </Tabs>
 
-      {/* Progress Bar */}
       {isGenerating && (
         <div className="space-y-2">
           <Progress value={progress} className="w-full" />
-          <p className="text-sm text-muted-foreground text-center">
-            Working on it… (~15-30 seconds)
-          </p>
+          <p className="text-center text-sm text-muted-foreground">Generating image...</p>
         </div>
       )}
 
-      {/* Generated Image */}
       {generatedImage && (
-        <div className="space-y-4 pt-4 border-t">
-          <div 
-            ref={imageContainerRef}
-            className="relative rounded-lg overflow-hidden bg-muted max-h-[50vh] md:max-h-none"
-          >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 p-4">
+            <div className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5 text-primary" />
+              <span className="font-semibold">Generation complete</span>
+            </div>
+            <Badge variant="secondary" className="gap-1">
+              AI Generated
+            </Badge>
+          </div>
+
+          <div className="rounded-lg bg-muted/30 p-2">
             <img
+              ref={imageContainerRef}
               src={generatedImage}
-              alt="Generated image"
-              className="w-full h-auto object-contain"
-              loading="lazy"
+              alt="Generated result"
+              className="mx-auto h-auto max-h-[600px] w-full object-contain"
             />
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Generated on {new Date().toLocaleString()}</span>
+            <span>{options.size}</span>
           </div>
         </div>
       )}
     </div>
   );
-  const footerContent = generatedImage ? (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-3 sm:flex-row">
+
+  const footerContent = (
+    <div className="studio-modal-footer flex flex-col gap-3">
+      {generatedImage ? (
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button onClick={handleRegenerate} className="min-h-[48px] w-full sm:flex-1">
+            <Wand2 className="mr-2 h-4 w-4" />
+            Generate Again
+          </Button>
+          <Button variant="outline" onClick={handleDownload} className="min-h-[48px] w-full sm:flex-1">
+            <Download className="mr-2 h-4 w-4" />
+            Download
+          </Button>
+        </div>
+      ) : (
         <Button
-          onClick={handleDownload}
-          className="min-h-[48px] w-full sm:flex-1"
-          variant="secondary"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Download Image
-        </Button>
-        <Button
-          onClick={handleRegenerate}
-          className="min-h-[48px] w-full sm:flex-1"
+          onClick={handleGenerate}
           disabled={isGenerating}
+          className="min-h-[48px] w-full"
+          size="lg"
         >
-          <Wand2 className="w-4 h-4 mr-2" />
-          {isGenerating ? "Working on it…" : "Regenerate"}
+          <Wand2 className="mr-2 h-4 w-4" />
+          {isGenerating ? "Generating..." : "Generate"}
         </Button>
-      </div>
-      <Button
-        variant="outline"
-        onClick={handleCopyPrompt}
-        className="min-h-[44px] w-full"
-      >
-        <Copy className="w-4 h-4 mr-2" />
-        Copy Prompt
+      )}
+      <Button variant="ghost" onClick={handleCopyPrompt} className="w-full">
+        <Copy className="mr-2 h-4 w-4" /> Copy Prompt
       </Button>
     </div>
-  ) : (
-    <Button
-      onClick={handleGenerate}
-      disabled={isGenerating || !prompt.trim() || prompt.length > MAX_PROMPT_LENGTH}
-      className="w-full min-h-[48px]"
-      size="lg"
-    >
-      <Wand2 className="w-4 h-4 mr-2" />
-      {isGenerating ? "Working on it…" : "Start Studio Generation (3 Credits)"}
-    </Button>
   );
 
   return (
     <ToolDrawer
-      open={open}
+      open={isGenerateModalOpen}
       onOpenChange={(nextOpen) => {
-        if (nextOpen) {
-          onOpenChange(true);
-        } else {
+        if (!nextOpen) {
           handleClose();
         }
       }}
-      stickyFooterOnMobile={true}
       title={
-        <>
-          <Wand2 className="w-5 h-5" />
+        <div className="flex items-center gap-2">
+          <Wand2 className="h-5 w-5" />
           Generate in Studio
-        </>
+        </div>
       }
-      description={
-        <>
-          Open this prompt in Studio and create instantly. Cost: <span className="font-semibold text-foreground">3 credits</span>
-        </>
-      }
+      description="Craft new variations instantly with your prompt and optional reference image."
+      contentClassName="studio-modal-body"
+      className="studio-modal-wrapper"
       footer={footerContent}
+      stickyFooterOnMobile
     >
       {bodyContent}
     </ToolDrawer>

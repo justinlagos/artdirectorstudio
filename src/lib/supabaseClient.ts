@@ -4,7 +4,6 @@ import type {
   RealtimePostgresChangesPayload,
   SupabaseClient,
 } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
 import { supabaseAnon } from "@/lib/publicSupabaseClient";
 import type { InspireProject } from "@/types/inspire";
 import type { Database } from "@/integrations/supabase/types";
@@ -38,18 +37,7 @@ const SELECT_COLUMNS = `
   )
 `;
 
-const resolveInspireClient = async (): Promise<SupabaseClient<Database>> => {
-  try {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) {
-      return supabase;
-    }
-  } catch (error) {
-    console.warn("Falling back to anon Supabase client for Inspire fetch", error);
-  }
-
-  return supabaseAnon;
-};
+const inspireClient: SupabaseClient<Database> = supabaseAnon;
 
 export const qualifiesForPublicInspire = (project: InspireProject | null | undefined) => {
   if (!project || project.is_deleted) {
@@ -102,9 +90,7 @@ export const fetchInspireProjects = async ({
   abortSignal,
 }: FetchInspireOptions = {}) => {
   try {
-    const client = await resolveInspireClient();
-
-    let query = client
+    let query = inspireClient
       .from("shared_assets")
       .select(SELECT_COLUMNS, { count: "exact" })
       .eq("is_deleted", false);
@@ -166,9 +152,7 @@ export const fetchInspireProjects = async ({
 };
 
 export const fetchInspireProjectById = async (id: string) => {
-  const client = await resolveInspireClient();
-
-  const { data, error } = await client
+  const { data, error } = await inspireClient
     .from("shared_assets")
     .select(SELECT_COLUMNS)
     .eq("id", id)
@@ -199,7 +183,7 @@ export const subscribeToInspireTable = (
   channelName: string,
   callback: (payload: RealtimePostgresChangesPayload<InspireProject>) => void
 ): RealtimeChannel => {
-  return supabase
+  return inspireClient
     .channel(channelName)
     .on("postgres_changes", { event: "*", schema: "public", table: "shared_assets" }, callback)
     .subscribe();
@@ -207,7 +191,7 @@ export const subscribeToInspireTable = (
 
 export const detachRealtimeChannel = (channel: RealtimeChannel | null | undefined) => {
   if (channel) {
-    supabase.removeChannel(channel);
+    inspireClient.removeChannel(channel);
   }
 };
 

@@ -32,7 +32,7 @@ export const TOOL_ERROR_MESSAGES = {
 /**
  * Maps error codes or messages to user-friendly messages
  */
-export function mapErrorMessage(error: any): string {
+export function mapErrorMessage(error: unknown): string {
   if (typeof error === 'string') {
     // Check for specific error patterns
     if (error.includes('size') || error.includes('large')) {
@@ -58,15 +58,26 @@ export function mapErrorMessage(error: any): string {
     }
   }
   
-  // Check error object properties
-  if (error?.message) {
-    return mapErrorMessage(error.message);
+  if (typeof error === 'object' && error !== null) {
+    const possibleError = error as { message?: unknown; status?: number };
+
+    if (typeof possibleError.message === 'string') {
+      return mapErrorMessage(possibleError.message);
+    }
+
+    switch (possibleError.status) {
+      case 429:
+        return TOOL_ERROR_MESSAGES.RATE_LIMIT;
+      case 402:
+        return TOOL_ERROR_MESSAGES.CREDITS_EXHAUSTED;
+      case 401:
+        return TOOL_ERROR_MESSAGES.AUTH_REQUIRED;
+      case 403:
+        return TOOL_ERROR_MESSAGES.FEATURE_ACCESS_DENIED;
+      default:
+        break;
+    }
   }
-  
-  if (error?.status === 429) return TOOL_ERROR_MESSAGES.RATE_LIMIT;
-  if (error?.status === 402) return TOOL_ERROR_MESSAGES.CREDITS_EXHAUSTED;
-  if (error?.status === 401) return TOOL_ERROR_MESSAGES.AUTH_REQUIRED;
-  if (error?.status === 403) return TOOL_ERROR_MESSAGES.FEATURE_ACCESS_DENIED;
-  
+
   return TOOL_ERROR_MESSAGES.UNKNOWN_ERROR;
 }

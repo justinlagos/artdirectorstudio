@@ -8,13 +8,12 @@ import { Download, Maximize2, Upload, Sparkles, FolderOpen, CheckCircle2, Wand2,
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 import { BeforeAfterSlider } from "@/components/ui/before-after-slider";
 import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
-import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { ToolDrawer } from "./ToolDrawer";
+import { openStudioWithPrompt } from "@/lib/studio";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -27,9 +26,7 @@ interface SourceImage {
 }
 
 export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogProps) => {
-  const navigate = useNavigate();
   const toolState = useToolState();
-  const { openGenerateDialog } = useToolsModal();
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
@@ -133,10 +130,10 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       });
       
       toast.success("Image upscaled successfully!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearInterval(progressInterval);
       console.error("❌ [Upscale] Error:", error);
-      
+
       const errorMessage = mapErrorMessage(error);
       toolState.handleError(errorMessage);
       toast.error(errorMessage);
@@ -206,7 +203,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         setUpscaledAssetId(assetData.id);
         console.log('✅ [Upscale] Saved to DB with share slug:', assetData.share_slug);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving to My Projects:', error);
       throw error;
     }
@@ -227,11 +224,14 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
   const handleUseInStudio = () => {
     if (!upscaledImage) return;
-    
-    // Generate a prompt based on the upscale action
+
     const studioPrompt = `Generate a high-resolution ${targetSize} variation of this upscaled image concept`;
-    
-    openGenerateDialog(studioPrompt);
+
+    openStudioWithPrompt({
+      basePrompt: studioPrompt,
+      imageUrl: upscaledImage,
+      meta: { source: "upscale" },
+    });
     handleClose();
   };
 
@@ -303,7 +303,9 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
               <Label htmlFor="targetSize">Target Size</Label>
               <Select
                 value={targetSize}
-                onValueChange={(value) => setTargetSize(value as any)}
+                onValueChange={(value) =>
+                  setTargetSize(value as '1536x1536' | '2048x2048')
+                }
                 disabled={toolState.isProcessing}
               >
                 <SelectTrigger id="targetSize">

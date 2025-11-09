@@ -8,12 +8,19 @@ import { Download, Blend, X, Upload, Sparkles, FolderOpen, CheckCircle2, Wand2, 
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
-import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { ToolDrawer } from "./ToolDrawer";
+import { openStudioWithPrompt } from "@/lib/studio";
+
+const BLEND_STYLE_PRESETS = [
+  { id: "modern", label: "Modern", hint: "Modern minimal aesthetic" },
+  { id: "cinematic", label: "Cinematic", hint: "Cinematic lighting and depth" },
+  { id: "editorial", label: "Editorial", hint: "Editorial magazine composition" },
+  { id: "dreamlike", label: "Dreamlike", hint: "Ethereal dreamlike atmosphere" },
+  { id: "high-contrast", label: "High contrast", hint: "High contrast dramatic tones" },
+] as const;
 
 interface ImageBlendDialogProps {
   open: boolean;
@@ -26,16 +33,34 @@ interface ImageFile {
 }
 
 export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) => {
-  const navigate = useNavigate();
   const toolState = useToolState();
-  const { openGenerateDialog } = useToolsModal();
   const [images, setImages] = useState<ImageFile[]>([]);
-  const [instruction, setInstruction] = useState("Blend these images seamlessly together");
+  const [instruction, setInstruction] = useState("");
+  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
   const [blendedAssetId, setBlendedAssetId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [showZoom, setShowZoom] = useState(false);
   const [blendStartTime, setBlendStartTime] = useState<number>(0);
+  const [blendPrompt, setBlendPrompt] = useState<string>("");
+
+  const toggleStyle = (styleId: string) => {
+    setSelectedStyles((prev) =>
+      prev.includes(styleId) ? prev.filter((id) => id !== styleId) : [...prev, styleId]
+    );
+  };
+
+  const buildFinalInstruction = (input: string, styles: string[]) => {
+    const trimmed = input.trim();
+    const base = trimmed.length
+      ? trimmed
+      : "Blend these images into a cohesive visual that respects shared color and lighting.";
+    const hints = styles
+      .map((id) => BLEND_STYLE_PRESETS.find((preset) => preset.id === id)?.hint)
+      .filter((hint): hint is string => Boolean(hint));
+    const combined = hints.length ? `${base}. ${hints.join(". ")}` : base;
+    return `${combined}. Create a seamless blend that feels unified and cohesive.`;
+  };
 
   const validateImage = async (file: File): Promise<{ valid: boolean; error?: string }> => {
     // Check file type
@@ -160,7 +185,10 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
     try {
       console.log('🎨 [Blend] Starting blend process with', images.length, 'images, idempotency:', idempotencyKey);
-      
+
+      const trimmedInstruction = instruction.trim();
+      const finalInstruction = buildFinalInstruction(trimmedInstruction, selectedStyles);
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         console.error('❌ [Blend] No session found');
@@ -181,12 +209,26 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       );
 
       console.log('🚀 [Blend] Invoking blend-images edge function...');
+
+      interface BlendRequestPayload {
+        images: string[];
+        stylePresets: string[];
+        idempotencyKey: string;
+        instruction?: string;
+      }
+
+      const payload: BlendRequestPayload = {
+        images: base64Images,
+        stylePresets: selectedStyles,
+        idempotencyKey,
+      };
+
+      if (trimmedInstruction.length) {
+        payload.instruction = trimmedInstruction;
+      }
+
       const { data, error } = await supabase.functions.invoke("blend-images", {
-        body: { 
-          images: base64Images, 
-          instruction,
-          idempotencyKey 
-        },
+        body: payload,
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -212,33 +254,38 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
       console.log('✅ [Blend] Image validated, setting state immediately');
       setBlendedImage(validatedImage);
+      setBlendPrompt(finalInstruction);
       toolState.handleSuccess();
-      
+
       // Save to database in background (don't block UI)
       const duration = Date.now() - startTime;
-      saveToMyProjects(validatedImage, instruction, base64Images, duration).catch(err => {
+      saveToMyProjects(validatedImage, finalInstruction, base64Images, duration, selectedStyles).catch((err: unknown) => {
         console.error('Background save failed:', err);
         // Don't show error since blend succeeded
       });
-      
+
       toast.success("Images blended successfully!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearInterval(progressInterval);
       console.error("❌ [Blend] Error occurred:", error);
-      
+      const fallbackMessage = "Blend failed. Try a smaller image or a simpler style.";
       const errorMessage = mapErrorMessage(error);
-      toolState.handleError(errorMessage);
-      toast.error(errorMessage);
+      if (errorMessage && errorMessage !== fallbackMessage) {
+        console.warn("Blend error detail:", errorMessage);
+      }
+      toolState.handleError(fallbackMessage);
+      toast.error(fallbackMessage);
     } finally {
       setTimeout(() => setProgress(0), 1000);
     }
   };
 
   const saveToMyProjects = async (
-    imageDataUrl: string, 
-    prompt: string, 
-    sourceImages: string[], 
-    duration: number
+    imageDataUrl: string,
+    prompt: string,
+    sourceImages: string[],
+    duration: number,
+    styles: string[]
   ) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -281,7 +328,8 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           source_urls: sourceImages,
           params: {
             imageCount: sourceImages.length,
-            instruction: prompt
+            instruction: prompt,
+            styles
           },
           duration_ms: duration,
           // share_slug auto-generated by trigger
@@ -295,7 +343,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         setBlendedAssetId(assetData.id);
         console.log('✅ [Blend] Saved to DB with share slug:', assetData.share_slug);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving to My Projects:', error);
       throw error; // Re-throw to be caught by background handler
     }
@@ -316,13 +364,14 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
   const handleUseInStudio = () => {
     if (!blendedImage) return;
-    
-    // Generate a prompt based on the blend instruction
-    const studioPrompt = instruction 
-      ? `Create a variation of this blended image concept: ${instruction}` 
-      : "Create a variation of this blended image concept";
-    
-    openGenerateDialog(studioPrompt);
+
+    const studioPrompt = blendPrompt || buildFinalInstruction(instruction, selectedStyles);
+
+    openStudioWithPrompt({
+      basePrompt: studioPrompt,
+      imageUrl: blendedImage,
+      meta: { source: "blend", styles: selectedStyles },
+    });
     handleClose();
   };
 
@@ -332,7 +381,9 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     setImages([]);
     setBlendedImage(null);
     setBlendedAssetId(null);
-    setInstruction("Blend these images seamlessly together");
+    setInstruction("");
+    setSelectedStyles([]);
+    setBlendPrompt("");
     setProgress(0);
     toolState.reset();
     onOpenChange(false);
@@ -399,16 +450,40 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
           {/* Blend Instruction */}
           {images.length >= 2 && !blendedImage && (
-            <div className="space-y-2">
-              <Label htmlFor="instruction">Blend Instruction (Optional)</Label>
-              <Textarea
-                id="instruction"
-                value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-                placeholder="Describe how you want the images blended..."
-                className="min-h-[80px] resize-none"
-                disabled={toolState.isProcessing}
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Style presets</Label>
+                <div className="flex flex-wrap gap-2">
+                  {BLEND_STYLE_PRESETS.map((preset) => {
+                    const isActive = selectedStyles.includes(preset.id);
+                    return (
+                      <Button
+                        key={preset.id}
+                        type="button"
+                        variant={isActive ? "secondary" : "outline"}
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() => toggleStyle(preset.id)}
+                        disabled={toolState.isProcessing}
+                      >
+                        {preset.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="instruction">Optional text prompt</Label>
+                <Textarea
+                  id="instruction"
+                  value={instruction}
+                  onChange={(e) => setInstruction(e.target.value)}
+                  placeholder="Add an optional instruction to guide the blend..."
+                  className="min-h-[80px] resize-none"
+                  disabled={toolState.isProcessing}
+                />
+              </div>
             </div>
           )}
 
@@ -516,7 +591,9 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           setBlendedImage(null);
           setBlendedAssetId(null);
           setImages([]);
-          setInstruction("Blend these images seamlessly together");
+          setInstruction("");
+          setSelectedStyles([]);
+          setBlendPrompt("");
         }}
         className="w-full"
       >
