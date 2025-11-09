@@ -1,201 +1,227 @@
-import { useEffect, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { useAdminCheck } from "@/hooks/useAdminCheck";
-import { useToolsModal } from "@/contexts/ToolsModalContext";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { InspireCard } from "@/components/inspire/InspireCard";
+import { GuestActionDialog } from "@/components/inspire/GuestActionDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Search, Eye, Calendar, Copy, Check, Sparkles, Shuffle, 
-  Heart, Bookmark, UserPlus, Wand2, Star, Tag, Trash2, 
-  MoreVertical, TrendingUp, Award
-} from "lucide-react";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import { toast } from "sonner";
+import { Separator } from "@/components/ui/separator";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { InspireProject } from "@/types/inspire";
+import {
+  ArrowUpRight,
+  Calendar,
+  Check,
+  Copy,
+  Eye,
+  Share2,
+  Sparkles,
+  Star,
+  Wand2,
+} from "lucide-react";
+import { toast } from "sonner";
 
-interface InspireItem {
-  id: string;
-  share_token: string;
-  view_count: number;
-  like_count: number;
-  bookmark_count: number;
-  created_at: string;
-  featured: boolean;
-  staff_pick: boolean;
-  tags: {
-    style?: string[];
-    color?: string[];
-    mood?: string[];
-    composition?: string[];
-  };
-  user_id: string;
-  asset: {
-    id: string;
-    type: string;
-    image_url: string | null;
-    prompt: string | null;
-    created_at: string;
-  };
-  profile: {
-    id: string;
-    email: string;
-    username?: string;
-  };
-  isLiked?: boolean;
-  isBookmarked?: boolean;
-  isFollowing?: boolean;
-}
+const ITEMS_PER_PAGE = 24;
+
+const SELECT_COLUMNS = `
+  id,
+  share_token,
+  view_count,
+  like_count,
+  bookmark_count,
+  created_at,
+  featured,
+  staff_pick,
+  is_inspire_approved,
+  is_deleted,
+  tags,
+  user_id,
+  asset:generated_assets (
+    id,
+    type,
+    image_url,
+    prompt,
+    created_at
+  ),
+  profile:profiles!shared_assets_user_id_fkey (
+    id,
+    email,
+    username
+  )
+`;
+
+const sortProjects = (projects: InspireProject[]) => {
+  return [...projects].sort((a, b) => {
+    if ((a.featured ?? false) !== (b.featured ?? false)) {
+      return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
+    }
+    if ((a.staff_pick ?? false) !== (b.staff_pick ?? false)) {
+      return (b.staff_pick ? 1 : 0) - (a.staff_pick ? 1 : 0);
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+};
+
+const qualifiesForGallery = (project: InspireProject) => {
+  return !project.is_deleted && (project.is_inspire_approved || project.featured || project.staff_pick);
+};
+
+const buildShareUrl = (project: InspireProject) => {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/share/${project.share_token}`;
+};
+
+const formatDate = (date: string) => {
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
 
 const Inspire = () => {
   const { user } = useAuth();
-  const { isAdmin } = useAdminCheck();
-  const { openTool } = useToolsModal();
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const [items, setItems] = useState<InspireItem[]>([]);
-  const [filteredItems, setFilteredItems] = useState<InspireItem[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [styleFilter, setStyleFilter] = useState<string>("all");
-  const [colorFilter, setColorFilter] = useState<string>("all");
-  const [moodFilter, setMoodFilter] = useState<string>("all");
-  const [compositionFilter, setCompositionFilter] = useState<string>("all");
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [projects, setProjects] = useState<InspireProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedItem, setSelectedItem] = useState<InspireItem | null>(null);
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const [editingTags, setEditingTags] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [recentlyUpdatedIds, setRecentlyUpdatedIds] = useState<Set<string>>(new Set());
-  const [similarWorks, setSimilarWorks] = useState<InspireItem[]>([]);
-  const [loadingSimilar, setLoadingSimilar] = useState(false);
-  const [similarAnalysisSummary, setSimilarAnalysisSummary] = useState<{styles?: string[], moods?: string[]} | null>(null);
-  const observerTarget = useRef<HTMLDivElement>(null);
-  
-  const ITEMS_PER_PAGE = 24;
+  const [selectedProject, setSelectedProject] = useState<InspireProject | null>(null);
+  const [guestDialogOpen, setGuestDialogOpen] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
+  const [queuedStudioAction, setQueuedStudioAction] = useState(false);
+  const observerRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    fetchInspireItems();
+  const sortedProjects = useMemo(() => sortProjects(projects), [projects]);
+
+  const fetchProjects = useCallback(
+    async (pageNumber: number = 1, append = false) => {
+      try {
+        if (!append) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+
+        const from = (pageNumber - 1) * ITEMS_PER_PAGE;
+        const to = from + ITEMS_PER_PAGE - 1;
+
+        const { data, error, count } = await supabase
+          .from("shared_assets")
+          .select(SELECT_COLUMNS, { count: "exact" })
+          .eq("is_deleted", false)
+          .or("is_inspire_approved.eq.true,featured.eq.true,staff_pick.eq.true")
+          .order("created_at", { ascending: false })
+          .range(from, to);
+
+        if (error) throw error;
+
+        const validProjects = (data || []).filter((item): item is InspireProject => !!item.asset && qualifiesForGallery(item));
+
+        setProjects((prev) => {
+          const combined = append ? [...prev, ...validProjects] : validProjects;
+          const deduped = new Map<string, InspireProject>();
+          combined.forEach((item) => {
+            deduped.set(item.id, item);
+          });
+          return Array.from(deduped.values());
+        });
+
+        setHasMore(count ? to + 1 < count : validProjects.length === ITEMS_PER_PAGE);
+      } catch (error) {
+        console.error("Failed to load Inspire projects", error);
+        toast.error("Unable to load Inspire gallery right now.");
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    []
+  );
+
+  const fetchProjectById = useCallback(async (id: string) => {
+    const { data, error } = await supabase
+      .from("shared_assets")
+      .select(SELECT_COLUMNS)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching project", error);
+      return null;
+    }
+
+    if (data && data.asset && qualifiesForGallery(data as InspireProject)) {
+      return data as InspireProject;
+    }
+    return null;
   }, []);
 
-  // Fetch similar works when user is logged in
   useEffect(() => {
-    if (user) {
-      fetchSimilarWorks();
-    }
-  }, [user]);
+    fetchProjects();
+  }, [fetchProjects]);
 
-  // Real-time subscription for inspire updates (admin approvals/changes)
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          const nextPage = page + 1;
+          setPage(nextPage);
+          fetchProjects(nextPage, true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const node = observerRef.current;
+    if (node) {
+      observer.observe(node);
+    }
+
+    return () => {
+      if (node) {
+        observer.unobserve(node);
+      }
+    };
+  }, [fetchProjects, hasMore, loadingMore, page]);
+
   useEffect(() => {
     const channel = supabase
-      .channel('inspire-updates')
+      .channel("inspire-gallery")
       .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shared_assets'
-        },
-        (payload) => {
-          console.log('Real-time inspire update:', payload);
-          
-          // Handle INSERT (new approved items)
-          if (payload.eventType === 'INSERT') {
-            const newItem = payload.new as any;
-            if (newItem.is_inspire_approved && !newItem.is_deleted) {
-              fetchInspireItems(); // Refresh to get full item with relations
-              toast.info("New item added to gallery", { duration: 3000 });
-            }
-          }
-          
-          // Handle UPDATE (approval/removal changes)
-          if (payload.eventType === 'UPDATE') {
-            const updatedItem = payload.new as any;
-            
-            // Item was approved for Inspire
-            if (updatedItem.is_inspire_approved && !updatedItem.is_deleted) {
-              // Check if this is a change in approval status
-              const wasApproved = payload.old.is_inspire_approved && !payload.old.is_deleted;
-              
-              if (!wasApproved) {
-                // New to Inspire gallery - fetch to get full data with relations
-                fetchInspireItems();
-                toast.info("New item approved for gallery", { duration: 3000 });
-              } else {
-                // Just update metadata (featured, staff_pick, etc.)
-                setItems(prevItems => 
-                  prevItems.map(item => 
-                    item.id === updatedItem.id 
-                      ? { ...item, ...updatedItem }
-                      : item
-                  )
-                );
-                
-                setFilteredItems(prevItems => 
-                  prevItems.map(item => 
-                    item.id === updatedItem.id 
-                      ? { ...item, ...updatedItem }
-                      : item
-                  )
-                );
-                
-                // Show notifications for featured/staff pick changes
-                if (updatedItem.featured !== payload.old.featured) {
-                  toast.info(
-                    updatedItem.featured ? "Item featured" : "Item unfeatured",
-                    { duration: 3000 }
-                  );
-                }
-                
-                if (updatedItem.staff_pick !== payload.old.staff_pick) {
-                  toast.info(
-                    updatedItem.staff_pick ? "New staff pick" : "Staff pick removed",
-                    { duration: 3000 }
-                  );
-                }
-                
-                // Visual indicator for recent updates
-                setRecentlyUpdatedIds(prev => new Set(prev).add(updatedItem.id));
-                setTimeout(() => {
-                  setRecentlyUpdatedIds(prev => {
-                    const next = new Set(prev);
-                    next.delete(updatedItem.id);
-                    return next;
-                  });
-                }, 5000);
-              }
+        "postgres_changes",
+        { event: "*", schema: "public", table: "shared_assets" },
+        async (payload) => {
+          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+            const projectId = payload.new.id as string;
+            const project = await fetchProjectById(projectId);
+
+            if (project) {
+              setProjects((prev) => {
+                const filtered = prev.filter((item) => item.id !== project.id);
+                return [...filtered, project];
+              });
             } else {
-              // Item was unapproved or deleted - remove from view
-              setItems(prevItems => prevItems.filter(item => item.id !== updatedItem.id));
-              setFilteredItems(prevItems => prevItems.filter(item => item.id !== updatedItem.id));
-              toast.info("Item removed from gallery", { duration: 3000 });
+              setProjects((prev) => prev.filter((item) => item.id !== projectId));
             }
           }
-          
-          // Handle DELETE
-          if (payload.eventType === 'DELETE') {
-            const deletedId = payload.old.id;
-            setItems(prevItems => prevItems.filter(item => item.id !== deletedId));
-            setFilteredItems(prevItems => prevItems.filter(item => item.id !== deletedId));
-            toast.info("Item removed from gallery", { duration: 3000 });
+
+          if (payload.eventType === "DELETE") {
+            const deletedId = payload.old.id as string;
+            setProjects((prev) => prev.filter((item) => item.id !== deletedId));
           }
         }
       )
@@ -204,1305 +230,348 @@ const Inspire = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchProjectById]);
 
   useEffect(() => {
-    applyFilters();
-  }, [searchQuery, styleFilter, colorFilter, moodFilter, compositionFilter, items]);
+    const params = new URLSearchParams(location.search);
+    const projectParam = params.get("project");
+    const actionParam = params.get("action");
 
-  const applyFilters = () => {
-    let filtered = [...items];
-
-    // Search filter
-    if (searchQuery) {
-      const queries = searchQuery.toLowerCase().split('+').map(q => q.trim());
-      filtered = filtered.filter(item => {
-        const searchText = `${item.asset?.prompt} ${item.tags?.style?.join(' ')} ${item.tags?.color?.join(' ')} ${item.tags?.mood?.join(' ')}`.toLowerCase();
-        return queries.every(q => searchText.includes(q));
-      });
+    if (projectParam) {
+      setPendingProjectId(projectParam);
     }
 
-    // Style filter
-    if (styleFilter !== "all") {
-      filtered = filtered.filter(item => item.tags?.style?.includes(styleFilter));
+    if (actionParam === "studio") {
+      setQueuedStudioAction(true);
     }
-
-    // Color filter
-    if (colorFilter !== "all") {
-      filtered = filtered.filter(item => item.tags?.color?.includes(colorFilter));
-    }
-
-    // Mood filter
-    if (moodFilter !== "all") {
-      filtered = filtered.filter(item => item.tags?.mood?.includes(moodFilter));
-    }
-
-    // Composition filter
-    if (compositionFilter !== "all") {
-      filtered = filtered.filter(item => item.tags?.composition?.includes(compositionFilter));
-    }
-
-    setFilteredItems(filtered);
-  };
-
-  const fetchInspireItems = async (pageNum: number = 1, append: boolean = false) => {
-    try {
-      if (!append) setLoading(true);
-      else setLoadingMore(true);
-      
-      const from = (pageNum - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
-      
-      // @ts-ignore - Complex Supabase query types cause TS depth issues
-      const response = await supabase
-        .from("shared_assets")
-        .select(`
-          id,
-          share_token,
-          view_count,
-          like_count,
-          bookmark_count,
-          created_at,
-          featured,
-          staff_pick,
-          tags,
-          user_id,
-          asset:generated_assets (
-            id,
-            type,
-            image_url,
-            prompt,
-            created_at
-          ),
-          profile:profiles!shared_assets_user_id_fkey (
-            id,
-            email,
-            username
-          )
-        `, { count: 'exact' })
-        .eq("is_inspire_approved", true)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .range(from, to);
-
-      if (response.error) throw response.error;
-
-      // Filter out items with null assets and cast to InspireItem type
-      let validItems = ((response.data || []) as any[]).filter((item: any) => item.asset !== null) as InspireItem[];
-
-      // If user is logged in, fetch their social interactions
-      if (user) {
-        const [likesRes, bookmarksRes, followsRes] = await Promise.all([
-          supabase.from("asset_likes").select("shared_asset_id").eq("user_id", user.id),
-          supabase.from("asset_bookmarks").select("shared_asset_id").eq("user_id", user.id),
-          supabase.from("user_follows").select("following_id").eq("follower_id", user.id)
-        ]);
-
-        const likedIds = new Set(likesRes.data?.map(l => l.shared_asset_id) || []);
-        const bookmarkedIds = new Set(bookmarksRes.data?.map(b => b.shared_asset_id) || []);
-        const followingIds = new Set(followsRes.data?.map(f => f.following_id) || []);
-
-        validItems = validItems.map(item => ({
-          ...item,
-          isLiked: likedIds.has(item.id),
-          isBookmarked: bookmarkedIds.has(item.id),
-          isFollowing: followingIds.has(item.profile.id)
-        }));
-      }
-
-      if (append) {
-        setItems(prev => [...prev, ...validItems]);
-        setFilteredItems(prev => [...prev, ...validItems]);
-      } else {
-        setItems(validItems);
-        setFilteredItems(validItems);
-      }
-      
-      setHasMore(validItems.length === ITEMS_PER_PAGE && (response.count ? from + ITEMS_PER_PAGE < response.count : true));
-    } catch (error) {
-      console.error("Error fetching inspire items:", error);
-      toast.error("Failed to load inspire gallery");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
-
-  const fetchSimilarWorks = async () => {
-    if (!user) return;
-    
-    try {
-      setLoadingSimilar(true);
-      console.log('[Inspire] Fetching similar works...');
-      
-      const { data, error } = await supabase.functions.invoke('get-similar-works', {
-        headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        }
-      });
-
-      if (error) {
-        console.error('[Inspire] Error fetching similar works:', error);
-        toast.error("Failed to load recommendations");
-        return;
-      }
-
-      console.log('[Inspire] Similar works data:', data);
-      
-      if (data?.recommendations) {
-        // Add user interaction flags
-        const [likesRes, bookmarksRes, followsRes] = await Promise.all([
-          supabase.from("asset_likes").select("shared_asset_id").eq("user_id", user.id),
-          supabase.from("asset_bookmarks").select("shared_asset_id").eq("user_id", user.id),
-          supabase.from("user_follows").select("following_id").eq("follower_id", user.id)
-        ]);
-
-        const likedIds = new Set(likesRes.data?.map(l => l.shared_asset_id) || []);
-        const bookmarkedIds = new Set(bookmarksRes.data?.map(b => b.shared_asset_id) || []);
-        const followingIds = new Set(followsRes.data?.map(f => f.following_id) || []);
-
-        const enrichedRecommendations = data.recommendations.map((item: InspireItem) => ({
-          ...item,
-          isLiked: likedIds.has(item.id),
-          isBookmarked: bookmarkedIds.has(item.id),
-          isFollowing: followingIds.has(item.profile.id)
-        }));
-
-        setSimilarWorks(enrichedRecommendations);
-        setSimilarAnalysisSummary(data.analysis_summary);
-        console.log('[Inspire] Set similar works:', enrichedRecommendations.length);
-      }
-    } catch (error) {
-      console.error('[Inspire] Error in fetchSimilarWorks:', error);
-      toast.error("Failed to load personalized recommendations");
-    } finally {
-      setLoadingSimilar(false);
-    }
-  };
-
-  const loadMore = useCallback(() => {
-    if (loadingMore || !hasMore) return;
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchInspireItems(nextPage, true);
-  }, [page, loadingMore, hasMore]);
+  }, [location.search]);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
-          loadMore();
-        }
-      },
-      { threshold: 0.1 }
+    if (!pendingProjectId || sortedProjects.length === 0) return;
+
+    const project = sortedProjects.find(
+      (item) => item.id === pendingProjectId || item.share_token === pendingProjectId
     );
 
-    const currentTarget = observerTarget.current;
-    if (currentTarget) {
-      observer.observe(currentTarget);
+    if (project) {
+      setSelectedProject(project);
+      setPendingProjectId(null);
+    }
+  }, [pendingProjectId, sortedProjects]);
+
+  useEffect(() => {
+    if (queuedStudioAction && selectedProject) {
+      handleUseInStudio(selectedProject, { fromQuery: true });
+      setQueuedStudioAction(false);
+    }
+  }, [queuedStudioAction, selectedProject]);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    const updated = sortedProjects.find((item) => item.id === selectedProject.id);
+    if (updated && updated !== selectedProject) {
+      setSelectedProject(updated);
+    }
+  }, [sortedProjects, selectedProject]);
+
+  const handleOpenProject = (project: InspireProject) => {
+    setSelectedProject(project);
+    const params = new URLSearchParams(location.search);
+    params.set("project", project.id);
+    params.delete("action");
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: false });
+  };
+
+  const handleCloseProject = () => {
+    setSelectedProject(null);
+    const params = new URLSearchParams(location.search);
+    params.delete("project");
+    params.delete("action");
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  };
+
+  const handleShare = async (project: InspireProject) => {
+    const shareUrl = buildShareUrl(project);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Link copied to clipboard");
+    } catch (error) {
+      console.error("Share copy failed", error);
+      toast.error("Unable to copy link");
+    }
+  };
+
+  const handleUseInStudio = (project: InspireProject, options?: { fromQuery?: boolean }) => {
+    if (!user) {
+      setGuestDialogOpen(true);
+      if (!options?.fromQuery) {
+        const params = new URLSearchParams(location.search);
+        params.set("project", project.id);
+        params.set("action", "studio");
+        navigate({ pathname: location.pathname, search: params.toString() }, { replace: false });
+      }
+      return;
     }
 
-    return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
-    };
-  }, [loadMore, hasMore, loadingMore]);
+    const params = new URLSearchParams(location.search);
+    params.delete("action");
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
 
-  const handleCopyPrompt = async (prompt: string) => {
+    navigate("/", {
+      state: {
+        studioPrefill: {
+          prompt: project.asset?.prompt ?? "",
+          imageUrl: project.asset?.image_url ?? undefined,
+        },
+      },
+    });
+  };
+
+  const handleGuestSignIn = () => {
+    setGuestDialogOpen(false);
+    navigate("/auth");
+  };
+
+  const handleCopyPrompt = async (project: InspireProject) => {
+    if (!project.asset?.prompt) return;
     try {
-      await navigator.clipboard.writeText(prompt);
+      await navigator.clipboard.writeText(project.asset.prompt);
       setCopiedPrompt(true);
       toast.success("Prompt copied to clipboard");
       setTimeout(() => setCopiedPrompt(false), 2000);
     } catch (error) {
-      toast.error("Failed to copy prompt");
+      console.error("Prompt copy failed", error);
+      toast.error("Unable to copy prompt");
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
-
-  const getCreatorName = (item: InspireItem) => {
-    if (item.profile.username) {
-      return item.profile.username;
-    }
-    return item.profile.email.split('@')[0];
-  };
-
-  const handleLike = async (item: InspireItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!user) {
-      toast.error("Sign in to like");
-      navigate("/auth");
-      return;
-    }
-
-    try {
-      if (item.isLiked) {
-        await supabase.from("asset_likes").delete().match({ 
-          user_id: user.id, 
-          shared_asset_id: item.id 
-        });
-        toast.success("Removed like");
-      } else {
-        await supabase.from("asset_likes").insert({ 
-          user_id: user.id, 
-          shared_asset_id: item.id 
-        });
-        toast.success("Liked!");
-      }
-      await fetchInspireItems();
-    } catch (error) {
-      console.error("Error toggling like:", error);
-      toast.error("Failed to update like");
-    }
-  };
-
-  const handleBookmark = async (item: InspireItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!user) {
-      toast.error("Sign in to bookmark");
-      navigate("/auth");
-      return;
-    }
-
-    try {
-      if (item.isBookmarked) {
-        await supabase.from("asset_bookmarks").delete().match({ 
-          user_id: user.id, 
-          shared_asset_id: item.id 
-        });
-        toast.success("Removed bookmark");
-      } else {
-        await supabase.from("asset_bookmarks").insert({ 
-          user_id: user.id, 
-          shared_asset_id: item.id 
-        });
-        toast.success("Bookmarked!");
-      }
-      await fetchInspireItems();
-    } catch (error) {
-      console.error("Error toggling bookmark:", error);
-      toast.error("Failed to update bookmark");
-    }
-  };
-
-  const handleFollow = async (item: InspireItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!user) {
-      toast.error("Sign in to follow");
-      navigate("/auth");
-      return;
-    }
-
-    if (user.id === item.profile.id) {
-      toast.error("You can't follow yourself");
-      return;
-    }
-
-    try {
-      if (item.isFollowing) {
-        await supabase.from("user_follows").delete().match({ 
-          follower_id: user.id, 
-          following_id: item.profile.id 
-        });
-        toast.success("Unfollowed");
-      } else {
-        await supabase.from("user_follows").insert({ 
-          follower_id: user.id, 
-          following_id: item.profile.id 
-        });
-        toast.success("Following!");
-      }
-      await fetchInspireItems();
-    } catch (error) {
-      console.error("Error toggling follow:", error);
-      toast.error("Failed to update follow");
-    }
-  };
-
-  const handleRemix = (item: InspireItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!user) {
-      toast.error("Sign in to remix");
-      navigate("/auth");
-      return;
-    }
-    // This would open Studio with the prompt prefilled
-    navigate("/", { state: { remixPrompt: item.asset.prompt } });
-  };
-
-  const handleUseInStudio = (item: InspireItem) => {
-    if (!user) {
-      toast.error("Sign in to use in Studio");
-      navigate("/auth");
-      return;
-    }
-    navigate("/", { state: { remixPrompt: item.asset.prompt } });
-  };
-
-  const handleFeatureToggle = async (item: InspireItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isAdmin) return;
-
-    try {
-      await supabase
-        .from("shared_assets")
-        .update({ 
-          featured: !item.featured,
-          is_inspire_approved: true // Auto-approve when featuring
-        })
-        .eq("id", item.id);
-      
-      toast.success(item.featured ? "Removed from featured" : "Added to featured");
-      await fetchInspireItems();
-    } catch (error) {
-      console.error("Error toggling feature:", error);
-      toast.error("Failed to update");
-    }
-  };
-
-  const handleStaffPickToggle = async (item: InspireItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isAdmin) return;
-
-    try {
-      await supabase
-        .from("shared_assets")
-        .update({ 
-          staff_pick: !item.staff_pick,
-          is_inspire_approved: true // Auto-approve when staff picking
-        })
-        .eq("id", item.id);
-      
-      toast.success(item.staff_pick ? "Removed from staff picks" : "Added to staff picks");
-      await fetchInspireItems();
-    } catch (error) {
-      console.error("Error toggling staff pick:", error);
-      toast.error("Failed to update");
-    }
-  };
-
-  const handleDelete = async (item: InspireItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isAdmin) return;
-
-    if (!confirm("Are you sure you want to remove this item?")) return;
-
-    try {
-      await supabase.from("shared_assets").delete().eq("id", item.id);
-      toast.success("Removed successfully");
-      await fetchInspireItems();
-    } catch (error) {
-      console.error("Error deleting:", error);
-      toast.error("Failed to delete");
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col bg-surface-1">
-        <Header />
-        <main className="flex-1 container mx-auto px-6 py-12 max-w-7xl">
-          <div className="space-y-8">
-            <Skeleton className="h-32 w-full max-w-2xl mx-auto" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <Skeleton key={i} className="h-80" />
-              ))}
-            </div>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
-  // Get featured image for social sharing
-  const featuredImage = filteredItems.find(item => item.featured)?.asset?.image_url || 
-                        filteredItems[0]?.asset?.image_url ||
-                        "https://storage.googleapis.com/gpt-engineer-file-uploads/RlxlOFYt8hNksHtmpOGReulPRGQ2/social-images/social-1762339250584-AD-studio-visuals.jpg";
+  const heroImage = sortedProjects[0]?.asset?.image_url;
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface-1">
-      <Helmet>
-        <title>Inspire - Discover AI-Generated Art & Design | ArtDirector Studio</title>
-        <meta name="description" content="Explore stunning AI-generated images from the ArtDirector Studio community. Discover creative styles, find inspiration, and create your own masterpieces. Free to browse." />
-        <meta name="keywords" content="AI art gallery, AI-generated images, design inspiration, creative community, art styles, digital art, AI design tool" />
-        
-        {/* OpenGraph Tags for Social Sharing */}
-        <meta property="og:title" content="Inspire - Discover AI-Generated Art & Design | ArtDirector Studio" />
-        <meta property="og:description" content="Explore stunning AI-generated images from the ArtDirector Studio community. Discover creative styles, find inspiration, and create your own masterpieces." />
-        <meta property="og:image" content={featuredImage} />
-        <meta property="og:url" content={`${window.location.origin}/inspire`} />
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="ArtDirector Studio" />
-        
-        {/* Twitter Card Tags */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Inspire - Discover AI-Generated Art & Design" />
-        <meta name="twitter:description" content="Explore stunning AI-generated images from the ArtDirector Studio community. Discover creative styles and find inspiration." />
-        <meta name="twitter:image" content={featuredImage} />
-        <meta name="twitter:site" content="@lovable_dev" />
-        
-        {/* Structured Data for Rich Results */}
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "ImageGallery",
-            "name": "ArtDirector Studio Inspire Gallery",
-            "description": "Community gallery of AI-generated images and designs",
-            "url": `${window.location.origin}/inspire`,
-            "image": featuredImage,
-            "publisher": {
-              "@type": "Organization",
-              "name": "ArtDirector Studio",
-              "url": window.location.origin
-            }
-          })}
-        </script>
-        
-        <link rel="canonical" href={`${window.location.origin}/inspire`} />
-      </Helmet>
-      
-      <Header />
-      <main className="flex-1 container mx-auto px-6 py-12 max-w-7xl">
-        <div className="space-y-8 animate-fade-in">
-          {/* Header */}
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-sm font-medium">Inspire</span>
-            </div>
-            <h1 className="text-5xl md:text-6xl font-display font-bold tracking-tight">
-              Discover & Create
-            </h1>
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              Explore community creations, discover styles, and find inspiration for your next masterpiece
-            </p>
-            {user ? (
-              <Button size="lg" onClick={() => navigate("/")} className="mt-4 min-h-[48px]">
-                Start Creating
-              </Button>
-            ) : (
-              <Button size="lg" onClick={() => navigate("/auth")} className="mt-4 min-h-[48px]">
-                Try ArtDirector Free
-              </Button>
-            )}
-          </div>
+    <TooltipProvider delayDuration={150}>
+      <div className="min-h-screen bg-surface-1 text-foreground">
+        <Helmet>
+          <title>Inspire - Discover Real-Time AI Creations | ArtDirector Studio</title>
+          <meta
+            name="description"
+            content="Explore a live, ever-evolving gallery of AI art from the ArtDirector Studio community. Discover featured work, staff picks, and creative inspiration updated in real time."
+          />
+          {heroImage && <meta property="og:image" content={heroImage} />}
+          <meta property="og:title" content="Inspire - ArtDirector Studio" />
+          <meta property="og:description" content="Discover featured AI projects from the ArtDirector community." />
+        </Helmet>
 
-          {/* Filters */}
-          <Card className="glass p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="lg:col-span-1">
-                <label htmlFor="inspire-search" className="text-sm font-medium mb-2 block">Search</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <Input
-                    id="inspire-search"
-                    placeholder="portraits + golden hour"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                    aria-label="Search inspiration gallery"
+        <Header />
+
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-16 px-6 pb-24 pt-16">
+          <section className="relative overflow-hidden rounded-4xl border border-border/60 bg-background/70 p-10 shadow-[0_55px_120px_-80px_rgba(0,0,0,0.75)]">
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent" />
+            <div className="relative z-10 grid gap-8 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:items-center">
+              <div className="space-y-6">
+                <Badge variant="secondary" className="rounded-full px-4 py-1 text-xs uppercase tracking-[0.35em]">
+                  Inspire Gallery
+                </Badge>
+                <h1 className="text-4xl font-semibold leading-tight text-foreground sm:text-5xl">
+                  A living gallery of ArtDirector Studio creators
+                </h1>
+                <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
+                  Immerse yourself in a calm, image-led space curated in real time. Every project here has been approved by the ArtDirector Studio team or celebrated as a featured highlight.
+                </p>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Real-time updates
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-amber-500" />
+                    Staff picks &amp; featured drops
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-sky-500" />
+                    Viewable without signing in
+                  </div>
+                </div>
+              </div>
+              {heroImage && (
+                <div className="hidden md:block overflow-hidden rounded-3xl border border-border/60 shadow-xl">
+                  <img src={heroImage} alt="Latest featured Inspire project" className="h-full w-full object-cover" loading="lazy" />
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section>
+            {loading && projects.length === 0 ? (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 9 }).map((_, index) => (
+                  <Skeleton key={index} className="h-80 w-full rounded-3xl" />
+                ))}
+              </div>
+            ) : (
+              <div className="columns-1 gap-6 sm:columns-2 lg:columns-3 xl:columns-4">
+                {sortedProjects.map((project) => (
+                  <InspireCard
+                    key={project.id}
+                    project={project}
+                    onSelect={handleOpenProject}
+                    onUseInStudio={(item) => handleUseInStudio(item)}
+                    onShare={handleShare}
+                  />
+                ))}
+              </div>
+            )}
+            {(hasMore || loadingMore) && (
+              <div ref={observerRef} className="mt-12 flex justify-center">
+                <Button variant="ghost" disabled className="px-6 text-muted-foreground">
+                  {loadingMore ? "Loading more" : "Scroll to load more"}
+                </Button>
+              </div>
+            )}
+          </section>
+        </main>
+
+        <Footer />
+
+        {selectedProject && (
+          isMobile ? (
+            <Drawer open={!!selectedProject} onOpenChange={(open) => !open && handleCloseProject()}>
+              <DrawerContent className="max-h-[92dvh] rounded-t-4xl">
+                <DrawerHeader className="flex flex-col gap-1 text-left">
+                  <DrawerTitle className="text-lg font-semibold">
+                    {selectedProject.profile.username || selectedProject.profile.email.split("@")[0]}
+                  </DrawerTitle>
+                  <p className="text-sm text-muted-foreground">{formatDate(selectedProject.created_at)}</p>
+                </DrawerHeader>
+                <div className="space-y-6 overflow-y-auto px-6 pb-10">
+                  {selectedProject.asset?.image_url && (
+                    <img
+                      src={selectedProject.asset.image_url}
+                      alt={selectedProject.asset.prompt ?? "Inspire project"}
+                      className="w-full rounded-3xl"
+                    />
+                  )}
+                  <ProjectDetails
+                    project={selectedProject}
+                    onCopyPrompt={() => handleCopyPrompt(selectedProject)}
+                    copiedPrompt={copiedPrompt}
+                    onUseInStudio={() => handleUseInStudio(selectedProject)}
+                    onShare={() => handleShare(selectedProject)}
                   />
                 </div>
-              </div>
-              
-              <div>
-                <label htmlFor="style-filter" className="text-sm font-medium mb-2 block">Style</label>
-                <Select value={styleFilter} onValueChange={setStyleFilter}>
-                  <SelectTrigger id="style-filter" aria-label="Filter by style">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Styles</SelectItem>
-                    <SelectItem value="realistic">Realistic</SelectItem>
-                    <SelectItem value="artistic">Artistic</SelectItem>
-                    <SelectItem value="abstract">Abstract</SelectItem>
-                    <SelectItem value="minimalist">Minimalist</SelectItem>
-                    <SelectItem value="vintage">Vintage</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label htmlFor="color-filter" className="text-sm font-medium mb-2 block">Color</label>
-                <Select value={colorFilter} onValueChange={setColorFilter}>
-                  <SelectTrigger id="color-filter" aria-label="Filter by color">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Colors</SelectItem>
-                    <SelectItem value="warm">Warm</SelectItem>
-                    <SelectItem value="cool">Cool</SelectItem>
-                    <SelectItem value="monochrome">Monochrome</SelectItem>
-                    <SelectItem value="vibrant">Vibrant</SelectItem>
-                    <SelectItem value="pastel">Pastel</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label htmlFor="mood-filter" className="text-sm font-medium mb-2 block">Mood</label>
-                <Select value={moodFilter} onValueChange={setMoodFilter}>
-                  <SelectTrigger id="mood-filter" aria-label="Filter by mood">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Moods</SelectItem>
-                    <SelectItem value="calm">Calm</SelectItem>
-                    <SelectItem value="dramatic">Dramatic</SelectItem>
-                    <SelectItem value="joyful">Joyful</SelectItem>
-                    <SelectItem value="mysterious">Mysterious</SelectItem>
-                    <SelectItem value="energetic">Energetic</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label htmlFor="composition-filter" className="text-sm font-medium mb-2 block">Composition</label>
-                <Select value={compositionFilter} onValueChange={setCompositionFilter}>
-                  <SelectTrigger id="composition-filter" aria-label="Filter by composition">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="portrait">Portrait</SelectItem>
-                    <SelectItem value="landscape">Landscape</SelectItem>
-                    <SelectItem value="closeup">Close-up</SelectItem>
-                    <SelectItem value="wideangle">Wide Angle</SelectItem>
-                    <SelectItem value="centered">Centered</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </Card>
-
-          {/* Tabs */}
-          <Tabs defaultValue="trending" className="w-full">
-            <TabsList className="glass-strong">
-              <TabsTrigger value="staffpicks" className="gap-2">
-                <Award className="w-4 h-4" />
-                Staff Picks
-              </TabsTrigger>
-              <TabsTrigger value="trending" className="gap-2">
-                <TrendingUp className="w-4 h-4" />
-                Trending This Week
-              </TabsTrigger>
-              <TabsTrigger value="fresh" className="gap-2">
-                <Sparkles className="w-4 h-4" />
-                Fresh
-              </TabsTrigger>
-              {user && (
-                <TabsTrigger value="similar" className="gap-2">
-                  <Shuffle className="w-4 h-4" />
-                  Similar to Your Work
-                </TabsTrigger>
-              )}
-            </TabsList>
-
-            <TabsContent value="staffpicks" className="mt-8">
-              <InspireGrid 
-                items={filteredItems.filter(i => i.staff_pick)} 
-                onItemClick={setSelectedItem}
-                onLike={handleLike}
-                onBookmark={handleBookmark}
-                onFollow={handleFollow}
-                onRemix={handleRemix}
-                onFeatureToggle={handleFeatureToggle}
-                onStaffPickToggle={handleStaffPickToggle}
-                onDelete={handleDelete}
-                getCreatorName={getCreatorName}
-                formatDate={formatDate}
-                isAdmin={isAdmin}
-                recentlyUpdatedIds={recentlyUpdatedIds}
-              />
-            </TabsContent>
-
-            <TabsContent value="trending" className="mt-8">
-              <InspireGrid 
-                items={[...filteredItems].sort((a, b) => 
-                  (b.like_count + b.view_count * 0.1) - (a.like_count + a.view_count * 0.1)
-                ).slice(0, 24)} 
-                onItemClick={setSelectedItem}
-                onLike={handleLike}
-                onBookmark={handleBookmark}
-                onFollow={handleFollow}
-                onRemix={handleRemix}
-                onFeatureToggle={handleFeatureToggle}
-                onStaffPickToggle={handleStaffPickToggle}
-                onDelete={handleDelete}
-                getCreatorName={getCreatorName}
-                formatDate={formatDate}
-                isAdmin={isAdmin}
-                recentlyUpdatedIds={recentlyUpdatedIds}
-              />
-            </TabsContent>
-
-            <TabsContent value="fresh" className="mt-8">
-              <InspireGrid 
-                items={filteredItems} 
-                onItemClick={setSelectedItem}
-                onLike={handleLike}
-                onBookmark={handleBookmark}
-                onFollow={handleFollow}
-                onRemix={handleRemix}
-                onFeatureToggle={handleFeatureToggle}
-                onStaffPickToggle={handleStaffPickToggle}
-                onDelete={handleDelete}
-                getCreatorName={getCreatorName}
-                formatDate={formatDate}
-                isAdmin={isAdmin}
-                recentlyUpdatedIds={recentlyUpdatedIds}
-              />
-            </TabsContent>
-
-            {user && (
-              <TabsContent value="similar" className="mt-8">
-                <div className="space-y-6">
-                  {similarAnalysisSummary && (
-                    <div className="glass p-6 rounded-2xl space-y-3 animate-fade-in">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Sparkles className="w-4 h-4" />
-                        <span>Based on your creative style</span>
+              </DrawerContent>
+            </Drawer>
+          ) : (
+            <Dialog open={!!selectedProject} onOpenChange={(open) => !open && handleCloseProject()}>
+              <DialogContent className="max-w-5xl overflow-hidden rounded-4xl p-0">
+                <div className="grid max-h-[80vh] grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+                  <div className="relative bg-muted">
+                    {selectedProject.asset?.image_url && (
+                      <img
+                        src={selectedProject.asset.image_url}
+                        alt={selectedProject.asset.prompt ?? "Inspire project"}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-6 overflow-y-auto border-l border-border/60 p-8">
+                    <DialogHeader className="space-y-3 text-left">
+                      <DialogTitle className="text-xl font-semibold">
+                        {selectedProject.profile.username || selectedProject.profile.email.split("@")[0]}
+                      </DialogTitle>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {formatDate(selectedProject.created_at)}</span>
+                        <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> {selectedProject.view_count.toLocaleString()} views</span>
+                        {selectedProject.featured && <Badge className="bg-primary/90 text-primary-foreground">Featured</Badge>}
+                        {selectedProject.staff_pick && <Badge variant="secondary">Staff Pick</Badge>}
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {similarAnalysisSummary.styles?.map((style, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {style}
-                          </Badge>
-                        ))}
-                        {similarAnalysisSummary.moods?.map((mood, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">
-                            {mood}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {loadingSimilar ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {[...Array(6)].map((_, i) => (
-                        <Skeleton key={i} className="h-80" />
-                      ))}
-                    </div>
-                  ) : similarWorks.length > 0 ? (
-                    <InspireGrid 
-                      items={similarWorks} 
-                      onItemClick={setSelectedItem}
-                      onLike={handleLike}
-                      onBookmark={handleBookmark}
-                      onFollow={handleFollow}
-                      onRemix={handleRemix}
-                      onFeatureToggle={handleFeatureToggle}
-                      onStaffPickToggle={handleStaffPickToggle}
-                      onDelete={handleDelete}
-                      getCreatorName={getCreatorName}
-                      formatDate={formatDate}
-                      isAdmin={isAdmin}
-                      recentlyUpdatedIds={recentlyUpdatedIds}
+                    </DialogHeader>
+                    <ProjectDetails
+                      project={selectedProject}
+                      onCopyPrompt={() => handleCopyPrompt(selectedProject)}
+                      copiedPrompt={copiedPrompt}
+                      onUseInStudio={() => handleUseInStudio(selectedProject)}
+                      onShare={() => handleShare(selectedProject)}
                     />
-                  ) : (
-                    <div className="text-center py-16 space-y-4">
-                      <div className="rounded-full bg-primary/10 w-16 h-16 mx-auto flex items-center justify-center">
-                        <Sparkles className="w-8 h-8 text-primary" />
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-xl font-semibold">Create to discover</h3>
-                        <p className="text-muted-foreground max-w-md mx-auto">
-                          Generate a few images first, and we'll find similar works that match your creative style
-                        </p>
-                      </div>
-                      <Button onClick={() => navigate("/")} className="mt-4">
-                        Start Creating
-                      </Button>
-                    </div>
-                  )}
+                  </div>
                 </div>
-              </TabsContent>
-            )}
-          </Tabs>
-        </div>
-      </main>
-      <Footer />
+              </DialogContent>
+            </Dialog>
+          )
+        )}
 
-      {/* Detail Modal */}
-      {isMobile ? (
-        <Drawer open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-          <DrawerContent className="max-h-[95dvh] overflow-y-auto">
-            {selectedItem && (
-              <div className="px-4 pb-4 space-y-6">
-                {selectedItem.asset.image_url && (
-                  <div className="relative overflow-hidden rounded-2xl bg-muted flex items-center justify-center min-h-[300px]">
-                    <img
-                      src={selectedItem.asset.image_url}
-                      alt="Generated content"
-                      className="w-full h-auto object-contain max-h-[70vh]"
-                      loading="lazy"
-                    />
-                    {(selectedItem.staff_pick || selectedItem.featured) && (
-                      <div className="absolute top-4 right-4 flex gap-2">
-                        {selectedItem.staff_pick && (
-                          <Badge className="bg-amber-500 text-white border-amber-600">
-                            <Award className="w-3 h-3 mr-1" />
-                            Staff Pick
-                          </Badge>
-                        )}
-                        {selectedItem.featured && (
-                          <Badge className="bg-primary">
-                            <Star className="w-3 h-3 mr-1" />
-                            Featured
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <div className="space-y-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-semibold text-lg">
-                        {getCreatorName(selectedItem)[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-base">by {getCreatorName(selectedItem)}</p>
-                          {user && user.id !== selectedItem.profile.id && (
-                            <Button
-                              size="sm"
-                              variant={selectedItem.isFollowing ? "secondary" : "outline"}
-                              onClick={(e) => handleFollow(selectedItem, e)}
-                              className="min-h-[36px] text-xs"
-                            >
-                              <UserPlus className="w-3 h-3 mr-1" />
-                              {selectedItem.isFollowing ? "Following" : "Follow"}
-                            </Button>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{formatDate(selectedItem.asset.created_at)}</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="capitalize text-xs px-2 py-1">
-                      {selectedItem.asset.type}
-                    </Badge>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                    <button
-                      onClick={(e) => handleLike(selectedItem, e)}
-                      className="flex items-center gap-2 hover:text-foreground transition-colors min-h-[44px] px-2"
-                    >
-                      <Heart className={`h-5 w-5 ${selectedItem.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-                      <span className="font-medium">{selectedItem.like_count}</span>
-                    </button>
-
-                    <button
-                      onClick={(e) => handleBookmark(selectedItem, e)}
-                      className="flex items-center gap-2 hover:text-foreground transition-colors min-h-[44px] px-2"
-                    >
-                      <Bookmark className={`h-5 w-5 ${selectedItem.isBookmarked ? 'fill-primary text-primary' : ''}`} />
-                      <span className="font-medium">{selectedItem.bookmark_count}</span>
-                    </button>
-
-                    <div className="flex items-center gap-2">
-                      <Eye className="h-5 w-5" />
-                      <span className="font-medium">{selectedItem.view_count} views</span>
-                    </div>
-                  </div>
-
-                  {selectedItem.asset.prompt && (
-                    <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-base">Prompt</h3>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleCopyPrompt(selectedItem.asset.prompt!)}
-                          className="min-h-[36px]"
-                        >
-                          {copiedPrompt ? (
-                            <>
-                              <Check className="h-4 w-4 mr-2" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4 mr-2" />
-                              Copy
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <p className="text-sm leading-relaxed">{selectedItem.asset.prompt}</p>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-3">
-                    <Button 
-                      className="w-full min-h-[48px]" 
-                      size="lg"
-                      onClick={() => handleUseInStudio(selectedItem)}
-                    >
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      Generate in Studio
-                    </Button>
-                    {user && (
-                      <Button 
-                        variant="outline" 
-                        size="lg"
-                        className="w-full min-h-[48px]"
-                        onClick={(e) => handleRemix(selectedItem, e)}
-                      >
-                        <Shuffle className="w-4 h-4 mr-2" />
-                        Remix
-                      </Button>
-                    )}
-                  </div>
-
-                  {isAdmin && (
-                    <div className="pt-4 border-t border-border space-y-3">
-                      <p className="text-sm font-medium text-muted-foreground">Admin Tools</p>
-                      <div className="flex flex-col gap-2">
-                        <Button
-                          size="sm"
-                          variant={selectedItem.staff_pick ? "default" : "outline"}
-                          onClick={(e) => handleStaffPickToggle(selectedItem, e)}
-                          className="w-full min-h-[44px]"
-                        >
-                          <Award className="w-3 h-3 mr-1" />
-                          {selectedItem.staff_pick ? "Remove Staff Pick" : "Add Staff Pick"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={selectedItem.featured ? "default" : "outline"}
-                          onClick={(e) => handleFeatureToggle(selectedItem, e)}
-                          className="w-full min-h-[44px]"
-                        >
-                          <Star className="w-3 h-3 mr-1" />
-                          {selectedItem.featured ? "Unfeature" : "Feature"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={(e) => handleDelete(selectedItem, e)}
-                          className="w-full min-h-[44px]"
-                        >
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-          <DialogContent className="max-w-5xl max-h-[90dvh] overflow-y-auto">
-            {selectedItem && (
-              <div className="space-y-6">
-                {selectedItem.asset.image_url && (
-                  <div className="relative overflow-hidden rounded-2xl bg-muted flex items-center justify-center min-h-[300px]">
-                    <img
-                      src={selectedItem.asset.image_url}
-                      alt="Generated content"
-                      className="w-full h-auto object-contain max-h-[70vh]"
-                      loading="lazy"
-                    />
-                    {(selectedItem.staff_pick || selectedItem.featured) && (
-                      <div className="absolute top-4 right-4 flex gap-2">
-                        {selectedItem.staff_pick && (
-                          <Badge className="bg-amber-500 text-white border-amber-600">
-                            <Award className="w-3 h-3 mr-1" />
-                            Staff Pick
-                          </Badge>
-                        )}
-                        {selectedItem.featured && (
-                          <Badge className="bg-primary">
-                            <Star className="w-3 h-3 mr-1" />
-                            Featured
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <div className="space-y-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-semibold text-lg">
-                        {getCreatorName(selectedItem)[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-lg">by {getCreatorName(selectedItem)}</p>
-                          {user && user.id !== selectedItem.profile.id && (
-                            <Button
-                              size="sm"
-                              variant={selectedItem.isFollowing ? "secondary" : "outline"}
-                              onClick={(e) => handleFollow(selectedItem, e)}
-                              className="min-h-[36px]"
-                            >
-                              <UserPlus className="w-3 h-3 mr-1" />
-                              {selectedItem.isFollowing ? "Following" : "Follow"}
-                            </Button>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">{formatDate(selectedItem.asset.created_at)}</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="capitalize text-sm px-3 py-1">
-                      {selectedItem.asset.type}
-                    </Badge>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => handleLike(selectedItem, e)}
-                            className="flex items-center gap-2 hover:text-foreground transition-colors min-h-[44px]"
-                          >
-                            <Heart className={`h-5 w-5 ${selectedItem.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-                            <span className="font-medium">{selectedItem.like_count}</span>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>Like</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => handleBookmark(selectedItem, e)}
-                            className="flex items-center gap-2 hover:text-foreground transition-colors min-h-[44px]"
-                          >
-                            <Bookmark className={`h-5 w-5 ${selectedItem.isBookmarked ? 'fill-primary text-primary' : ''}`} />
-                            <span className="font-medium">{selectedItem.bookmark_count}</span>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>Bookmark</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <div className="flex items-center gap-2">
-                      <Eye className="h-5 w-5" />
-                      <span className="font-medium">{selectedItem.view_count} views</span>
-                    </div>
-                  </div>
-
-                  {selectedItem.asset.prompt && (
-                    <div className="space-y-3 p-6 rounded-xl bg-muted/30 border border-border">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-lg">Prompt</h3>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleCopyPrompt(selectedItem.asset.prompt!)}
-                          className="min-h-[36px]"
-                        >
-                          {copiedPrompt ? (
-                            <>
-                              <Check className="h-4 w-4 mr-2" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4 mr-2" />
-                              Copy
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <p className="text-sm leading-relaxed">{selectedItem.asset.prompt}</p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <Button 
-                      className="flex-1 min-h-[44px]" 
-                      size="lg"
-                      onClick={() => handleUseInStudio(selectedItem)}
-                    >
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      Generate in Studio
-                    </Button>
-                    {user && (
-                      <Button 
-                        variant="outline" 
-                        size="lg"
-                        className="min-h-[44px]"
-                        onClick={(e) => handleRemix(selectedItem, e)}
-                      >
-                        <Shuffle className="w-4 h-4 mr-2" />
-                        Remix
-                      </Button>
-                    )}
-                  </div>
-
-                  {isAdmin && (
-                    <div className="pt-4 border-t border-border space-y-3">
-                      <p className="text-sm font-medium text-muted-foreground">Admin Tools</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant={selectedItem.staff_pick ? "default" : "outline"}
-                          onClick={(e) => handleStaffPickToggle(selectedItem, e)}
-                          className="min-h-[36px]"
-                        >
-                          <Award className="w-3 h-3 mr-1" />
-                          {selectedItem.staff_pick ? "Remove Staff Pick" : "Add Staff Pick"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={selectedItem.featured ? "default" : "outline"}
-                          onClick={(e) => handleFeatureToggle(selectedItem, e)}
-                          className="min-h-[36px]"
-                        >
-                          <Star className="w-3 h-3 mr-1" />
-                          {selectedItem.featured ? "Unfeature" : "Feature"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={(e) => handleDelete(selectedItem, e)}
-                          className="min-h-[36px]"
-                        >
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
+        <GuestActionDialog
+          open={guestDialogOpen}
+          onOpenChange={setGuestDialogOpen}
+          onSignIn={handleGuestSignIn}
+          title="Sign in to remix this project"
+          description="Access the Studio to remix prompts, tweak settings, and generate your own variations."
+        />
+      </div>
+    </TooltipProvider>
   );
 };
 
-interface InspireGridProps {
-  items: InspireItem[];
-  onItemClick: (item: InspireItem) => void;
-  onLike: (item: InspireItem, e: React.MouseEvent) => void;
-  onBookmark: (item: InspireItem, e: React.MouseEvent) => void;
-  onFollow: (item: InspireItem, e: React.MouseEvent) => void;
-  onRemix: (item: InspireItem, e: React.MouseEvent) => void;
-  onFeatureToggle: (item: InspireItem, e: React.MouseEvent) => void;
-  onStaffPickToggle: (item: InspireItem, e: React.MouseEvent) => void;
-  onDelete: (item: InspireItem, e: React.MouseEvent) => void;
-  getCreatorName: (item: InspireItem) => string;
-  formatDate: (date: string) => string;
-  isAdmin: boolean;
-  recentlyUpdatedIds: Set<string>;
+interface ProjectDetailsProps {
+  project: InspireProject;
+  onCopyPrompt: () => void;
+  copiedPrompt: boolean;
+  onUseInStudio: () => void;
+  onShare: () => void;
 }
 
-const InspireGrid = ({ 
-  items, 
-  onItemClick, 
-  onLike,
-  onBookmark,
-  onFollow,
-  onRemix,
-  onFeatureToggle,
-  onStaffPickToggle,
-  onDelete,
-  getCreatorName, 
-  formatDate,
-  isAdmin,
-  recentlyUpdatedIds
-}: InspireGridProps) => {
-  const { user } = useAuth();
-
-  if (items.length === 0) {
-    return (
-      <Card className="p-12 text-center glass">
-        <Sparkles className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-        <p className="text-muted-foreground">No items found</p>
-      </Card>
-    );
-  }
-
+const ProjectDetails = ({ project, onCopyPrompt, copiedPrompt, onUseInStudio, onShare }: ProjectDetailsProps) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {items.map((item) => (
-        <Card
-          key={item.id}
-          className={`group cursor-pointer overflow-hidden hover:shadow-strong transition-all duration-300 interactive-card border-border/50 relative ${
-            recentlyUpdatedIds.has(item.id) ? 'animate-scale-in ring-2 ring-primary shadow-lg' : ''
-          }`}
-          onClick={() => onItemClick(item)}
-        >
-          {item.asset?.image_url && (
-            <div className="aspect-square overflow-hidden bg-muted relative">
-              <img
-                src={item.asset.image_url}
-                alt={`Generated artwork - ${item.asset.prompt?.substring(0, 100) || 'Creative inspiration'}`}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                loading="lazy"
-                decoding="async"
-                width="400"
-                height="400"
-              />
-              
-              {/* Badges */}
-              <div className="absolute top-2 right-2 flex gap-1">
-                {recentlyUpdatedIds.has(item.id) && (
-                  <Badge className="animate-pulse bg-primary text-primary-foreground text-xs">
-                    <Sparkles className="w-3 h-3" />
-                  </Badge>
-                )}
-                {item.staff_pick && (
-                  <Badge className="bg-amber-500 text-white border-amber-600 text-xs">
-                    <Award className="w-3 h-3" />
-                  </Badge>
-                )}
-                {item.featured && (
-                  <Badge className="bg-primary text-xs">
-                    <Star className="w-3 h-3" />
-                  </Badge>
-                )}
-              </div>
+    <div className="space-y-6 text-sm text-muted-foreground">
+      <div>
+        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/70">Prompt</p>
+        <p className="mt-3 rounded-2xl bg-muted/40 p-4 text-base text-foreground shadow-inner">
+          {project.asset?.prompt ?? "No prompt provided"}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={onCopyPrompt} className="gap-2">
+            {copiedPrompt ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copiedPrompt ? "Copied" : "Copy prompt"}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onShare} className="gap-2">
+            <Share2 className="h-4 w-4" /> Share
+          </Button>
+        </div>
+      </div>
 
-              {/* Hover Actions */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                         <Button
-                           size="sm"
-                           variant="secondary"
-                           className="min-h-[44px] min-w-[44px] p-0"
-                           onClick={(e) => onLike(item, e)}
-                           aria-label={item.isLiked ? "Unlike this item" : "Like this item"}
-                         >
-                           <Heart className={`h-4 w-4 ${item.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {user ? (item.isLiked ? "Unlike" : "Like") : "Sign in to like"}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                         <Button
-                           size="sm"
-                           variant="secondary"
-                           className="min-h-[44px] min-w-[44px] p-0"
-                           onClick={(e) => onBookmark(item, e)}
-                           aria-label={item.isBookmarked ? "Remove bookmark" : "Bookmark this item"}
-                         >
-                           <Bookmark className={`h-4 w-4 ${item.isBookmarked ? 'fill-primary text-primary' : ''}`} />
-                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {user ? (item.isBookmarked ? "Remove bookmark" : "Bookmark") : "Sign in to bookmark"}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                         <Button
-                           size="sm"
-                           variant="secondary"
-                           className="min-h-[44px] min-w-[44px] p-0"
-                           onClick={(e) => onRemix(item, e)}
-                           aria-label="Remix this creation"
-                         >
-                           <Shuffle className="h-4 w-4" />
-                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {user ? "Remix this creation" : "Sign in to remix"}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  {isAdmin && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                         <Button
-                           size="sm"
-                           variant="secondary"
-                           className="min-h-[44px] min-w-[44px] p-0 ml-auto"
-                           onClick={(e) => e.stopPropagation()}
-                           aria-label="Admin actions menu"
-                         >
-                           <MoreVertical className="h-4 w-4" />
-                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem onClick={(e) => onStaffPickToggle(item, e)}>
-                          <Award className="w-4 h-4 mr-2" />
-                          {item.staff_pick ? "Remove Staff Pick" : "Add Staff Pick"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => onFeatureToggle(item, e)}>
-                          <Star className="w-4 h-4 mr-2" />
-                          {item.featured ? "Unfeature" : "Feature"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => onDelete(item, e)} className="text-destructive">
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <Badge variant="secondary" className="capitalize text-xs">{item.asset.type}</Badge>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Heart className={`h-3 w-3 ${item.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-                  <span>{item.like_count}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Eye className="h-3 w-3" />
-                  <span>{item.view_count}</span>
-                </div>
-              </div>
-            </div>
-            
-            {item.asset.prompt && (
-              <p className="text-sm line-clamp-2 leading-relaxed">{item.asset.prompt}</p>
+      <div className="space-y-3">
+        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/70">Tags</p>
+        <div className="flex flex-wrap gap-2">
+          {project.tags &&
+            Object.entries(project.tags).flatMap(([group, values]) =>
+              (values || []).map((value) => (
+                <Badge key={`${group}-${value}`} variant="outline" className="rounded-full border-border/60">
+                  {value}
+                </Badge>
+              ))
             )}
-            
-            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
-              <span className="flex items-center gap-1 font-medium">
-                by {getCreatorName(item)}
-              </span>
-              <span className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {formatDate(item.asset.created_at)}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+          {!project.tags && <span className="text-muted-foreground">No tags provided</span>}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <Button className="w-full gap-2" onClick={onUseInStudio}>
+          <Wand2 className="h-4 w-4" /> Use in Studio
+        </Button>
+        <Button
+          variant="secondary"
+          className="w-full gap-2"
+          onClick={() => {
+            const url = buildShareUrl(project);
+            if (url) {
+              window.open(url, "_blank", "noopener,noreferrer");
+            }
+          }}
+        >
+          <ArrowUpRight className="h-4 w-4" /> View public link
+        </Button>
+      </div>
     </div>
   );
 };
