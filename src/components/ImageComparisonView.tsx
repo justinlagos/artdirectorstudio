@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Download, X, ChevronLeft, ChevronRight, Eye, Maximize2 } from "lucide-r
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface GeneratedImage {
   id: string;
@@ -28,12 +29,41 @@ export const ImageComparisonView = ({
 }: ImageComparisonViewProps) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showFullscreen, setShowFullscreen] = useState(false);
+  const isMobile = useIsMobile();
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
 
   if (generatedImages.length === 0) {
     return null;
   }
 
   const currentImage = generatedImages[selectedIndex];
+
+  // Swipe gesture support for mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!isMobile || generatedImages.length <= 1) return;
+    
+    const swipeThreshold = 50;
+    const diff = touchStartX.current - touchEndX.current;
+
+    if (Math.abs(diff) > swipeThreshold) {
+      if (diff > 0) {
+        // Swiped left - next image
+        handleNext();
+      } else {
+        // Swiped right - previous image
+        handlePrevious();
+      }
+    }
+  };
 
   const handleDownloadComparison = () => {
     // Download the current generated image
@@ -87,8 +117,13 @@ export const ImageComparisonView = ({
             )}
           </div>
 
-          {/* Before/After Slider */}
-          <div className="relative">
+          {/* Before/After Slider with Touch Support */}
+          <div 
+            className="relative touch-pan-x"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <BeforeAfterSlider
               beforeImage={originalImage}
               afterImage={currentImage.imageUrl}
@@ -96,6 +131,17 @@ export const ImageComparisonView = ({
               afterLabel="Generated"
               className="w-full"
             />
+            
+            {/* Swipe Indicator for Mobile */}
+            {isMobile && generatedImages.length > 1 && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+                <Badge variant="secondary" className="text-xs py-1 px-3 bg-background/90 backdrop-blur-sm shadow-lg animate-fade-in">
+                  <ChevronLeft className="w-3 h-3 inline mr-1" />
+                  Swipe to compare
+                  <ChevronRight className="w-3 h-3 inline ml-1" />
+                </Badge>
+              </div>
+            )}
             
             {/* Navigation Arrows (on larger screens) */}
             {generatedImages.length > 1 && (
@@ -135,7 +181,7 @@ export const ImageComparisonView = ({
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Eye className="w-3 h-3" />
+                  <Eye className="w-3 h-3 flex-shrink-0" />
                   <span>Generated {formatTimestamp(currentImage.timestamp)}</span>
                 </div>
                 <p className="text-sm text-muted-foreground line-clamp-2">
@@ -146,9 +192,10 @@ export const ImageComparisonView = ({
                 variant="secondary"
                 size="sm"
                 onClick={handleDownloadComparison}
+                className="min-h-[44px] px-4 flex-shrink-0"
               >
-                <Download className="w-3 h-3 mr-2" />
-                Download
+                <Download className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Download</span>
               </Button>
             </div>
           </div>
@@ -163,6 +210,7 @@ export const ImageComparisonView = ({
                     variant="outline"
                     size="sm"
                     onClick={handlePrevious}
+                    className="min-h-[44px] min-w-[44px]"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
@@ -170,6 +218,7 @@ export const ImageComparisonView = ({
                     variant="outline"
                     size="sm"
                     onClick={handleNext}
+                    className="min-h-[44px] min-w-[44px]"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </Button>
@@ -182,7 +231,7 @@ export const ImageComparisonView = ({
                     <button
                       key={image.id}
                       onClick={() => setSelectedIndex(index)}
-                      className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                      className={`relative flex-shrink-0 w-20 h-20 min-w-[80px] rounded-lg overflow-hidden border-2 transition-all touch-manipulation ${
                         selectedIndex === index
                           ? 'border-primary shadow-medium scale-105'
                           : 'border-border hover:border-primary/50 opacity-70 hover:opacity-100'

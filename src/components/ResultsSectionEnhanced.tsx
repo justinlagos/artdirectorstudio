@@ -509,6 +509,73 @@ export const ResultsSection = ({
           </div>
         </section>
 
+        {/* Studio Results Section - Moved Here */}
+        <section className="space-y-6 rounded-3xl border border-border/40 bg-background p-6 sm:p-10 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)] animate-fade-in">
+          <div className="flex flex-col gap-2 text-center sm:text-left">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground/80">Studio Output</p>
+            <h2 className="text-2xl sm:text-3xl font-display font-bold tracking-tight">Studio Results</h2>
+            <p className="text-sm text-muted-foreground">Review and compare everything you created from this blueprint.</p>
+          </div>
+
+          {generatedImages.length === 0 ? (
+            // Empty State
+            <div className="flex flex-col items-center justify-center py-12 sm:py-16 px-4 text-center space-y-4 rounded-2xl border-2 border-dashed border-border/60 bg-muted/20">
+              <div className="rounded-full bg-primary/10 p-4 animate-scale-in">
+                <Wand2 className="w-8 h-8 text-primary" />
+              </div>
+              <div className="space-y-2 max-w-md">
+                <h3 className="text-lg font-semibold text-foreground">No images generated yet</h3>
+                <p className="text-sm text-muted-foreground">
+                  Click "Generate in Studio" above to create your first image from this blueprint. Your generated images will appear here for comparison.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => handleOpenStudio()}
+                className="mt-2 min-h-[44px] px-6"
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                Generate Your First Image
+              </Button>
+            </div>
+          ) : (
+            // Results Content
+            <Tabs defaultValue="comparison" className="w-full">
+              <TabsList className="grid w-full max-w-md grid-cols-2 h-11">
+                <TabsTrigger value="comparison" className="gap-2 min-h-[44px]">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">Comparison</span>
+                  <span className="sm:hidden">Compare</span>
+                </TabsTrigger>
+                <TabsTrigger value="gallery" className="gap-2 min-h-[44px]">
+                  <Grid3x3 className="h-4 w-4" />
+                  Gallery
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="comparison" className="mt-6">
+                {imagePreviewUrl ? (
+                  <ImageComparisonView
+                    originalImage={imagePreviewUrl}
+                    generatedImages={generatedImages}
+                  />
+                ) : (
+                  <div className="py-12 text-center rounded-2xl border border-border/40 bg-muted/10">
+                    <p className="text-sm text-muted-foreground">Original image not available for comparison</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="gallery" className="mt-6">
+                <GeneratedImagesGallery
+                  images={generatedImages}
+                  onDelete={onDeleteImage}
+                />
+              </TabsContent>
+            </Tabs>
+          )}
+        </section>
+
         {extractInsights().length > 0 && (
           <InsightChips insights={extractInsights()} />
         )}
@@ -557,46 +624,6 @@ export const ResultsSection = ({
         </section>
       </div>
 
-      {generatedImages.length > 0 && (
-        <div className="space-y-6 rounded-3xl border border-border/40 bg-background p-6 sm:p-10 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)]">
-          <div className="flex flex-col gap-2 text-center sm:text-left">
-            <h2 className="text-2xl font-display font-bold tracking-tight">Studio Results</h2>
-            <p className="text-sm text-muted-foreground">Review and compare everything you created from this blueprint.</p>
-          </div>
-
-          <Tabs defaultValue="comparison" className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="comparison" className="gap-2">
-                <SlidersHorizontal className="h-4 w-4" />
-                Comparison
-              </TabsTrigger>
-              <TabsTrigger value="gallery" className="gap-2">
-                Gallery
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="comparison" className="mt-6">
-              {imagePreviewUrl ? (
-                <ImageComparisonView
-                  originalImage={imagePreviewUrl}
-                  generatedImages={generatedImages}
-                />
-              ) : (
-                <div className="py-8 text-center text-muted-foreground">
-                  Original image not available for comparison
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="gallery" className="mt-6">
-              <GeneratedImagesGallery
-                images={generatedImages}
-                onDelete={onDeleteImage}
-              />
-            </TabsContent>
-          </Tabs>
-        </div>
-      )}
 
       {/* Quick Tools Section - Moved to End */}
       <section className="rounded-3xl border border-border/40 bg-background p-6 sm:p-8 shadow-[0_35px_90px_-60px_rgba(0,0,0,0.55)]">
