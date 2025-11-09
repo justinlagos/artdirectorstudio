@@ -295,11 +295,11 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       const response = await fetch(imageDataUrl);
       const blob = await response.blob();
       
-      // Use standardized storage path: results/{userId}/{yyyy-mm}/blend/{uuid}.png
+      // Storage path MUST start with user ID for RLS policy: {userId}/blend/{yyyy-mm}/{uuid}.png
       const now = new Date();
       const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       const uuid = crypto.randomUUID();
-      const fileName = `results/${user.id}/${yearMonth}/blend/${uuid}.png`;
+      const fileName = `${user.id}/blend/${yearMonth}/${uuid}.png`;
       
       const { error: uploadError } = await supabase.storage
         .from('generated-images')
