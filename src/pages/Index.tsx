@@ -25,6 +25,8 @@ import { useKeyboardShortcuts, KeyboardShortcut, getModifierKey } from "@/hooks/
 import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { ImageGenerationDialog, type GenerationOptions } from "@/components/ImageGenerationDialog";
 import { LandingFeaturedInspire } from "@/components/LandingFeaturedInspire";
+import { GuestActionDialog } from "@/components/GuestActionDialog";
+import type { InspireProject } from "@/types/inspire";
 
 export interface Analysis {
   image_overview: string;
@@ -80,6 +82,7 @@ const Index = () => {
   const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
   const [studioPrefill, setStudioPrefill] = useState<{ prompt: string; imageUrl?: string } | null>(null);
   const [showStudioPrefillDialog, setShowStudioPrefillDialog] = useState(false);
+  const [landingGuestDialogOpen, setLandingGuestDialogOpen] = useState(false);
 
   // Pull-to-refresh functionality
   const handleRefresh = async () => {
@@ -227,10 +230,30 @@ const Index = () => {
     }
   ];
 
-  useKeyboardShortcuts({ 
-    shortcuts, 
-    enabled: !loading 
+  useKeyboardShortcuts({
+    shortcuts,
+    enabled: !loading
   });
+
+  const handleLandingUseInStudio = (project: InspireProject) => {
+    if (!project) return;
+
+    if (!user) {
+      setLandingGuestDialogOpen(true);
+      return;
+    }
+
+    setStudioPrefill({
+      prompt: project.asset?.prompt ?? "",
+      imageUrl: project.asset?.image_url ?? undefined,
+    });
+    setShowStudioPrefillDialog(true);
+  };
+
+  const handleLandingGuestSignIn = () => {
+    setLandingGuestDialogOpen(false);
+    navigate("/auth");
+  };
 
   if (loading) {
     return (
@@ -727,7 +750,7 @@ const Index = () => {
 
       <section className="px-6 lg:px-8 pb-16">
         <div className="mx-auto w-full max-w-7xl">
-          <LandingFeaturedInspire />
+          <LandingFeaturedInspire onUseInStudio={handleLandingUseInStudio} />
         </div>
       </section>
 
@@ -770,6 +793,14 @@ const Index = () => {
           </TooltipContent>
         </Tooltip>
       )}
+
+      <GuestActionDialog
+        open={landingGuestDialogOpen}
+        onOpenChange={setLandingGuestDialogOpen}
+        onSignIn={handleLandingGuestSignIn}
+        title="Sign in to Remix this project"
+        description="Try ArtDirector Studio free. Sign in to open this project in Studio."
+      />
     </div>
   );
 };

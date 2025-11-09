@@ -1,5 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface GuestActionDialogProps {
   open: boolean;
@@ -13,8 +20,8 @@ export const GuestActionDialog = ({
   open,
   onOpenChange,
   onSignIn,
-  title = "Sign in to continue",
-  description = "Create a free account or sign in to remix this project in ArtDirector Studio.",
+  title = "Sign in to remix this project",
+  description = "Try ArtDirector Studio free. Sign in to open this project in Studio.",
 }: GuestActionDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -47,3 +54,4 @@ export const GuestActionDialog = ({
     </Dialog>
   );
 };
+
