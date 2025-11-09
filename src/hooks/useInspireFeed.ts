@@ -76,20 +76,22 @@ export const useInspireFeed = ({
       });
 
       if (fetchError) {
-        setError("Unable to load Inspire projects right now.");
+        console.error('[useInspireFeed] Fetch error:', fetchError);
+        setError("Unable to load Inspire projects. Please try again.");
         throw fetchError;
       }
 
       setError(null);
+      const dataArray = Array.isArray(data) ? data : [];
       setProjects((prev) => {
-        const combined = append ? [...prev, ...data] : data;
+        const combined = append ? [...prev, ...dataArray] : dataArray;
         return sortInspireProjects(dedupeProjects(combined));
       });
 
       if (typeof count === "number") {
-        setHasMore((from + data.length) < count);
+        setHasMore((from + dataArray.length) < count);
       } else {
-        setHasMore(data.length === pageSize);
+        setHasMore(dataArray.length === pageSize);
       }
     },
     [dedupeProjects, filter, pageSize, resetAbortController]

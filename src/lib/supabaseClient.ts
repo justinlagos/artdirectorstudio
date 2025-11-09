@@ -126,6 +126,13 @@ export const fetchInspireProjects = async ({
     const { data, error, count } = await query;
 
     if (error) {
+      console.error('[fetchInspireProjects] Database error:', {
+        code: error.code,
+        message: error.message,
+        hint: error.hint,
+        details: error.details
+      });
+      
       if (error.code === "PGRST301" || error.code === "42501") {
         return { data: [], count: 0, error: null } as const;
       }
@@ -137,9 +144,12 @@ export const fetchInspireProjects = async ({
       return { data: [], count: 0, error } as const;
     }
 
-    const cleaned = (data ?? []).filter((item): item is InspireProject =>
-      Boolean(item && item.asset && qualifiesForPublicInspire(item as InspireProject))
-    );
+    const cleaned = (data ?? [])
+      .filter((item) => {
+        if (!item || !item.asset) return false;
+        return qualifiesForPublicInspire(item as unknown as InspireProject);
+      })
+      .map((item) => item as unknown as InspireProject);
 
     return { data: sortInspireProjects(cleaned), count: count ?? cleaned.length, error: null } as const;
   } catch (error) {

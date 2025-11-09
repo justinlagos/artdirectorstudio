@@ -1,6 +1,6 @@
 export interface InspireProjectAsset {
   id: string;
-  type: string;
+  type: "analysis" | "image" | "prompt";
   image_url: string | null;
   prompt: string | null;
   created_at: string;
@@ -31,7 +31,7 @@ export interface InspireProject {
   staff_pick: boolean | null;
   is_inspire_approved?: boolean | null;
   is_deleted?: boolean | null;
-  tags: InspireProjectTags | null;
+  tags: InspireProjectTags | null | Record<string, any>;
   user_id: string;
   asset: InspireProjectAsset | null;
   profile?: InspireProjectProfile | null;

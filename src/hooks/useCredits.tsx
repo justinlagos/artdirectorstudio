@@ -31,9 +31,14 @@ export const useCredits = () => {
   };
 
   useEffect(() => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
     fetchBalance();
 
-    // Subscribe to credit changes
+    // Subscribe to credit changes - only if user.id is defined
     const channel = supabase
       .channel('credits-changes')
       .on(
@@ -42,7 +47,7 @@ export const useCredits = () => {
           event: '*',
           schema: 'public',
           table: 'credits',
-          filter: `user_id=eq.${user?.id}`
+          filter: `user_id=eq.${user.id}`
         },
         () => {
           fetchBalance();
@@ -53,7 +58,7 @@ export const useCredits = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]);
 
   return { balance, loading, refetch: fetchBalance };
 };

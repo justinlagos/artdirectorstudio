@@ -37,9 +37,12 @@ const History = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
 
-    const fetchAssets = async () => {
+    const fetchAssets = async (retries = 3) => {
       try {
         const { data, error } = await supabase
           .from('generated_assets')
@@ -47,11 +50,21 @@ const History = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+          console.error('[History] Fetch error:', error);
+          throw error;
+        }
+        
+        console.log(`[History] Fetched ${data?.length || 0} assets`);
         setAssets(data || []);
       } catch (error) {
         console.error("Error fetching assets:", error);
-        toast.error("Failed to load history");
+        if (retries > 0) {
+          console.log(`Retrying... (${retries} attempts left)`);
+          setTimeout(() => fetchAssets(retries - 1), 1000);
+        } else {
+          toast.error("Failed to load projects. Please refresh the page.");
+        }
       } finally {
         setLoading(false);
       }
@@ -59,7 +72,7 @@ const History = () => {
 
     fetchAssets();
 
-    // Subscribe to realtime changes
+    // Subscribe to realtime changes - only if user.id is defined
     const channel = supabase
       .channel('assets-changes')
       .on(
@@ -79,7 +92,7 @@ const History = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]);
 
   const handleDelete = async (id: string) => {
     try {
