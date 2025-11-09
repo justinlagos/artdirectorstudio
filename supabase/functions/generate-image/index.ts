@@ -87,7 +87,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({ action: 'generate_image' }),
       },
-      { maxRetries: 1, delayMs: 1000, timeoutMs: 10000 }
+      { maxRetries: 1, baseDelayMs: 1000, maxDelayMs: 10000, timeoutMs: 10000 }
     );
 
     const accessResult = await accessResponse.json();
@@ -206,7 +206,7 @@ serve(async (req) => {
           modalities: ["image", "text"]
         }),
       },
-      { maxRetries: 2, delayMs: 2000, timeoutMs: 60000 }
+      { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 60000 }
     );
 
     if (!aiResponse.ok) {

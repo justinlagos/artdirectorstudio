@@ -178,7 +178,7 @@ serve(async (req) => {
           modalities: ["image", "text"]
         })
       },
-      { maxRetries: 1, delayMs: 2000, timeoutMs: 45000 }
+      { maxRetries: 2, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 45000 }
     );
 
     if (!response.ok) {

@@ -57,7 +57,7 @@ serve(async (req) => {
           ]
         })
       },
-      { maxRetries: 2, delayMs: 1000, timeoutMs: 30000 }
+      { maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 20000, timeoutMs: 30000 }
     );
 
     if (!response.ok) {

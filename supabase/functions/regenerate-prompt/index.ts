@@ -192,7 +192,7 @@ Return ONLY the JSON object, no markdown, no extra text.`
           ],
         }),
       },
-      { maxRetries: 2, delayMs: 2000, timeoutMs: 45000 }
+      { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 45000 }
     );
 
     if (!response.ok) {

@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useRetryWithBackoff } from "@/hooks/useRetryWithBackoff";
 
 interface Message {
   id: string;
@@ -49,6 +50,7 @@ export const ArtieChat = () => {
   const { openTool } = useToolsModal();
   const { balance, refetch: refetchCredits } = useCredits();
   const isMobile = useIsMobile();
+  const { fetchWithRetry, retryState } = useRetryWithBackoff();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -575,28 +577,37 @@ export const ArtieChat = () => {
                     throw new Error('No active session');
                   }
 
-                  const genResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`,
-                    },
-                    body: JSON.stringify({ 
-                      prompt: args.prompt,
-                      quality: args.quality || 'auto',
-                      size: args.size || '1024x1024'
-                    })
-                  });
-
-                  console.log('[ARTIE] Generate image response status:', genResponse.status);
-                  
-                  if (!genResponse.ok) {
-                    const errorData = await genResponse.json().catch(() => ({ error: 'Failed to generate image' }));
-                    console.error('[ARTIE] Generate image error:', errorData);
-                    throw new Error(errorData.error || `Failed to generate image (${genResponse.status})`);
-                  }
-
-                  const genData = await genResponse.json();
+                  // Use retry with exponential backoff
+                  const genData = await fetchWithRetry<{ success: boolean; image: string; assetId?: string }>(
+                    () => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                      },
+                      body: JSON.stringify({ 
+                        prompt: args.prompt,
+                        quality: args.quality || 'auto',
+                        size: args.size || '1024x1024'
+                      })
+                    }),
+                    {
+                      maxRetries: 3,
+                      baseDelayMs: 2000,
+                      onRetry: (attempt, error) => {
+                        console.log(`[ARTIE] Generate retry attempt ${attempt}:`, error.message);
+                        // Update UI to show retry status
+                        const retryText = `\n\n⏳ Retrying (attempt ${attempt}/3)...`;
+                        setMessages(prev => 
+                          prev.map(m => 
+                            m.id === assistantMessageId 
+                              ? { ...m, text: accumulatedText + retryText }
+                              : m
+                          )
+                        );
+                      }
+                    }
+                  );
                   console.log('[ARTIE] Generated image data:', genData);
                   
                   if (genData.image) {
@@ -656,29 +667,38 @@ export const ArtieChat = () => {
                     throw new Error('No active session');
                   }
 
-                  const editResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-image`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`,
-                    },
-                    body: JSON.stringify({ 
-                      imageUrl: args.imageUrl,
-                      instruction: args.instruction,
-                      quality: args.quality || 'auto',
-                      size: args.size || '1024x1024'
-                    })
-                  });
-
-                  console.log('[ARTIE] Edit image response status:', editResponse.status);
-                  
-                  if (!editResponse.ok) {
-                    const errorData = await editResponse.json().catch(() => ({ error: 'Failed to edit image' }));
-                    console.error('[ARTIE] Edit image error:', errorData);
-                    throw new Error(errorData.error || `Failed to edit image (${editResponse.status})`);
-                  }
-
-                  const editData = await editResponse.json();
+                  // Use retry with exponential backoff
+                  const editData = await fetchWithRetry<{ success: boolean; image: string; assetId?: string }>(
+                    () => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-image`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                      },
+                      body: JSON.stringify({ 
+                        imageUrl: args.imageUrl,
+                        instruction: args.instruction,
+                        quality: args.quality || 'auto',
+                        size: args.size || '1024x1024'
+                      })
+                    }),
+                    {
+                      maxRetries: 3,
+                      baseDelayMs: 2000,
+                      onRetry: (attempt, error) => {
+                        console.log(`[ARTIE] Edit retry attempt ${attempt}:`, error.message);
+                        // Update UI to show retry status
+                        const retryText = `\n\n⏳ Retrying (attempt ${attempt}/3)...`;
+                        setMessages(prev => 
+                          prev.map(m => 
+                            m.id === assistantMessageId 
+                              ? { ...m, text: accumulatedText + retryText }
+                              : m
+                          )
+                        );
+                      }
+                    }
+                  );
                   console.log('[ARTIE] Edited image data:', editData);
                   
                   if (editData.image) {
