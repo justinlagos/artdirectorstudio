@@ -548,7 +548,6 @@ export const ImageGenerationDialog = ({
           Open this prompt in Studio and create instantly. Cost: <span className="font-semibold text-foreground">3 credits</span>
         </>
       }
-      contentClassName="pb-8 md:pb-6"
       footer={footerContent}
     >
       {bodyContent}
