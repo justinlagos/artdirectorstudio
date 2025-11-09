@@ -67,6 +67,7 @@ export const ToolDrawer = ({
                 contentClassName,
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
+              data-studio-modal-body
             >
               {children}
             </div>

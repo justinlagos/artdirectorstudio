@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Wand2 } from "lucide-react";
+import { openStudioWithPrompt } from "@/lib/studio";
 
 interface InspireCardProps {
   project: InspireProject;
@@ -129,7 +130,10 @@ const InspireCardComponent = ({
               className="h-10 w-10 rounded-full bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:scale-105"
               onClick={(event) => {
                 event.stopPropagation();
-                onUseInStudio(project);
+                openStudioWithPrompt({
+                  basePrompt: project.asset?.prompt ?? "",
+                  imageUrl: project.asset?.image_url ?? undefined,
+                });
               }}
               aria-label="Use in Studio"
             >
