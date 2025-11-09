@@ -8,7 +8,7 @@ export interface InspireProjectAsset {
 
 export interface InspireProjectProfile {
   id: string;
-  email: string;
+  email?: string | null;
   username?: string | null;
 }
 
@@ -34,5 +34,5 @@ export interface InspireProject {
   tags: InspireProjectTags | null;
   user_id: string;
   asset: InspireProjectAsset | null;
-  profile: InspireProjectProfile;
+  profile?: InspireProjectProfile | null;
 }

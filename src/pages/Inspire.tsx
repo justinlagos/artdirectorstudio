@@ -337,7 +337,9 @@ const Inspire = () => {
               <DrawerContent className="max-h-[92dvh] rounded-t-4xl">
                 <DrawerHeader className="flex flex-col gap-1 text-left">
                   <DrawerTitle className="text-lg font-semibold">
-                    {selectedProject.profile.username || selectedProject.profile.email.split("@")[0]}
+                    {selectedProject.profile?.username ||
+                      selectedProject.profile?.email?.split("@")[0] ||
+                      "Creator"}
                   </DrawerTitle>
                   <p className="text-sm text-muted-foreground">{formatDate(selectedProject.created_at)}</p>
                 </DrawerHeader>
@@ -375,7 +377,9 @@ const Inspire = () => {
                   <div className="flex flex-col gap-6 overflow-y-auto border-l border-border/60 p-8">
                     <DialogHeader className="space-y-3 text-left">
                       <DialogTitle className="text-xl font-semibold">
-                        {selectedProject.profile.username || selectedProject.profile.email.split("@")[0]}
+                        {selectedProject.profile?.username ||
+                          selectedProject.profile?.email?.split("@")[0] ||
+                          "Creator"}
                       </DialogTitle>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
