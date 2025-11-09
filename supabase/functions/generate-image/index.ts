@@ -296,48 +296,53 @@ serve(async (req) => {
         .getPublicUrl(fileName);
       finalImageUrl = urlData.publicUrl;
 
-      // Save metadata to database
+      // Save metadata to database with graceful fallback
       const dbStart = Date.now();
       console.log(`[${requestId}] Saving to database...`);
-      const { data: savedAsset, error: assetError } = await supabaseAdmin
-        .from('generated_assets')
-        .insert({
-          user_id: userId,
-          type: 'image',
-          prompt: prompt,
-          image_url: finalImageUrl,
-          analysis_data: {
-            generation_params: { quality, size, background },
-            generated_at: new Date().toISOString(),
-            request_id: requestId
-          }
-        })
-        .select()
-        .single();
+      
+      try {
+        const { data: savedAsset, error: assetError } = await supabaseAdmin
+          .from('generated_assets')
+          .insert({
+            user_id: userId,
+            type: 'image',
+            prompt: prompt,
+            image_url: finalImageUrl,
+            analysis_data: {
+              generation_params: { quality, size, background },
+              generated_at: new Date().toISOString(),
+              request_id: requestId
+            }
+          })
+          .select()
+          .single();
 
-      if (assetError) {
-        console.error(`[${requestId}] Database save error:`, assetError);
-        const { response } = createErrorResponse(
-          assetError.message?.includes('duplicate') 
-            ? 'Duplicate generation detected. Please try again.'
-            : 'Failed to save image metadata. The image was generated but not saved.',
-          500,
-          'database_error',
-          requestId,
-          { dbError: assetError.message }
-        );
-        return response;
+        if (assetError) {
+          console.error(`[${requestId}] Database save error (non-fatal):`, {
+            error: assetError.message,
+            code: assetError.code,
+            details: assetError.details
+          });
+          // Don't fail the request - image is already generated and uploaded
+          console.log(`[${requestId}] Continuing without metadata save - image available at: ${finalImageUrl}`);
+        } else {
+          const dbDuration = Date.now() - dbStart;
+          assetData = savedAsset;
+          console.log(`[${requestId}] Database save complete (${dbDuration}ms)`);
+          console.log(`[${requestId}] Asset details:`, { 
+            assetId: assetData.id, 
+            hasImageUrl: !!assetData.image_url,
+            hasPrompt: !!assetData.prompt,
+            userId: assetData.user_id
+          });
+        }
+      } catch (dbSaveError) {
+        console.error(`[${requestId}] Database save exception (non-fatal):`, {
+          error: dbSaveError instanceof Error ? dbSaveError.message : 'Unknown',
+          stack: dbSaveError instanceof Error ? dbSaveError.stack : undefined
+        });
+        // Continue - image is available even if metadata isn't saved
       }
-
-      const dbDuration = Date.now() - dbStart;
-      assetData = savedAsset;
-      console.log(`[${requestId}] Database save complete (${dbDuration}ms)`);
-      console.log(`[${requestId}] Asset details:`, { 
-        assetId: assetData.id, 
-        hasImageUrl: !!assetData.image_url,
-        hasPrompt: !!assetData.prompt,
-        userId: assetData.user_id
-      });
     } catch (error) {
       console.error(`[${requestId}] Failed to save image:`, error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
