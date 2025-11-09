@@ -61,8 +61,9 @@ export const ToolDrawer = ({
               className={cn(
                 "flex-1 overflow-y-auto px-6 py-5",
                 "[&::-webkit-scrollbar]:w-2",
-                "supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.25rem+env(safe-area-inset-bottom))]",
-                stickyFooterOnMobile && "pb-32 md:pb-5",
+                stickyFooterOnMobile 
+                  ? "pb-[calc(8rem+env(safe-area-inset-bottom))] md:pb-5" 
+                  : "supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.25rem+env(safe-area-inset-bottom))]",
                 contentClassName,
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
@@ -72,7 +73,7 @@ export const ToolDrawer = ({
 
             {footer && (
               <footer className={cn(
-                "z-20 border-t border-border/80 bg-background px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur shadow-[0_-4px_12px_rgba(0,0,0,0.1)]",
+                "z-20 border-t border-border/80 bg-background/95 px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)]",
                 stickyFooterOnMobile 
                   ? "fixed bottom-0 left-0 right-0 md:sticky md:bottom-0" 
                   : "sticky bottom-0"
