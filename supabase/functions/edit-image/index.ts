@@ -108,6 +108,15 @@ serve(async (req) => {
 
     console.log("[EDIT-IMAGE] Request:", { imageUrl: imageUrl.slice(0, 50), instructionLength: instruction.length });
 
+    // Convert filename to full URL if needed
+    let fullImageUrl = imageUrl;
+    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:')) {
+      // It's a filename, construct the full Supabase Storage URL
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      fullImageUrl = `${supabaseUrl}/storage/v1/object/public/generated-images/${imageUrl}`;
+      console.log("[EDIT-IMAGE] Converted filename to URL:", fullImageUrl);
+    }
+
     // Get Lovable API key
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -149,7 +158,7 @@ serve(async (req) => {
                 {
                   type: "image_url",
                   image_url: {
-                    url: imageUrl
+                    url: fullImageUrl
                   }
                 }
               ]
@@ -240,7 +249,7 @@ serve(async (req) => {
           prompt: instruction,
           image_url: finalImageUrl,
           analysis_data: {
-            source_image: imageUrl.slice(0, 100),
+            source_image: fullImageUrl.slice(0, 100),
             generation_params: { quality, size },
             edited_at: new Date().toISOString()
           }
