@@ -28,6 +28,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const ITEMS_PER_PAGE = 24;
 
@@ -264,21 +265,22 @@ const Inspire = () => {
   };
 
   return (
-    <TooltipProvider delayDuration={150}>
-      <div className="min-h-screen bg-surface-1 text-foreground">
-        <Helmet>
-          <title>Inspire - Discover Real-Time AI Creations | ArtDirector Studio</title>
-          <meta
-            name="description"
-            content="Explore a live, ever-evolving gallery of AI art from the ArtDirector Studio community. Discover featured work, staff picks, and creative inspiration updated in real time."
-          />
-          {heroImage && <meta property="og:image" content={heroImage} />}
-          <meta property="og:title" content="Inspire - ArtDirector Studio" />
-          <meta
-            property="og:description"
-            content="Discover featured AI projects from the ArtDirector community."
-          />
-        </Helmet>
+    <ErrorBoundary onReset={() => refresh()}>
+      <TooltipProvider delayDuration={150}>
+        <div className="min-h-screen bg-surface-1 text-foreground">
+          <Helmet>
+            <title>Inspire - Discover Real-Time AI Creations | ArtDirector Studio</title>
+            <meta
+              name="description"
+              content="Explore a live, ever-evolving gallery of AI art from the ArtDirector Studio community. Discover featured work, staff picks, and creative inspiration updated in real time."
+            />
+            {heroImage && <meta property="og:image" content={heroImage} />}
+            <meta property="og:title" content="Inspire - ArtDirector Studio" />
+            <meta
+              property="og:description"
+              content="Discover featured AI projects from the ArtDirector community."
+            />
+          </Helmet>
 
         <Header />
 
@@ -425,8 +427,9 @@ const Inspire = () => {
           title="Sign in to Remix this project"
           description="Try ArtDirector Studio free. Sign in to open this project in Studio."
         />
-      </div>
-    </TooltipProvider>
+        </div>
+      </TooltipProvider>
+    </ErrorBoundary>
   );
 };
 

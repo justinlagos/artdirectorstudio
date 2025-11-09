@@ -28,6 +28,7 @@ import { GuestActionDialog } from "@/components/GuestActionDialog";
 import type { InspireProject } from "@/types/inspire";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { useStudioStore } from "@/store/studioStore";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export interface Analysis {
   image_overview: string;
@@ -483,13 +484,14 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <PullToRefreshIndicator
-        pullDistance={pullDistance}
-        isRefreshing={isRefreshing}
-        threshold={80}
-      />
-      <Header />
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background">
+        <PullToRefreshIndicator
+          pullDistance={pullDistance}
+          isRefreshing={isRefreshing}
+          threshold={80}
+        />
+        <Header />
       
       {/* Hero Section */}
       <section className="pt-20 pb-16 px-6 lg:px-8">
@@ -803,7 +805,8 @@ const Index = () => {
         title="Sign in to Remix this project"
         description="Try ArtDirector Studio free. Sign in to open this project in Studio."
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };
 

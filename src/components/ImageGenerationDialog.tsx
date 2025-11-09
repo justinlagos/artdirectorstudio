@@ -28,6 +28,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useModalStore } from "@/store/modalStore";
 import { useStudioStore } from "@/store/studioStore";
 import { closeStudioModal } from "@/lib/studio";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
@@ -555,26 +556,28 @@ export const ImageGenerationDialog = () => {
   );
 
   return (
-    <ToolDrawer
-      open={isGenerateModalOpen}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          handleClose();
+    <ErrorBoundary onReset={handleClose}>
+      <ToolDrawer
+        open={isGenerateModalOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            handleClose();
+          }
+        }}
+        title={
+          <div className="flex items-center gap-2">
+            <Wand2 className="h-5 w-5" />
+            Generate in Studio
+          </div>
         }
-      }}
-      title={
-        <div className="flex items-center gap-2">
-          <Wand2 className="h-5 w-5" />
-          Generate in Studio
-        </div>
-      }
-      description="Craft new variations instantly with your prompt and optional reference image."
-      contentClassName="studio-modal-body"
-      className="studio-modal-wrapper"
-      footer={footerContent}
-      stickyFooterOnMobile
-    >
-      {bodyContent}
-    </ToolDrawer>
+        description="Craft new variations instantly with your prompt and optional reference image."
+        contentClassName="studio-modal-body"
+        className="studio-modal-wrapper"
+        footer={footerContent}
+        stickyFooterOnMobile
+      >
+        {bodyContent}
+      </ToolDrawer>
+    </ErrorBoundary>
   );
 };
