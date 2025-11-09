@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { GenerationOptions } from "@/components/ImageGenerationDialog";
+import { mapErrorMessage } from "@/lib/toolErrorMessages";
 
 export type StudioGenerator = (
   prompt: string,
@@ -34,21 +35,27 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
   });
 
   if (error) {
-    const message = error.message || "Failed to generate image. Please try again.";
-
-    if (message.toLowerCase().includes("rate limit")) {
-      throw new Error("Too many requests. Please wait a moment and try again.");
+    // Parse structured error response
+    let errorData: any = error;
+    
+    // Try to extract error details from FunctionsHttpError
+    if (error.context) {
+      try {
+        errorData = typeof error.context === 'string' 
+          ? JSON.parse(error.context) 
+          : error.context;
+      } catch {
+        errorData = error;
+      }
     }
-
-    if (message.toLowerCase().includes("credits")) {
-      throw new Error("AI service temporarily unavailable. Please try again later.");
-    }
-
-    throw new Error(message);
+    
+    // Use the error mapping utility to get user-friendly message
+    const friendlyMessage = mapErrorMessage(errorData);
+    throw new Error(friendlyMessage);
   }
 
   if (!data?.image) {
-    throw new Error("Failed to generate image. Please try again.");
+    throw new Error("Failed to generate image. No image data returned.");
   }
 
   return data.image as string;

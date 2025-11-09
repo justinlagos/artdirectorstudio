@@ -2,6 +2,8 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { fetchWithRetry } from '../_shared/retry.ts';
+import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
+import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,20 +12,28 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Generate unique request ID for tracing
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
+    console.log(`[${requestId}] Generation request started`);
+    
     // Extract and validate JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      console.error("No authorization header");
-      return new Response(
-        JSON.stringify({ error: "Unauthorized: No authorization header" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(`[${requestId}] No authorization header`);
+      const { response } = createErrorResponse(
+        "Please sign in to generate images",
+        401,
+        'auth_required'
       );
+      return response;
     }
 
     const token = authHeader.replace('Bearer ', '');
@@ -35,18 +45,36 @@ serve(async (req) => {
 
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !userData?.user) {
-      console.error("Unable to resolve user from token", userError);
-      return new Response(
-        JSON.stringify({ error: "Unauthorized: invalid session" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(`[${requestId}] Unable to resolve user from token`, userError);
+      const { response } = createErrorResponse(
+        "Invalid or expired session. Please sign in again.",
+        401,
+        'invalid_session'
       );
+      return response;
     }
 
     const userId = userData.user.id;
+    console.log(`[${requestId}] Authenticated user: ${userId}`);
 
-    console.log("Authenticated user:", userId);
-
+    // Check for idempotency
+    const idempotencyKey = req.headers.get('idempotency-key');
+    if (idempotencyKey) {
+      const cached = await checkIdempotency(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        idempotencyKey
+      );
+      if (cached.cached && cached.response) {
+        console.log(`[${requestId}] Returning cached response`);
+        return new Response(JSON.stringify(cached.response), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
     // Check feature access before processing
+    console.log(`[${requestId}] Checking feature access`);
     const accessResponse = await fetchWithRetry(
       `${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`,
       {
@@ -63,20 +91,26 @@ serve(async (req) => {
     const accessResult = await accessResponse.json();
     
     if (!accessResult.allowed) {
-      return new Response(
-        JSON.stringify({ 
-          error: accessResult.reason || "Access denied",
-          upgrade_required: accessResult.upgrade_required || false,
-          tier: accessResult.tier
-        }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.log(`[${requestId}] Access denied:`, accessResult.reason);
+      const { response } = createErrorResponse(
+        accessResult.reason || "Access denied. Please upgrade your plan.",
+        403,
+        'access_denied'
       );
+      return response;
     }
 
-    console.log("Access granted:", accessResult);
+    console.log(`[${requestId}] Access granted: ${accessResult.tier}`);
 
     // Parse request body
     const { prompt, quality = 'auto', size = '1024x1024', background = 'auto' } = await req.json();
+    
+    console.log(`[${requestId}] Request params:`, { 
+      promptLength: prompt?.length, 
+      quality, 
+      size, 
+      background 
+    });
     
     // Parse size dimensions
     let aspectRatio = '1:1'; // Default square
@@ -88,47 +122,60 @@ serve(async (req) => {
     
     // Validate prompt
     if (!prompt) {
-      return new Response(
-        JSON.stringify({ error: "Prompt is required" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(`[${requestId}] Missing prompt`);
+      const { response } = createErrorResponse(
+        "Prompt is required to generate an image",
+        400,
+        'validation_error'
       );
+      return response;
     }
 
     if (typeof prompt !== 'string') {
-      return new Response(
-        JSON.stringify({ error: "Prompt must be a string" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(`[${requestId}] Invalid prompt type`);
+      const { response } = createErrorResponse(
+        ERROR_MESSAGES.INVALID_INPUT,
+        400,
+        'validation_error'
       );
+      return response;
     }
 
     if (prompt.length < 3) {
-      return new Response(
-        JSON.stringify({ error: "Prompt too short. Minimum 3 characters" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(`[${requestId}] Prompt too short: ${prompt.length} characters`);
+      const { response } = createErrorResponse(
+        "Prompt too short. Please provide at least 3 characters describing what you want to generate.",
+        400,
+        'validation_error'
       );
+      return response;
     }
 
     if (prompt.length > 2000) {
-      return new Response(
-        JSON.stringify({ error: "Prompt too long. Maximum 2000 characters" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(`[${requestId}] Prompt too long: ${prompt.length} characters`);
+      const { response } = createErrorResponse(
+        `Prompt too long (${prompt.length} characters). Maximum 2000 characters allowed. Try being more concise.`,
+        400,
+        'validation_error'
       );
+      return response;
     }
-
-    console.log("Generation request:", { promptLength: prompt.length, quality, size, background });
 
     // Get Lovable API key
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "AI service not configured" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(`[${requestId}] LOVABLE_API_KEY not configured`);
+      const { response } = createErrorResponse(
+        "AI service not configured. Please contact support.",
+        500,
+        'config_error'
       );
+      return response;
     }
 
     // Call Lovable AI Gateway with Nano banana model
-    console.log("Calling Lovable AI Gateway...");
+    const aiCallStart = Date.now();
+    console.log(`[${requestId}] Calling AI API with model: google/gemini-2.5-flash-image-preview`);
     const aiResponse = await fetchWithRetry(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
@@ -153,49 +200,52 @@ serve(async (req) => {
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("Lovable AI error:", aiResponse.status, errorText);
+      const aiCallDuration = Date.now() - aiCallStart;
+      console.error(`[${requestId}] AI API error (${aiCallDuration}ms):`, {
+        status: aiResponse.status,
+        error: errorText
+      });
       
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI service credits exhausted. Please try again later or contact support." }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ error: "Failed to generate image" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      const friendlyMessage = mapAIError(aiResponse.status, errorText);
+      const { response } = createErrorResponse(
+        friendlyMessage,
+        aiResponse.status,
+        aiResponse.status === 429 ? 'rate_limit' : 
+        aiResponse.status === 402 ? 'credits_exhausted' : 
+        'ai_error'
       );
+      return response;
     }
 
+    const aiCallDuration = Date.now() - aiCallStart;
     const aiData = await aiResponse.json();
-    console.log("AI response received:", { hasImages: !!aiData.choices?.[0]?.message?.images });
+    console.log(`[${requestId}] AI response received (${aiCallDuration}ms):`, { 
+      hasImages: !!aiData.choices?.[0]?.message?.images 
+    });
 
     // Extract generated image
     const generatedImageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
     if (!generatedImageUrl) {
-      console.error("No image in AI response:", JSON.stringify(aiData));
-      return new Response(
-        JSON.stringify({ error: "Failed to generate image: No image data returned" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      console.error(`[${requestId}] No image in AI response:`, JSON.stringify(aiData).substring(0, 200));
+      const { response } = createErrorResponse(
+        ERROR_MESSAGES.PROCESSING_FAILED,
+        500,
+        'no_image_data'
       );
+      return response;
     }
 
-    console.log("Image generated successfully, base64 length:", generatedImageUrl.length);
+    console.log(`[${requestId}] Image generated, base64 length: ${generatedImageUrl.length}`);
 
     // Upload to storage instead of saving base64 to database
     let finalImageUrl = generatedImageUrl;
     let assetData = null;
 
     try {
+      const storageStart = Date.now();
+      console.log(`[${requestId}] Uploading to storage...`);
+      
       // Extract base64 data
       const base64Data = generatedImageUrl.split(',')[1];
       const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
@@ -210,18 +260,21 @@ serve(async (req) => {
         });
 
       if (uploadError) {
-        console.error("Storage upload error:", uploadError);
+        console.error(`[${requestId}] Storage upload error:`, uploadError);
         throw uploadError;
       }
+
+      const storageDuration = Date.now() - storageStart;
+      console.log(`[${requestId}] Storage upload complete (${storageDuration}ms)`);
 
       // Get public URL
       const { data: urlData } = supabaseAdmin.storage
         .from('generated-images')
         .getPublicUrl(fileName);
       finalImageUrl = urlData.publicUrl;
-      console.log("Image uploaded to storage:", finalImageUrl);
 
       // Save metadata to database
+      const dbStart = Date.now();
       const { data: savedAsset, error: assetError } = await supabaseAdmin
         .from('generated_assets')
         .insert({
@@ -231,39 +284,66 @@ serve(async (req) => {
           image_url: finalImageUrl,
           analysis_data: {
             generation_params: { quality, size, background },
-            generated_at: new Date().toISOString()
+            generated_at: new Date().toISOString(),
+            request_id: requestId
           }
         })
         .select()
         .single();
 
       if (assetError) {
-        console.error("Database save error:", assetError);
+        console.error(`[${requestId}] Database save error:`, assetError);
         throw assetError;
       }
 
+      const dbDuration = Date.now() - dbStart;
       assetData = savedAsset;
-      console.log("Saved to database:", assetData.id);
+      console.log(`[${requestId}] Database save complete (${dbDuration}ms): ${assetData.id}`);
     } catch (error) {
-      console.error("Failed to save image:", error);
-      throw error;
+      console.error(`[${requestId}] Failed to save image:`, error);
+      const { response } = createErrorResponse(
+        "Failed to save generated image. Please try again.",
+        500,
+        'storage_error'
+      );
+      return response;
     }
 
+    const totalDuration = Date.now() - startTime;
+    console.log(`[${requestId}] Generation complete (${totalDuration}ms)`);
+    
+    const successResponse = { 
+      success: true,
+      image: finalImageUrl,
+      assetId: assetData?.id,
+      message: "Image generated successfully"
+    };
+    
+    // Cache response for idempotency
+    if (idempotencyKey) {
+      await cacheResponse(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        idempotencyKey,
+        successResponse,
+        3600 // 1 hour TTL
+      );
+    }
+    
     return new Response(
-      JSON.stringify({ 
-        success: true,
-        image: finalImageUrl,
-        assetId: assetData?.id,
-        message: "Image generated successfully"
-      }),
+      JSON.stringify(successResponse),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error("Error in generate-image function:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    const totalDuration = Date.now() - startTime;
+    console.error(`[${requestId}] Error in generate-image function (${totalDuration}ms):`, error);
+    
+    const { response } = createErrorResponse(
+      error instanceof Error ? error.message : ERROR_MESSAGES.PROCESSING_FAILED,
+      500,
+      'server_error'
     );
+    return response;
   }
 });

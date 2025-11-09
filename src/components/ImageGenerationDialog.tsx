@@ -142,7 +142,41 @@ export const ImageGenerationDialog = () => {
     } catch (error) {
       clearInterval(progressInterval);
       console.error("Generation error:", error);
-      toast.error("Failed to generate image. Please try again.");
+      
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      
+      // Show appropriate toast based on error type with actionable guidance
+      if (errorMessage.toLowerCase().includes("rate limit")) {
+        toast.error("Too many requests. Please wait a minute and try again.", {
+          duration: 5000,
+        });
+      } else if (errorMessage.toLowerCase().includes("credits") || errorMessage.toLowerCase().includes("exhausted")) {
+        toast.error("Credits exhausted. Please add credits to continue.", {
+          duration: 5000,
+          action: {
+            label: "Add Credits",
+            onClick: () => window.location.href = "/subscriptions",
+          },
+        });
+      } else if (errorMessage.toLowerCase().includes("sign in") || errorMessage.toLowerCase().includes("log in")) {
+        toast.error("Please sign in to generate images.", {
+          duration: 5000,
+          action: {
+            label: "Sign In",
+            onClick: () => window.location.href = "/auth",
+          },
+        });
+      } else if (errorMessage.toLowerCase().includes("access denied") || errorMessage.toLowerCase().includes("upgrade")) {
+        toast.error(errorMessage, {
+          duration: 5000,
+          action: {
+            label: "Upgrade",
+            onClick: () => window.location.href = "/subscriptions",
+          },
+        });
+      } else {
+        toast.error(errorMessage || "Failed to generate image. Please try again.");
+      }
     } finally {
       setIsGenerating(false);
       setTimeout(() => setProgress(0), 1000);
