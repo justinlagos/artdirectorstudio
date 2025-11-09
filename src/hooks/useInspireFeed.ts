@@ -184,7 +184,7 @@ export const useInspireFeed = ({
         abortRef.current.abort();
       }
     };
-  }, [filter, pageSize]);
+  }, [fetchPage]);
 
   useEffect(() => {
     if (channelRef.current) {
@@ -222,7 +222,7 @@ export const useInspireFeed = ({
         debounceRef.current = null;
       }
     };
-  }, [filter, realtimeKey, schedulePendingFlush]);
+  }, [realtimeKey, schedulePendingFlush]);
 
   const memoisedProjects = useMemo(() => sortInspireProjects(projects), [projects]);
 
