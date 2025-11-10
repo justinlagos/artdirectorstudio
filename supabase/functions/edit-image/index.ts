@@ -246,8 +246,15 @@ serve(async (req) => {
         .insert({
           user_id: userId,
           type: 'image',
-          prompt: instruction,
+          action: 'edit',
           image_url: finalImageUrl,
+          prompt: instruction,
+          source_urls: [fullImageUrl.slice(0, 100)],
+          params: {
+            quality,
+            size,
+            operation: 'edit'
+          },
           analysis_data: {
             source_image: fullImageUrl.slice(0, 100),
             generation_params: { quality, size },

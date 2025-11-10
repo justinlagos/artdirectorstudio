@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { validateImages, validateInstruction } from '../_shared/validation.ts';
 import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
@@ -207,9 +208,73 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     }));
 
+    // Save to database
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    let finalImageUrl = blendedImageUrl;
+    let assetData = null;
+
+    try {
+      // Extract base64 data and upload to storage
+      if (blendedImageUrl.startsWith('data:image/')) {
+        const base64Data = blendedImageUrl.split(',')[1];
+        const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+        
+        const fileName = `${userId}/${Date.now()}-blended.png`;
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from('generated-images')
+          .upload(fileName, buffer, {
+            contentType: 'image/png',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError);
+        } else {
+          const { data: urlData } = supabaseAdmin.storage
+            .from('generated-images')
+            .getPublicUrl(fileName);
+          finalImageUrl = urlData.publicUrl;
+        }
+      }
+
+      // Save to generated_assets
+      const { data: savedAsset, error: assetError } = await supabaseAdmin
+        .from('generated_assets')
+        .insert({
+          user_id: userId,
+          type: 'image',
+          action: 'blend',
+          image_url: finalImageUrl,
+          prompt: trimmedInstruction || 'Blended images',
+          source_urls: images.map((img: string) => img.substring(0, 100)),
+          params: {
+            stylePresets: presetList,
+            operation: 'blend',
+            imageCount: images.length
+          },
+          duration_ms: duration,
+        })
+        .select()
+        .single();
+
+      if (assetError) {
+        console.error('Database save error (non-fatal):', assetError);
+      } else {
+        assetData = savedAsset;
+        console.log('Saved blend to database:', assetData.id);
+      }
+    } catch (error) {
+      console.error('Error saving blend (non-fatal):', error);
+    }
+
     const result = { 
-      image: blendedImageUrl,
-      thumbnail: blendedImageUrl // For now, same as image. TODO: Generate actual thumbnail
+      image: finalImageUrl,
+      thumbnail: finalImageUrl,
+      assetId: assetData?.id
     };
 
     if (idempotencyKey) {

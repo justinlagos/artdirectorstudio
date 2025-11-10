@@ -107,14 +107,24 @@ serve(async (req) => {
     console.log(`[${requestId}] Access granted: ${accessResult.tier}`);
 
     // Parse request body
-    const { prompt, quality = 'auto', size = '1024x1024', background = 'auto', referenceImageUrl } = await req.json();
+    const { 
+      prompt, 
+      quality = 'auto', 
+      size = '1024x1024', 
+      background = 'auto', 
+      referenceImageUrl,
+      continuationStrength = 1.0,
+      previousPrompt
+    } = await req.json();
     
     console.log(`[${requestId}] Request params:`, { 
       promptLength: prompt?.length, 
       quality, 
       size, 
       background,
-      hasReference: !!referenceImageUrl
+      hasReference: !!referenceImageUrl,
+      continuationStrength,
+      hasPreviousPrompt: !!previousPrompt
     });
     
     // Parse size dimensions
@@ -193,22 +203,46 @@ serve(async (req) => {
     let messageContent: any;
     
     if (referenceImageUrl) {
-      console.log(`[${requestId}] Using reference image for context: ${referenceImageUrl}`);
+      console.log(`[${requestId}] Using reference image for context: ${referenceImageUrl.substring(0, 50)}...`);
+      console.log(`[${requestId}] Continuation strength: ${continuationStrength} (${continuationStrength <= 0.3 ? 'high continuity' : continuationStrength <= 0.6 ? 'moderate' : continuationStrength <= 0.8 ? 'major change' : 'fresh'})`);
       
-      // Context-aware prompt that preserves visual DNA
-      const contextPrompt = `You are refining and evolving an existing image. 
-CRITICAL: Preserve the visual DNA, composition, style, and subject of the reference image.
-Only apply the following changes while maintaining everything else:
+      // Adjust instructions based on continuation strength
+      let contextInstructions = '';
+      if (continuationStrength <= 0.3) {
+        // High continuity - minor edits only
+        contextInstructions = `CRITICAL: This is a MINOR REFINEMENT. Preserve nearly everything from the reference image.
+1. Keep the EXACT same subject, composition, framing, and perspective
+2. Maintain the EXACT same artistic style, technique, and mood
+3. Preserve the EXACT same color palette and lighting setup
+4. Only make MINIMAL changes as explicitly mentioned: ${prompt}
+5. If unclear what to change, keep everything identical to the reference`;
+      } else if (continuationStrength <= 0.6) {
+        // Moderate - balance preservation and change
+        contextInstructions = `IMPORTANT: This is a MODERATE REFINEMENT. Balance preservation with intentional changes.
+1. Keep the core subject, general composition, and framing
+2. Maintain the overall artistic style and mood
+3. Preserve the general color palette unless explicitly changed
+4. Apply these specific changes while keeping context: ${prompt}
+5. Ensure changes feel natural and cohesive with the original`;
+      } else if (continuationStrength <= 0.8) {
+        // Major - significant changes but maintain some context
+        contextInstructions = `NOTE: This is a MAJOR REVISION. Make significant changes while maintaining some visual connection.
+1. Transform based on: ${prompt}
+2. You may alter composition, style, and colors as needed
+3. Keep some recognizable elements from the reference if appropriate
+4. Prioritize the new vision while honoring the reference's essence`;
+      } else {
+        // Fresh - minimal constraint
+        contextInstructions = `This is a FRESH GENERATION inspired by the reference.
+Create: ${prompt}
+Use the reference image only as loose inspiration for general style or mood, but feel free to create something entirely new.`;
+      }
+      
+      const contextPrompt = `${contextInstructions}
 
-${prompt}
+Aspect ratio: ${aspectRatio}
 
-Rules:
-1. Keep the same subject, composition, and framing
-2. Maintain the same artistic style and mood
-3. Preserve color palette unless explicitly changed
-4. Only modify what's explicitly mentioned in the prompt
-5. If the prompt is vague (e.g., "make it better"), enhance quality while keeping everything else identical
-6. Aspect ratio: ${aspectRatio}`;
+${previousPrompt ? `Previous prompt was: "${previousPrompt}"` : ''}`;
 
       messageContent = [
         {
@@ -345,8 +379,17 @@ Rules:
           .insert({
             user_id: userId,
             type: 'image',
+            action: 'generate',
             prompt: prompt,
             image_url: finalImageUrl,
+            source_urls: referenceImageUrl ? [referenceImageUrl] : null,
+            params: {
+              quality, 
+              size, 
+              background,
+              continuationStrength: referenceImageUrl ? continuationStrength : undefined,
+              hadReference: !!referenceImageUrl
+            },
             analysis_data: {
               generation_params: { quality, size, background },
               generated_at: new Date().toISOString(),

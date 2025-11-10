@@ -75,12 +75,6 @@ export const Header = () => {
             <Button variant="ghost" size="sm" asChild>
               <Link to="/inspire">Inspire</Link>
             </Button>
-            
-            {user && (
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/presets">Presets</Link>
-              </Button>
-            )}
           </nav>
         </div>
 
@@ -203,20 +197,6 @@ export const Header = () => {
                       Inspire
                     </Link>
                   </Button>
-                  
-                  {user && (
-                    <Button 
-                      variant="ghost" 
-                      asChild 
-                      className="justify-start min-h-[48px]"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Link to="/presets">
-                        <Palette className="mr-3 h-4 w-4" />
-                        Presets
-                      </Link>
-                    </Button>
-                  )}
                   
                   {!user && (
                     <Button 

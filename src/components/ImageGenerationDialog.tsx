@@ -29,12 +29,18 @@ import { useModalStore } from "@/store/modalStore";
 import { useStudioStore } from "@/store/studioStore";
 import { closeStudioModal } from "@/lib/studio";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { 
+  calculateContinuationStrength, 
+  getContinuationDescription 
+} from "@/lib/promptSimilarity";
 
 export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
   size: "1024x1024" | "1536x1024" | "1024x1536";
   background: "transparent" | "opaque" | "auto";
   referenceImageUrl?: string;
+  continuationStrength?: number;
+  previousPrompt?: string;
 }
 
 const MAX_PROMPT_LENGTH = 2000;
@@ -71,6 +77,8 @@ export const ImageGenerationDialog = () => {
   const [generationStage, setGenerationStage] = useState<string>("");
   const [generationTime, setGenerationTime] = useState<number>(0);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [continuationStrength, setContinuationStrength] = useState<number>(1.0);
+  const [previousGeneratedPrompt, setPreviousGeneratedPrompt] = useState<string>("");
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const generationStartTime = useRef<number>(0);
 
@@ -94,11 +102,23 @@ export const ImageGenerationDialog = () => {
     setShowAdvanced(false);
     setPresetsExpanded(false);
     setReferenceImage(storeImage ?? null);
+    setPreviousGeneratedPrompt("");
+    setContinuationStrength(1.0);
 
     if (storePrompt.length > MAX_PROMPT_LENGTH) {
       toast.info(`Prompt automatically shortened to ${MAX_PROMPT_LENGTH} characters`);
     }
   }, [isGenerateModalOpen, truncatedInitialPrompt, storeImage, storePrompt]);
+
+  // Calculate continuation strength when prompt changes
+  useEffect(() => {
+    if (previousGeneratedPrompt && prompt && referenceImage) {
+      const strength = calculateContinuationStrength(previousGeneratedPrompt, prompt);
+      setContinuationStrength(strength);
+    } else {
+      setContinuationStrength(1.0);
+    }
+  }, [prompt, previousGeneratedPrompt, referenceImage]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -148,9 +168,14 @@ export const ImageGenerationDialog = () => {
       const optionsWithReference = {
         ...options,
         referenceImageUrl: referenceImage || undefined,
+        continuationStrength: referenceImage ? continuationStrength : undefined,
+        previousPrompt: previousGeneratedPrompt || undefined,
       };
       
       const imageUrl = await generator(prompt, optionsWithReference);
+      
+      // Store this prompt for future similarity calculations
+      setPreviousGeneratedPrompt(prompt);
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -427,11 +452,39 @@ export const ImageGenerationDialog = () => {
               onClick={() => {
                 setReferenceImage(null);
                 setStoreImage(undefined);
+                setPreviousGeneratedPrompt("");
+                setContinuationStrength(1.0);
               }}
             >
               Remove
             </Button>
           </div>
+          
+          {/* Continuation Strength Indicator */}
+          {previousGeneratedPrompt && continuationStrength < 1.0 && (
+            <div className="px-4 pb-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium">Context Strength</span>
+                <span className={`text-xs font-semibold ${getContinuationDescription(continuationStrength).colorClass}`}>
+                  {Math.round((1 - continuationStrength) * 100)}%
+                </span>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-300 ${
+                    continuationStrength <= 0.3 ? 'bg-blue-500' :
+                    continuationStrength <= 0.6 ? 'bg-yellow-500' :
+                    continuationStrength <= 0.8 ? 'bg-orange-500' :
+                    'bg-red-500'
+                  }`}
+                  style={{ width: `${(1 - continuationStrength) * 100}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {getContinuationDescription(continuationStrength).description}
+              </p>
+            </div>
+          )}
         </div>
       )}
 

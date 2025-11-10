@@ -66,6 +66,24 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
+    // Validate file types
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const invalidFiles = files.filter(file => !validTypes.includes(file.type));
+    
+    if (invalidFiles.length > 0) {
+      toast.error(`Unsupported file type. Please upload JPG, PNG, or WebP images only.`);
+      return;
+    }
+    
+    // Validate file sizes (15MB limit)
+    const MAX_FILE_SIZE = 15 * 1024 * 1024;
+    const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
+    
+    if (oversizedFiles.length > 0) {
+      toast.error(`File too large. Maximum 15MB per file.`);
+      return;
+    }
+    
     // Blend requires exactly 2 images, others allow up to 10
     const maxFiles = operation === 'blend' ? 2 : 10;
     const requiredFiles = operation === 'blend' ? 2 : 1;
@@ -235,7 +253,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         .insert({
           user_id: user.id,
           type: 'analysis',
-          action: 'batch',
+          action: 'batch_analyze',
           prompt: analysisData?.full_regeneration_prompt || 'Batch analysis',
           analysis_data: analysisData,
           source_urls: [sourceImage],
@@ -248,11 +266,14 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         .select()
         .single();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Failed to save analysis to database:', dbError);
+        throw dbError;
+      }
       return assetData.id;
     }
 
-    // For upscale, save the image
+    // For other operations, save the image
     const response = await fetch(imageDataUrl);
     const blob = await response.blob();
     
@@ -261,26 +282,58 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     const uuid = crypto.randomUUID();
     const fileName = `results/${user.id}/${yearMonth}/batch/${uuid}.png`;
     
-    const { error: uploadError } = await supabase.storage
-      .from('generated-images')
-      .upload(fileName, blob, {
-        contentType: 'image/png',
-        cacheControl: '3600',
-        upsert: false
-      });
+    // Retry upload up to 3 times
+    let uploadError = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error } = await supabase.storage
+        .from('generated-images')
+        .upload(fileName, blob, {
+          contentType: 'image/png',
+          cacheControl: '3600',
+          upsert: false
+        });
 
-    if (uploadError) throw uploadError;
+      if (!error) {
+        uploadError = null;
+        break;
+      }
+      
+      uploadError = error;
+      console.warn(`Upload attempt ${attempt + 1} failed:`, error);
+      
+      if (attempt < 2) {
+        // Wait before retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+      }
+    }
+
+    if (uploadError) {
+      console.error('All upload attempts failed:', uploadError);
+      throw uploadError;
+    }
 
     const { data: { publicUrl } } = supabase.storage
       .from('generated-images')
       .getPublicUrl(fileName);
+
+    // Verify file exists
+    const { error: headError } = await supabase.storage
+      .from('generated-images')
+      .list(fileName.split('/').slice(0, -1).join('/'), {
+        search: fileName.split('/').pop()
+      });
+
+    if (headError) {
+      console.error('File verification failed:', headError);
+      throw new Error('Upload succeeded but file verification failed');
+    }
 
     const { data: assetData, error: dbError } = await supabase
       .from('generated_assets')
       .insert({
         user_id: user.id,
         type: 'image',
-        action: 'batch',
+        action: `batch_${operationType}`,
         image_url: publicUrl,
         prompt: `Batch ${operationType} to ${size}`,
         source_urls: [sourceImage],
@@ -294,7 +347,10 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       .select()
       .single();
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      console.error('Failed to save to database:', dbError);
+      throw dbError;
+    }
     return assetData.id;
   };
 
@@ -592,7 +648,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
                 <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
                     multiple={operation !== 'blend'}
                     onChange={handleFileUpload}
                     className="hidden"
@@ -604,6 +660,9 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
                       {operation === 'blend' 
                         ? 'Click to upload exactly 2 images' 
                         : 'Click to add images (up to 10 total)'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Supports: JPG, PNG, WebP (max 15MB each)
                     </p>
                   </label>
                 </div>

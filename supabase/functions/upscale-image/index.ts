@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { validateImageData, validateTargetSize } from '../_shared/validation.ts';
 import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
@@ -257,9 +258,72 @@ serve(async (req) => {
       imageLength: upscaledImageUrl?.length || 0
     }));
 
+    // Save to database
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    let finalImageUrl = upscaledImageUrl;
+    let assetData = null;
+
+    try {
+      // Extract base64 data and upload to storage
+      if (upscaledImageUrl.startsWith('data:image/')) {
+        const base64Data = upscaledImageUrl.split(',')[1];
+        const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+        
+        const fileName = `${userId}/${Date.now()}-upscaled.png`;
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from('generated-images')
+          .upload(fileName, buffer, {
+            contentType: 'image/png',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError);
+        } else {
+          const { data: urlData } = supabaseAdmin.storage
+            .from('generated-images')
+            .getPublicUrl(fileName);
+          finalImageUrl = urlData.publicUrl;
+        }
+      }
+
+      // Save to generated_assets
+      const { data: savedAsset, error: assetError } = await supabaseAdmin
+        .from('generated_assets')
+        .insert({
+          user_id: userId,
+          type: 'image',
+          action: 'upscale',
+          image_url: finalImageUrl,
+          prompt: `Upscaled to ${targetSize}`,
+          source_urls: [image.substring(0, 100)],
+          params: {
+            targetSize,
+            operation: 'upscale'
+          },
+          duration_ms: duration,
+        })
+        .select()
+        .single();
+
+      if (assetError) {
+        console.error('Database save error (non-fatal):', assetError);
+      } else {
+        assetData = savedAsset;
+        console.log('Saved upscale to database:', assetData.id);
+      }
+    } catch (error) {
+      console.error('Error saving upscale (non-fatal):', error);
+    }
+
     const result = { 
-      image: upscaledImageUrl,
-      thumbnail: upscaledImageUrl // For now, same as image. TODO: Generate actual thumbnail
+      image: finalImageUrl,
+      thumbnail: finalImageUrl,
+      assetId: assetData?.id
     };
 
     // Cache response for idempotency
