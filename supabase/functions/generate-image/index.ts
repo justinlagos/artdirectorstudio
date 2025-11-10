@@ -107,13 +107,14 @@ serve(async (req) => {
     console.log(`[${requestId}] Access granted: ${accessResult.tier}`);
 
     // Parse request body
-    const { prompt, quality = 'auto', size = '1024x1024', background = 'auto' } = await req.json();
+    const { prompt, quality = 'auto', size = '1024x1024', background = 'auto', referenceImageUrl } = await req.json();
     
     console.log(`[${requestId}] Request params:`, { 
       promptLength: prompt?.length, 
       quality, 
       size, 
-      background 
+      background,
+      hasReference: !!referenceImageUrl
     });
     
     // Parse size dimensions
@@ -187,6 +188,44 @@ serve(async (req) => {
     // Call Lovable AI Gateway with Nano banana model
     const aiCallStart = Date.now();
     console.log(`[${requestId}] Calling AI API with model: google/gemini-2.5-flash-image-preview`);
+    
+    // Build message content with context preservation
+    let messageContent: any;
+    
+    if (referenceImageUrl) {
+      console.log(`[${requestId}] Using reference image for context: ${referenceImageUrl}`);
+      
+      // Context-aware prompt that preserves visual DNA
+      const contextPrompt = `You are refining and evolving an existing image. 
+CRITICAL: Preserve the visual DNA, composition, style, and subject of the reference image.
+Only apply the following changes while maintaining everything else:
+
+${prompt}
+
+Rules:
+1. Keep the same subject, composition, and framing
+2. Maintain the same artistic style and mood
+3. Preserve color palette unless explicitly changed
+4. Only modify what's explicitly mentioned in the prompt
+5. If the prompt is vague (e.g., "make it better"), enhance quality while keeping everything else identical
+6. Aspect ratio: ${aspectRatio}`;
+
+      messageContent = [
+        {
+          type: "text",
+          text: contextPrompt
+        },
+        {
+          type: "image_url",
+          image_url: {
+            url: referenceImageUrl
+          }
+        }
+      ];
+    } else {
+      messageContent = `Generate an image with aspect ratio ${aspectRatio}. ${prompt}`;
+    }
+    
     const aiResponse = await fetchWithRetry(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
@@ -200,7 +239,7 @@ serve(async (req) => {
           messages: [
             {
               role: "user",
-              content: `Generate an image with aspect ratio ${aspectRatio}. ${prompt}`
+              content: messageContent
             }
           ],
           modalities: ["image", "text"]

@@ -28,6 +28,7 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
       quality: options.quality,
       size: options.size,
       background: options.background,
+      referenceImageUrl: options.referenceImageUrl,
     },
     headers: {
       Authorization: `Bearer ${session.access_token}`,

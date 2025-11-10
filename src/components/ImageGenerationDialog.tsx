@@ -34,6 +34,7 @@ export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
   size: "1024x1024" | "1536x1024" | "1024x1536";
   background: "transparent" | "opaque" | "auto";
+  referenceImageUrl?: string;
 }
 
 const MAX_PROMPT_LENGTH = 2000;
@@ -144,7 +145,12 @@ export const ImageGenerationDialog = () => {
     }, 1200);
 
     try {
-      const imageUrl = await generator(prompt, options);
+      const optionsWithReference = {
+        ...options,
+        referenceImageUrl: referenceImage || undefined,
+      };
+      
+      const imageUrl = await generator(prompt, optionsWithReference);
 
       clearInterval(progressInterval);
       setProgress(100);
