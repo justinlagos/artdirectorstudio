@@ -18,6 +18,7 @@ import {
   Clock
 } from "lucide-react";
 import { toast } from "sonner";
+import { FloatingCreditTracker } from "@/components/FloatingCreditTracker";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -351,6 +352,7 @@ const Dashboard = () => {
         </div>
       </main>
       <Footer />
+      <FloatingCreditTracker />
     </div>
   );
 };

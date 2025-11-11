@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
 import { formatDistanceToNow } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
+import { FloatingCreditTracker } from "@/components/FloatingCreditTracker";
 
 type GeneratedAsset = Database['public']['Tables']['generated_assets']['Row'];
 
@@ -362,6 +363,7 @@ const History = () => {
         assetId={shareAssetId || ""}
         assetType={shareAssetType}
       />
+      <FloatingCreditTracker />
     </div>
   );
 };

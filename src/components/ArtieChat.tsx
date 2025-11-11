@@ -974,15 +974,24 @@ export const ArtieChat = () => {
                   </div>
                 )}
                 <div className="space-y-2 w-full">
-                  {/* Attachment Preview */}
+                   {/* Attachment Preview */}
                   {message.attachment && (
-                    <div className="rounded-xl overflow-hidden border border-border">
+                    <div className="rounded-xl overflow-hidden border border-border bg-muted">
                       {message.attachment.type === 'image' ? (
-                        <img 
-                          src={message.attachment.url} 
-                          alt={message.attachment.name}
-                          className="w-full h-auto max-h-[180px] md:max-h-[200px] object-cover"
-                        />
+                        <div className="relative">
+                          <img 
+                            src={message.attachment.url} 
+                            alt={message.attachment.name}
+                            className="w-full h-auto max-h-[250px] md:max-h-[300px] object-contain"
+                            loading="lazy"
+                          />
+                          <button
+                            onClick={() => window.open(message.attachment?.url, '_blank')}
+                            className="absolute bottom-2 right-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-background transition-colors"
+                          >
+                            Open in Studio
+                          </button>
+                        </div>
                       ) : (
                         <div className="bg-surface-3 px-3 py-2 flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
