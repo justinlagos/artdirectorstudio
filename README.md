@@ -63,6 +63,14 @@ VITE_SUPABASE_PROJECT_ID="YOUR_PROJECT_ID"
 VITE_SUPABASE_PUBLISHABLE_KEY="YOUR_PUBLIC_ANON_KEY"
 ```
 
+If you use Supabase Edge Functions (recommended), set these server-side environment variables in your Supabase project (or local .env for function dev):
+- SUPABASE_URL
+- SUPABASE_ANON_KEY (for client contexts)
+- SUPABASE_SERVICE_ROLE_KEY (server-only)
+- STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET (billing)
+- RESEND_API_KEY (emails)
+- LOVABLE_API_KEY (AI gateway)
+
 3) Install dependencies
 ```
 npm install
