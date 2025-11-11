@@ -71,6 +71,17 @@ If you use Supabase Edge Functions (recommended), set these server-side environm
 - RESEND_API_KEY (emails)
 - LOVABLE_API_KEY (AI gateway)
 
+
+## Environment Variables
+Create a `.env.local` file in the project root with:
+
+```
+SUPABASE_URL=<your Supabase project URL>
+SUPABASE_SERVICE_ROLE_KEY=<your service key>
+RESEND_API_KEY=<your Resend API key>
+STRIPE_SECRET_KEY=<your Stripe key>
+```
+
 3) Install dependencies
 ```
 npm install
