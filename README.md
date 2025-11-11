@@ -1,36 +1,46 @@
 # Art Director Studio
 
-An AI-powered creative agency workspace for concept development, content production, and brand collaboration.
+Your AI-native creative agency workspace. From first idea to final delivery, Artie (your AI creative partner) helps you explore directions, generate visuals, collaborate with clients, and ship work faster.
 
 
 ## Overview
 
-Art Director Studio brings creative strategy, production tools, and AI assistance into a single, streamlined workspace. Use it to ideate campaigns, generate visual directions, organize assets, collaborate with clients, and track performance — all while an AI creative partner (Artie) helps you move from brief to deliverables faster.
+Art Director Studio unifies creative strategy, visual generation, project ops, and client collaboration in one place. Ideate campaigns, generate image directions, manage assets, and review deliverables — all with an AI copilot that remembers context and accelerates the path from brief to execution.
 
-Technology stack: Vite + React + TypeScript, shadcn/ui, Tailwind CSS, TanStack Query, Supabase, Workbox, and modern performance practices.
+<img alt="Feature overview" src="./public/feature-overview.svg" width="100%"/>
 
 
 ## Features
 
 - AI Creative Copilot (Artie)
-  - Chat for ideas, briefs, and prompts
-  - Continuation-aware assistance for refining concepts
+  - Structured chat for concepts, briefs, and iteration
+  - Context-aware refinements and prompt suggestions
 - Image Generation & Inspiration
-  - Prompt presets and a browsable gallery
-  - Image optimization for web delivery
-- Project and Asset Workflow
-  - Unified tools modal for quick actions
-  - Shareable links for assets and presentations
+  - Fast generations with size/aspect presets and guided tweaks
+  - Reference-driven iterations and a browsable inspiration feed
+- Project & Asset Workflow
+  - Unified actions modal, versioning, and sharable links
+  - Supabase Storage-backed asset pipeline
 - Client Collaboration
-  - Commenting, history, and version visibility
-  - Role-based access with authentication via Supabase
-- Insights and Analytics
-  - Performance and usage dashboards for creative ops
-- Subscriptions and Billing
-  - Support for plans, billing history, and subscription flows
+  - Commenting, change history, and role-based access
+  - Review flows built for creative feedback
+- Insights & Analytics
+  - Usage and performance dashboards for creative ops
+- Billing & Access Controls
+  - Stripe-powered checkout, subscriptions, and customer portal
+  - Tiered feature access with guardrails
 - Production-ready Frontend
-  - Vite + React + TypeScript with shadcn/ui components
-  - Tailwind CSS, dark mode, and responsive UI
+  - Vite + React + TypeScript, shadcn/ui, Tailwind CSS
+  - Optimized for speed, accessibility, and dark mode
+
+
+## Tech Stack
+
+- React + Vite + TypeScript (UI, routing, DX)
+- Supabase (Auth, Postgres, Edge Functions, Storage)
+- Stripe (payments, subscriptions, portal)
+- Resend (transactional email)
+- OpenDevin-style AI workflows (copilot, context, idempotent tasks)
 
 
 ## Getting Started
