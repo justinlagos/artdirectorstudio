@@ -1,73 +1,77 @@
-# Welcome to your Lovable project
+# Art Director Studio
 
-## Project info
+An AI-powered creative agency workspace for concept development, content production, and brand collaboration.
 
-**URL**: https://lovable.dev/projects/8fa57e4b-a448-4467-a4c7-194f3c886cb7
 
-## How can I edit this code?
+## Overview
 
-There are several ways of editing your application.
+Art Director Studio brings creative strategy, production tools, and AI assistance into a single, streamlined workspace. Use it to ideate campaigns, generate visual directions, organize assets, collaborate with clients, and track performance — all while an AI creative partner (Artie) helps you move from brief to deliverables faster.
 
-**Use Lovable**
+Technology stack: Vite + React + TypeScript, shadcn/ui, Tailwind CSS, TanStack Query, Supabase, Workbox, and modern performance practices.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8fa57e4b-a448-4467-a4c7-194f3c886cb7) and start prompting.
 
-Changes made via Lovable will be committed automatically to this repo.
+## Features
 
-**Use your preferred IDE**
+- AI Creative Copilot (Artie)
+  - Chat for ideas, briefs, and prompts
+  - Continuation-aware assistance for refining concepts
+- Image Generation & Inspiration
+  - Prompt presets and a browsable gallery
+  - Image optimization for web delivery
+- Project and Asset Workflow
+  - Unified tools modal for quick actions
+  - Shareable links for assets and presentations
+- Client Collaboration
+  - Commenting, history, and version visibility
+  - Role-based access with authentication via Supabase
+- Insights and Analytics
+  - Performance and usage dashboards for creative ops
+- Subscriptions and Billing
+  - Support for plans, billing history, and subscription flows
+- Production-ready Frontend
+  - Vite + React + TypeScript with shadcn/ui components
+  - Tailwind CSS, dark mode, and responsive UI
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Getting Started
 
-Follow these steps:
+Prerequisites
+- Node.js 18+ and npm 9+
+- Supabase project (URL and public anon key)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+1) Clone the repository
+```
+git clone https://github.com/justinlagos/artdirectorstudio.git
+cd artdirectorstudio
 ```
 
-**Edit a file directly in GitHub**
+2) Configure environment
+Create a .env file in the project root and add your Supabase credentials:
+```
+VITE_SUPABASE_URL="https://YOUR-PROJECT.supabase.co"
+VITE_SUPABASE_PROJECT_ID="YOUR_PROJECT_ID"
+VITE_SUPABASE_PUBLISHABLE_KEY="YOUR_PUBLIC_ANON_KEY"
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+3) Install dependencies
+```
+npm install
+```
 
-**Use GitHub Codespaces**
+4) Run the development server
+```
+npm run dev
+```
+The app will start on http://localhost:5173 by default.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+5) Build for production (optional)
+```
+npm run build
+npm run preview
+```
 
-## What technologies are used for this project?
 
-This project is built with:
+## Contact
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/8fa57e4b-a448-4467-a4c7-194f3c886cb7) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- Issues and feature requests: https://github.com/justinlagos/artdirectorstudio/issues
+- General inquiries: please open an issue or contact the repository owner via GitHub profile
