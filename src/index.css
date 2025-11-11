@@ -449,6 +449,10 @@ All colors MUST be HSL.
   .mb-safe {
     margin-bottom: env(safe-area-inset-bottom);
   }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
   
   /* Proper z-index layering */
   .z-page-content {
