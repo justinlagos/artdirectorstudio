@@ -46,9 +46,13 @@ const TrialWelcomeToast = lazy(() => import("./components/TrialWelcomeToast").th
 
 const queryClient = new QueryClient();
 
-const App = () => {
+// Component to track page views inside Router context
+const PageViewTracker = () => {
   usePageViewTracking();
-  
+  return null;
+};
+
+const App = () => {
   // Global escape handler to force close all Radix UI popper elements
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -83,6 +87,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <PageViewTracker />
           <AuthProvider>
             <ToolsModalProvider>
             <Suspense fallback={<LoadingState />}>
