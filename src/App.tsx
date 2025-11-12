@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { usePageViewTracking } from "@/hooks/usePageViewTracking";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { lazy, Suspense, useEffect } from "react";
@@ -46,6 +47,8 @@ const TrialWelcomeToast = lazy(() => import("./components/TrialWelcomeToast").th
 const queryClient = new QueryClient();
 
 const App = () => {
+  usePageViewTracking();
+  
   // Global escape handler to force close all Radix UI popper elements
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

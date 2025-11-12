@@ -469,6 +469,72 @@ export type Database = {
         }
         Relationships: []
       }
+      page_views: {
+        Row: {
+          browser: string | null
+          city: string | null
+          country: string | null
+          created_at: string | null
+          device_type: string | null
+          id: string
+          is_bounce: boolean | null
+          os: string | null
+          page_path: string
+          page_title: string | null
+          referrer: string | null
+          screen_resolution: string | null
+          session_id: string
+          time_on_page: number | null
+          user_agent: string | null
+          user_id: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          device_type?: string | null
+          id?: string
+          is_bounce?: boolean | null
+          os?: string | null
+          page_path: string
+          page_title?: string | null
+          referrer?: string | null
+          screen_resolution?: string | null
+          session_id: string
+          time_on_page?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          device_type?: string | null
+          id?: string
+          is_bounce?: boolean | null
+          os?: string | null
+          page_path?: string
+          page_title?: string | null
+          referrer?: string | null
+          screen_resolution?: string | null
+          session_id?: string
+          time_on_page?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount_cents: number

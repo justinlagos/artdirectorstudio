@@ -15,7 +15,8 @@ import { SystemHealth } from "@/components/admin/SystemHealth";
 import { InspireApprovalPanel } from "@/components/admin/InspireApprovalPanel";
 import { CreditAuditLog } from "@/components/admin/CreditAuditLog";
 import TestimonialsManagement from "@/components/admin/TestimonialsManagement";
-import { Shield, Users, Flag, Mail, Activity, DollarSign, Sparkles, MessageSquare, Receipt } from "lucide-react";
+import { VisitorAnalytics } from "@/components/admin/VisitorAnalytics";
+import { Shield, Users, Flag, Mail, Activity, DollarSign, Sparkles, MessageSquare, Receipt, Eye } from "lucide-react";
 
 const Admin = () => {
   const { user, loading: authLoading } = useAuth();
@@ -54,7 +55,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9 h-auto">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-10 h-auto">
             <TabsTrigger value="overview" className="gap-2">
               <Activity className="w-4 h-4" />
               <span className="hidden sm:inline">Overview</span>
@@ -90,6 +91,10 @@ const Admin = () => {
             <TabsTrigger value="testimonials" className="gap-2">
               <MessageSquare className="w-4 h-4" />
               <span className="hidden sm:inline">Testimonials</span>
+            </TabsTrigger>
+            <TabsTrigger value="visitors" className="gap-2">
+              <Eye className="w-4 h-4" />
+              <span className="hidden sm:inline">Visitors</span>
             </TabsTrigger>
           </TabsList>
 
@@ -127,6 +132,10 @@ const Admin = () => {
 
           <TabsContent value="testimonials">
             <TestimonialsManagement />
+          </TabsContent>
+
+          <TabsContent value="visitors">
+            <VisitorAnalytics />
           </TabsContent>
         </Tabs>
       </main>
