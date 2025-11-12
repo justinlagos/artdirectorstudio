@@ -310,6 +310,20 @@ export const ArtieChat = () => {
       // Process uploaded files first
       const attachments: any[] = [];
       
+      // Extract image URLs from message text (Supabase storage URLs)
+      const urlRegex = /(https:\/\/[^\s]+\.supabase\.co\/storage\/v1\/object\/[^\s]+\.(jpg|jpeg|png|gif|webp))/gi;
+      const imageUrls = inputValue.match(urlRegex) || [];
+      
+      for (const imageUrl of imageUrls) {
+        attachments.push({
+          type: 'image',
+          url: imageUrl,
+          name: 'Referenced Image'
+        });
+        // Store in context memory
+        setContextMemory(prev => ({ ...prev, lastImageUrl: imageUrl }));
+      }
+      
       for (const file of uploadedFiles) {
         if (file.type.startsWith('image/')) {
           // Upload image to storage
@@ -426,11 +440,36 @@ export const ArtieChat = () => {
             messages: messages
               .filter(m => m.sender === 'user' || m.sender === 'artie')
               .slice(-10)
-              .map(m => ({
-                role: m.sender === 'user' ? 'user' : 'assistant',
-                content: m.text
-              }))
-              .concat([{ role: 'user', content: contextualInput }]),
+              .map(m => {
+                // Include image attachments in message content for multimodal understanding
+                if (m.attachment?.type === 'image') {
+                  return {
+                    role: m.sender === 'user' ? 'user' : 'assistant',
+                    content: [
+                      { type: 'text', text: m.text },
+                      { type: 'image_url', image_url: { url: m.attachment.url } }
+                    ] as any
+                  };
+                }
+                return {
+                  role: m.sender === 'user' ? 'user' : 'assistant',
+                  content: m.text
+                };
+              })
+              .concat([
+                attachments.length > 0 && attachments[0].type === 'image'
+                  ? {
+                      role: 'user' as const,
+                      content: [
+                        { type: 'text', text: contextualInput },
+                        { type: 'image_url', image_url: { url: attachments[0].url } }
+                      ] as any
+                    }
+                  : {
+                      role: 'user' as const,
+                      content: contextualInput
+                    }
+              ]),
             attachments: attachments,
             contextMemory: contextMemory
           }),
@@ -560,7 +599,7 @@ export const ArtieChat = () => {
                 });
                 
               } else if (toolCall.function.name === 'generate_image') {
-                accumulatedText += '\n\n(Generating image...)';
+                accumulatedText += '\n\n✨ Generating image...';
                 setMessages(prev => 
                   prev.map(m => 
                     m.id === assistantMessageId 
@@ -611,8 +650,8 @@ export const ArtieChat = () => {
                   console.log('[ARTIE] Generated image data:', genData);
                   
                   if (genData.image) {
-                    accumulatedText = accumulatedText.replace('(Generating image...)', '');
-                    accumulatedText += `\n\n[Generated Image]\n${genData.image}`;
+                    accumulatedText = accumulatedText.replace(/✨ Generating image\.\.\.|⏳ Retrying \(attempt \d\/3\)\.\.\./g, '').trim();
+                    accumulatedText += `\n\n✅ Image generated!`;
                     await refetchCredits();
                     setMessages(prev => 
                       prev.map(m => 
@@ -635,7 +674,7 @@ export const ArtieChat = () => {
                 } catch (imgError) {
                   console.error('[ARTIE] Image generation error:', imgError);
                   const errorMessage = imgError instanceof Error ? imgError.message : 'Unknown error';
-                  accumulatedText = accumulatedText.replace('(Generating image...)', '');
+                  accumulatedText = accumulatedText.replace(/✨ Generating image\.\.\.|⏳ Retrying \(attempt \d\/3\)\.\.\./g, '').trim();
                   accumulatedText += `\n\n❌ Failed to generate image: ${errorMessage}`;
                   setMessages(prev => 
                     prev.map(m => 
@@ -650,7 +689,7 @@ export const ArtieChat = () => {
                   });
                 }
               } else if (toolCall.function.name === 'edit_image') {
-                accumulatedText += '\n\n(Editing image...)';
+                accumulatedText += '\n\n🎨 Editing image...';
                 setMessages(prev => 
                   prev.map(m => 
                     m.id === assistantMessageId 
@@ -667,6 +706,11 @@ export const ArtieChat = () => {
                     throw new Error('No active session');
                   }
 
+                  const imageUrl = args.imageUrl || contextMemory.lastImageUrl;
+                  if (!imageUrl) {
+                    throw new Error('No image provided. Please upload or reference an image first.');
+                  }
+
                   // Use retry with exponential backoff
                   const editData = await fetchWithRetry<{ success: boolean; image: string; assetId?: string }>(
                     () => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-image`, {
@@ -676,7 +720,7 @@ export const ArtieChat = () => {
                         'Authorization': `Bearer ${session.access_token}`,
                       },
                       body: JSON.stringify({ 
-                        imageUrl: args.imageUrl,
+                        imageUrl: imageUrl,
                         instruction: args.instruction,
                         quality: args.quality || 'auto',
                         size: args.size || '1024x1024'
@@ -702,8 +746,8 @@ export const ArtieChat = () => {
                   console.log('[ARTIE] Edited image data:', editData);
                   
                   if (editData.image) {
-                    accumulatedText = accumulatedText.replace('(Editing image...)', '');
-                    accumulatedText += `\n\n[Edited Image]\n${editData.image}`;
+                    accumulatedText = accumulatedText.replace(/🎨 Editing image\.\.\.|⏳ Retrying \(attempt \d\/3\)\.\.\./g, '').trim();
+                    accumulatedText += `\n\n✅ Image edited!`;
                     await refetchCredits();
                     setMessages(prev => 
                       prev.map(m => 
@@ -726,7 +770,7 @@ export const ArtieChat = () => {
                 } catch (editError) {
                   console.error('[ARTIE] Image editing error:', editError);
                   const errorMessage = editError instanceof Error ? editError.message : 'Unknown error';
-                  accumulatedText = accumulatedText.replace('(Editing image...)', '');
+                  accumulatedText = accumulatedText.replace(/🎨 Editing image\.\.\.|⏳ Retrying \(attempt \d\/3\)\.\.\./g, '').trim();
                   accumulatedText += `\n\n❌ Failed to edit image: ${errorMessage}`;
                   setMessages(prev => 
                     prev.map(m => 
