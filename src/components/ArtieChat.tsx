@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRetryWithBackoff } from "@/hooks/useRetryWithBackoff";
 import { ImageEditor } from "./ImageEditor";
+import { extractTextFromBriefFile } from "@/lib/documentParser";
 
 interface Message {
   id: string;
@@ -26,11 +27,50 @@ interface Message {
     url: string;
     name: string;
     data?: string;
+    analysis?: BriefAnalysis;
+    excerpt?: string;
   };
   actionChips?: { label: string; action: string }[];
   error?: boolean;
   retryPayload?: any;
 }
+
+type BriefAnalysis = {
+  summary: string;
+  keyInsights: string[];
+  targetAudience?: string;
+  deliverables?: string[];
+  tonalKeywords?: string[];
+  suggestedActions?: string[];
+};
+
+interface ContextImage {
+  url: string;
+  messageId: string;
+  timestamp: string;
+  name?: string;
+  source: 'user' | 'artie' | 'link';
+}
+
+interface ContextDocument {
+  id: string;
+  name: string;
+  summary: string;
+  keyInsights: string[];
+  targetAudience?: string;
+  deliverables?: string[];
+  tonalKeywords?: string[];
+  textExcerpt?: string;
+  createdAt: string;
+}
+
+interface ContextMemory {
+  images: ContextImage[];
+  documents: ContextDocument[];
+  briefSummary?: string;
+}
+
+const SUPABASE_IMAGE_REGEX = /(https:\/\/[^\s]+\.supabase\.co\/storage\/v1\/object\/[^\s]+\.(?:jpg|jpeg|png|gif|webp))/gi;
 
 type QuickAction = {
   icon: typeof Lightbulb;
@@ -59,11 +99,22 @@ export const ArtieChat = () => {
   const [contextualPrompt, setContextualPrompt] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [contextMemory, setContextMemory] = useState<{
-    images: Array<{ url: string; messageId: string; timestamp: Date }>;
-    lastAnalysis?: any;
-    briefSummary?: string;
-  }>({ images: [] });
+  const [contextMemory, setContextMemory] = useState<ContextMemory>(() => {
+    const saved = sessionStorage.getItem('artie-context-memory');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          images: Array.isArray(parsed.images) ? parsed.images : [],
+          documents: Array.isArray(parsed.documents) ? parsed.documents : [],
+          briefSummary: typeof parsed.briefSummary === 'string' ? parsed.briefSummary : undefined
+        } as ContextMemory;
+      } catch {
+        // ignore parsing errors
+      }
+    }
+    return { images: [], documents: [] };
+  });
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
   const [generationPrompt, setGenerationPrompt] = useState("");
   const [generationOptions, setGenerationOptions] = useState<any>({});
@@ -98,12 +149,157 @@ export const ArtieChat = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingImageUrl, setEditingImageUrl] = useState<string>("");
 
+  const registerContextImage = useCallback(
+    (image: {
+      url: string;
+      messageId: string;
+      name?: string;
+      source: ContextImage['source'];
+      timestamp?: string;
+    }): ContextImage | null => {
+      if (!image.url) return null;
+
+      let createdImage: ContextImage | null = null;
+      setContextMemory((prev) => {
+        if (prev.images.some((img) => img.url === image.url && img.messageId === image.messageId)) {
+          return prev;
+        }
+        createdImage = {
+          url: image.url,
+          messageId: image.messageId,
+          name: image.name,
+          source: image.source,
+          timestamp: image.timestamp || new Date().toISOString(),
+        };
+        return {
+          ...prev,
+          images: [...prev.images, createdImage],
+        };
+      });
+      return createdImage;
+    },
+    []
+  );
+
+  const registerDocumentContext = useCallback(
+    (doc: {
+      name: string;
+      summary: string;
+      keyInsights: string[];
+      targetAudience?: string;
+      deliverables?: string[];
+      tonalKeywords?: string[];
+      textExcerpt?: string;
+    }): ContextDocument | null => {
+      if (!doc.summary) return null;
+
+      const docId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `doc-${Date.now()}`;
+      const createdDocument: ContextDocument = {
+        id: docId,
+        name: doc.name,
+        summary: doc.summary,
+        keyInsights: doc.keyInsights,
+        targetAudience: doc.targetAudience,
+        deliverables: doc.deliverables,
+        tonalKeywords: doc.tonalKeywords,
+        textExcerpt: doc.textExcerpt,
+        createdAt: new Date().toISOString(),
+      };
+
+      setContextMemory((prev) => ({
+        ...prev,
+        documents: [...prev.documents, createdDocument],
+        briefSummary: doc.summary || prev.briefSummary,
+      }));
+
+      return createdDocument;
+    },
+    []
+  );
+
+  const latestContextImage = useMemo(
+    () => contextMemory.images[contextMemory.images.length - 1],
+    [contextMemory.images]
+  );
+
+  const handleOpenLatestImage = useCallback(() => {
+    if (!latestContextImage) {
+      toast.error("No recent image to open");
+      return;
+    }
+
+    try {
+      const { openStudioWithPrompt } = require('@/lib/studio');
+      openStudioWithPrompt({
+        basePrompt: "Refine this image",
+        imageUrl: latestContextImage.url,
+      });
+      toast.success("Opening latest image in Studio");
+    } catch (error) {
+      console.error('[ARTIE] Failed to open Studio:', error);
+      toast.error("Unable to open image in Studio");
+    }
+  }, [latestContextImage]);
+
+  const extractSupabaseImageUrls = useCallback((text: string) => {
+    if (!text) return [];
+    const matches = text.match(SUPABASE_IMAGE_REGEX) || [];
+    return Array.from(new Set(matches));
+  }, []);
+
+  const analyzeBriefDocument = useCallback(
+    async (fileName: string, text: string): Promise<BriefAnalysis> => {
+      const trimmedText = text.length > 20000 ? text.slice(0, 20000) : text;
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-brief`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          filename: fileName,
+          text: trimmedText,
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to analyze brief';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // ignore
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      return {
+        summary: result.summary,
+        keyInsights: result.key_insights || result.keyInsights || [],
+        targetAudience: result.target_audience || result.targetAudience,
+        deliverables: result.deliverables,
+        tonalKeywords: result.tonal_keywords || result.tonalKeywords,
+        suggestedActions: result.suggested_actions || result.suggestedActions,
+      };
+    },
+    []
+  );
+
   // Save conversation to sessionStorage
   useEffect(() => {
     if (messages.length > 1) {
       sessionStorage.setItem('artie-conversation', JSON.stringify(messages));
     }
   }, [messages]);
+
+  useEffect(() => {
+    sessionStorage.setItem('artie-context-memory', JSON.stringify(contextMemory));
+  }, [contextMemory]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -142,6 +338,53 @@ export const ArtieChat = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    setContextMemory((prev) => {
+      const existingKeys = new Set(prev.images.map((img) => `${img.messageId}|${img.url}`));
+      const additions: ContextImage[] = [];
+
+      messages.forEach((message) => {
+        if (message.attachment?.type === 'image') {
+          const key = `${message.id}|${message.attachment.url}`;
+          if (!existingKeys.has(key)) {
+            additions.push({
+              url: message.attachment.url,
+              messageId: message.id,
+              name: message.attachment.name,
+              source: message.sender === 'user' ? 'user' : 'artie',
+              timestamp: message.timestamp.toISOString(),
+            });
+            existingKeys.add(key);
+          }
+        }
+
+        const embeddedUrls = extractSupabaseImageUrls(message.text);
+        embeddedUrls.forEach((url, index) => {
+          const key = `${message.id}|${url}`;
+          if (!existingKeys.has(key)) {
+            additions.push({
+              url,
+              messageId: `${message.id}-link-${index}`,
+              name: 'Referenced Image',
+              source: 'link',
+              timestamp: message.timestamp.toISOString(),
+            });
+            existingKeys.add(key);
+          }
+        });
+      });
+
+      if (additions.length === 0) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        images: [...prev.images, ...additions],
+      };
+    });
+  }, [messages, extractSupabaseImageUrls]);
 
   // Custom event listener for mobile bottom nav
   useEffect(() => {
@@ -350,28 +593,41 @@ export const ArtieChat = () => {
     setIsUploading(true);
 
     try {
-      // Process uploaded files first
       const attachments: any[] = [];
-      
-      // Extract image URLs from message text (Supabase storage URLs)
-      const urlRegex = /(https:\/\/[^\s]+\.supabase\.co\/storage\/v1\/object\/[^\s]+\.(jpg|jpeg|png|gif|webp))/gi;
-      const imageUrls = inputValue.match(urlRegex) || [];
-      
-      for (const imageUrl of imageUrls) {
+      const trackedImages: ContextImage[] = [];
+      const trackedDocuments: ContextDocument[] = [];
+      const userMessageId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : Date.now().toString();
+
+      const embeddedImageUrls = extractSupabaseImageUrls(inputValue);
+      embeddedImageUrls.forEach((imageUrl, index) => {
         attachments.push({
           type: 'image',
           url: imageUrl,
-          name: 'Referenced Image'
+          name: 'Referenced Image',
         });
-        // Store in context memory
-        setContextMemory(prev => ({ ...prev, lastImageUrl: imageUrl }));
-      }
-      
+        const registered = registerContextImage({
+          url: imageUrl,
+          messageId: `${userMessageId}-link-${index}`,
+          name: 'Referenced Image',
+          source: 'link',
+          timestamp: new Date().toISOString(),
+        });
+        if (registered) {
+          trackedImages.push(registered);
+        }
+      });
+
       for (const file of uploadedFiles) {
         if (file.type.startsWith('image/')) {
-          // Upload image to storage
           const fileExt = file.name.split('.').pop();
-          const fileName = `${Math.random()}.${fileExt}`;
+          const randomPart =
+            typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? crypto.randomUUID()
+              : Math.random().toString(36).slice(2);
+          const fileName = `${randomPart}.${fileExt}`;
           const { data: { user } } = await supabase.auth.getUser();
           
           if (user) {
@@ -390,30 +646,74 @@ export const ArtieChat = () => {
                 url: publicUrl,
                 name: file.name
               });
-
-              // Store in context memory
-              setContextMemory(prev => ({ ...prev, lastImageUrl: publicUrl }));
+              const registered = registerContextImage({
+                url: publicUrl,
+                messageId: userMessageId,
+                name: file.name,
+                source: 'user',
+                timestamp: new Date().toISOString(),
+              });
+              if (registered) {
+                trackedImages.push(registered);
+              }
             }
           }
         } else if (file.type === 'application/pdf' || file.type.includes('word')) {
-          // Parse document
           const reader = new FileReader();
-          const fileData = await new Promise<string>((resolve) => {
+          const fileData = await new Promise<string>((resolve, reject) => {
             reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = () => reject(new Error('Failed to read document'));
             reader.readAsDataURL(file);
           });
 
-          attachments.push({
-            type: 'document',
-            url: fileData,
-            name: file.name,
-            rawFile: file
-          });
+          try {
+            const extractedText = await extractTextFromBriefFile(file);
+            if (!extractedText) {
+              throw new Error('Unable to extract text from document');
+            }
+            const briefAnalysis = await analyzeBriefDocument(file.name, extractedText);
+            const registered = registerDocumentContext({
+              name: file.name,
+              summary: briefAnalysis.summary,
+              keyInsights: briefAnalysis.keyInsights || [],
+              targetAudience: briefAnalysis.targetAudience,
+              deliverables: briefAnalysis.deliverables,
+              tonalKeywords: briefAnalysis.tonalKeywords,
+              textExcerpt: extractedText.slice(0, 1200),
+            });
+            if (registered) {
+              trackedDocuments.push(registered);
+            }
+
+            attachments.push({
+              type: 'document',
+              url: fileData,
+              name: file.name,
+              analysis: briefAnalysis,
+              excerpt: extractedText.slice(0, 2000),
+            });
+
+            toast.success("Brief processed", {
+              description: `I've summarized ${file.name}.`,
+            });
+          } catch (docError) {
+            const errorMessage = docError instanceof Error ? docError.message : 'Document analysis failed';
+            console.error('[ARTIE] Brief analysis error:', docError);
+            toast.error("Brief analysis failed", {
+              description: errorMessage,
+            });
+
+            attachments.push({
+              type: 'document',
+              url: fileData,
+              name: file.name,
+            });
+          }
         }
       }
 
       const userMessage: Message = {
-        id: Date.now().toString(),
+        id: userMessageId,
         text: inputValue || "Please review these files",
         sender: 'user',
         timestamp: new Date(),
@@ -434,26 +734,60 @@ export const ArtieChat = () => {
         
         // Build context-aware message with attachments
         let contextualInput = inputValue || "Please review these files";
-        const contextParts = [];
+        const contextParts: string[] = [];
         
-        // Add file context
         if (attachments.length > 0) {
           for (const att of attachments) {
             if (att.type === 'image') {
               contextParts.push(`[User uploaded image: ${att.name}]`);
             } else if (att.type === 'document') {
-              contextParts.push(`[User uploaded document: ${att.name} - analyzing for creative brief content]`);
+              if (att.analysis?.summary) {
+                contextParts.push(`[Brief summary (${att.name}): ${att.analysis.summary}]`);
+              } else {
+                contextParts.push(`[User uploaded document: ${att.name} - analyzing for creative brief content]`);
+              }
             }
           }
         }
         
-        // Add context memory
-        if (contextMemory.briefSummary) {
+        const combinedDocuments = [
+          ...contextMemory.documents,
+          ...trackedDocuments,
+        ];
+        const recentDocuments = combinedDocuments.slice(-3);
+        recentDocuments.forEach((doc) => {
+          const keyInsightSnippet = doc.keyInsights?.slice(0, 3).join('; ');
+          contextParts.push(
+            `Brief "${doc.name}" summary: ${doc.summary}` +
+              (keyInsightSnippet ? ` | Key points: ${keyInsightSnippet}` : '')
+          );
+        });
+
+        if (contextMemory.briefSummary && combinedDocuments.length === 0) {
           contextParts.push(`Previous brief context: ${contextMemory.briefSummary}`);
         }
-        const lastImage = contextMemory.images?.[contextMemory.images.length - 1];
-        if (lastImage?.url && !attachments.some(a => a.type === 'image')) {
-          contextParts.push(`Last image reference: ${lastImage.url}`);
+
+        const combinedImages = [
+          ...contextMemory.images,
+          ...trackedImages,
+        ];
+        const uniqueImages: ContextImage[] = [];
+        const seenImageUrls = new Set<string>();
+        combinedImages.forEach((img) => {
+          if (!seenImageUrls.has(img.url)) {
+            seenImageUrls.add(img.url);
+            uniqueImages.push(img);
+          }
+        });
+        const recentImages = uniqueImages.slice(-4);
+        recentImages.forEach((img, index) => {
+          contextParts.push(
+            `Image reference ${index + 1} (${img.source}): ${img.url}`
+          );
+        });
+
+        if (trackedDocuments.length === 0 && contextMemory.briefSummary) {
+          contextParts.push(`Retained brief context: ${contextMemory.briefSummary}`);
         }
 
         if (contextData) {
@@ -515,7 +849,12 @@ export const ArtieChat = () => {
                     }
               ]),
             attachments: attachments,
-            contextMemory: contextMemory
+            contextMemory: {
+              ...contextMemory,
+              images: combinedImages,
+              documents: combinedDocuments,
+              briefSummary: trackedDocuments[trackedDocuments.length - 1]?.summary || contextMemory.briefSummary,
+            }
           }),
         });
 
@@ -694,6 +1033,42 @@ export const ArtieChat = () => {
                   console.log('[ARTIE] Generated image data:', genData);
                   
                   if (genData.image) {
+                    // Verify the image was saved to database
+                    if (!genData.assetId) {
+                      console.warn('[ARTIE] Image generated but not saved to My Projects. Attempting fallback save...');
+                      try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (user) {
+                          const { data: savedAsset, error: saveError } = await supabase
+                            .from('generated_assets')
+                            .insert({
+                              user_id: user.id,
+                              type: 'image',
+                              action: 'generate',
+                              prompt: args.prompt,
+                              image_url: genData.image,
+                              params: {
+                                quality: args.quality || 'auto',
+                                size: args.size || '1024x1024',
+                                fallback_save: true
+                              }
+                            })
+                            .select()
+                            .single();
+
+                          if (saveError) {
+                            console.error('[ARTIE] Fallback save failed:', saveError);
+                          } else {
+                            console.log('[ARTIE] Fallback save successful:', savedAsset?.id);
+                          }
+                        }
+                      } catch (fallbackError) {
+                        console.error('[ARTIE] Fallback save exception:', fallbackError);
+                      }
+                    } else {
+                      console.log('[ARTIE] Image saved to My Projects:', genData.assetId);
+                    }
+
                     accumulatedText = accumulatedText.replace(/✨ Generating image\.\.\.|⏳ Retrying \(attempt \d\/3\)\.\.\./g, '').trim();
                     accumulatedText += `\n\n✅ Image generated!`;
                     await refetchCredits();
@@ -733,6 +1108,20 @@ export const ArtieChat = () => {
                   });
                 }
               } else if (toolCall.function.name === 'edit_image') {
+                if (!args.instruction || typeof args.instruction !== 'string' || !args.instruction.trim()) {
+                  accumulatedText += '\n\n⚠️ I need a clear edit instruction before I can modify this image. Try something like “brighten the lighting and lean into a cinematic teal-orange palette.”';
+                  setMessages(prev => 
+                    prev.map(m => 
+                      m.id === assistantMessageId 
+                        ? { ...m, text: accumulatedText }
+                        : m
+                    )
+                  );
+                  continue;
+                }
+
+                const instruction = args.instruction.trim();
+
                 accumulatedText += '\n\n🎨 Editing image...';
                 setMessages(prev => 
                   prev.map(m => 
@@ -743,7 +1132,7 @@ export const ArtieChat = () => {
                 );
 
                 try {
-                  console.log('[ARTIE] Editing image with instruction:', args.instruction);
+                  console.log('[ARTIE] Editing image with instruction:', instruction);
                   const { data: { session } } = await supabase.auth.getSession();
                   
                   if (!session?.access_token) {
@@ -766,7 +1155,7 @@ export const ArtieChat = () => {
                       },
                       body: JSON.stringify({ 
                         imageUrl: imageUrl,
-                        instruction: args.instruction,
+                        instruction: instruction,
                         quality: args.quality || 'auto',
                         size: args.size || '1024x1024'
                       })
@@ -979,6 +1368,22 @@ export const ArtieChat = () => {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {latestContextImage && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleOpenLatestImage}
+                    className="h-8 w-8 hover:bg-muted"
+                    aria-label="Open latest image in Studio"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open latest image in Studio</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -1045,7 +1450,9 @@ export const ArtieChat = () => {
           className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-5 space-y-3 md:space-y-4 overscroll-contain"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {messages.map((message) => (
+          {messages.map((message) => {
+            const inlineImageUrls = extractSupabaseImageUrls(message.text);
+            return (
             <div
               key={message.id}
               className={cn(
@@ -1106,11 +1513,82 @@ export const ArtieChat = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-surface-3 px-3 py-2 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground truncate">{message.attachment.name}</span>
-                        </div>
+                        <>
+                          <div className="bg-surface-3 px-3 py-2 flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground truncate">{message.attachment.name}</span>
+                          </div>
+                          {message.attachment.analysis?.summary && (
+                            <div className="px-3 py-3 bg-background/80 border-t border-border/70 space-y-2">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                                Brief summary
+                              </p>
+                              <p className="text-xs text-foreground/80 leading-relaxed">
+                                {message.attachment.analysis.summary}
+                              </p>
+                              {message.attachment.analysis.keyInsights?.length > 0 && (
+                                <div className="space-y-1.5">
+                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                                    Key directives
+                                  </p>
+                                  <ul className="space-y-1">
+                                    {message.attachment.analysis.keyInsights.slice(0, 3).map((insight, idx) => (
+                                      <li key={`${message.id}-insight-${idx}`} className="text-xs text-muted-foreground/90">
+                                        • {insight}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
+                    </div>
+                  )}
+
+                  {inlineImageUrls.length > 0 && (
+                    <div className="grid grid-cols-1 gap-2">
+                      {inlineImageUrls.map((url, idx) => (
+                        <div key={`${message.id}-inline-${idx}`} className="relative rounded-xl overflow-hidden border border-border bg-muted group">
+                          <img
+                            src={url}
+                            alt="Referenced image"
+                            className="w-full h-auto max-h-[220px] md:max-h-[260px] object-contain"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                const { openStudioWithPrompt } = require('@/lib/studio');
+                                openStudioWithPrompt({
+                                  basePrompt: "Refine this reference",
+                                  imageUrl: url,
+                                });
+                                toast.success("Opening in Studio");
+                              }}
+                              className="gap-1.5"
+                            >
+                              <Wand2 className="h-3.5 w-3.5" />
+                              Open in Studio
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setEditingImageUrl(url);
+                                setEditorOpen(true);
+                              }}
+                              className="gap-1.5"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                              Edit
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
@@ -1162,7 +1640,7 @@ export const ArtieChat = () => {
                 </div>
               </div>
             </div>
-          ))}
+          )})}
           
           {/* Typing Indicator */}
           {isLoading && (
@@ -1340,10 +1818,47 @@ export const ArtieChat = () => {
                       });
 
                       const data = await response.json();
-                      if (data.imageUrl) {
+                      if (data.image || data.imageUrl) {
+                        const imageUrl = data.image || data.imageUrl;
+                        
+                        // Verify the image was saved to database
+                        if (!data.assetId) {
+                          console.warn('[ARTIE] Image generated but not saved to My Projects. Attempting fallback save...');
+                          try {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            if (user) {
+                              const { data: savedAsset, error: saveError } = await supabase
+                                .from('generated_assets')
+                                .insert({
+                                  user_id: user.id,
+                                  type: 'image',
+                                  action: 'generate',
+                                  prompt: generationPrompt,
+                                  image_url: imageUrl,
+                                  params: {
+                                    ...generationOptions,
+                                    fallback_save: true
+                                  }
+                                })
+                                .select()
+                                .single();
+
+                              if (saveError) {
+                                console.error('[ARTIE] Fallback save failed:', saveError);
+                              } else {
+                                console.log('[ARTIE] Fallback save successful:', savedAsset?.id);
+                              }
+                            }
+                          } catch (fallbackError) {
+                            console.error('[ARTIE] Fallback save exception:', fallbackError);
+                          }
+                        } else {
+                          console.log('[ARTIE] Image saved to My Projects:', data.assetId);
+                        }
+
                         setMessages(prev => prev.map(m => 
                           m.id === genMessageId
-                            ? { ...m, text: `Generated successfully! 🎨\n\n![Generated Image](${data.imageUrl})`, attachment: { type: 'image' as const, url: data.imageUrl, name: 'Generated' } }
+                            ? { ...m, text: `Generated successfully! 🎨\n\n![Generated Image](${imageUrl})`, attachment: { type: 'image' as const, url: imageUrl, name: 'Generated' } }
                             : m
                         ));
                         toast.success("Image generated successfully!");
@@ -1377,16 +1892,18 @@ export const ArtieChat = () => {
         imageUrl={editingImageUrl}
         onImageEdited={(newImageUrl) => {
           // Add the edited image to context memory
-          const imageMessageId = crypto.randomUUID();
-          setContextMemory(prev => ({
-            ...prev,
-            images: [...prev.images, {
-              url: newImageUrl,
-              messageId: imageMessageId,
-              timestamp: new Date()
-            }]
-          }));
-          
+        const imageMessageId =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `artie-image-${Date.now()}`;
+          registerContextImage({
+            url: newImageUrl,
+            messageId: imageMessageId,
+            name: 'Edited Image',
+            source: 'artie',
+            timestamp: new Date().toISOString()
+          });
+        
           // Add a message showing the edited result
           const editedMessage: Message = {
             id: imageMessageId,

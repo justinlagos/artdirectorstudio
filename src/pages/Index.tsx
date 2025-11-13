@@ -431,6 +431,51 @@ const Index = () => {
         return null;
       }
 
+      // Verify the image was saved to database
+      if (!data.assetId) {
+        console.warn("[Index] Image generated but not saved to My Projects. Attempting fallback save...");
+        
+        // Fallback: Try to save from client side
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: savedAsset, error: saveError } = await supabase
+              .from('generated_assets')
+              .insert({
+                user_id: user.id,
+                type: 'image',
+                action: 'generate',
+                prompt: prompt,
+                image_url: data.image,
+                params: {
+                  quality: options.quality,
+                  size: options.size,
+                  background: options.background,
+                  fallback_save: true
+                }
+              })
+              .select()
+              .single();
+
+            if (saveError) {
+              console.error("[Index] Fallback save failed:", saveError);
+              toast.warning("Image generated but may not appear in My Projects. Please refresh if needed.");
+            } else {
+              console.log("[Index] Fallback save successful:", savedAsset?.id);
+              // Update the assetId in the response
+              if (savedAsset?.id) {
+                data.assetId = savedAsset.id;
+              }
+            }
+          }
+        } catch (fallbackError) {
+          console.error("[Index] Fallback save exception:", fallbackError);
+          toast.warning("Image generated but may not appear in My Projects. Please refresh if needed.");
+        }
+      } else {
+        console.log("[Index] Image saved to My Projects:", data.assetId);
+      }
+
       // Add to generated images list
       const newImage: GeneratedImage = {
         id: data.assetId || crypto.randomUUID(),

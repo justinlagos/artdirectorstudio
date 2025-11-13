@@ -369,61 +369,86 @@ ${previousPrompt ? `Previous prompt was: "${previousPrompt}"` : ''}`;
         .getPublicUrl(fileName);
       finalImageUrl = urlData.publicUrl;
 
-      // Save metadata to database with graceful fallback
+      // Save metadata to database with retry logic
       const dbStart = Date.now();
       console.log(`[${requestId}] Saving to database...`);
       
-      try {
-        const { data: savedAsset, error: assetError } = await supabaseAdmin
-          .from('generated_assets')
-          .insert({
-            user_id: userId,
-            type: 'image',
-            action: 'generate',
-            prompt: prompt,
-            image_url: finalImageUrl,
-            source_urls: referenceImageUrl ? [referenceImageUrl] : null,
-            params: {
-              quality, 
-              size, 
-              background,
-              continuationStrength: referenceImageUrl ? continuationStrength : undefined,
-              hadReference: !!referenceImageUrl
-            },
-            analysis_data: {
-              generation_params: { quality, size, background },
-              generated_at: new Date().toISOString(),
-              request_id: requestId
-            }
-          })
-          .select()
-          .single();
+      let saveAttempts = 0;
+      const maxSaveAttempts = 3;
+      let saveSuccess = false;
+      
+      while (saveAttempts < maxSaveAttempts && !saveSuccess) {
+        try {
+          const { data: savedAsset, error: assetError } = await supabaseAdmin
+            .from('generated_assets')
+            .insert({
+              user_id: userId,
+              type: 'image',
+              action: 'generate',
+              prompt: prompt,
+              image_url: finalImageUrl,
+              source_urls: referenceImageUrl ? [referenceImageUrl] : null,
+              params: {
+                quality, 
+                size, 
+                background,
+                continuationStrength: referenceImageUrl ? continuationStrength : undefined,
+                hadReference: !!referenceImageUrl
+              },
+              analysis_data: {
+                generation_params: { quality, size, background },
+                generated_at: new Date().toISOString(),
+                request_id: requestId
+              }
+            })
+            .select()
+            .single();
 
-        if (assetError) {
-          console.error(`[${requestId}] Database save error (non-fatal):`, {
-            error: assetError.message,
-            code: assetError.code,
-            details: assetError.details
+          if (assetError) {
+            saveAttempts++;
+            console.error(`[${requestId}] Database save error (attempt ${saveAttempts}/${maxSaveAttempts}):`, {
+              error: assetError.message,
+              code: assetError.code,
+              details: assetError.details
+            });
+            
+            if (saveAttempts < maxSaveAttempts) {
+              // Wait before retry with exponential backoff
+              const delay = Math.min(1000 * Math.pow(2, saveAttempts - 1), 5000);
+              console.log(`[${requestId}] Retrying database save in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+              console.error(`[${requestId}] All database save attempts failed. Image available at: ${finalImageUrl}`);
+              // Still continue - image is generated and uploaded, but metadata save failed
+            }
+          } else {
+            const dbDuration = Date.now() - dbStart;
+            assetData = savedAsset;
+            saveSuccess = true;
+            console.log(`[${requestId}] Database save complete (${dbDuration}ms, attempt ${saveAttempts + 1})`);
+            console.log(`[${requestId}] Asset details:`, { 
+              assetId: assetData.id, 
+              hasImageUrl: !!assetData.image_url,
+              hasPrompt: !!assetData.prompt,
+              userId: assetData.user_id
+            });
+          }
+        } catch (dbSaveError) {
+          saveAttempts++;
+          console.error(`[${requestId}] Database save exception (attempt ${saveAttempts}/${maxSaveAttempts}):`, {
+            error: dbSaveError instanceof Error ? dbSaveError.message : 'Unknown',
+            stack: dbSaveError instanceof Error ? dbSaveError.stack : undefined
           });
-          // Don't fail the request - image is already generated and uploaded
-          console.log(`[${requestId}] Continuing without metadata save - image available at: ${finalImageUrl}`);
-        } else {
-          const dbDuration = Date.now() - dbStart;
-          assetData = savedAsset;
-          console.log(`[${requestId}] Database save complete (${dbDuration}ms)`);
-          console.log(`[${requestId}] Asset details:`, { 
-            assetId: assetData.id, 
-            hasImageUrl: !!assetData.image_url,
-            hasPrompt: !!assetData.prompt,
-            userId: assetData.user_id
-          });
+          
+          if (saveAttempts < maxSaveAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, saveAttempts - 1), 5000);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
         }
-      } catch (dbSaveError) {
-        console.error(`[${requestId}] Database save exception (non-fatal):`, {
-          error: dbSaveError instanceof Error ? dbSaveError.message : 'Unknown',
-          stack: dbSaveError instanceof Error ? dbSaveError.stack : undefined
-        });
-        // Continue - image is available even if metadata isn't saved
+      }
+      
+      if (!saveSuccess) {
+        console.warn(`[${requestId}] WARNING: Image generated but NOT saved to My Projects. Image URL: ${finalImageUrl}`);
       }
     } catch (error) {
       console.error(`[${requestId}] Failed to save image:`, error);
