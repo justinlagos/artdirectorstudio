@@ -156,11 +156,12 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       const response = await fetch(imageDataUrl);
       const blob = await response.blob();
       
-      // Use standardized storage path: results/{userId}/{yyyy-mm}/upscale/{uuid}.png
+      // Use standardized storage path: {userId}/upscale/{yyyy-mm}/{uuid}.png
+      // RLS policy requires first folder to be user ID
       const now = new Date();
       const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       const uuid = crypto.randomUUID();
-      const fileName = `results/${user.id}/${yearMonth}/upscale/${uuid}.png`;
+      const fileName = `${user.id}/upscale/${yearMonth}/${uuid}.png`;
       
       const { error: uploadError } = await supabase.storage
         .from('generated-images')

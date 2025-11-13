@@ -280,7 +280,8 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const uuid = crypto.randomUUID();
-    const fileName = `results/${user.id}/${yearMonth}/batch/${uuid}.png`;
+    // RLS policy requires first folder to be user ID
+    const fileName = `${user.id}/batch/${yearMonth}/${uuid}.png`;
     
     // Retry upload up to 3 times
     let uploadError = null;
