@@ -67,6 +67,47 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
     throw new Error("Failed to generate image. No image data returned.");
   }
 
+  // Verify the image was saved to database
+  if (!data.assetId) {
+    console.warn("[Studio] Image generated but not saved to My Projects. Attempting fallback save...");
+    
+    // Fallback: Try to save from client side
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: savedAsset, error: saveError } = await supabase
+          .from('generated_assets')
+          .insert({
+            user_id: user.id,
+            type: 'image',
+            action: 'generate',
+            prompt: trimmedPrompt,
+            image_url: data.image,
+            params: {
+              quality: options.quality,
+              size: options.size,
+              background: options.background,
+              fallback_save: true
+            }
+          })
+          .select()
+          .single();
+
+        if (saveError) {
+          console.error("[Studio] Fallback save failed:", saveError);
+          // Still return the image - user can see it even if not saved
+        } else {
+          console.log("[Studio] Fallback save successful:", savedAsset?.id);
+        }
+      }
+    } catch (fallbackError) {
+      console.error("[Studio] Fallback save exception:", fallbackError);
+      // Continue - image is still available
+    }
+  } else {
+    console.log("[Studio] Image saved to My Projects:", data.assetId);
+  }
+
   return data.image as string;
 };
 

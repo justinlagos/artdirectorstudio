@@ -13,7 +13,7 @@ export const FloatingCreditTracker = () => {
   const [hasNotified, setHasNotified] = useState(false);
 
   useEffect(() => {
-    if (balance !== null && balance <= 2) {
+    if (balance !== null && balance < 2) {
       setShowUpgrade(true);
       
       // Send email notification if we haven't already
@@ -50,7 +50,7 @@ export const FloatingCreditTracker = () => {
 
   const percentage = Math.min((balance / 10) * 100, 100);
   const isLow = balance <= 5;
-  const isCritical = balance <= 2;
+  const isCritical = balance < 2;
 
   return (
     <div className="fixed bottom-20 sm:bottom-6 right-4 z-40 animate-fade-in">

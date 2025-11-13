@@ -125,6 +125,34 @@ serve(async (req) => {
         .eq('id', user.id);
 
       const newUsage = profile.daily_usage + 1;
+      const usagePercentage = (newUsage / profile.daily_limit) * 100;
+      const previousUsagePercentage = (profile.daily_usage / profile.daily_limit) * 100;
+
+      // Check if user just hit 80% usage threshold and send notification
+      if (usagePercentage >= 80 && previousUsagePercentage < 80 && newUsage < profile.daily_limit) {
+        const resetTime = profile.daily_usage_reset_at 
+          ? new Date(profile.daily_usage_reset_at).toLocaleTimeString()
+          : "midnight";
+        
+        // Send 80% usage notification email asynchronously
+        fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-notification-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({
+            type: "daily_usage_80_percent",
+            userId: user.id,
+            data: { 
+              dailyUsage: newUsage,
+              dailyLimit: profile.daily_limit,
+              usagePercentage: Math.round(usagePercentage),
+              resetTime,
+            },
+          }),
+        }).catch(err => console.error("Failed to send 80% usage notification:", err));
+      }
 
       // Check if user just hit their daily limit and send notification
       if (newUsage >= profile.daily_limit) {

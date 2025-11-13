@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface NotificationRequest {
-  type: "trial_credits_low" | "daily_limit_reached" | "subscription_renewal" | "payment_failure";
+  type: "trial_credits_low" | "daily_limit_reached" | "daily_usage_80_percent" | "subscription_renewal" | "payment_failure";
   userId: string;
   data?: Record<string, any>;
 }
@@ -109,6 +109,36 @@ const createEmailHTML = (type: string, userName: string | undefined, data: any, 
               ✓ All AI-powered tools<br/>
               ✓ Priority support<br/>
               ✓ No credit limits
+            </div>
+            <p class="footer">Best regards,<br/>The ArtDirector Studio Team</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+    case "daily_usage_80_percent":
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>${commonStyles}</style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>📊 You're at 80% of Your Daily Limit</h1>
+            <p>${greeting}</p>
+            <p>You've used <strong>${data.dailyUsage} out of ${data.dailyLimit} generations</strong> today (${data.usagePercentage}% of your daily limit).</p>
+            <p>You have <strong>${data.dailyLimit - data.dailyUsage} generations remaining</strong> today. Your limit will reset at <strong>${data.resetTime}</strong>.</p>
+            <p>Want unlimited generations? Upgrade to Pro or Enterprise for unlimited daily access!</p>
+            <a href="${baseUrl}/subscriptions" class="button">Upgrade to Unlimited</a>
+            <div class="features">
+              <strong>Pro Plan Benefits:</strong><br/>
+              ✓ Unlimited daily generations<br/>
+              ✓ All AI-powered tools<br/>
+              ✓ Priority support<br/>
+              ✓ Advanced features
             </div>
             <p class="footer">Best regards,<br/>The ArtDirector Studio Team</p>
           </div>
@@ -239,6 +269,7 @@ serve(async (req) => {
 
     const subjects = {
       trial_credits_low: "⚠️ Your trial credits are running low",
+      daily_usage_80_percent: "📊 You're at 80% of your daily limit",
       daily_limit_reached: "📊 You've reached your daily generation limit",
       subscription_renewal: "🔄 Your subscription is renewing soon",
       payment_failure: "⚠️ Action required: Payment failed for your subscription",
