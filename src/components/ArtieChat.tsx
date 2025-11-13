@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck, Zap, Minimize2, RefreshCw } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck, Zap, Minimize2, RefreshCw, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRetryWithBackoff } from "@/hooks/useRetryWithBackoff";
+import { ImageEditor } from "./ImageEditor";
 
 interface Message {
   id: string;
@@ -94,6 +95,8 @@ export const ArtieChat = () => {
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingImageUrl, setEditingImageUrl] = useState<string>("");
 
   // Save conversation to sessionStorage
   useEffect(() => {
@@ -314,6 +317,23 @@ export const ArtieChat = () => {
       } else {
         toast.error("No image found", {
           description: "Couldn't find the image to open in Studio",
+        });
+      }
+      return;
+    }
+    
+    if (action === "EDIT_IMAGE") {
+      // Find the image from this message or the most recent one
+      const targetImage = messageId 
+        ? contextMemory.images.find(img => img.messageId === messageId)
+        : contextMemory.images[contextMemory.images.length - 1];
+      
+      if (targetImage) {
+        setEditingImageUrl(targetImage.url);
+        setEditorOpen(true);
+      } else {
+        toast.error("No image found", {
+          description: "Couldn't find the image to edit",
         });
       }
       return;
@@ -1071,6 +1091,18 @@ export const ArtieChat = () => {
                               <Wand2 className="h-3.5 w-3.5" />
                               Open in Studio
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setEditingImageUrl(message.attachment?.url || "");
+                                setEditorOpen(true);
+                              }}
+                              className="gap-1.5"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                              Edit
+                            </Button>
                           </div>
                         </div>
                       ) : (
@@ -1338,6 +1370,39 @@ export const ArtieChat = () => {
           </div>
         </div>
       )}
+
+      <ImageEditor
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        imageUrl={editingImageUrl}
+        onImageEdited={(newImageUrl) => {
+          // Add the edited image to context memory
+          const imageMessageId = crypto.randomUUID();
+          setContextMemory(prev => ({
+            ...prev,
+            images: [...prev.images, {
+              url: newImageUrl,
+              messageId: imageMessageId,
+              timestamp: new Date()
+            }]
+          }));
+          
+          // Add a message showing the edited result
+          const editedMessage: Message = {
+            id: imageMessageId,
+            text: '✨ Image edited successfully!',
+            sender: 'artie',
+            timestamp: new Date(),
+            attachment: { type: 'image', url: newImageUrl, name: 'Edited Image' },
+            actionChips: [
+              { label: '🎨 Open in Studio', action: 'OPEN_STUDIO' },
+              { label: '✏️ Edit Again', action: 'EDIT_IMAGE' }
+            ]
+          };
+          setMessages(prev => [...prev, editedMessage]);
+          toast.success("Your edited image is ready!");
+        }}
+      />
     </>
   );
 };
