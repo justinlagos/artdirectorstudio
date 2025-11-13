@@ -431,8 +431,9 @@ export const ArtieChat = () => {
         if (contextMemory.briefSummary) {
           contextParts.push(`Previous brief context: ${contextMemory.briefSummary}`);
         }
-        if (contextMemory.lastImageUrl && !attachments.some(a => a.type === 'image')) {
-          contextParts.push(`Last image reference: ${contextMemory.lastImageUrl}`);
+        const lastImage = contextMemory.images?.[contextMemory.images.length - 1];
+        if (lastImage?.url && !attachments.some(a => a.type === 'image')) {
+          contextParts.push(`Last image reference: ${lastImage.url}`);
         }
 
         if (contextData) {
@@ -729,7 +730,8 @@ export const ArtieChat = () => {
                     throw new Error('No active session');
                   }
 
-                  const imageUrl = args.imageUrl || contextMemory.lastImageUrl;
+                  const lastImage = contextMemory.images?.[contextMemory.images.length - 1];
+                  const imageUrl = args.imageUrl || lastImage?.url;
                   if (!imageUrl) {
                     throw new Error('No image provided. Please upload or reference an image first.');
                   }
