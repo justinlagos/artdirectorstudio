@@ -61,16 +61,6 @@ export const SubscriptionStatus = () => {
           {subscription.tier === 'free' ? 'Free' : subscription.tier}
         </span>
       </div>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={handleManageSubscription}
-        disabled={managingSubscription}
-        className="h-9 gap-1.5 text-xs"
-      >
-        <Settings className="w-3.5 h-3.5" />
-        Manage
-      </Button>
     </div>
   );
 };
