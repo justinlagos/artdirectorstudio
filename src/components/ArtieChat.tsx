@@ -59,10 +59,10 @@ export const ArtieChat = () => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [contextMemory, setContextMemory] = useState<{
-    lastImageUrl?: string;
+    images: Array<{ url: string; messageId: string; timestamp: Date }>;
     lastAnalysis?: any;
     briefSummary?: string;
-  }>({});
+  }>({ images: [] });
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
   const [generationPrompt, setGenerationPrompt] = useState("");
   const [generationOptions, setGenerationOptions] = useState<any>({});
@@ -295,7 +295,30 @@ export const ArtieChat = () => {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleChipAction = (action: string) => {
+  const handleChipAction = (action: string, messageId?: string) => {
+    if (action === "OPEN_STUDIO") {
+      // Find the image from this message or the most recent one
+      const targetImage = messageId 
+        ? contextMemory.images.find(img => img.messageId === messageId)
+        : contextMemory.images[contextMemory.images.length - 1];
+      
+      if (targetImage) {
+        const { openStudioWithPrompt } = require('@/lib/studio');
+        openStudioWithPrompt({
+          basePrompt: "Refine this image",
+          imageUrl: targetImage.url,
+        });
+        toast.success("Opening in Studio", {
+          description: "Your image has been loaded into the Studio editor",
+        });
+      } else {
+        toast.error("No image found", {
+          description: "Couldn't find the image to open in Studio",
+        });
+      }
+      return;
+    }
+    
     setInputValue(action);
     setTimeout(() => handleSend(), 100);
   };
@@ -1022,19 +1045,31 @@ export const ArtieChat = () => {
                   {message.attachment && (
                     <div className="rounded-xl overflow-hidden border border-border bg-muted">
                       {message.attachment.type === 'image' ? (
-                        <div className="relative">
+                        <div className="relative group">
                           <img 
                             src={message.attachment.url} 
                             alt={message.attachment.name}
                             className="w-full h-auto max-h-[250px] md:max-h-[300px] object-contain"
                             loading="lazy"
                           />
-                          <button
-                            onClick={() => window.open(message.attachment?.url, '_blank')}
-                            className="absolute bottom-2 right-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-background transition-colors"
-                          >
-                            Open in Studio
-                          </button>
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                const { openStudioWithPrompt } = require('@/lib/studio');
+                                openStudioWithPrompt({
+                                  basePrompt: "Refine this image",
+                                  imageUrl: message.attachment?.url || "",
+                                });
+                                toast.success("Opening in Studio");
+                              }}
+                              className="gap-1.5"
+                            >
+                              <Wand2 className="h-3.5 w-3.5" />
+                              Open in Studio
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <div className="bg-surface-3 px-3 py-2 flex items-center gap-2">
