@@ -154,16 +154,30 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
         return;
       }
 
-      const response = await fetch(asset.image_url);
+      // Fetch with CORS handling and proper blob response
+      const response = await fetch(asset.image_url, {
+        mode: 'cors',
+        cache: 'no-cache'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch image');
+      }
+      
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `artdirector-${assetType}-${Date.now()}.png`;
+      a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      
+      // Cleanup
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
       
       // Track export/download
       analytics.track("Asset Exported", {

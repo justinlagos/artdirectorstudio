@@ -257,7 +257,36 @@ ${previousPrompt ? `Previous prompt was: "${previousPrompt}"` : ''}`;
         }
       ];
     } else {
-      messageContent = `Generate an image with aspect ratio ${aspectRatio}. ${prompt}`;
+      // Enhanced prompt generation with dynamic thinking and quality focus
+      const enhancedPrompt = `You are an expert AI image generator specializing in creating stunning, professional-quality visuals.
+
+TASK: Generate a high-quality image based on this description: "${prompt}"
+
+REQUIREMENTS:
+1. **Composition Excellence**: Create a visually compelling composition with proper rule of thirds, balanced elements, and strong focal points
+2. **Technical Quality**: Ensure sharp focus, proper depth of field, and professional lighting
+3. **Artistic Merit**: Apply sophisticated color theory, harmonious palettes, and thoughtful visual hierarchy
+4. **Detail & Realism**: Include rich details, textures, and realistic rendering appropriate to the subject
+5. **Style Consistency**: Maintain a cohesive artistic style throughout the entire image
+6. **Aspect Ratio**: Optimize composition for ${aspectRatio} aspect ratio
+
+DYNAMIC THINKING:
+- Analyze the prompt to understand the core intent and visual goals
+- Consider the best artistic approach (photorealistic, stylized, abstract, etc.)
+- Determine optimal lighting conditions (natural, studio, dramatic, soft)
+- Select appropriate color palette that enhances the mood and message
+- Plan composition elements for maximum visual impact
+- Ensure all elements work together harmoniously
+
+OUTPUT: Generate a single, high-quality image that exceeds professional standards and fully realizes the creative vision described in the prompt.
+
+Aspect ratio: ${aspectRatio}
+Quality level: ${quality === 'high' ? 'Maximum - Ultra-detailed, professional grade' : quality === 'medium' ? 'High - Detailed and polished' : quality === 'low' ? 'Standard - Good quality' : 'Auto - Optimal quality based on prompt complexity'}
+Background: ${background === 'transparent' ? 'Transparent PNG with clean edges' : background === 'opaque' ? 'Solid background appropriate to the scene' : 'Auto - Choose best background type'}
+
+Generate the image now: ${prompt}`;
+      
+      messageContent = enhancedPrompt;
     }
     
     const aiResponse = await fetchWithRetry(

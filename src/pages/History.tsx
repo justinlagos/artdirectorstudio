@@ -13,13 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileText, Trash2, Search, Image as ImageIcon, FileCode, Share2, Copy, Clock, RefreshCw, Download } from "lucide-react";
+import { FileText, Trash2, Search, Image as ImageIcon, FileCode, Share2, Copy, Clock, RefreshCw, Download, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
 import { formatDistanceToNow } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 import { FloatingCreditTracker } from "@/components/FloatingCreditTracker";
 import { getOptimizedImageUrl } from "@/lib/imageOptimization";
+import { ImageEditor } from "@/components/ImageEditor";
 
 type GeneratedAsset = Database['public']['Tables']['generated_assets']['Row'];
 
@@ -31,6 +32,7 @@ const History = () => {
   const [shareAssetId, setShareAssetId] = useState<string | null>(null);
   const [shareAssetType, setShareAssetType] = useState<string>("");
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
+  const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -166,13 +168,31 @@ const History = () => {
 
     for (const asset of assetsToDownload) {
       try {
+        // Fetch as blob to ensure proper download
+        const response = await fetch(asset.image_url!, {
+          mode: 'cors',
+          cache: 'no-cache'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch image');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
-        // Use original URL for downloads (not optimized)
-        link.href = asset.image_url!;
+        link.href = url;
         link.download = `${asset.type}-${asset.id.slice(0, 8)}.png`;
+        link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        
+        // Cleanup
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(link);
+        }, 100);
+        
         await new Promise(resolve => setTimeout(resolve, 500));
         successCount++;
       } catch (error) {
@@ -217,27 +237,16 @@ const History = () => {
     const isBatch = params?.batchItem === true || params?.batch === true;
     
     // Type matching: show all if filter is "all", or match specific type, or match batch
+    // IMPORTANT: Ensure all image types are shown, including 'generate' action
     const matchesType = 
       filterType === "all" || 
       asset.type === filterType ||
       (filterType === "batch" && isBatch);
     
-    // Debug: Log all image assets to help diagnose issues
-    if (asset.type === 'image') {
-      console.log('[History] Image asset check:', {
-        id: asset.id,
-        type: asset.type,
-        action: asset.action,
-        hasImageUrl: !!asset.image_url,
-        hasPrompt: !!asset.prompt,
-        filterType,
-        matchesType,
-        matchesSearch,
-        willShow: matchesSearch && matchesType
-      });
-    }
+    // Ensure generated images (type='image' with action='generate') are always shown
+    const isGeneratedImage = asset.type === 'image' && (asset.action === 'generate' || asset.image_url);
     
-    return matchesSearch && matchesType;
+    return (matchesSearch && matchesType) || (filterType === "all" && isGeneratedImage && matchesSearch);
   });
 
   const getTypeBadge = (type: string) => {
@@ -415,6 +424,21 @@ const History = () => {
                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {asset.image_url && asset.type === 'image' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => {
+                            if (asset.image_url) {
+                              setEditingImageUrl(asset.image_url);
+                            }
+                          }}
+                          title="Edit Image"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -496,6 +520,25 @@ const History = () => {
       </main>
       
       <Footer />
+
+      {/* Image Editor Dialog */}
+      {editingImageUrl && (
+        <ImageEditor
+          open={!!editingImageUrl}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingImageUrl(null);
+            }
+          }}
+          imageUrl={editingImageUrl}
+          onImageEdited={(newImageUrl) => {
+            // Refresh assets after edit
+            refetch();
+            setEditingImageUrl(null);
+            toast.success("Image edited successfully!");
+          }}
+        />
+      )}
 
       <ShareDialog
         open={!!shareAssetId}

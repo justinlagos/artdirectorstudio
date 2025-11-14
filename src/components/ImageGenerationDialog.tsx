@@ -305,17 +305,40 @@ export const ImageGenerationDialog = () => {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!generatedImage) return;
 
-    const link = document.createElement("a");
-    link.href = generatedImage;
-    link.download = `generated-image-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Fetch as blob to ensure proper download
+      const response = await fetch(generatedImage, {
+        mode: 'cors',
+        cache: 'no-cache'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch image');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `generated-image-${Date.now()}.png`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+      }, 100);
 
-    toast.success("Image download started.");
+      toast.success("Image downloaded");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download image");
+    }
   };
 
   const handleCopyPrompt = () => {
@@ -440,9 +463,45 @@ export const ImageGenerationDialog = () => {
 
   const bodyContent = (
     <div className="space-y-4">
+      {/* Show generated image first if it exists */}
+      {generatedImage && (
+        <div className="space-y-3 border-b border-border pb-4">
+          <div className="flex items-center gap-2">
+            <Wand2 className="h-5 w-5 text-primary" />
+            <span className="font-semibold">Your Generated Image</span>
+            {generationTime > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {generationTime}s
+              </Badge>
+            )}
+          </div>
+          
+          <div ref={imageContainerRef} className="rounded-lg bg-muted/30 p-3 border-2 border-primary/20 shadow-lg">
+            <img
+              src={generatedImage}
+              alt="Generated result"
+              className="mx-auto h-auto max-h-[350px] w-full object-contain rounded-md"
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/10 p-3 text-xs">
+            <div className="flex gap-3 text-muted-foreground">
+              <span>{options.size}</span>
+              <span>•</span>
+              <span className="capitalize">{options.quality} quality</span>
+              <span>•</span>
+              <span className="capitalize">{options.background} BG</span>
+            </div>
+            <span className="text-muted-foreground">
+              {new Date().toLocaleTimeString()}
+            </span>
+          </div>
+        </div>
+      )}
+
       {referenceImage && (
         <div className="overflow-hidden rounded-2xl border border-border/60 bg-muted/30 shadow">
-          <img src={referenceImage} alt="Reference inspiration" className="w-full object-cover" />
+          <img src={referenceImage} alt="Reference inspiration" className="w-full max-h-[200px] object-cover" />
           <div className="flex items-center justify-between gap-4 px-4 py-3">
             <div>
               <p className="text-sm font-medium text-foreground">Reference image</p>
@@ -734,50 +793,6 @@ export const ImageGenerationDialog = () => {
         </Alert>
       )}
 
-      {generatedImage && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-4">
-            <div className="flex items-center gap-2">
-              <Wand2 className="h-5 w-5 text-primary" />
-              <div>
-                <span className="font-semibold block">Generation complete!</span>
-                {generationTime > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    Completed in {generationTime}s
-                  </span>
-                )}
-              </div>
-            </div>
-            <Badge variant="secondary" className="gap-1">
-              AI Generated
-            </Badge>
-          </div>
-
-          <div ref={imageContainerRef} className="rounded-lg bg-muted/30 p-2">
-            <img
-              src={generatedImage}
-              alt="Generated result"
-              className="mx-auto h-auto max-h-[600px] w-full object-contain"
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/10 p-3">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-foreground">Image Details</span>
-              <div className="flex gap-3 text-xs text-muted-foreground">
-                <span>{options.size}</span>
-                <span>•</span>
-                <span className="capitalize">{options.quality} quality</span>
-                <span>•</span>
-                <span className="capitalize">{options.background} BG</span>
-              </div>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {new Date().toLocaleTimeString()}
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 

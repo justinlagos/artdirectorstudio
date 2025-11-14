@@ -51,12 +51,14 @@ export const InspireApprovalPanel = () => {
           created_at,
           is_inspire_approved,
           is_deleted,
+          is_public,
           user_id,
           profiles!shared_assets_user_id_fkey(username, email),
-          generated_assets!shared_assets_asset_id_fkey(image_url, prompt, type)
+          generated_assets!shared_assets_asset_id_fkey(image_url, prompt, type, action)
         `)
         .eq("is_public", true)
         .eq("is_deleted", false)
+        .not("generated_assets", "is", null) // Ensure asset exists
         .order("created_at", { ascending: false });
 
       if (filterStatus === "pending") {
