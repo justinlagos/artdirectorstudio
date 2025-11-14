@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +20,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // Prefetch common queries when user logs in
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Prefetch History (generated assets)
+    queryClient.prefetchQuery({
+      queryKey: ['generated_assets', user.id],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('generated_assets')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (error) throw error;
+        return data;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+
+    // Prefetch Profile
+    queryClient.prefetchQuery({
+      queryKey: ['profile', user.id],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        if (error) throw error;
+        return data;
+      },
+      staleTime: 10 * 60 * 1000, // 10 minutes - profile changes less frequently
+    });
+  }, [user?.id, queryClient]);
 
   useEffect(() => {
     // Set up auth state listener FIRST

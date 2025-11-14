@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LoadingState } from "@/components/LoadingState";
@@ -17,14 +18,13 @@ import { ShareDialog } from "@/components/ShareDialog";
 import { formatDistanceToNow } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 import { FloatingCreditTracker } from "@/components/FloatingCreditTracker";
+import { getOptimizedImageUrl } from "@/lib/imageOptimization";
 
 type GeneratedAsset = Database['public']['Tables']['generated_assets']['Row'];
 
 const History = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [assets, setAssets] = useState<GeneratedAsset[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [shareAssetId, setShareAssetId] = useState<string | null>(null);
@@ -39,74 +39,37 @@ const History = () => {
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
+  // Use react-query with caching for assets
+  const { data: assets = [], isLoading: loading, refetch } = useQuery({
+    queryKey: ['generated_assets', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      console.log(`[History] Fetching assets for user: ${user.id}`);
+      const { data, error } = await supabase
+        .from('generated_assets')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-    const fetchAssets = async (retries = 3) => {
-      try {
-        console.log(`[History] Fetching assets for user: ${user.id}`);
-        const { data, error } = await supabase
-          .from('generated_assets')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('[History] Fetch error:', error);
-          throw error;
-        }
-        
-        console.log(`[History] Fetched ${data?.length || 0} assets`);
-        // Debug: Log asset types and image-specific details
-        if (data && data.length > 0) {
-          const typeCounts = data.reduce((acc, asset) => {
-            acc[asset.type] = (acc[asset.type] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>);
-          console.log('[History] Asset types:', typeCounts);
-          
-          // Log all image assets specifically
-          const imageAssets = data.filter(a => a.type === 'image');
-          console.log(`[History] Found ${imageAssets.length} image assets:`, imageAssets.map(a => ({
-            id: a.id,
-            type: a.type,
-            action: a.action,
-            hasImageUrl: !!a.image_url,
-            hasPrompt: !!a.prompt,
-            userId: a.user_id,
-            created_at: a.created_at
-          })));
-          
-          console.log('[History] Sample assets (first 5):', data.slice(0, 5).map(a => ({
-            id: a.id,
-            type: a.type,
-            action: a.action,
-            hasImageUrl: !!a.image_url,
-            hasPrompt: !!a.prompt
-          })));
-        } else {
-          console.warn('[History] No assets found for user:', user.id);
-        }
-        setAssets(data || []);
-      } catch (error) {
-        console.error("Error fetching assets:", error);
-        if (retries > 0) {
-          console.log(`Retrying... (${retries} attempts left)`);
-          setTimeout(() => fetchAssets(retries - 1), 1000);
-        } else {
-          toast.error("Failed to load projects. Please refresh the page.");
-        }
-      } finally {
-        setLoading(false);
+      if (error) {
+        console.error('[History] Fetch error:', error);
+        throw error;
       }
-    };
+      
+      console.log(`[History] Fetched ${data?.length || 0} assets`);
+      return data || [];
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes - matches prefetch
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    retry: 1,
+  });
 
-    fetchAssets();
+  // Subscribe to realtime changes
+  useEffect(() => {
+    if (!user?.id) return;
 
-    // Subscribe to realtime changes - only if user.id is defined
     const channel = supabase
       .channel(`assets-changes-${user.id}`)
       .on(
@@ -126,10 +89,10 @@ const History = () => {
             hasImageUrl: !!newAsset?.image_url,
             userId: newAsset?.user_id
           });
-          // Small delay to ensure database consistency, then refresh
+          // Invalidate and refetch on realtime update
           setTimeout(() => {
             console.log('[History] Refreshing assets after realtime update...');
-            fetchAssets();
+            refetch();
           }, 200);
         }
       )
@@ -145,7 +108,7 @@ const History = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, refetch]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -200,6 +163,7 @@ const History = () => {
     for (const asset of assetsToDownload) {
       try {
         const link = document.createElement('a');
+        // Use original URL for downloads (not optimized)
         link.href = asset.image_url!;
         link.download = `${asset.type}-${asset.id.slice(0, 8)}.png`;
         document.body.appendChild(link);
@@ -334,31 +298,12 @@ const History = () => {
             size="icon"
             className="h-11 w-11"
             onClick={async () => {
-              setLoading(true);
               try {
-                const { data, error } = await supabase
-                  .from('generated_assets')
-                  .select('*')
-                  .eq('user_id', user!.id)
-                  .order('created_at', { ascending: false });
-
-                if (error) throw error;
-                
-                console.log(`[History] Manual refresh: Fetched ${data?.length || 0} assets`);
-                if (data && data.length > 0) {
-                  const typeCounts = data.reduce((acc, asset) => {
-                    acc[asset.type] = (acc[asset.type] || 0) + 1;
-                    return acc;
-                  }, {} as Record<string, number>);
-                  console.log('[History] Manual refresh - Asset types:', typeCounts);
-                }
-                setAssets(data || []);
+                await refetch();
                 toast.success("Projects refreshed");
               } catch (error) {
                 console.error("Error refreshing assets:", error);
                 toast.error("Failed to refresh projects");
-              } finally {
-                setLoading(false);
               }
             }}
             title="Refresh"
@@ -482,7 +427,7 @@ const History = () => {
                   {asset.image_url && (
                     <div className="rounded-xl overflow-hidden border border-border/50 bg-muted flex items-center justify-center min-h-[200px]">
                       <img 
-                        src={asset.image_url}
+                        src={getOptimizedImageUrl(asset.image_url, { width: 800, quality: 85, format: 'webp' })}
                         alt="Generated content" 
                         className="w-full h-full object-contain max-h-[400px]"
                         loading="lazy"

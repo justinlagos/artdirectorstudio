@@ -5,6 +5,7 @@ import { InspireCard } from "@/components/InspireCard";
 import { Button } from "@/components/ui/button";
 import { useInspireFeed } from "@/hooks/useInspireFeed";
 import { cn } from "@/lib/utils";
+import { getOptimizedImageUrl } from "@/lib/imageOptimization";
 
 interface LandingFeaturedInspireProps {
   onUseInStudio?: (project: InspireProject) => void;
@@ -107,7 +108,7 @@ export const LandingFeaturedInspire = ({ onUseInStudio }: LandingFeaturedInspire
             >
               <div className="relative aspect-[4/3] overflow-hidden">
                 <img
-                  src={project.asset?.image_url}
+                  src={getOptimizedImageUrl(project.asset?.image_url, { width: 1024, quality: 85, format: 'webp' })}
                   alt={project.asset?.prompt || "Featured artwork"}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   loading="lazy"

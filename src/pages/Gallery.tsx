@@ -12,6 +12,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Search, Eye, Calendar, User, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getOptimizedImageUrl } from "@/lib/imageOptimization";
 
 interface GalleryItem {
   id: string;
@@ -177,9 +178,10 @@ const Gallery = () => {
                   {item.asset.image_url && (
                     <div className="aspect-square overflow-hidden bg-muted">
                       <img
-                        src={item.asset.image_url}
+                        src={getOptimizedImageUrl(item.asset.image_url, { width: 640, quality: 85, format: 'webp' })}
                         alt="Generated content"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
                       />
                     </div>
                   )}
@@ -215,7 +217,7 @@ const Gallery = () => {
               {selectedItem.asset.image_url && (
                 <div className="bg-muted rounded-lg flex items-center justify-center min-h-[300px] p-4">
                   <img
-                    src={selectedItem.asset.image_url}
+                    src={getOptimizedImageUrl(selectedItem.asset.image_url, { width: 1920, quality: 90, format: 'webp' })}
                     alt="Generated content"
                     className="w-full h-auto object-contain max-h-[70vh] rounded-lg"
                   />

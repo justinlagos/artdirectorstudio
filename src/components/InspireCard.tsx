@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Wand2 } from "lucide-react";
 import { openStudioWithPrompt } from "@/lib/studio";
+import { getOptimizedImageUrl } from "@/lib/imageOptimization";
 
 interface InspireCardProps {
   project: InspireProject;
@@ -88,17 +89,20 @@ const InspireCardComponent = ({
       )}
     >
       <div className="relative">
-        {project.asset?.image_url && (
-          <img
-            src={project.asset.image_url}
-            srcSet={buildSrcSet(project.asset.image_url)}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-            alt={altText}
-            loading="lazy"
-            decoding="async"
-            className="h-auto w-full object-cover"
-          />
-        )}
+        {project.asset?.image_url && (() => {
+          const optimizedUrl = getOptimizedImageUrl(project.asset.image_url, { quality: 85, format: 'webp' });
+          return (
+            <img
+              src={optimizedUrl}
+              srcSet={buildSrcSet(optimizedUrl)}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              alt={altText}
+              loading="lazy"
+              decoding="async"
+              className="h-auto w-full object-cover"
+            />
+          );
+        })()}
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/95 via-background/10 to-background/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 

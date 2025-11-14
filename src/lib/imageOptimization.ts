@@ -216,3 +216,84 @@ export async function generateBase64LQIP(
     img.src = imageUrl;
   });
 }
+
+/**
+ * Get optimized image URL using Cloudflare Images
+ * Wraps image URLs with Cloudflare optimization parameters
+ * 
+ * For Supabase storage URLs, this will use Cloudflare Images to optimize and serve
+ * the images with proper format, quality, and sizing.
+ */
+export function getOptimizedImageUrl(
+  imageUrl: string | null | undefined,
+  options?: {
+    width?: number;
+    height?: number;
+    quality?: number;
+    format?: 'webp' | 'avif' | 'jpg' | 'png';
+    fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
+  }
+): string {
+  if (!imageUrl) return '';
+  
+  const CLOUDFLARE_ACCOUNT_ID = import.meta.env.VITE_CLOUDFLARE_ACCOUNT_ID;
+  
+  // If Cloudflare is not configured, return original URL
+  if (!CLOUDFLARE_ACCOUNT_ID) {
+    return imageUrl;
+  }
+  
+  // If already a Cloudflare URL, return as-is
+  if (imageUrl.includes('imagedelivery.net')) {
+    return imageUrl;
+  }
+  
+  // If it's a data URL or blob URL, return as-is
+  if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
+    return imageUrl;
+  }
+  
+  // For Supabase storage URLs, use Cloudflare Images to optimize
+  // Cloudflare Images can proxy and optimize external images
+  if (imageUrl.includes('supabase.co') || imageUrl.includes('supabase')) {
+    // Extract the path from Supabase URL for use as image identifier
+    // Cloudflare Images requires images to be uploaded, but we can use
+    // Cloudflare's image resizing service as a proxy
+    const baseUrl = `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_ID}`;
+    
+    // Use the full URL as the image identifier (URL-encoded)
+    const imageId = encodeURIComponent(imageUrl);
+    
+    const params = new URLSearchParams();
+    
+    if (options?.width) {
+      params.append('w', options.width.toString());
+    }
+    if (options?.height) {
+      params.append('h', options.height.toString());
+    }
+    if (options?.quality) {
+      params.append('q', Math.min(100, Math.max(1, options.quality)).toString());
+    } else {
+      params.append('q', '85'); // Default quality
+    }
+    if (options?.format) {
+      params.append('f', options.format);
+    } else {
+      params.append('f', 'webp'); // Default to WebP for better compression
+    }
+    if (options?.fit) {
+      params.append('fit', options.fit);
+    } else {
+      params.append('fit', 'scale-down'); // Default fit to maintain aspect ratio
+    }
+    
+    const queryString = params.toString();
+    return `${baseUrl}/${imageId}?${queryString}`;
+  }
+  
+  // For other external images, return original URL
+  // Note: Cloudflare Images typically requires images to be uploaded first
+  // For production, consider uploading images to Cloudflare Images during generation
+  return imageUrl;
+}

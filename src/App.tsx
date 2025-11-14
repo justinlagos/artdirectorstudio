@@ -45,7 +45,18 @@ const PresetGallery = lazy(() => import("./pages/PresetGallery"));
 const ArtieChat = lazy(() => import("./components/ArtieChat").then(m => ({ default: m.ArtieChat })));
 const TrialWelcomeToast = lazy(() => import("./components/TrialWelcomeToast").then(m => ({ default: m.TrialWelcomeToast })));
 
-const queryClient = new QueryClient();
+// Configure QueryClient with increased cache TTL and better defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes - cache persists for 30 minutes (formerly cacheTime)
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+      refetchOnReconnect: true, // Refetch on reconnect
+      retry: 1, // Retry failed requests once
+    },
+  },
+});
 
 // Component to track page views inside Router context
 const PageViewTracker = () => {
