@@ -1,14 +1,38 @@
-import mixpanel from "mixpanel-browser";
-
+// Lazy load mixpanel to prevent blocking
+let mixpanel: any = null;
+let mixpanelInitialized = false;
 const MIXPANEL_TOKEN = import.meta.env.VITE_MIXPANEL_TOKEN;
 
-// Initialize Mixpanel only if token is provided
+// Initialize Mixpanel asynchronously to prevent blocking
+const initMixpanel = async () => {
+  if (mixpanelInitialized || !MIXPANEL_TOKEN) return;
+  
+  try {
+    // Dynamically import to prevent blocking
+    const mixpanelModule = await import("mixpanel-browser");
+    mixpanel = mixpanelModule.default;
+    
+    mixpanel.init(MIXPANEL_TOKEN, {
+      track_pageview: false, // We'll track pageviews manually
+      persistence: "localStorage",
+      ignore_dnt: false, // Respect Do Not Track
+    });
+    
+    mixpanelInitialized = true;
+  } catch (error) {
+    console.error("[Analytics] Failed to initialize Mixpanel:", error);
+    // Continue without analytics - don't block the app
+  }
+};
+
+// Initialize in background (non-blocking)
 if (MIXPANEL_TOKEN) {
-  mixpanel.init(MIXPANEL_TOKEN, {
-    track_pageview: false, // We'll track pageviews manually
-    persistence: "localStorage",
-    ignore_dnt: false, // Respect Do Not Track
-  });
+  // Use setTimeout to ensure it doesn't block the main thread
+  setTimeout(() => {
+    initMixpanel().catch(() => {
+      // Silently fail - analytics is not critical
+    });
+  }, 0);
 } else {
   console.log("[Analytics] Mixpanel token not provided, analytics disabled");
 }
@@ -24,7 +48,10 @@ export const analytics = {
    * @param properties - Event properties (no user text content)
    */
   track: (eventName: string, properties?: AnalyticsProperties) => {
-    if (!MIXPANEL_TOKEN) return;
+    if (!MIXPANEL_TOKEN || !mixpanelInitialized || !mixpanel) {
+      // Silently fail if not initialized - don't block
+      return;
+    }
 
     try {
       // Sanitize properties - remove any text content
@@ -69,7 +96,7 @@ export const analytics = {
    * @param userId - User ID
    */
   identify: (userId: string) => {
-    if (!MIXPANEL_TOKEN) return;
+    if (!MIXPANEL_TOKEN || !mixpanelInitialized || !mixpanel) return;
 
     try {
       mixpanel.identify(userId);
@@ -83,7 +110,7 @@ export const analytics = {
    * @param properties - User properties (no sensitive data)
    */
   setUserProperties: (properties: AnalyticsProperties) => {
-    if (!MIXPANEL_TOKEN) return;
+    if (!MIXPANEL_TOKEN || !mixpanelInitialized || !mixpanel) return;
 
     try {
       // Only set allowed properties
@@ -110,7 +137,7 @@ export const analytics = {
    * @param pageName - Name of the page
    */
   trackPageView: (pageName: string) => {
-    if (!MIXPANEL_TOKEN) return;
+    if (!MIXPANEL_TOKEN || !mixpanelInitialized || !mixpanel) return;
 
     try {
       mixpanel.track("Page View", { page: pageName });
@@ -123,7 +150,7 @@ export const analytics = {
    * Reset user identity (on logout)
    */
   reset: () => {
-    if (!MIXPANEL_TOKEN) return;
+    if (!MIXPANEL_TOKEN || !mixpanelInitialized || !mixpanel) return;
 
     try {
       mixpanel.reset();

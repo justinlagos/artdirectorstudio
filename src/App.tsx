@@ -14,7 +14,8 @@ import { LoadingState } from "@/components/LoadingState";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
 import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
-import { Sentry, sentryInitialized } from "@/lib/sentry";
+// Sentry is loaded asynchronously in main.tsx, so we don't import it here
+// This prevents blocking the app initialization
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
@@ -188,13 +189,9 @@ const AppContent = () => {
   );
 };
 
-// Wrap App with Sentry Error Boundary only if Sentry is initialized
-// Otherwise, just export AppContent directly to avoid blocking
-const App = sentryInitialized
-  ? Sentry.withErrorBoundary(AppContent, {
-      fallback: ErrorFallback,
-      showDialog: false, // We have our own fallback UI
-    })
-  : AppContent;
+// For now, just export AppContent directly
+// Sentry error boundary can be added later if needed, but it shouldn't block app initialization
+// The app will work fine without it - errors will just be logged to console
+const App = AppContent;
 
 export default App;
