@@ -13,6 +13,7 @@ import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { ToolDrawer } from "./ToolDrawer";
 import { openStudioWithPrompt } from "@/lib/studio";
+import { analytics } from "@/lib/analytics";
 
 const BLEND_STYLE_PRESETS = [
   { id: "modern", label: "Modern", hint: "Modern minimal aesthetic" },
@@ -239,10 +240,24 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
       if (error) {
         console.error('❌ [Blend] Edge function error:', error);
+        analytics.track("Image Blend", {
+          tool: "blend",
+          action: "blend",
+          success: false,
+          image_count: images.length,
+          error_type: error.message?.substring(0, 50) || "unknown",
+        });
         throw error;
       }
 
       if (!data?.image) {
+        analytics.track("Image Blend", {
+          tool: "blend",
+          action: "blend",
+          success: false,
+          image_count: images.length,
+          error_type: "no_image_data",
+        });
         throw new Error('No blended image returned');
       }
 
@@ -264,6 +279,16 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         // Don't show error since blend succeeded
       });
 
+      // Track successful blend
+      analytics.track("Image Blend", {
+        tool: "blend",
+        action: "blend",
+        success: true,
+        image_count: images.length,
+        duration_ms: duration,
+        asset_id: data.assetId || undefined,
+      });
+
       toast.success("Images blended successfully!");
     } catch (error: unknown) {
       clearInterval(progressInterval);
@@ -275,6 +300,17 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       }
       toolState.handleError(fallbackMessage);
       toast.error(fallbackMessage);
+      
+      // Track blend failure (if not already tracked above)
+      if (error && !(error as any).__analyticsTracked) {
+        analytics.track("Image Blend", {
+          tool: "blend",
+          action: "blend",
+          success: false,
+          image_count: images.length,
+          error_type: errorMessage?.substring(0, 50) || "unknown",
+        });
+      }
     } finally {
       setTimeout(() => setProgress(0), 1000);
     }

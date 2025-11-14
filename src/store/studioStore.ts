@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
+import { analytics } from "@/lib/analytics";
 
 export type StudioGenerator = (
   prompt: string,
@@ -14,6 +15,7 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
     throw new Error("Prompt is required for generation.");
   }
 
+  const startTime = Date.now();
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -36,6 +38,15 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
   });
 
   if (error) {
+    // Track generation failure
+    analytics.track("Image Generation", {
+      tool: "generate",
+      action: "generate",
+      success: false,
+      has_reference: !!options.referenceImageUrl,
+      error_type: error.message?.substring(0, 50) || "unknown",
+    });
+
     // Parse structured error response
     let errorData: any = error;
     
@@ -64,6 +75,13 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
   }
 
   if (!data?.image) {
+    analytics.track("Image Generation", {
+      tool: "generate",
+      action: "generate",
+      success: false,
+      has_reference: !!options.referenceImageUrl,
+      error_type: "no_image_data",
+    });
     throw new Error("Failed to generate image. No image data returned.");
   }
 
@@ -107,6 +125,17 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
   } else {
     console.log("[Studio] Image saved to My Projects:", data.assetId);
   }
+
+  // Track successful generation
+  const duration = Date.now() - startTime;
+  analytics.track("Image Generation", {
+    tool: "generate",
+    action: "generate",
+    success: true,
+    has_reference: !!options.referenceImageUrl,
+    duration_ms: duration,
+    asset_id: data.assetId || undefined,
+  });
 
   return data.image as string;
 };

@@ -14,6 +14,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
 import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
+import { Sentry } from "@/lib/sentry";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
@@ -64,7 +65,42 @@ const PageViewTracker = () => {
   return null;
 };
 
-const App = () => {
+// Sentry Error Boundary Fallback Component
+const ErrorFallback = ({ error, resetError }: { error: Error; resetError: () => void }) => {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background p-4">
+      <div className="text-center max-w-md space-y-4">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold">Something went wrong</h2>
+          <p className="text-muted-foreground">
+            We're sorry, but something unexpected happened. Our team has been notified.
+          </p>
+        </div>
+        {import.meta.env.DEV && (
+          <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+            <p className="text-sm font-mono text-destructive break-all">{error.message}</p>
+          </div>
+        )}
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={resetError}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            Try again
+          </button>
+          <button
+            onClick={() => window.location.href = "/"}
+            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 transition-colors"
+          >
+            Go home
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AppContent = () => {
   // Global escape handler to force close all Radix UI popper elements
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -151,5 +187,11 @@ const App = () => {
   </QueryClientProvider>
   );
 };
+
+// Wrap App with Sentry Error Boundary
+const App = Sentry.withErrorBoundary(AppContent, {
+  fallback: ErrorFallback,
+  showDialog: false, // We have our own fallback UI
+});
 
 export default App;

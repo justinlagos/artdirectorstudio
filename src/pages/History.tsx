@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { analytics } from "@/lib/analytics";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LoadingState } from "@/components/LoadingState";
@@ -160,6 +161,9 @@ const History = () => {
 
     toast.info(`Downloading ${assetsToDownload.length} image(s)...`);
 
+    let successCount = 0;
+    let errorCount = 0;
+
     for (const asset of assetsToDownload) {
       try {
         const link = document.createElement('a');
@@ -170,10 +174,22 @@ const History = () => {
         link.click();
         document.body.removeChild(link);
         await new Promise(resolve => setTimeout(resolve, 500));
+        successCount++;
       } catch (error) {
         console.error(`Failed to download ${asset.id}:`, error);
+        errorCount++;
       }
     }
+
+    // Track bulk export
+    analytics.track("Asset Exported", {
+      tool: "export",
+      action: "bulk_download",
+      asset_count: assetsToDownload.length,
+      success_count: successCount,
+      error_count: errorCount,
+      success: errorCount === 0,
+    });
 
     toast.success(`Downloaded ${assetsToDownload.length} image(s)`);
     setSelectedAssets(new Set());

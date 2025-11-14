@@ -3,6 +3,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { analytics } from "@/lib/analytics";
 
 interface AuthContextType {
   user: User | null;
@@ -61,18 +62,59 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Track auth events
+        if (event === "SIGNED_IN" && session?.user) {
+          analytics.identify(session.user.id);
+          analytics.track("User Logged In", {
+            success: true,
+          });
+          
+          // Set user properties
+          try {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("subscription_tier, credits")
+              .eq("id", session.user.id)
+              .single();
+            
+            if (profile) {
+              analytics.setUserProperties({
+                subscription_tier: profile.subscription_tier || "free",
+                credits: profile.credits || 0,
+              });
+            }
+          } catch (error) {
+            console.error("Error fetching user profile for analytics:", error);
+          }
+        } else if (event === "SIGNED_OUT") {
+          analytics.reset();
+          analytics.track("User Logged Out", {
+            success: true,
+          });
+        } else if (event === "SIGNED_UP" && session?.user) {
+          analytics.identify(session.user.id);
+          analytics.track("User Signed Up", {
+            success: true,
+          });
+        }
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Identify existing session
+      if (session?.user) {
+        analytics.identify(session.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -90,7 +132,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     
     if (!error) {
+      analytics.track("User Sign Up Attempt", {
+        success: true,
+      });
       navigate("/");
+    } else {
+      analytics.track("User Sign Up Attempt", {
+        success: false,
+        error_type: error.message,
+      });
     }
     
     return { error };
@@ -103,7 +153,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     
     if (!error) {
+      analytics.track("User Sign In Attempt", {
+        success: true,
+      });
       navigate("/");
+    } else {
+      analytics.track("User Sign In Attempt", {
+        success: false,
+        error_type: error.message,
+      });
     }
     
     return { error };

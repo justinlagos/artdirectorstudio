@@ -10,6 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { Copy, Check, Share2, Eye, Download } from "lucide-react";
 import { FaXTwitter, FaLinkedin, FaPinterest } from "react-icons/fa6";
+import { analytics } from "@/lib/analytics";
 
 interface ShareDialogProps {
   open: boolean;
@@ -88,8 +89,25 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
       const url = `${window.location.origin}/shared/${shareToken}`;
       setShareUrl(url);
       setShareData({ id: shareId, view_count: viewCount });
+      
+      // Track share creation
+      analytics.track("Asset Shared", {
+        tool: "share",
+        action: "share",
+        asset_type: assetType,
+        is_public: isPublic,
+        success: true,
+      });
     } catch (error) {
       console.error("Error creating share:", error);
+      analytics.track("Asset Shared", {
+        tool: "share",
+        action: "share",
+        asset_type: assetType,
+        is_public: isPublic,
+        success: false,
+        error_type: error instanceof Error ? error.message.substring(0, 50) : "unknown",
+      });
       toast.error("Failed to create share link");
     } finally {
       setIsSharing(false);
@@ -146,9 +164,25 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      
+      // Track export/download
+      analytics.track("Asset Exported", {
+        tool: "export",
+        action: "download",
+        asset_type: assetType,
+        success: true,
+      });
+      
       toast.success("Image downloaded");
     } catch (error) {
       console.error("Download error:", error);
+      analytics.track("Asset Exported", {
+        tool: "export",
+        action: "download",
+        asset_type: assetType,
+        success: false,
+        error_type: error instanceof Error ? error.message.substring(0, 50) : "unknown",
+      });
       toast.error("Failed to download image");
     }
   };

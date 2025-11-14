@@ -14,6 +14,7 @@ import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { ToolDrawer } from "./ToolDrawer";
 import { openStudioWithPrompt } from "@/lib/studio";
+import { analytics } from "@/lib/analytics";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -110,8 +111,26 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (error) throw error;
-      if (!data?.image) throw new Error('No upscaled image returned');
+      if (error) {
+        analytics.track("Image Upscale", {
+          tool: "upscale",
+          action: "upscale",
+          success: false,
+          target_size: targetSize,
+          error_type: error.message?.substring(0, 50) || "unknown",
+        });
+        throw error;
+      }
+      if (!data?.image) {
+        analytics.track("Image Upscale", {
+          tool: "upscale",
+          action: "upscale",
+          success: false,
+          target_size: targetSize,
+          error_type: "no_image_data",
+        });
+        throw new Error('No upscaled image returned');
+      }
 
       // Validate and set image IMMEDIATELY
       let validatedImage = data.image;
@@ -129,6 +148,16 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         console.error('Background save failed:', err);
       });
       
+      // Track successful upscale
+      analytics.track("Image Upscale", {
+        tool: "upscale",
+        action: "upscale",
+        success: true,
+        target_size: targetSize,
+        duration_ms: duration,
+        asset_id: data.assetId || undefined,
+      });
+      
       toast.success("Image upscaled successfully!");
     } catch (error: unknown) {
       clearInterval(progressInterval);
@@ -137,6 +166,17 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       const errorMessage = mapErrorMessage(error);
       toolState.handleError(errorMessage);
       toast.error(errorMessage);
+      
+      // Track upscale failure (if not already tracked above)
+      if (error && !(error as any).__analyticsTracked) {
+        analytics.track("Image Upscale", {
+          tool: "upscale",
+          action: "upscale",
+          success: false,
+          target_size: targetSize,
+          error_type: errorMessage?.substring(0, 50) || "unknown",
+        });
+      }
     } finally {
       setTimeout(() => setProgress(0), 1000);
     }

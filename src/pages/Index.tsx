@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { analytics } from "@/lib/analytics";
 import { Header } from "@/components/Header";
 import { UploadSection } from "@/components/UploadSection";
 import { ProgressiveAnalysisFeedback } from "@/components/ProgressiveAnalysisFeedback";
@@ -280,6 +281,7 @@ const Index = () => {
   const handleAnalyze = async (retryCount = 0) => {
     if (!selectedFile) return;
 
+    const startTime = Date.now();
     setIsAnalyzing(true);
     setShowProgressiveFeedback(true);
     setAnalysisComplete(false);
@@ -309,6 +311,12 @@ const Index = () => {
 
         if (error) {
           console.error("Analysis error:", error);
+          analytics.track("Image Analysis", {
+            tool: "analyze",
+            action: "analyze",
+            success: false,
+            error_type: error.message?.substring(0, 50) || "unknown",
+          });
           toast.error("Failed to analyze image. Please try again.");
           setIsAnalyzing(false);
           setShowProgressiveFeedback(false);
@@ -321,11 +329,28 @@ const Index = () => {
           setAnalysisComplete(true);
           setIsAnalyzing(false);
           setShowProgressiveFeedback(false);
+          
+          // Track successful analysis
+          const duration = Date.now() - startTime;
+          analytics.track("Image Analysis", {
+            tool: "analyze",
+            action: "analyze",
+            success: true,
+            duration_ms: duration,
+            asset_id: data?.assetId || undefined,
+          });
+          
           toast.success("Image analyzed successfully!");
         }, 3000);
       };
 
       reader.onerror = () => {
+        analytics.track("Image Analysis", {
+          tool: "analyze",
+          action: "analyze",
+          success: false,
+          error_type: "file_read_error",
+        });
         toast.error("Failed to read image file.");
         setIsAnalyzing(false);
         setShowProgressiveFeedback(false);
@@ -333,6 +358,12 @@ const Index = () => {
     } catch (error) {
       console.error("Error during analysis:", error);
       const errorMsg = error instanceof Error ? error.message : "An error occurred during analysis.";
+      analytics.track("Image Analysis", {
+        tool: "analyze",
+        action: "analyze",
+        success: false,
+        error_type: errorMsg.substring(0, 50),
+      });
       toast.error(errorMsg);
       setIsAnalyzing(false);
       setShowProgressiveFeedback(false);
@@ -392,6 +423,7 @@ const Index = () => {
     options: GenerationOptions,
     retryCount = 0
   ): Promise<string | null> => {
+    const startTime = Date.now();
     try {
       // Get session token
       const { data: { session } } = await supabase.auth.getSession();
@@ -416,6 +448,15 @@ const Index = () => {
       if (error) {
         console.error("Generation error:", error);
         
+        // Track generation failure
+        analytics.track("Image Generation", {
+          tool: "generate",
+          action: "generate",
+          success: false,
+          has_reference: false,
+          error_type: error.message?.substring(0, 50) || "unknown",
+        });
+        
         if (error.message?.includes("Rate limit")) {
           toast.error("Too many requests. Please wait a moment and try again.");
         } else if (error.message?.includes("credits exhausted")) {
@@ -427,6 +468,13 @@ const Index = () => {
       }
 
       if (!data?.image) {
+        analytics.track("Image Generation", {
+          tool: "generate",
+          action: "generate",
+          success: false,
+          has_reference: false,
+          error_type: "no_image_data",
+        });
         toast.error("Failed to generate image. Please try again.");
         return null;
       }
@@ -486,6 +534,17 @@ const Index = () => {
       
       setGeneratedImages(prev => [newImage, ...prev]);
       toast.success("Image generated successfully!");
+      
+      // Track successful generation
+      const duration = Date.now() - startTime;
+      analytics.track("Image Generation", {
+        tool: "generate",
+        action: "generate",
+        success: true,
+        has_reference: false,
+        duration_ms: duration,
+        asset_id: data.assetId || undefined,
+      });
       
       return data.image;
     } catch (error) {
