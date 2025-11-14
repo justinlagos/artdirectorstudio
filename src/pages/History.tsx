@@ -45,6 +45,7 @@ const History = () => {
 
     const fetchAssets = async (retries = 3) => {
       try {
+        console.log(`[History] Fetching assets for user: ${user.id}`);
         const { data, error } = await supabase
           .from('generated_assets')
           .select('*')
@@ -57,20 +58,35 @@ const History = () => {
         }
         
         console.log(`[History] Fetched ${data?.length || 0} assets`);
-        // Debug: Log asset types
+        // Debug: Log asset types and image-specific details
         if (data && data.length > 0) {
           const typeCounts = data.reduce((acc, asset) => {
             acc[asset.type] = (acc[asset.type] || 0) + 1;
             return acc;
           }, {} as Record<string, number>);
           console.log('[History] Asset types:', typeCounts);
-          console.log('[History] Sample assets:', data.slice(0, 3).map(a => ({
+          
+          // Log all image assets specifically
+          const imageAssets = data.filter(a => a.type === 'image');
+          console.log(`[History] Found ${imageAssets.length} image assets:`, imageAssets.map(a => ({
+            id: a.id,
+            type: a.type,
+            action: a.action,
+            hasImageUrl: !!a.image_url,
+            hasPrompt: !!a.prompt,
+            userId: a.user_id,
+            created_at: a.created_at
+          })));
+          
+          console.log('[History] Sample assets (first 5):', data.slice(0, 5).map(a => ({
             id: a.id,
             type: a.type,
             action: a.action,
             hasImageUrl: !!a.image_url,
             hasPrompt: !!a.prompt
           })));
+        } else {
+          console.warn('[History] No assets found for user:', user.id);
         }
         setAssets(data || []);
       } catch (error) {
@@ -100,15 +116,28 @@ const History = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('[History] Realtime update received:', payload.eventType, payload.new?.id);
-          // Small delay to ensure database consistency
+          const newAsset = payload.new as GeneratedAsset | null;
+          console.log('[History] Realtime update received:', {
+            eventType: payload.eventType,
+            assetId: newAsset?.id,
+            assetType: newAsset?.type,
+            hasImageUrl: !!newAsset?.image_url,
+            userId: newAsset?.user_id
+          });
+          // Small delay to ensure database consistency, then refresh
           setTimeout(() => {
+            console.log('[History] Refreshing assets after realtime update...');
             fetchAssets();
-          }, 100);
+          }, 200);
         }
       )
       .subscribe((status) => {
         console.log('[History] Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[History] Successfully subscribed to realtime updates');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[History] Realtime subscription error');
+        }
       });
 
     return () => {
@@ -148,25 +177,33 @@ const History = () => {
   const filteredAssets = assets.filter((asset) => {
     const analysisData = asset.analysis_data as Record<string, any> | null;
     const params = asset.params as Record<string, any> | null;
+    
+    // Search matching: if search query is empty, match all; otherwise check prompt or analysis
     const matchesSearch = searchQuery === "" || 
       asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       analysisData?.image_overview?.toLowerCase().includes(searchQuery.toLowerCase());
     
     // Batch filter: check if this is a batch item
     const isBatch = params?.batchItem === true || params?.batch === true;
+    
+    // Type matching: show all if filter is "all", or match specific type, or match batch
     const matchesType = 
       filterType === "all" || 
       asset.type === filterType ||
       (filterType === "batch" && isBatch);
     
-    // Debug: Log filtered out assets for image type
-    if (asset.type === 'image' && !matchesType && filterType === 'image') {
-      console.log('[History] Image asset filtered out:', {
+    // Debug: Log all image assets to help diagnose issues
+    if (asset.type === 'image') {
+      console.log('[History] Image asset check:', {
         id: asset.id,
         type: asset.type,
+        action: asset.action,
+        hasImageUrl: !!asset.image_url,
+        hasPrompt: !!asset.prompt,
         filterType,
         matchesType,
-        matchesSearch
+        matchesSearch,
+        willShow: matchesSearch && matchesType
       });
     }
     
