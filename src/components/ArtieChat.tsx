@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { X, Sparkles, Lightbulb, Wand2, Image as ImageIcon, ImagePlus } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { X, Sparkles, Lightbulb, Wand2, Image as ImageIcon, ImagePlus, FileText, Edit, Minimize2, RefreshCw, FileCheck, Paperclip, Send, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
