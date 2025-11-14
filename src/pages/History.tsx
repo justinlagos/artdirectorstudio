@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Trash2, Search, Image as ImageIcon, FileCode, Share2, Copy, Clock } from "lucide-react";
+import { FileText, Trash2, Search, Image as ImageIcon, FileCode, Share2, Copy, Clock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
 import { formatDistanceToNow } from "date-fns";
@@ -37,45 +37,65 @@ const History = () => {
     }
   }, [user, authLoading, navigate]);
 
+  const fetchAssets = useCallback(async (retries = 3, showLoading = true) => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    if (showLoading) {
+      setLoading(true);
+    }
+
+    try {
+      console.log(`[History] Fetching assets for user: ${user.id}`);
+      const { data, error } = await supabase
+        .from('generated_assets')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[History] Fetch error:', error);
+        throw error;
+      }
+      
+      console.log(`[History] Fetched ${data?.length || 0} assets`);
+      if (data && data.length > 0) {
+        const typeCounts = data.reduce((acc, asset) => {
+          acc[asset.type] = (acc[asset.type] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log(`[History] Asset types:`, typeCounts);
+        console.log(`[History] Sample assets:`, data.slice(0, 3).map(a => ({ id: a.id, type: a.type, hasImage: !!a.image_url, hasPrompt: !!a.prompt })));
+      }
+      setAssets(data || []);
+    } catch (error) {
+      console.error("Error fetching assets:", error);
+      if (retries > 0) {
+        console.log(`Retrying... (${retries} attempts left)`);
+        setTimeout(() => fetchAssets(retries - 1, showLoading), 1000);
+      } else {
+        toast.error("Failed to load projects. Please refresh the page.");
+      }
+    } finally {
+      if (showLoading) {
+        setLoading(false);
+      }
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     if (!user?.id) {
       setLoading(false);
       return;
     }
 
-    const fetchAssets = async (retries = 3) => {
-      try {
-        const { data, error } = await supabase
-          .from('generated_assets')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('[History] Fetch error:', error);
-          throw error;
-        }
-        
-        console.log(`[History] Fetched ${data?.length || 0} assets`);
-        setAssets(data || []);
-      } catch (error) {
-        console.error("Error fetching assets:", error);
-        if (retries > 0) {
-          console.log(`Retrying... (${retries} attempts left)`);
-          setTimeout(() => fetchAssets(retries - 1), 1000);
-        } else {
-          toast.error("Failed to load projects. Please refresh the page.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchAssets();
 
     // Subscribe to realtime changes - only if user.id is defined
     const channel = supabase
-      .channel('assets-changes')
+      .channel(`assets-changes-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -84,16 +104,31 @@ const History = () => {
           table: 'generated_assets',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
-          fetchAssets();
+        (payload) => {
+          console.log('[History] Realtime event received:', payload.eventType, payload.new?.id);
+          // Small delay to ensure database transaction is committed
+          setTimeout(() => {
+            fetchAssets();
+          }, 500);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[History] Realtime subscription status:', status);
+      });
+
+    // Refetch when page regains focus (in case images were generated in another tab)
+    const handleFocus = () => {
+      console.log('[History] Page regained focus, refetching assets...');
+      fetchAssets(3, false);
+    };
+
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('focus', handleFocus);
     };
-  }, [user?.id]);
+  }, [user?.id, fetchAssets]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -138,8 +173,34 @@ const History = () => {
       asset.type === filterType ||
       (filterType === "batch" && isBatch);
     
-    return matchesSearch && matchesType;
+    const matches = matchesSearch && matchesType;
+    
+    // Debug logging for filtered assets
+    if (asset.type === 'image' && !matches) {
+      console.log('[History] Image asset filtered out:', {
+        id: asset.id,
+        type: asset.type,
+        matchesSearch,
+        matchesType,
+        filterType,
+        hasPrompt: !!asset.prompt,
+        hasImageUrl: !!asset.image_url
+      });
+    }
+    
+    return matches;
   });
+
+  // Log filtered results for debugging
+  useEffect(() => {
+    if (assets.length > 0) {
+      console.log(`[History] Filtered ${filteredAssets.length} of ${assets.length} assets (filter: ${filterType}, search: "${searchQuery}")`);
+      const imageCount = filteredAssets.filter(a => a.type === 'image').length;
+      if (imageCount > 0) {
+        console.log(`[History] ${imageCount} image assets in filtered results`);
+      }
+    }
+  }, [filteredAssets.length, assets.length, filterType, searchQuery]);
 
   const getTypeBadge = (type: string) => {
     const config = {
@@ -210,6 +271,18 @@ const History = () => {
               <SelectItem value="batch">Batch Results</SelectItem>
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-11"
+            onClick={() => {
+              console.log('[History] Manual refresh triggered');
+              fetchAssets();
+            }}
+            title="Refresh"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
 
         {filteredAssets.length === 0 && assets.length === 0 ? (
