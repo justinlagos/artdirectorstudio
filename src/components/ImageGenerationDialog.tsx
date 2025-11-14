@@ -13,6 +13,7 @@ import {
   RectangleHorizontal,
   RectangleVertical,
   RotateCcw,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
@@ -33,6 +34,8 @@ import {
   calculateContinuationStrength, 
   getContinuationDescription 
 } from "@/lib/promptSimilarity";
+import { useRecentPrompts } from "@/hooks/useRecentPrompts";
+import { useSmartDefaults } from "@/hooks/useSmartDefaults";
 
 export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
@@ -58,16 +61,15 @@ export const ImageGenerationDialog = () => {
   const setStoreImage = useStudioStore((state) => state.setImage);
   const generator = useStudioStore((state) => state.generator);
 
+  const { recentPrompts, addPrompt } = useRecentPrompts();
+  const { lastOptions, saveOptions } = useSmartDefaults();
+
   const truncatedInitialPrompt = useMemo(() => truncatePrompt(storePrompt ?? ""), [storePrompt]);
 
   const [prompt, setPrompt] = useState(truncatedInitialPrompt);
   const [basePrompt, setBasePrompt] = useState(truncatedInitialPrompt);
   const [selectedPreset, setSelectedPreset] = useState<GenerationPreset | null>(null);
-  const [options, setOptions] = useState<GenerationOptions>({
-    quality: "auto",
-    size: "1024x1024",
-    background: "auto",
-  });
+  const [options, setOptions] = useState<GenerationOptions>(lastOptions);
   const [referenceImage, setReferenceImage] = useState<string | null>(storeImage ?? null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -569,6 +571,27 @@ export const ImageGenerationDialog = () => {
         </TabsContent>
 
         <TabsContent value="custom" className="mt-4 space-y-4">
+          {recentPrompts.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Recent Prompts
+              </Label>
+              <Select onValueChange={(value) => setPrompt(value)} disabled={isGenerating}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Load a recent prompt..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {recentPrompts.map((recentPrompt, idx) => (
+                    <SelectItem key={idx} value={recentPrompt}>
+                      {recentPrompt.slice(0, 60)}...
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {prompt.length > MAX_PROMPT_LENGTH * 0.9 && (
             <Alert variant={prompt.length > MAX_PROMPT_LENGTH ? "destructive" : "default"}>
               <AlertCircle className="h-4 w-4" />

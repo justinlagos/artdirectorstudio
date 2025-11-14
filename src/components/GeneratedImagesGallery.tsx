@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Trash2, Maximize2, Image as ImageIcon } from "lucide-react";
+import { Download, Trash2, Maximize2, Image as ImageIcon, Sparkles } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { OptimizedImage } from "@/components/ui/optimized-image";
+import { openStudioWithPrompt } from "@/lib/studio";
 
 interface GeneratedImage {
   id: string;
@@ -41,6 +42,16 @@ export const GeneratedImagesGallery = ({ images, onDelete }: GeneratedImagesGall
       onDelete(id);
       toast.success("Image deleted");
     }
+  };
+
+  const handleGenerateSimilar = (image: GeneratedImage, e: React.MouseEvent) => {
+    e.stopPropagation();
+    openStudioWithPrompt({
+      basePrompt: image.prompt,
+      imageUrl: image.imageUrl,
+      meta: { source: 'generate-similar' }
+    });
+    toast.success("Opening Studio with similar prompt");
   };
 
   const togglePrompt = (id: string, e: React.MouseEvent) => {
@@ -138,6 +149,15 @@ export const GeneratedImagesGallery = ({ images, onDelete }: GeneratedImagesGall
                   </div>
                   
                   <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => handleGenerateSimilar(image, e)}
+                    >
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Similar
+                    </Button>
                     <Button
                       variant="secondary"
                       size="sm"
