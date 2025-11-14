@@ -18,14 +18,36 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
-          'query-vendor': ['@tanstack/react-query'],
+        manualChunks: (id) => {
+          // React core
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/')) {
+            return 'react-vendor';
+          }
+          // Radix UI components
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'ui-vendor';
+          }
+          // TanStack Query
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'query-vendor';
+          }
+          // Supabase
+          if (id.includes('node_modules/@supabase/')) {
+            return 'supabase-vendor';
+          }
+          // ArtieChat and subcomponents (lazy loaded)
+          if (id.includes('components/artie/') || id.includes('components/ArtieChat')) {
+            return 'artie-chat';
+          }
+          // Large chart libraries
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/jspdf')) {
+            return 'chart-vendor';
+          }
         },
       },
     },
     cssCodeSplit: true,
     minify: 'esbuild',
+    chunkSizeWarningLimit: 1000,
   },
 }));

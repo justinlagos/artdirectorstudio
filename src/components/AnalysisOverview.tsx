@@ -23,7 +23,7 @@ export const AnalysisOverview = ({ analysis }: AnalysisOverviewProps) => {
     // 1. Lighting insights (High priority - affects entire image)
     if (analysis.lighting) {
       const lightingLower = analysis.lighting.toLowerCase();
-      let lightingInsight = analysis.lighting.split('.')[0]; // First sentence
+      const lightingInsight = analysis.lighting.split('.')[0]; // First sentence
       
       if (lightingLower.includes('dramatic') || lightingLower.includes('high contrast')) {
         insights.push({

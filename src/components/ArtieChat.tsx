@@ -1,12 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MessageCircle, X, Send, Loader2, Sparkles, Lightbulb, Wand2, Image as ImageIcon, Paperclip, FileText, ImagePlus, FileCheck, Zap, Minimize2, RefreshCw, Edit } from "lucide-react";
+import { X, Sparkles, Lightbulb, Wand2, Image as ImageIcon, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,67 +11,34 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useRetryWithBackoff } from "@/hooks/useRetryWithBackoff";
 import { ImageEditor } from "./ImageEditor";
 import { extractTextFromBriefFile } from "@/lib/documentParser";
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'artie';
-  timestamp: Date;
-  attachment?: {
-    type: 'image' | 'document';
-    url: string;
-    name: string;
-    data?: string;
-    analysis?: BriefAnalysis;
-    excerpt?: string;
-  };
-  actionChips?: { label: string; action: string }[];
-  error?: boolean;
-  retryPayload?: any;
-}
-
-type BriefAnalysis = {
-  summary: string;
-  keyInsights: string[];
-  targetAudience?: string;
-  deliverables?: string[];
-  tonalKeywords?: string[];
-  suggestedActions?: string[];
-};
-
-interface ContextImage {
-  url: string;
-  messageId: string;
-  timestamp: string;
-  name?: string;
-  source: 'user' | 'artie' | 'link';
-}
-
-interface ContextDocument {
-  id: string;
-  name: string;
-  summary: string;
-  keyInsights: string[];
-  targetAudience?: string;
-  deliverables?: string[];
-  tonalKeywords?: string[];
-  textExcerpt?: string;
-  createdAt: string;
-}
-
-interface ContextMemory {
-  images: ContextImage[];
-  documents: ContextDocument[];
-  briefSummary?: string;
-}
+import { openStudioWithPrompt } from "@/lib/studio";
+import type {
+  Message,
+  BriefAnalysis,
+  ContextImage,
+  ContextDocument,
+  ContextMemory,
+  QuickAction,
+  PendingAction,
+  GenerationOptions,
+  ChatAttachment,
+  ToolCall,
+  ToolCallDelta,
+  StreamDelta,
+  StreamChoice,
+  StreamResponse,
+  GenerateImageResponse,
+  EditImageResponse,
+  RetryPayload,
+  ImageAnalysis,
+} from "./artie/types";
+import { ArtieMessage } from "./artie/ArtieMessage";
+import { ArtieFloatingIcon } from "./artie/ArtieFloatingIcon";
+import { ArtieChatInput } from "./artie/ArtieChatInput";
+import { ArtieQuickActions } from "./artie/ArtieQuickActions";
+import { ArtieGenerationDialog } from "./artie/ArtieGenerationDialog";
 
 const SUPABASE_IMAGE_REGEX = /(https:\/\/[^\s]+\.supabase\.co\/storage\/v1\/object\/[^\s]+\.(?:jpg|jpeg|png|gif|webp))/gi;
-
-type QuickAction = {
-  icon: typeof Lightbulb;
-  label: string;
-  prompt: string;
-};
 
 const quickActions: QuickAction[] = [
   { icon: Lightbulb, label: "Brainstorm ideas", prompt: "Help me brainstorm creative concepts" },
@@ -117,16 +79,16 @@ export const ArtieChat = () => {
   });
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
   const [generationPrompt, setGenerationPrompt] = useState("");
-  const [generationOptions, setGenerationOptions] = useState<any>({});
-  const [pendingAction, setPendingAction] = useState<{ type: string; data: any } | null>(null);
+  const [generationOptions, setGenerationOptions] = useState<GenerationOptions>({});
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [showCreditConfirm, setShowCreditConfirm] = useState(false);
   const [messages, setMessages] = useState<Message[]>(() => {
     // Try to restore from sessionStorage
     const saved = sessionStorage.getItem('artie-conversation');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+        const parsed = JSON.parse(saved) as Array<Omit<Message, 'timestamp'> & { timestamp: string }>;
+        return parsed.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
       } catch {
         // Fallback to welcome message
       }
@@ -232,7 +194,6 @@ export const ArtieChat = () => {
     }
 
     try {
-      const { openStudioWithPrompt } = require('@/lib/studio');
       openStudioWithPrompt({
         basePrompt: "Refine this image",
         imageUrl: latestContextImage.url,
@@ -549,7 +510,6 @@ export const ArtieChat = () => {
         : contextMemory.images[contextMemory.images.length - 1];
       
       if (targetImage) {
-        const { openStudioWithPrompt } = require('@/lib/studio');
         openStudioWithPrompt({
           basePrompt: "Refine this image",
           imageUrl: targetImage.url,
@@ -586,14 +546,14 @@ export const ArtieChat = () => {
     setTimeout(() => handleSend(), 100);
   };
 
-  const handleSend = async (contextData?: { prompt?: string; analysis?: any; credits?: number }) => {
+  const handleSend = async (contextData?: RetryPayload) => {
     if ((!inputValue.trim() && uploadedFiles.length === 0) || isLoading) return;
 
     setIsLoading(true);
     setIsUploading(true);
 
     try {
-      const attachments: any[] = [];
+      const attachments: ChatAttachment[] = [];
       const trackedImages: ContextImage[] = [];
       const trackedDocuments: ContextDocument[] = [];
       const userMessageId =
@@ -727,7 +687,7 @@ export const ArtieChat = () => {
       setUploadedFiles([]);
       setIsUploading(false);
 
-      let assistantMessageId = '';
+      const assistantMessageId = (Date.now() + 1).toString();
       
       try {
         const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/artie-chat`;
@@ -806,8 +766,6 @@ export const ArtieChat = () => {
           contextualInput = `Context: ${contextParts.join(' | ')}\n\nUser message: ${contextualInput}`;
         }
         
-        const assistantMessageId = (Date.now() + 1).toString();
-        
         const response = await fetch(CHAT_URL, {
           method: 'POST',
           headers: {
@@ -826,7 +784,7 @@ export const ArtieChat = () => {
                     content: [
                       { type: 'text', text: m.text },
                       { type: 'image_url', image_url: { url: m.attachment.url } }
-                    ] as any
+                    ] as Array<{ type: 'text' | 'image_url'; text?: string; image_url?: { url: string } }>
                   };
                 }
                 return {
@@ -839,9 +797,9 @@ export const ArtieChat = () => {
                   ? {
                       role: 'user' as const,
                       content: [
-                        { type: 'text', text: contextualInput },
-                        { type: 'image_url', image_url: { url: attachments[0].url } }
-                      ] as any
+                        { type: 'text' as const, text: contextualInput },
+                        { type: 'image_url' as const, image_url: { url: attachments[0].url } }
+                      ]
                     }
                   : {
                       role: 'user' as const,
@@ -866,7 +824,7 @@ export const ArtieChat = () => {
         const decoder = new TextDecoder();
         let accumulatedText = '';
         let textBuffer = '';
-        let toolCalls: any[] = [];
+        const toolCalls: ToolCall[] = [];
 
         setMessages(prev => [...prev, {
           id: assistantMessageId,
@@ -910,16 +868,18 @@ export const ArtieChat = () => {
                 }
 
                 if (delta?.tool_calls) {
-                  delta.tool_calls.forEach((tc: any) => {
-                    if (!toolCalls[tc.index]) {
-                      toolCalls[tc.index] = {
-                        id: tc.id,
-                        type: tc.type,
-                        function: { name: tc.function?.name || '', arguments: '' }
-                      };
-                    }
-                    if (tc.function?.arguments) {
-                      toolCalls[tc.index].function.arguments += tc.function.arguments;
+                  delta.tool_calls.forEach((tc: ToolCallDelta) => {
+                    if (tc.index !== undefined) {
+                      if (!toolCalls[tc.index]) {
+                        toolCalls[tc.index] = {
+                          id: tc.id || '',
+                          type: tc.type || '',
+                          function: { name: tc.function?.name || '', arguments: '' }
+                        };
+                      }
+                      if (tc.function?.arguments) {
+                        toolCalls[tc.index].function.arguments += tc.function.arguments;
+                      }
                     }
                   });
                 }
@@ -1000,7 +960,7 @@ export const ArtieChat = () => {
                   }
 
                   // Use retry with exponential backoff
-                  const genData = await fetchWithRetry<{ success: boolean; image: string; assetId?: string }>(
+                  const genData = await fetchWithRetry<GenerateImageResponse>(
                     () => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
                       method: 'POST',
                       headers: {
@@ -1146,7 +1106,7 @@ export const ArtieChat = () => {
                   }
 
                   // Use retry with exponential backoff
-                  const editData = await fetchWithRetry<{ success: boolean; image: string; assetId?: string }>(
+                  const editData = await fetchWithRetry<EditImageResponse>(
                     () => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-image`, {
                       method: 'POST',
                       headers: {
@@ -1486,7 +1446,6 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                const { openStudioWithPrompt } = require('@/lib/studio');
                                 openStudioWithPrompt({
                                   basePrompt: "Refine this image",
                                   imageUrl: message.attachment?.url || "",
@@ -1562,7 +1521,6 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                const { openStudioWithPrompt } = require('@/lib/studio');
                                 openStudioWithPrompt({
                                   basePrompt: "Refine this reference",
                                   imageUrl: url,
@@ -1866,10 +1824,11 @@ export const ArtieChat = () => {
                       } else {
                         throw new Error(data.error || 'Generation failed');
                       }
-                    } catch (error: any) {
+                    } catch (error: unknown) {
                       console.error('Generation error:', error);
+                      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                       toast.error("Generation failed", {
-                        description: error.message,
+                        description: errorMessage,
                       });
                     }
                     
