@@ -15,6 +15,13 @@ export const useAdminCheck = () => {
         return;
       }
 
+      // Add timeout to prevent hanging
+      const timeoutId = setTimeout(() => {
+        console.warn("Admin check timeout - defaulting to non-admin");
+        setIsAdmin(false);
+        setLoading(false);
+      }, 5000); // 5 second timeout
+
       try {
         const { data, error } = await supabase
           .from('user_roles')
@@ -23,9 +30,16 @@ export const useAdminCheck = () => {
           .eq('role', 'admin')
           .maybeSingle();
 
-        if (error) throw error;
-        setIsAdmin(!!data);
+        clearTimeout(timeoutId);
+        
+        if (error) {
+          console.error("Error checking admin status:", error);
+          setIsAdmin(false);
+        } else {
+          setIsAdmin(!!data);
+        }
       } catch (error) {
+        clearTimeout(timeoutId);
         console.error("Error checking admin status:", error);
         setIsAdmin(false);
       } finally {

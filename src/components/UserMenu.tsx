@@ -15,7 +15,7 @@ import { LogOut, User, History, Shield, Settings, BarChart3, Crown } from "lucid
 
 export const UserMenu = () => {
   const { user, signOut } = useAuth();
-  const { isAdmin } = useAdminCheck();
+  const { isAdmin, loading: adminLoading } = useAdminCheck();
   const navigate = useNavigate();
 
   if (!user) return null;

@@ -14,7 +14,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
 import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
-import { Sentry } from "@/lib/sentry";
+import { Sentry, sentryInitialized } from "@/lib/sentry";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
@@ -188,10 +188,13 @@ const AppContent = () => {
   );
 };
 
-// Wrap App with Sentry Error Boundary
-const App = Sentry.withErrorBoundary(AppContent, {
-  fallback: ErrorFallback,
-  showDialog: false, // We have our own fallback UI
-});
+// Wrap App with Sentry Error Boundary only if Sentry is initialized
+// Otherwise, just export AppContent directly to avoid blocking
+const App = sentryInitialized
+  ? Sentry.withErrorBoundary(AppContent, {
+      fallback: ErrorFallback,
+      showDialog: false, // We have our own fallback UI
+    })
+  : AppContent;
 
 export default App;
