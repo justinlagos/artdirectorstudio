@@ -36,7 +36,7 @@ export const useAdminCheck = () => {
           console.error("Error checking admin status:", error);
           setIsAdmin(false);
         } else {
-          setIsAdmin(!!data);
+        setIsAdmin(!!data);
         }
       } catch (error) {
         clearTimeout(timeoutId);

@@ -190,7 +190,7 @@ const History = () => {
         // Cleanup
         setTimeout(() => {
           window.URL.revokeObjectURL(url);
-          document.body.removeChild(link);
+        document.body.removeChild(link);
         }, 100);
         
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -337,7 +337,7 @@ const History = () => {
           </Button>
         </div>
 
-        {/* Bulk Actions Bar */}
+        {/* Selection Mode & Bulk Actions Bar */}
         {filteredAssets.filter(a => a.image_url).length > 0 && (
           <div className="mb-4 flex items-center justify-between gap-4 bg-muted/50 p-3 rounded-lg border border-border">
             <div className="flex items-center gap-3">
@@ -350,10 +350,41 @@ const History = () => {
               </span>
             </div>
             {selectedAssets.size > 0 && (
-              <Button onClick={handleBulkDownload} size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Download Selected
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleBulkDownload} size="sm" variant="default">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download ({selectedAssets.size})
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    const assetsToDelete = Array.from(selectedAssets);
+                    let successCount = 0;
+                    let errorCount = 0;
+                    
+                    for (const id of assetsToDelete) {
+                      try {
+                        await handleDelete(id);
+                        successCount++;
+                      } catch (error) {
+                        errorCount++;
+                      }
+                    }
+                    
+                    setSelectedAssets(new Set());
+                    if (successCount > 0) {
+                      toast.success(`Deleted ${successCount} asset(s)`);
+                    }
+                    if (errorCount > 0) {
+                      toast.error(`Failed to delete ${errorCount} asset(s)`);
+                    }
+                  }}
+                  size="sm" 
+                  variant="destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete ({selectedAssets.size})
+                </Button>
+              </div>
             )}
           </div>
         )}

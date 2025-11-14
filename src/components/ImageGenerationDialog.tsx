@@ -36,6 +36,8 @@ import {
 } from "@/lib/promptSimilarity";
 import { useRecentPrompts } from "@/hooks/useRecentPrompts";
 import { useSmartDefaults } from "@/hooks/useSmartDefaults";
+import { ImageContainer } from "./ImageContainer";
+import { PromptTemplates } from "./PromptTemplates";
 
 export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
@@ -321,17 +323,17 @@ export const ImageGenerationDialog = () => {
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
+    const link = document.createElement("a");
       link.href = url;
-      link.download = `generated-image-${Date.now()}.png`;
+    link.download = `generated-image-${Date.now()}.png`;
       link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
+    document.body.appendChild(link);
+    link.click();
       
       // Cleanup
       setTimeout(() => {
         window.URL.revokeObjectURL(url);
-        document.body.removeChild(link);
+    document.body.removeChild(link);
       }, 100);
 
       toast.success("Image downloaded");
@@ -466,21 +468,24 @@ export const ImageGenerationDialog = () => {
       {/* Show generated image first if it exists */}
       {generatedImage && (
         <div className="space-y-3 border-b border-border pb-4">
-          <div className="flex items-center gap-2">
-            <Wand2 className="h-5 w-5 text-primary" />
-            <span className="font-semibold">Your Generated Image</span>
-            {generationTime > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {generationTime}s
-              </Badge>
-            )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5 text-primary" />
+              <span className="font-semibold">Your Generated Image</span>
+              {generationTime > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {generationTime}s
+                </Badge>
+              )}
+            </div>
           </div>
           
-          <div ref={imageContainerRef} className="rounded-lg bg-muted/30 p-3 border-2 border-primary/20 shadow-lg">
-            <img
+          <div ref={imageContainerRef}>
+            <ImageContainer
               src={generatedImage}
               alt="Generated result"
-              className="mx-auto h-auto max-h-[350px] w-full object-contain rounded-md"
+              maxHeight="max-h-[400px]"
+              containerClassName="border-2 border-primary/20 shadow-lg"
             />
           </div>
 
@@ -500,13 +505,9 @@ export const ImageGenerationDialog = () => {
       )}
 
       {referenceImage && (
-        <div className="overflow-hidden rounded-2xl border border-border/60 bg-muted/30 shadow">
-          <img src={referenceImage} alt="Reference inspiration" className="w-full max-h-[200px] object-cover" />
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div>
-              <p className="text-sm font-medium text-foreground">Reference image</p>
-              <p className="text-xs text-muted-foreground">Remix this Inspire project in Studio.</p>
-            </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-foreground">Reference Image</p>
             <Button
               variant="ghost"
               size="sm"
@@ -520,10 +521,14 @@ export const ImageGenerationDialog = () => {
               Remove
             </Button>
           </div>
-          
-          {/* Continuation Strength Indicator */}
+          <ImageContainer
+            src={referenceImage}
+            alt="Reference inspiration"
+            maxHeight="max-h-[200px]"
+            objectFit="cover"
+          />
           {previousGeneratedPrompt && continuationStrength < 1.0 && (
-            <div className="px-4 pb-3">
+            <div className="rounded-lg border border-border/30 bg-muted/10 p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium">Context Strength</span>
                 <span className={`text-xs font-semibold ${getContinuationDescription(continuationStrength).colorClass}`}>
@@ -549,11 +554,22 @@ export const ImageGenerationDialog = () => {
         </div>
       )}
 
-      <Tabs defaultValue="presets" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs defaultValue="templates" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="presets">Presets</TabsTrigger>
           <TabsTrigger value="custom">Custom Prompt</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="templates" className="mt-4">
+          <PromptTemplates
+            onSelect={(templatePrompt) => {
+              setPrompt(templatePrompt);
+              setBasePrompt(templatePrompt);
+              setStorePrompt(templatePrompt);
+            }}
+          />
+        </TabsContent>
 
         <TabsContent value="presets" className="mt-4 space-y-4">
           <div className="space-y-2 rounded-xl border border-accent/20 bg-accent/5 p-4">

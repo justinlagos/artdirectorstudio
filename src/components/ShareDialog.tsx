@@ -175,8 +175,8 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
       
       // Cleanup
       setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       }, 100);
       
       // Track export/download

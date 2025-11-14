@@ -257,34 +257,43 @@ ${previousPrompt ? `Previous prompt was: "${previousPrompt}"` : ''}`;
         }
       ];
     } else {
-      // Enhanced prompt generation with dynamic thinking and quality focus
-      const enhancedPrompt = `You are an expert AI image generator specializing in creating stunning, professional-quality visuals.
+      // Ad agency level, top photography quality prompt
+      const enhancedPrompt = `You are a world-class commercial photographer and creative director working for top-tier advertising agencies. Your work appears in Vogue, National Geographic, and award-winning campaigns.
 
-TASK: Generate a high-quality image based on this description: "${prompt}"
+TASK: Create a stunning, publication-ready image that would impress the most demanding creative directors and art buyers.
 
-REQUIREMENTS:
-1. **Composition Excellence**: Create a visually compelling composition with proper rule of thirds, balanced elements, and strong focal points
-2. **Technical Quality**: Ensure sharp focus, proper depth of field, and professional lighting
-3. **Artistic Merit**: Apply sophisticated color theory, harmonious palettes, and thoughtful visual hierarchy
-4. **Detail & Realism**: Include rich details, textures, and realistic rendering appropriate to the subject
-5. **Style Consistency**: Maintain a cohesive artistic style throughout the entire image
-6. **Aspect Ratio**: Optimize composition for ${aspectRatio} aspect ratio
+PROFESSIONAL STANDARDS:
+1. **Award-Winning Composition**: Master-level composition using rule of thirds, golden ratio, leading lines, and perfect visual balance. Every element placed with intention.
+2. **Commercial Photography Quality**: Studio-grade lighting, perfect exposure, razor-sharp focus, and professional depth of field. Image quality suitable for billboards and print campaigns.
+3. **Art Direction Excellence**: Sophisticated color grading, harmonious color palettes, and visual hierarchy that guides the eye naturally through the image.
+4. **Detail & Craftsmanship**: Ultra-high detail, realistic textures, perfect rendering. Every pixel crafted to perfection. No artifacts, no imperfections.
+5. **Brand-Ready Aesthetics**: Image quality that agencies would confidently present to Fortune 500 clients. Polished, refined, and commercially viable.
+6. **Aspect Ratio Optimization**: Composition expertly designed for ${aspectRatio} format, maximizing visual impact within these dimensions.
 
-DYNAMIC THINKING:
-- Analyze the prompt to understand the core intent and visual goals
-- Consider the best artistic approach (photorealistic, stylized, abstract, etc.)
-- Determine optimal lighting conditions (natural, studio, dramatic, soft)
-- Select appropriate color palette that enhances the mood and message
-- Plan composition elements for maximum visual impact
-- Ensure all elements work together harmoniously
+CREATIVE EXECUTION:
+- Analyze the core creative intent: What story does this image tell? What emotion should it evoke?
+- Determine the optimal visual style: Is this editorial, commercial, artistic, or documentary? Execute accordingly.
+- Master lighting design: Natural light, studio lighting, or dramatic lighting - choose and execute flawlessly.
+- Color psychology: Select colors that enhance the message, mood, and brand positioning.
+- Composition mastery: Arrange elements for maximum visual impact, ensuring nothing distracts from the main subject.
+- Professional polish: Every detail refined to perfection - shadows, highlights, midtones all balanced expertly.
 
-OUTPUT: Generate a single, high-quality image that exceeds professional standards and fully realizes the creative vision described in the prompt.
+QUALITY SPECIFICATIONS:
+- Resolution: Maximum detail, suitable for large format printing
+- Sharpness: Professional-grade sharpness throughout, with appropriate depth of field
+- Color Accuracy: Perfect color reproduction, suitable for professional color grading
+- Artifact-Free: Zero compression artifacts, noise, or imperfections
+- Background: ${background === 'transparent' ? 'Perfect transparent background with clean edges, no halos or artifacts' : background === 'opaque' ? 'Professionally composed background that enhances the subject without distraction' : 'Intelligently chosen background that serves the creative vision'}
+
+OUTPUT REQUIREMENT:
+Generate a single, world-class image that would win awards at Cannes Lions, D&AD, or One Show. This image should be portfolio-worthy and suitable for premium brand campaigns.
 
 Aspect ratio: ${aspectRatio}
-Quality level: ${quality === 'high' ? 'Maximum - Ultra-detailed, professional grade' : quality === 'medium' ? 'High - Detailed and polished' : quality === 'low' ? 'Standard - Good quality' : 'Auto - Optimal quality based on prompt complexity'}
-Background: ${background === 'transparent' ? 'Transparent PNG with clean edges' : background === 'opaque' ? 'Solid background appropriate to the scene' : 'Auto - Choose best background type'}
+Quality tier: ${quality === 'high' ? 'Maximum - Ultra-premium, award-winning quality' : quality === 'medium' ? 'High - Professional commercial quality' : quality === 'low' ? 'Standard - Good commercial quality' : 'Auto - Optimal quality based on creative requirements'}
 
-Generate the image now: ${prompt}`;
+CREATIVE BRIEF: ${prompt}
+
+Now create this image with the skill and artistry of a world-renowned commercial photographer.`;
       
       messageContent = enhancedPrompt;
     }

@@ -129,9 +129,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!mounted) return;
         
         const { data: { session } } = result;
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
 
         // Identify existing session (async, don't block)
         if (session?.user) {
@@ -149,7 +149,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (mounted) {
           setLoading(false);
         }
-      });
+    });
 
     return () => {
       mounted = false;
