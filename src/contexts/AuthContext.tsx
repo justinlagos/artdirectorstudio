@@ -60,64 +60,101 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [user?.id, queryClient]);
 
   useEffect(() => {
+    let mounted = true;
+    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Track auth events
-        if (event === "SIGNED_IN" && session?.user) {
-          analytics.identify(session.user.id);
-          analytics.track("User Logged In", {
-            success: true,
-          });
-          
-          // Set user properties
+        // Track auth events asynchronously (don't block)
+        setTimeout(() => {
           try {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("subscription_tier, credits")
-              .eq("id", session.user.id)
-              .single();
-            
-            if (profile) {
-              analytics.setUserProperties({
-                subscription_tier: profile.subscription_tier || "free",
-                credits: profile.credits || 0,
+            if (event === "SIGNED_IN" && session?.user) {
+              analytics.identify(session.user.id);
+              analytics.track("User Logged In", {
+                success: true,
+              });
+              
+              // Set user properties (async, don't block)
+              supabase
+                .from("profiles")
+                .select("subscription_tier, credits")
+                .eq("id", session.user.id)
+                .single()
+                .then(({ data: profile }) => {
+                  if (profile) {
+                    analytics.setUserProperties({
+                      subscription_tier: profile.subscription_tier || "free",
+                      credits: profile.credits || 0,
+                    });
+                  }
+                })
+                .catch((error) => {
+                  console.error("Error fetching user profile for analytics:", error);
+                });
+            } else if (event === "SIGNED_OUT") {
+              analytics.reset();
+              analytics.track("User Logged Out", {
+                success: true,
+              });
+            } else if (event === "SIGNED_UP" && session?.user) {
+              analytics.identify(session.user.id);
+              analytics.track("User Signed Up", {
+                success: true,
               });
             }
           } catch (error) {
-            console.error("Error fetching user profile for analytics:", error);
+            console.error("Analytics error:", error);
+            // Don't block on analytics errors
           }
-        } else if (event === "SIGNED_OUT") {
-          analytics.reset();
-          analytics.track("User Logged Out", {
-            success: true,
-          });
-        } else if (event === "SIGNED_UP" && session?.user) {
-          analytics.identify(session.user.id);
-          analytics.track("User Signed Up", {
-            success: true,
-          });
-        }
+        }, 0);
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-
-      // Identify existing session
-      if (session?.user) {
-        analytics.identify(session.user.id);
-      }
+    // THEN check for existing session with timeout
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ data: { session: null }, error: null });
+      }, 3000); // 3 second timeout
     });
 
-    return () => subscription.unsubscribe();
+    Promise.race([sessionPromise, timeoutPromise])
+      .then(async (result: any) => {
+        if (!mounted) return;
+        
+        const { data: { session } } = result;
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+
+        // Identify existing session (async, don't block)
+        if (session?.user) {
+          setTimeout(() => {
+            try {
+              analytics.identify(session.user.id);
+            } catch (error) {
+              console.error("Analytics error:", error);
+            }
+          }, 0);
+        }
+      })
+      .catch((error) => {
+        console.error("Error getting session:", error);
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string) => {
@@ -131,16 +168,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
     
+    // Track analytics asynchronously (don't block navigation)
+    setTimeout(() => {
+      try {
+        analytics.track("User Sign Up Attempt", {
+          success: !error,
+          error_type: error?.message?.substring(0, 50),
+        });
+      } catch (err) {
+        console.error("Analytics error:", err);
+      }
+    }, 0);
+    
     if (!error) {
-      analytics.track("User Sign Up Attempt", {
-        success: true,
-      });
       navigate("/");
-    } else {
-      analytics.track("User Sign Up Attempt", {
-        success: false,
-        error_type: error.message,
-      });
     }
     
     return { error };
@@ -152,16 +193,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       password
     });
     
+    // Track analytics asynchronously (don't block navigation)
+    setTimeout(() => {
+      try {
+        analytics.track("User Sign In Attempt", {
+          success: !error,
+          error_type: error?.message?.substring(0, 50),
+        });
+      } catch (err) {
+        console.error("Analytics error:", err);
+      }
+    }, 0);
+    
     if (!error) {
-      analytics.track("User Sign In Attempt", {
-        success: true,
-      });
       navigate("/");
-    } else {
-      analytics.track("User Sign In Attempt", {
-        success: false,
-        error_type: error.message,
-      });
     }
     
     return { error };
