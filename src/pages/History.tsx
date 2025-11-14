@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Trash2, Search, Image as ImageIcon, FileCode, Share2, Copy, Clock, RefreshCw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FileText, Trash2, Search, Image as ImageIcon, FileCode, Share2, Copy, Clock, RefreshCw, Download } from "lucide-react";
 import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
 import { formatDistanceToNow } from "date-fns";
@@ -28,6 +29,7 @@ const History = () => {
   const [filterType, setFilterType] = useState<string>("all");
   const [shareAssetId, setShareAssetId] = useState<string | null>(null);
   const [shareAssetType, setShareAssetType] = useState<string>("");
+  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -163,6 +165,54 @@ const History = () => {
   const handleCopyPrompt = (prompt: string) => {
     navigator.clipboard.writeText(prompt);
     toast.success("Prompt copied to clipboard!");
+  };
+
+  const toggleAssetSelection = (assetId: string) => {
+    setSelectedAssets(prev => {
+      const next = new Set(prev);
+      if (next.has(assetId)) {
+        next.delete(assetId);
+      } else {
+        next.add(assetId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedAssets.size === filteredAssets.length) {
+      setSelectedAssets(new Set());
+    } else {
+      setSelectedAssets(new Set(filteredAssets.map(a => a.id)));
+    }
+  };
+
+  const handleBulkDownload = async () => {
+    const assetsToDownload = assets.filter(a => selectedAssets.has(a.id) && a.image_url);
+    
+    if (assetsToDownload.length === 0) {
+      toast.error("No images selected for download");
+      return;
+    }
+
+    toast.info(`Downloading ${assetsToDownload.length} image(s)...`);
+
+    for (const asset of assetsToDownload) {
+      try {
+        const link = document.createElement('a');
+        link.href = asset.image_url!;
+        link.download = `${asset.type}-${asset.id.slice(0, 8)}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`Failed to download ${asset.id}:`, error);
+      }
+    }
+
+    toast.success(`Downloaded ${assetsToDownload.length} image(s)`);
+    setSelectedAssets(new Set());
   };
 
   if (authLoading || loading) {
@@ -317,6 +367,27 @@ const History = () => {
           </Button>
         </div>
 
+        {/* Bulk Actions Bar */}
+        {filteredAssets.filter(a => a.image_url).length > 0 && (
+          <div className="mb-4 flex items-center justify-between gap-4 bg-muted/50 p-3 rounded-lg border border-border">
+            <div className="flex items-center gap-3">
+              <Checkbox 
+                checked={selectedAssets.size === filteredAssets.length && filteredAssets.length > 0}
+                onCheckedChange={toggleSelectAll}
+              />
+              <span className="text-sm font-medium">
+                {selectedAssets.size > 0 ? `${selectedAssets.size} selected` : 'Select all'}
+              </span>
+            </div>
+            {selectedAssets.size > 0 && (
+              <Button onClick={handleBulkDownload} size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Download Selected
+              </Button>
+            )}
+          </div>
+        )}
+
         {filteredAssets.length === 0 && assets.length === 0 ? (
           <Card className="glass-strong">
             <CardContent className="py-16 text-center">
@@ -365,13 +436,21 @@ const History = () => {
                 <CardContent className="p-6 space-y-4">
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 space-y-2">
-                      {getTypeBadge(asset.type)}
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" />
-                        <span>
-                          {formatDistanceToNow(new Date(asset.created_at), { addSuffix: true })}
-                        </span>
+                    <div className="flex items-center gap-3 flex-1">
+                      {asset.image_url && (
+                        <Checkbox 
+                          checked={selectedAssets.has(asset.id)}
+                          onCheckedChange={() => toggleAssetSelection(asset.id)}
+                        />
+                      )}
+                      <div className="flex-1 space-y-2">
+                        {getTypeBadge(asset.type)}
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span>
+                            {formatDistanceToNow(new Date(asset.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

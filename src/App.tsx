@@ -13,6 +13,7 @@ import { ImageGenerationDialog } from "@/components/ImageGenerationDialog";
 import { LoadingState } from "@/components/LoadingState";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
+import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
@@ -89,6 +90,7 @@ const App = () => {
         <BrowserRouter>
           <PageViewTracker />
           <AuthProvider>
+            <GlobalKeyboardShortcuts />
             <ToolsModalProvider>
             <Suspense fallback={<LoadingState />}>
               <Routes>
