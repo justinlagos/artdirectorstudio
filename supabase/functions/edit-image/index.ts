@@ -75,7 +75,7 @@ serve(async (req) => {
     console.log("[EDIT-IMAGE] Access granted");
 
     // Parse request body
-    const { imageUrl, instruction, quality = 'auto', size = '1024x1024' } = await req.json();
+    const { imageUrl, instruction, quality = 'auto', size = '1024x1024', mask, region } = await req.json();
     
     // Validate inputs
     if (!imageUrl) {
@@ -85,28 +85,36 @@ serve(async (req) => {
       );
     }
 
-    if (!instruction) {
+    if (!instruction || typeof instruction !== 'string' || !instruction.trim()) {
       return new Response(
-        JSON.stringify({ error: "Editing instruction is required" }),
+        JSON.stringify({ error: "Editing instruction is required. Please describe what you want to change." }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (typeof instruction !== 'string' || instruction.length < 3) {
+    const trimmedInstruction = instruction.trim();
+
+    if (trimmedInstruction.length < 3) {
       return new Response(
-        JSON.stringify({ error: "Instruction must be at least 3 characters" }),
+        JSON.stringify({ error: "Instruction must be at least 3 characters. Please provide a clear description of the changes you want." }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (instruction.length > 2000) {
+    if (trimmedInstruction.length > 2000) {
       return new Response(
         JSON.stringify({ error: "Instruction too long. Maximum 2000 characters" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log("[EDIT-IMAGE] Request:", { imageUrl: imageUrl.slice(0, 50), instructionLength: instruction.length });
+    console.log("[EDIT-IMAGE] Request:", { 
+      imageUrl: imageUrl.slice(0, 50), 
+      instructionLength: trimmedInstruction.length,
+      instruction: trimmedInstruction.substring(0, 100),
+      hasMask: !!mask,
+      hasRegion: !!region
+    });
 
     // Convert filename to full URL if needed
     let fullImageUrl = imageUrl;
@@ -153,7 +161,7 @@ serve(async (req) => {
               content: [
                 {
                   type: "text",
-                  text: `${instruction}. Generate with aspect ratio ${aspectRatio}.`
+                  text: `${trimmedInstruction}. Generate with aspect ratio ${aspectRatio}.${region ? ` Apply changes to the selected region only.` : ''}${mask ? ` Use the provided mask to guide the editing.` : ''}`
                 },
                 {
                   type: "image_url",
@@ -248,7 +256,7 @@ serve(async (req) => {
           type: 'image',
           action: 'edit',
           image_url: finalImageUrl,
-          prompt: instruction,
+          prompt: trimmedInstruction,
           source_urls: [fullImageUrl.slice(0, 100)],
           params: {
             quality,

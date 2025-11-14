@@ -227,17 +227,17 @@ Remember: You're a creative mind that happens to live inside the interface.`;
         type: "function",
         function: {
           name: "edit_image",
-          description: "Create variations or edits of an uploaded reference image. Use when user uploads an image and asks for variations, style changes, or modifications.",
+          description: "Create variations or edits of an uploaded reference image. Use when user uploads an image and asks for variations, style changes, or modifications. CRITICAL: You MUST ALWAYS generate a clear, specific editing instruction. Never call this function without a detailed instruction. If the user's request is vague (e.g., 'edit this', 'change it'), you must interpret their intent and create a specific instruction based on the image content and context.",
           parameters: {
             type: "object",
             properties: {
               imageUrl: {
                 type: "string",
-                description: "URL of the reference image to edit (from context memory)"
+                description: "URL of the reference image to edit (from context memory or user upload). If not provided, use the most recent image from contextMemory.images."
               },
               instruction: {
                 type: "string",
-                description: "Clear editing instruction describing the desired changes or variation"
+                description: "REQUIRED: Clear, specific editing instruction (minimum 10 characters, recommended 20+). You MUST construct this instruction even if the user's request is vague. Examples: 'brighten the image by 20% and increase contrast', 'remove the background and make it transparent', 'change the sky color to a vibrant sunset orange with warm tones', 'remove the person in the background while preserving the rest of the scene', 'make the colors more vibrant, increase saturation by 30%, and enhance contrast for a dramatic look'. Always be specific about what to change and how. If user says 'brighten', expand to 'brighten the overall image by 20% and adjust exposure for better visibility'. If user says 'remove the bag', use 'remove the bag from the image while maintaining natural lighting and background details'."
               },
               quality: {
                 type: "string",
@@ -250,7 +250,7 @@ Remember: You're a creative mind that happens to live inside the interface.`;
                 description: "Image dimensions"
               }
             },
-            required: ["imageUrl", "instruction"]
+            required: ["instruction"]
           }
         }
       }

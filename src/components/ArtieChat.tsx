@@ -112,6 +112,7 @@ export const ArtieChat = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingImageUrl, setEditingImageUrl] = useState<string>("");
+  const [editorInstruction, setEditorInstruction] = useState<string>("");
 
   const registerContextImage = useCallback(
     (image: {
@@ -535,6 +536,7 @@ export const ArtieChat = () => {
       
       if (targetImage) {
         setEditingImageUrl(targetImage.url);
+        setEditorInstruction("");
         setEditorOpen(true);
       } else {
         toast.error("No image found", {
@@ -1087,92 +1089,9 @@ export const ArtieChat = () => {
                   continue;
                 }
 
-                const instruction = args.instruction.trim();
-
-                accumulatedText += '\n\n🎨 Editing image...';
-                setMessages(prev => 
-                  prev.map(m => 
-                    m.id === assistantMessageId 
-                      ? { ...m, text: accumulatedText }
-                      : m
-                  )
-                );
-
-                try {
-                  console.log('[ARTIE] Editing image with instruction:', instruction);
-                  const { data: { session } } = await supabase.auth.getSession();
-                  
-                  if (!session?.access_token) {
-                    throw new Error('No active session');
-                  }
-
-                  const lastImage = contextMemory.images?.[contextMemory.images.length - 1];
-                  const imageUrl = args.imageUrl || lastImage?.url;
-                  if (!imageUrl) {
-                    throw new Error('No image provided. Please upload or reference an image first.');
-                  }
-
-                  // Use retry with exponential backoff
-                  const editData = await fetchWithRetry<EditImageResponse>(
-                    () => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-image`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session.access_token}`,
-                      },
-                      body: JSON.stringify({ 
-                        imageUrl: imageUrl,
-                        instruction: instruction,
-                        quality: args.quality || 'auto',
-                        size: args.size || '1024x1024'
-                      })
-                    }),
-                    {
-                      maxRetries: 3,
-                      baseDelayMs: 2000,
-                      onRetry: (attempt, error) => {
-                        console.log(`[ARTIE] Edit retry attempt ${attempt}:`, error.message);
-                        // Update UI to show retry status
-                        const retryText = `\n\n⏳ Retrying (attempt ${attempt}/3)...`;
-                        setMessages(prev => 
-                          prev.map(m => 
-                            m.id === assistantMessageId 
-                              ? { ...m, text: accumulatedText + retryText }
-                              : m
-                          )
-                        );
-                      }
-                    }
-                  );
-                  console.log('[ARTIE] Edited image data:', editData);
-                  
-                  if (editData.image) {
-                    accumulatedText = accumulatedText.replace(/🎨 Editing image\.\.\.|⏳ Retrying \(attempt \d\/3\)\.\.\./g, '').trim();
-                    accumulatedText += `\n\n✅ Image edited!`;
-                    await refetchCredits();
-                    setMessages(prev => 
-                      prev.map(m => 
-                        m.id === assistantMessageId 
-                          ? { 
-                              ...m, 
-                              text: accumulatedText,
-                              attachment: {
-                                type: 'image',
-                                url: editData.image,
-                                name: 'Edited Image'
-                              }
-                            }
-                          : m
-                      )
-                    );
-                  } else {
-                    throw new Error('No image URL in response');
-                  }
-                } catch (editError) {
-                  console.error('[ARTIE] Image editing error:', editError);
-                  const errorMessage = editError instanceof Error ? editError.message : 'Unknown error';
-                  accumulatedText = accumulatedText.replace(/🎨 Editing image\.\.\.|⏳ Retrying \(attempt \d\/3\)\.\.\./g, '').trim();
-                  accumulatedText += `\n\n❌ Failed to edit image: ${errorMessage}`;
+                // Validate instruction
+                if (!args.instruction || !args.instruction.trim() || args.instruction.trim().length < 3) {
+                  accumulatedText += '\n\n❌ Please provide a clear editing instruction (at least 3 characters). For example: "brighten the image", "remove the background", or "change colors to blue".';
                   setMessages(prev => 
                     prev.map(m => 
                       m.id === assistantMessageId 
@@ -1180,11 +1099,38 @@ export const ArtieChat = () => {
                         : m
                     )
                   );
-                  
-                  toast.error("Image editing failed", {
-                    description: errorMessage,
-                  });
+                  continue;
                 }
+
+                const instruction = args.instruction.trim();
+
+                const lastImage = contextMemory.images?.[contextMemory.images.length - 1];
+                const imageUrl = args.imageUrl || lastImage?.url;
+                if (!imageUrl) {
+                  accumulatedText += '\n\n❌ No image provided. Please upload or reference an image first.';
+                  setMessages(prev => 
+                    prev.map(m => 
+                      m.id === assistantMessageId 
+                        ? { ...m, text: accumulatedText }
+                        : m
+                    )
+                  );
+                  continue;
+                }
+
+                // Open Edit Image Modal with pre-filled instruction
+                setEditingImageUrl(imageUrl);
+                setEditorInstruction(instruction);
+                setEditorOpen(true);
+                
+                accumulatedText += `\n\n✅ Opening Edit Image tool with instruction: "${instruction}"\n\nYou can review and adjust the settings before applying the changes.`;
+                setMessages(prev => 
+                  prev.map(m => 
+                    m.id === assistantMessageId 
+                      ? { ...m, text: accumulatedText }
+                      : m
+                  )
+                );
               }
             }
           }
@@ -1469,7 +1415,9 @@ export const ArtieChat = () => {
                               variant="secondary"
                               onClick={() => {
                                 setEditingImageUrl(message.attachment?.url || "");
-                                setEditorOpen(true);
+                                setEditorInstruction("");
+                                setEditorInstruction("");
+        setEditorOpen(true);
                               }}
                               className="gap-1.5"
                             >
@@ -1544,7 +1492,9 @@ export const ArtieChat = () => {
                               variant="secondary"
                               onClick={() => {
                                 setEditingImageUrl(url);
-                                setEditorOpen(true);
+                                setEditorInstruction("");
+                                setEditorInstruction("");
+        setEditorOpen(true);
                               }}
                               className="gap-1.5"
                             >
@@ -1854,8 +1804,14 @@ export const ArtieChat = () => {
 
       <ImageEditor
         open={editorOpen}
-        onOpenChange={setEditorOpen}
+        onOpenChange={(open) => {
+          setEditorOpen(open);
+          if (!open) {
+            setEditorInstruction("");
+          }
+        }}
         imageUrl={editingImageUrl}
+        initialInstruction={editorInstruction}
         onImageEdited={(newImageUrl) => {
           // Add the edited image to context memory
         const imageMessageId =

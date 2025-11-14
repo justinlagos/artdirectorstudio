@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { useNavigate } from "react-router-dom";
+import { useCredits } from "@/hooks/useCredits";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,11 +12,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, User, History, Shield, Settings, BarChart3, Crown } from "lucide-react";
+import { LogOut, User, History, Shield, Settings, BarChart3, Crown, Coins } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export const UserMenu = () => {
   const { user, signOut } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdminCheck();
+  const { balance } = useCredits();
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -45,6 +48,19 @@ export const UserMenu = () => {
             </p>
           </div>
         </DropdownMenuLabel>
+        {balance !== null && (
+          <div className="px-2 py-1.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Credits</span>
+              </div>
+              <Badge variant={balance < 5 ? "destructive" : "secondary"}>
+                {balance}
+              </Badge>
+            </div>
+          </div>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer">
           <Settings className="mr-2 h-4 w-4" />
