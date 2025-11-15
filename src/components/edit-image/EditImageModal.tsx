@@ -344,7 +344,7 @@ export const EditImageModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[95vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-7xl max-h-[95vh] flex flex-col p-0 gap-0 z-[65]">
         {/* Header with proper spacing - 24px padding below title/subtitle */}
         <DialogHeader className="px-6 pt-6 pb-6 border-b border-border">
           <DialogTitle className="text-2xl font-semibold text-left flex items-center gap-2 mb-2">

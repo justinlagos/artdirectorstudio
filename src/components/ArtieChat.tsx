@@ -545,14 +545,17 @@ export const ArtieChat = () => {
         : contextMemory.images[contextMemory.images.length - 1];
       
       if (targetImage) {
-        // Minimize Artie on desktop to avoid covering Edit modal
+        // Close Artie completely on desktop to avoid covering Edit modal
         if (!isMobile) {
           setIsOpen(false);
-          setIsMinimized(true);
+          setIsMinimized(false);
         }
-        setEditingImageUrl(targetImage.url);
-        setEditorInstruction("");
-        setEditorOpen(true);
+        // Use setTimeout to ensure Artie closes before Dialog opens
+        setTimeout(() => {
+          setEditingImageUrl(targetImage.url);
+          setEditorInstruction("");
+          setEditorOpen(true);
+        }, 100);
       } else {
         toast.error("No image found", {
           description: "Couldn't find the image to edit",
@@ -1134,14 +1137,17 @@ export const ArtieChat = () => {
                 }
 
                 // Open Edit Image Modal with pre-filled instruction
-                // Minimize Artie on desktop to avoid covering Edit modal
+                // Close Artie completely on desktop to avoid covering Edit modal
                 if (!isMobile) {
                   setIsOpen(false);
-                  setIsMinimized(true);
+                  setIsMinimized(false);
                 }
-                setEditingImageUrl(imageUrl);
-                setEditorInstruction(instruction);
-                setEditorOpen(true);
+                // Use setTimeout to ensure Artie closes before Dialog opens
+                setTimeout(() => {
+                  setEditingImageUrl(imageUrl);
+                  setEditorInstruction(instruction);
+                  setEditorOpen(true);
+                }, 100);
                 
                 accumulatedText += `\n\n✅ Opening Edit Image tool with instruction: "${instruction}"\n\nYou can review and adjust the settings before applying the changes.`;
                 setMessages(prev => 
@@ -1439,14 +1445,17 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                // Minimize Artie on desktop to avoid covering Edit modal
+                                // Close Artie completely on desktop to avoid covering Edit modal
                                 if (!isMobile) {
                                   setIsOpen(false);
-                                  setIsMinimized(true);
+                                  setIsMinimized(false);
                                 }
-                                setEditingImageUrl(message.attachment?.url || "");
-                                setEditorInstruction("");
-                                setEditorOpen(true);
+                                // Use setTimeout to ensure Artie closes before Dialog opens
+                                setTimeout(() => {
+                                  setEditingImageUrl(message.attachment?.url || "");
+                                  setEditorInstruction("");
+                                  setEditorOpen(true);
+                                }, 100);
                               }}
                               className="gap-1.5"
                             >
@@ -1525,14 +1534,17 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                // Minimize Artie on desktop to avoid covering Edit modal
+                                // Close Artie completely on desktop to avoid covering Edit modal
                                 if (!isMobile) {
                                   setIsOpen(false);
-                                  setIsMinimized(true);
+                                  setIsMinimized(false);
                                 }
-                                setEditingImageUrl(url);
-                                setEditorInstruction("");
-                                setEditorOpen(true);
+                                // Use setTimeout to ensure Artie closes before Dialog opens
+                                setTimeout(() => {
+                                  setEditingImageUrl(url);
+                                  setEditorInstruction("");
+                                  setEditorOpen(true);
+                                }, 100);
                               }}
                               className="gap-1.5"
                             >
