@@ -521,35 +521,80 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       // Handle both data URLs and HTTP URLs
       if (imageDataUrl.startsWith('data:')) {
         // Convert data URL to blob
-        const base64Data = imageDataUrl.split(',')[1];
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        const commaIndex = imageDataUrl.indexOf(',');
+        if (commaIndex === -1) {
+          throw new Error('Invalid data URL format: missing comma separator');
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        blob = new Blob([byteArray], { type: 'image/png' });
-        console.log('[Batch SaveToDatabase] Converted data URL to blob', {
-          blobSize: blob.size,
-          blobType: blob.type
+        
+        const base64Data = imageDataUrl.substring(commaIndex + 1);
+        if (!base64Data || base64Data.length === 0) {
+          throw new Error('Invalid data URL format: empty base64 data');
+        }
+        
+        console.log('[Batch SaveToDatabase] Converting data URL to blob', {
+          dataUrlPrefix: imageDataUrl.substring(0, 50),
+          base64Length: base64Data.length,
+          hasComma: commaIndex > -1
         });
-      } else {
+        
+        try {
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          blob = new Blob([byteArray], { type: 'image/png' });
+          console.log('[Batch SaveToDatabase] Converted data URL to blob', {
+            blobSize: blob.size,
+            blobType: blob.type,
+            expectedSize: Math.ceil(base64Data.length * 0.75)
+          });
+        } catch (base64Error) {
+          console.error('[Batch SaveToDatabase] Base64 decode failed', {
+            error: base64Error instanceof Error ? base64Error.message : String(base64Error),
+            base64Length: base64Data.length,
+            base64Prefix: base64Data.substring(0, 20)
+          });
+          throw new Error(`Failed to decode base64 image data: ${base64Error instanceof Error ? base64Error.message : String(base64Error)}`);
+        }
+      } else if (imageDataUrl.startsWith('http://') || imageDataUrl.startsWith('https://')) {
         // Fetch HTTP URL
-        const response = await fetch(imageDataUrl);
+        console.log('[Batch SaveToDatabase] Fetching image from URL', {
+          url: imageDataUrl.substring(0, 100)
+        });
+        
+        const response = await fetch(imageDataUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'image/*'
+          }
+        });
+        
         if (!response.ok) {
           throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
         }
+        
         blob = await response.blob();
         console.log('[Batch SaveToDatabase] Fetched image from URL', {
           blobSize: blob.size,
           blobType: blob.type,
-          responseStatus: response.status
+          responseStatus: response.status,
+          contentType: response.headers.get('content-type')
         });
+        
+        if (!blob || blob.size === 0) {
+          throw new Error('Fetched blob is empty or invalid');
+        }
+      } else {
+        throw new Error(`Invalid image URL format: must be data: URL or http(s):// URL, got: ${imageDataUrl.substring(0, 50)}`);
       }
     } catch (fetchError) {
       console.error('[Batch SaveToDatabase] Failed to process image', {
         error: fetchError instanceof Error ? fetchError.message : String(fetchError),
-        imageDataUrlPrefix: imageDataUrl?.substring(0, 50)
+        imageDataUrlPrefix: imageDataUrl?.substring(0, 100),
+        imageDataUrlType: imageDataUrl?.startsWith('data:') ? 'data-url' : imageDataUrl?.startsWith('http') ? 'http-url' : 'unknown',
+        stack: fetchError instanceof Error ? fetchError.stack : undefined
       });
       throw new Error(`Failed to process image: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
     }
@@ -566,39 +611,80 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       blobType: blob.type
     });
     
+    // Validate blob before upload
+    if (!blob || blob.size === 0) {
+      console.error('[Batch SaveToDatabase] Invalid blob before upload', {
+        blobSize: blob?.size || 0,
+        blobType: blob?.type || 'unknown',
+        fileName
+      });
+      throw new Error('Failed to upload images: Invalid or empty image blob');
+    }
+    
+    console.log('[Batch SaveToDatabase] Validated blob, starting upload', {
+      blobSize: blob.size,
+      blobType: blob.type,
+      fileName,
+      userId: user.id
+    });
+    
     // Retry upload up to 3 times
     let uploadError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
-      const { error, data } = await supabase.storage
-        .from('generated-images')
-        .upload(fileName, blob, {
-          contentType: 'image/png',
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (!error) {
-        uploadError = null;
-        console.log('[Batch SaveToDatabase] Upload successful', {
-          attempt: attempt + 1,
+      try {
+        console.log(`[Batch SaveToDatabase] Upload attempt ${attempt + 1}/3`, {
           fileName,
-          uploadData: data
+          blobSize: blob.size,
+          userId: user.id
         });
-        break;
-      }
-      
-      uploadError = error;
-      console.warn(`[Batch SaveToDatabase] Upload attempt ${attempt + 1} failed:`, {
-        error: error.message,
-        errorCode: error.statusCode,
-        fileName
-      });
-      
-      if (attempt < 2) {
-        // Wait before retry with exponential backoff
-        const delay = 1000 * Math.pow(2, attempt);
-        console.log(`[Batch SaveToDatabase] Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        const { error, data } = await supabase.storage
+          .from('generated-images')
+          .upload(fileName, blob, {
+            contentType: 'image/png',
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (!error) {
+          uploadError = null;
+          console.log('[Batch SaveToDatabase] Upload successful', {
+            attempt: attempt + 1,
+            fileName,
+            uploadData: data,
+            path: data?.path
+          });
+          break;
+        }
+        
+        uploadError = error;
+        console.warn(`[Batch SaveToDatabase] Upload attempt ${attempt + 1} failed:`, {
+          error: error.message,
+          errorCode: error.statusCode,
+          errorName: error.name,
+          fileName,
+          userId: user.id,
+          blobSize: blob.size
+        });
+        
+        if (attempt < 2) {
+          // Wait before retry with exponential backoff
+          const delay = 1000 * Math.pow(2, attempt);
+          console.log(`[Batch SaveToDatabase] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } catch (uploadException) {
+        uploadError = uploadException;
+        console.error(`[Batch SaveToDatabase] Upload attempt ${attempt + 1} threw exception:`, {
+          error: uploadException instanceof Error ? uploadException.message : String(uploadException),
+          stack: uploadException instanceof Error ? uploadException.stack : undefined,
+          fileName
+        });
+        
+        if (attempt < 2) {
+          const delay = 1000 * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
     }
 
@@ -795,14 +881,32 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
         if (operation === 'upscale') {
           result = await processUpscale(item);
+          console.log(`[Batch] Upscale result received for item ${i}`, {
+            resultType: typeof result,
+            resultLength: result?.length || 0,
+            resultPrefix: result?.substring(0, 50) || 'none',
+            isDataUrl: result?.startsWith('data:'),
+            isHttpUrl: result?.startsWith('http')
+          });
           const duration = Date.now() - itemStartTime;
           assetId = await saveToDatabase(result, 'upscale', targetSize, originalBase64, duration);
         } else if (operation === 'analyze') {
           result = await processAnalyze(item);
+          console.log(`[Batch] Analyze result received for item ${i}`, {
+            resultType: typeof result,
+            hasResult: !!result
+          });
           const duration = Date.now() - itemStartTime;
           assetId = await saveToDatabase('', 'analyze', '', originalBase64, duration, result);
         } else if (operation === 'generate') {
           result = await processGenerate(item);
+          console.log(`[Batch] Generate result received for item ${i}`, {
+            resultType: typeof result,
+            resultLength: result?.length || 0,
+            resultPrefix: result?.substring(0, 50) || 'none',
+            isDataUrl: result?.startsWith('data:'),
+            isHttpUrl: result?.startsWith('http')
+          });
           const duration = Date.now() - itemStartTime;
           assetId = await saveToDatabase(result, 'generate', '1024x1024', originalBase64, duration);
         }
