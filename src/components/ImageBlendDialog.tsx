@@ -265,6 +265,14 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         payload.instruction = trimmedInstruction;
       }
 
+      console.log('📤 [Blend] Sending request to blend-images', {
+        payloadKeys: Object.keys(payload),
+        imageCount: payload.images.length,
+        hasInstruction: !!payload.instruction,
+        hasStylePresets: payload.stylePresets.length > 0,
+        idempotencyKey: payload.idempotencyKey
+      });
+
       const { data, error } = await supabase.functions.invoke("blend-images", {
         body: payload,
         headers: {
@@ -275,8 +283,22 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       clearInterval(progressInterval);
       setProgress(100);
 
+      // CRITICAL: Log full response for debugging
+      console.log('📥 [Blend] Raw response from edge function:', {
+        hasData: !!data,
+        hasError: !!error,
+        dataKeys: data ? Object.keys(data) : [],
+        dataType: typeof data,
+        errorMessage: error?.message,
+        errorDetails: error
+      });
+
       if (error) {
-        console.error('❌ [Blend] Edge function error:', error);
+        console.error('❌ [Blend] Edge function error:', {
+          message: error.message,
+          status: error.status,
+          error: error
+        });
         analytics.track("Image Blend", {
           tool: "blend",
           action: "blend",
@@ -287,7 +309,33 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         throw error;
       }
 
-      if (!data?.image) {
+      if (!data) {
+        console.error('❌ [Blend] No data in response');
+        analytics.track("Image Blend", {
+          tool: "blend",
+          action: "blend",
+          success: false,
+          image_count: images.length,
+          error_type: "no_data",
+        });
+        throw new Error('No response data from server');
+      }
+
+      console.log('🔍 [Blend] Response data structure:', {
+        hasImage: !!data.image,
+        imageType: typeof data.image,
+        imagePrefix: data.image ? data.image.substring(0, 50) : 'null',
+        imageLength: data.image?.length || 0,
+        hasThumbnail: !!data.thumbnail,
+        hasAssetId: !!data.assetId,
+        allKeys: Object.keys(data)
+      });
+
+      if (!data.image) {
+        console.error('❌ [Blend] No image field in response data', {
+          availableKeys: Object.keys(data),
+          dataString: JSON.stringify(data).substring(0, 500)
+        });
         analytics.track("Image Blend", {
           tool: "blend",
           action: "blend",
@@ -300,8 +348,20 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
 
       // Validate and set image IMMEDIATELY for instant display
       let validatedImage = data.image;
-      if (!data.image.startsWith('data:image/')) {
+      
+      // Handle both HTTP(S) URLs and base64 data URIs
+      if (data.image.startsWith('http://') || data.image.startsWith('https://')) {
+        // Already a valid URL, use as-is
+        validatedImage = data.image;
+        console.log('✅ [Blend] Received HTTP(S) URL from edge function');
+      } else if (!data.image.startsWith('data:image/')) {
+        // Assume it's base64 without prefix, add it
         validatedImage = `data:image/png;base64,${data.image}`;
+        console.log('⚠️ [Blend] Adding data URI prefix to base64 image');
+      } else {
+        // Already a valid data URI
+        validatedImage = data.image;
+        console.log('✅ [Blend] Received data URI from edge function');
       }
 
       console.log('✅ [Blend] Image validated, setting state immediately');

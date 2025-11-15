@@ -381,20 +381,51 @@ serve(async (req) => {
                 requestId,
                 action: 'storage_upload_error',
                 error: uploadError.message,
+                errorCode: uploadError.statusCode,
+                fileName,
+                userId,
                 timestamp: new Date().toISOString()
               }));
-            } else {
-              const { data: urlData } = supabaseAdmin.storage
-                .from('generated-images')
-                .getPublicUrl(fileName);
-              finalImageUrl = urlData.publicUrl;
-              console.log(JSON.stringify({
-                requestId,
-                action: 'storage_upload_success',
-                publicUrl: finalImageUrl,
-                timestamp: new Date().toISOString()
-              }));
+              // CRITICAL: Storage upload failure must be fatal
+              throw new Error(`Storage upload failed: ${uploadError.message}`);
             }
+            
+            // Get public URL - verify it's accessible
+            const { data: urlData, error: urlError } = supabaseAdmin.storage
+              .from('generated-images')
+              .getPublicUrl(fileName);
+            
+            if (urlError || !urlData?.publicUrl) {
+              console.error(JSON.stringify({
+                requestId,
+                action: 'public_url_error',
+                error: urlError?.message || 'No public URL returned',
+                fileName,
+                timestamp: new Date().toISOString()
+              }));
+              throw new Error(`Failed to get public URL: ${urlError?.message || 'Unknown error'}`);
+            }
+            
+            finalImageUrl = urlData.publicUrl;
+            
+            // Verify URL format
+            if (!finalImageUrl || (!finalImageUrl.startsWith('http://') && !finalImageUrl.startsWith('https://'))) {
+              console.error(JSON.stringify({
+                requestId,
+                action: 'invalid_url_format',
+                url: finalImageUrl,
+                timestamp: new Date().toISOString()
+              }));
+              throw new Error(`Invalid public URL format: ${finalImageUrl?.substring(0, 100)}`);
+            }
+            
+            console.log(JSON.stringify({
+              requestId,
+              action: 'storage_upload_success',
+              publicUrl: finalImageUrl,
+              fileName,
+              timestamp: new Date().toISOString()
+            }));
           } catch (base64Error) {
             console.error(JSON.stringify({
               requestId,
@@ -404,8 +435,8 @@ serve(async (req) => {
             }));
           }
         }
-      } else {
-        // Already a URL, use as-is
+      } else if (blendedImageUrl.startsWith('http://') || blendedImageUrl.startsWith('https://')) {
+        // Already a valid URL, use as-is
         finalImageUrl = blendedImageUrl;
         console.log(JSON.stringify({
           requestId,
@@ -413,9 +444,36 @@ serve(async (req) => {
           url: finalImageUrl.substring(0, 100),
           timestamp: new Date().toISOString()
         }));
+      } else {
+        // Invalid format - must be base64 data URI or HTTP(S) URL
+        console.error(JSON.stringify({
+          requestId,
+          action: 'invalid_image_format',
+          urlPrefix: blendedImageUrl.substring(0, 100),
+          timestamp: new Date().toISOString()
+        }));
+        throw new Error('Invalid image format returned from AI. Expected base64 data URI or HTTP(S) URL.');
       }
 
-      // Save to generated_assets
+      // Save to generated_assets - CRITICAL: Verify userId is valid
+      if (!userId || userId === 'unknown') {
+        console.error(JSON.stringify({
+          requestId,
+          action: 'invalid_user_id',
+          userId,
+          timestamp: new Date().toISOString()
+        }));
+        throw new Error('Invalid user ID. Cannot save to database.');
+      }
+
+      console.log(JSON.stringify({
+        requestId,
+        action: 'database_insert_start',
+        userId,
+        imageUrl: finalImageUrl.substring(0, 100),
+        timestamp: new Date().toISOString()
+      }));
+
       const { data: savedAsset, error: assetError } = await supabaseAdmin
         .from('generated_assets')
         .insert({
@@ -441,14 +499,25 @@ serve(async (req) => {
           action: 'database_save_error',
           error: assetError.message,
           errorCode: assetError.code,
+          errorDetails: assetError,
+          userId,
           timestamp: new Date().toISOString()
         }));
-      } else {
+        // Database errors are non-fatal for the response, but log them
+        // The image URL is still valid and can be returned
+      } else if (savedAsset) {
         assetData = savedAsset;
         console.log(JSON.stringify({
           requestId,
           action: 'database_save_success',
           assetId: assetData.id,
+          imageUrl: assetData.image_url?.substring(0, 100),
+          timestamp: new Date().toISOString()
+        }));
+      } else {
+        console.warn(JSON.stringify({
+          requestId,
+          action: 'database_save_no_data',
           timestamp: new Date().toISOString()
         }));
       }
@@ -462,11 +531,47 @@ serve(async (req) => {
       }));
     }
 
+    // CRITICAL: Verify finalImageUrl is valid before returning
+    if (!finalImageUrl || (typeof finalImageUrl !== 'string')) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'invalid_final_url',
+        finalImageUrl: typeof finalImageUrl,
+        timestamp: new Date().toISOString()
+      }));
+      throw new Error('Failed to generate valid image URL');
+    }
+
+    // Verify URL is accessible (must be HTTP/HTTPS or data URI)
+    const isValidUrl = finalImageUrl.startsWith('http://') || 
+                      finalImageUrl.startsWith('https://') || 
+                      finalImageUrl.startsWith('data:image/');
+    
+    if (!isValidUrl) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'invalid_url_format_final',
+        url: finalImageUrl.substring(0, 200),
+        timestamp: new Date().toISOString()
+      }));
+      throw new Error(`Invalid final URL format: ${finalImageUrl.substring(0, 100)}`);
+    }
+
     const result = { 
       image: finalImageUrl,
       thumbnail: finalImageUrl,
       assetId: assetData?.id
     };
+
+    console.log(JSON.stringify({
+      requestId,
+      action: 'returning_result',
+      hasImage: !!result.image,
+      imageType: result.image?.startsWith('http') ? 'url' : result.image?.startsWith('data:') ? 'base64' : 'unknown',
+      imageLength: result.image?.length || 0,
+      hasAssetId: !!result.assetId,
+      timestamp: new Date().toISOString()
+    }));
 
     if (idempotencyKey) {
       await cacheResponse(
