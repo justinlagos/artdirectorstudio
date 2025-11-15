@@ -88,15 +88,62 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         return;
       }
 
-      // Convert file to base64
+      // Validate file before conversion
+      console.log('🔄 [Upscale] Validating file...', {
+        fileName: sourceImage.file.name,
+        fileSize: `${(sourceImage.file.size / 1024 / 1024).toFixed(2)}MB`,
+        fileType: sourceImage.file.type
+      });
+
+      if (!sourceImage.file.type.startsWith('image/')) {
+        console.error('❌ [Upscale] Invalid file type:', sourceImage.file.type);
+        throw new Error('Invalid file type. Please upload an image file.');
+      }
+
+      const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+      if (sourceImage.file.size > MAX_FILE_SIZE) {
+        const error = `File too large: ${(sourceImage.file.size / 1024 / 1024).toFixed(2)}MB. Max 15MB.`;
+        console.error('❌ [Upscale] File size validation failed:', error);
+        throw new Error(error);
+      }
+
+      // Convert file to base64 with validation
+      console.log('🔄 [Upscale] Converting file to base64...');
       const base64Image = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
+        reader.onload = () => {
+          const result = reader.result as string;
+          
+          // Validate base64 format
+          if (!result.startsWith('data:image/')) {
+            console.error('❌ [Upscale] Invalid base64 format');
+            reject(new Error('Invalid image format'));
+            return;
+          }
+          
+          console.log('✅ [Upscale] File converted to base64', {
+            base64Length: result.length,
+            estimatedSizeMB: (result.length / 1.33 / 1024 / 1024).toFixed(2)
+          });
+          resolve(result);
+        };
+        reader.onerror = (error) => {
+          console.error('❌ [Upscale] FileReader error:', error);
+          reject(new Error('Failed to read file'));
+        };
         reader.readAsDataURL(sourceImage.file);
       });
 
-      console.log('🚀 [Upscale] Invoking upscale-image edge function...');
+      // Final validation before API call
+      if (!base64Image || !base64Image.startsWith('data:image/')) {
+        console.error('❌ [Upscale] Final validation failed');
+        throw new Error('Invalid image data');
+      }
+
+      console.log('🚀 [Upscale] Invoking upscale-image edge function...', {
+        targetSize,
+        base64Length: base64Image.length
+      });
       const { data, error } = await supabase.functions.invoke("upscale-image", {
         body: { 
           image: base64Image, 

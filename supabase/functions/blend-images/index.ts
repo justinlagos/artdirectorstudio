@@ -72,17 +72,65 @@ serve(async (req) => {
       ).response;
     }
 
-    const { images, instruction, stylePresets, idempotencyKey } = await req.json();
+    // Parse and validate request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log(JSON.stringify({
+        requestId,
+        action: 'request_parsed',
+        hasImages: !!requestBody.images,
+        imagesCount: Array.isArray(requestBody.images) ? requestBody.images.length : 0,
+        hasInstruction: !!requestBody.instruction,
+        hasStylePresets: !!requestBody.stylePresets,
+        hasIdempotencyKey: !!requestBody.idempotencyKey,
+        timestamp: new Date().toISOString()
+      }));
+    } catch (parseError) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'parse_error',
+        error: parseError instanceof Error ? parseError.message : 'Unknown',
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse('Invalid request body. Expected JSON.', 400).response;
+    }
 
+    const { images, instruction, stylePresets, idempotencyKey } = requestBody;
+
+    // Validate images array
+    console.log(JSON.stringify({
+      requestId,
+      action: 'validating_images',
+      timestamp: new Date().toISOString()
+    }));
     const imagesValidation = validateImages(images, 2, 4);
     if (!imagesValidation.valid) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'images_validation_failed',
+        error: imagesValidation.error,
+        timestamp: new Date().toISOString()
+      }));
       return createErrorResponse(imagesValidation.error!, 400).response;
     }
 
     // Instruction is now optional - validate only if provided
     if (instruction) {
+      console.log(JSON.stringify({
+        requestId,
+        action: 'validating_instruction',
+        instructionLength: instruction.length,
+        timestamp: new Date().toISOString()
+      }));
       const instructionValidation = validateInstruction(instruction);
       if (!instructionValidation.valid) {
+        console.error(JSON.stringify({
+          requestId,
+          action: 'instruction_validation_failed',
+          error: instructionValidation.error,
+          timestamp: new Date().toISOString()
+        }));
         return createErrorResponse(instructionValidation.error!, 400).response;
       }
     }
@@ -113,8 +161,15 @@ serve(async (req) => {
       }
     }
 
+    // Validate API key
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'config_error',
+        error: 'LOVABLE_API_KEY missing',
+        timestamp: new Date().toISOString()
+      }));
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
@@ -140,8 +195,19 @@ serve(async (req) => {
       | { type: "text"; text: string }
       | { type: "image_url"; image_url: { url: string } };
 
+    // Build content array with validation
     const content: BlendContentEntry[] = [{ type: "text", text: enhancedInstruction }];
-    for (const img of images) {
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      if (!img || typeof img !== 'string') {
+        console.error(JSON.stringify({
+          requestId,
+          action: 'content_build_error',
+          error: `Image ${i} is invalid`,
+          timestamp: new Date().toISOString()
+        }));
+        return createErrorResponse(`Image ${i + 1} is invalid`, 400).response;
+      }
       content.push({ type: "image_url", image_url: { url: img } });
     }
 
@@ -150,6 +216,9 @@ serve(async (req) => {
       action: 'api_call_start',
       provider: 'lovable-ai-gateway',
       model: 'google/gemini-2.5-flash-image-preview',
+      imageCount: images.length,
+      instructionLength: enhancedInstruction.length,
+      contentItems: content.length,
       timestamp: new Date().toISOString()
     }));
 
@@ -186,15 +255,67 @@ serve(async (req) => {
       return createErrorResponse(errorMessage, response.status).response;
     }
 
-    const data = await response.json();
+    // Parse and extract image from response
+    let data;
+    try {
+      data = await response.json();
+      console.log(JSON.stringify({
+        requestId,
+        action: 'api_response_received',
+        hasChoices: !!data.choices,
+        choicesLength: data.choices?.length || 0,
+        responseKeys: Object.keys(data),
+        timestamp: new Date().toISOString()
+      }));
+    } catch (parseError) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'api_response_parse_error',
+        error: parseError instanceof Error ? parseError.message : 'Unknown',
+        timestamp: new Date().toISOString()
+      }));
+      throw new Error('Failed to parse API response');
+    }
+
+    // Try multiple extraction paths with detailed logging
     const blendedImageUrl =
       data.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
       data.choices?.[0]?.message?.content ||
       data.images?.[0]?.url ||
       data.data?.[0]?.url;
 
+    console.log(JSON.stringify({
+      requestId,
+      action: 'image_extraction',
+      found: !!blendedImageUrl,
+      path: blendedImageUrl 
+        ? (data.choices?.[0]?.message?.images?.[0]?.image_url?.url ? 'choices[0].message.images[0].image_url.url' :
+           data.choices?.[0]?.message?.content ? 'choices[0].message.content' :
+           data.images?.[0]?.url ? 'images[0].url' :
+           'data[0].url')
+        : 'none',
+      imageLength: blendedImageUrl?.length || 0,
+      timestamp: new Date().toISOString()
+    }));
+
     if (!blendedImageUrl) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'no_image_in_response',
+        responseStructure: JSON.stringify(data).substring(0, 1000),
+        timestamp: new Date().toISOString()
+      }));
       throw new Error('No blended image returned from API');
+    }
+
+    // Validate extracted image URL format
+    if (!blendedImageUrl.startsWith('data:image/') && !blendedImageUrl.startsWith('https://')) {
+      console.warn(JSON.stringify({
+        requestId,
+        action: 'unexpected_image_format',
+        urlPrefix: blendedImageUrl.substring(0, 50),
+        timestamp: new Date().toISOString()
+      }));
     }
 
     const duration = Date.now() - startTime;
@@ -220,25 +341,79 @@ serve(async (req) => {
     try {
       // Extract base64 data and upload to storage
       if (blendedImageUrl.startsWith('data:image/')) {
-        const base64Data = blendedImageUrl.split(',')[1];
-        const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-        
-        const fileName = `${userId}/${Date.now()}-blended.png`;
-        const { error: uploadError } = await supabaseAdmin.storage
-          .from('generated-images')
-          .upload(fileName, buffer, {
-            contentType: 'image/png',
-            upsert: false
-          });
+        console.log(JSON.stringify({
+          requestId,
+          action: 'uploading_to_storage',
+          format: 'base64',
+          timestamp: new Date().toISOString()
+        }));
 
-        if (uploadError) {
-          console.error('Storage upload error:', uploadError);
+        const base64Data = blendedImageUrl.split(',')[1];
+        if (!base64Data) {
+          console.error(JSON.stringify({
+            requestId,
+            action: 'storage_upload_error',
+            error: 'No base64 data found',
+            timestamp: new Date().toISOString()
+          }));
         } else {
-          const { data: urlData } = supabaseAdmin.storage
-            .from('generated-images')
-            .getPublicUrl(fileName);
-          finalImageUrl = urlData.publicUrl;
+          try {
+            const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+            
+            const fileName = `${userId}/${Date.now()}-blended.png`;
+            console.log(JSON.stringify({
+              requestId,
+              action: 'storage_upload_start',
+              fileName,
+              bufferSize: buffer.length,
+              timestamp: new Date().toISOString()
+            }));
+
+            const { error: uploadError } = await supabaseAdmin.storage
+              .from('generated-images')
+              .upload(fileName, buffer, {
+                contentType: 'image/png',
+                upsert: false
+              });
+
+            if (uploadError) {
+              console.error(JSON.stringify({
+                requestId,
+                action: 'storage_upload_error',
+                error: uploadError.message,
+                errorCode: uploadError.statusCode,
+                timestamp: new Date().toISOString()
+              }));
+            } else {
+              const { data: urlData } = supabaseAdmin.storage
+                .from('generated-images')
+                .getPublicUrl(fileName);
+              finalImageUrl = urlData.publicUrl;
+              console.log(JSON.stringify({
+                requestId,
+                action: 'storage_upload_success',
+                publicUrl: finalImageUrl,
+                timestamp: new Date().toISOString()
+              }));
+            }
+          } catch (base64Error) {
+            console.error(JSON.stringify({
+              requestId,
+              action: 'base64_decode_error',
+              error: base64Error instanceof Error ? base64Error.message : 'Unknown',
+              timestamp: new Date().toISOString()
+            }));
+          }
         }
+      } else {
+        // Already a URL, use as-is
+        finalImageUrl = blendedImageUrl;
+        console.log(JSON.stringify({
+          requestId,
+          action: 'using_provided_url',
+          url: finalImageUrl.substring(0, 100),
+          timestamp: new Date().toISOString()
+        }));
       }
 
       // Save to generated_assets
@@ -262,13 +437,30 @@ serve(async (req) => {
         .single();
 
       if (assetError) {
-        console.error('Database save error (non-fatal):', assetError);
+        console.error(JSON.stringify({
+          requestId,
+          action: 'database_save_error',
+          error: assetError.message,
+          errorCode: assetError.code,
+          timestamp: new Date().toISOString()
+        }));
       } else {
         assetData = savedAsset;
-        console.log('Saved blend to database:', assetData.id);
+        console.log(JSON.stringify({
+          requestId,
+          action: 'database_save_success',
+          assetId: assetData.id,
+          timestamp: new Date().toISOString()
+        }));
       }
     } catch (error) {
-      console.error('Error saving blend (non-fatal):', error);
+      console.error(JSON.stringify({
+        requestId,
+        action: 'save_error',
+        error: error instanceof Error ? error.message : 'Unknown',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
+      }));
     }
 
     const result = { 
@@ -292,13 +484,27 @@ serve(async (req) => {
     );
   } catch (error) {
     const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
     console.error(JSON.stringify({
       requestId,
       action: 'blend_error',
       timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown',
-      duration
+      error: errorMessage,
+      stack: errorStack,
+      duration_ms: duration,
+      userId
     }));
+    
+    // Return more specific error messages when possible
+    if (errorMessage.includes('LOVABLE_API_KEY')) {
+      return createErrorResponse('Service configuration error. Please contact support.', 500).response;
+    }
+    if (errorMessage.includes('parse') || errorMessage.includes('JSON')) {
+      return createErrorResponse('Invalid response from image service. Please try again.', 500).response;
+    }
+    
     return createErrorResponse(ERROR_MESSAGES.PROCESSING_FAILED, 500).response;
   }
 });

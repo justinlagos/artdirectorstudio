@@ -74,25 +74,60 @@ serve(async (req) => {
       tier: accessResult.tier
     }));
 
-    const { image, targetSize, idempotencyKey } = await req.json();
+    // Parse and validate request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log(JSON.stringify({
+        requestId,
+        action: 'request_parsed',
+        hasImage: !!requestBody.image,
+        imageLength: requestBody.image?.length || 0,
+        hasTargetSize: !!requestBody.targetSize,
+        targetSize: requestBody.targetSize,
+        hasIdempotencyKey: !!requestBody.idempotencyKey,
+        timestamp: new Date().toISOString()
+      }));
+    } catch (parseError) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'parse_error',
+        error: parseError instanceof Error ? parseError.message : 'Unknown',
+        timestamp: new Date().toISOString()
+      }));
+      return createErrorResponse('Invalid request body. Expected JSON.', 400).response;
+    }
+
+    const { image, targetSize, idempotencyKey } = requestBody;
     
     // Input validation
+    console.log(JSON.stringify({
+      requestId,
+      action: 'validating_image',
+      timestamp: new Date().toISOString()
+    }));
     const imageValidation = validateImageData(image);
     if (!imageValidation.valid) {
       console.error(JSON.stringify({
         requestId,
-        action: 'validation_failed',
+        action: 'image_validation_failed',
         error: imageValidation.error,
         timestamp: new Date().toISOString()
       }));
       return createErrorResponse(imageValidation.error!, 400).response;
     }
 
+    console.log(JSON.stringify({
+      requestId,
+      action: 'validating_target_size',
+      targetSize,
+      timestamp: new Date().toISOString()
+    }));
     const sizeValidation = validateTargetSize(targetSize);
     if (!sizeValidation.valid) {
       console.error(JSON.stringify({
         requestId,
-        action: 'validation_failed',
+        action: 'size_validation_failed',
         error: sizeValidation.error,
         timestamp: new Date().toISOString()
       }));
@@ -133,8 +168,15 @@ serve(async (req) => {
       targetSize
     }));
 
+    // Validate API key
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'config_error',
+        error: 'LOVABLE_API_KEY missing',
+        timestamp: new Date().toISOString()
+      }));
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
@@ -201,20 +243,30 @@ serve(async (req) => {
       return createErrorResponse(errorMessage, response.status).response;
     }
 
-    const data = await response.json();
-    
-    // Log full response structure for debugging
-    console.log(JSON.stringify({
-      requestId,
-      action: 'api_response_structure',
-      timestamp: new Date().toISOString(),
-      hasChoices: !!data.choices,
-      choicesLength: data.choices?.length,
-      hasMessage: !!data.choices?.[0]?.message,
-      hasImages: !!data.choices?.[0]?.message?.images,
-      imageCount: data.choices?.[0]?.message?.images?.length,
-      responseKeys: Object.keys(data)
-    }));
+    // Parse and extract image from response
+    let data;
+    try {
+      data = await response.json();
+      console.log(JSON.stringify({
+        requestId,
+        action: 'api_response_received',
+        hasChoices: !!data.choices,
+        choicesLength: data.choices?.length,
+        hasMessage: !!data.choices?.[0]?.message,
+        hasImages: !!data.choices?.[0]?.message?.images,
+        imageCount: data.choices?.[0]?.message?.images?.length,
+        responseKeys: Object.keys(data),
+        timestamp: new Date().toISOString()
+      }));
+    } catch (parseError) {
+      console.error(JSON.stringify({
+        requestId,
+        action: 'api_response_parse_error',
+        error: parseError instanceof Error ? parseError.message : 'Unknown',
+        timestamp: new Date().toISOString()
+      }));
+      throw new Error('Failed to parse API response');
+    }
 
     // Try multiple extraction paths for the upscaled image
     let upscaledImageUrl = 
@@ -222,6 +274,20 @@ serve(async (req) => {
       data.choices?.[0]?.message?.content ||                       // Fallback 1: content field
       data.images?.[0]?.url ||                                     // Fallback 2: direct images array
       data.data?.[0]?.url;                                         // Fallback 3: data array
+
+    console.log(JSON.stringify({
+      requestId,
+      action: 'image_extraction',
+      found: !!upscaledImageUrl,
+      path: upscaledImageUrl 
+        ? (data.choices?.[0]?.message?.images?.[0]?.image_url?.url ? 'choices[0].message.images[0].image_url.url' :
+           data.choices?.[0]?.message?.content ? 'choices[0].message.content' :
+           data.images?.[0]?.url ? 'images[0].url' :
+           'data[0].url')
+        : 'none',
+      imageLength: upscaledImageUrl?.length || 0,
+      timestamp: new Date().toISOString()
+    }));
 
     if (!upscaledImageUrl) {
       console.error(JSON.stringify({
@@ -240,7 +306,7 @@ serve(async (req) => {
     if (!isValidImage) {
       console.warn(JSON.stringify({
         requestId,
-        action: 'invalid_image_format',
+        action: 'unexpected_image_format',
         timestamp: new Date().toISOString(),
         urlPrefix: upscaledImageUrl.substring(0, 50)
       }));
@@ -270,25 +336,79 @@ serve(async (req) => {
     try {
       // Extract base64 data and upload to storage
       if (upscaledImageUrl.startsWith('data:image/')) {
-        const base64Data = upscaledImageUrl.split(',')[1];
-        const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-        
-        const fileName = `${userId}/${Date.now()}-upscaled.png`;
-        const { error: uploadError } = await supabaseAdmin.storage
-          .from('generated-images')
-          .upload(fileName, buffer, {
-            contentType: 'image/png',
-            upsert: false
-          });
+        console.log(JSON.stringify({
+          requestId,
+          action: 'uploading_to_storage',
+          format: 'base64',
+          timestamp: new Date().toISOString()
+        }));
 
-        if (uploadError) {
-          console.error('Storage upload error:', uploadError);
+        const base64Data = upscaledImageUrl.split(',')[1];
+        if (!base64Data) {
+          console.error(JSON.stringify({
+            requestId,
+            action: 'storage_upload_error',
+            error: 'No base64 data found',
+            timestamp: new Date().toISOString()
+          }));
         } else {
-          const { data: urlData } = supabaseAdmin.storage
-            .from('generated-images')
-            .getPublicUrl(fileName);
-          finalImageUrl = urlData.publicUrl;
+          try {
+            const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+            
+            const fileName = `${userId}/${Date.now()}-upscaled.png`;
+            console.log(JSON.stringify({
+              requestId,
+              action: 'storage_upload_start',
+              fileName,
+              bufferSize: buffer.length,
+              timestamp: new Date().toISOString()
+            }));
+
+            const { error: uploadError } = await supabaseAdmin.storage
+              .from('generated-images')
+              .upload(fileName, buffer, {
+                contentType: 'image/png',
+                upsert: false
+              });
+
+            if (uploadError) {
+              console.error(JSON.stringify({
+                requestId,
+                action: 'storage_upload_error',
+                error: uploadError.message,
+                errorCode: uploadError.statusCode,
+                timestamp: new Date().toISOString()
+              }));
+            } else {
+              const { data: urlData } = supabaseAdmin.storage
+                .from('generated-images')
+                .getPublicUrl(fileName);
+              finalImageUrl = urlData.publicUrl;
+              console.log(JSON.stringify({
+                requestId,
+                action: 'storage_upload_success',
+                publicUrl: finalImageUrl,
+                timestamp: new Date().toISOString()
+              }));
+            }
+          } catch (base64Error) {
+            console.error(JSON.stringify({
+              requestId,
+              action: 'base64_decode_error',
+              error: base64Error instanceof Error ? base64Error.message : 'Unknown',
+              timestamp: new Date().toISOString()
+            }));
+          }
         }
+      } else {
+        // Already a URL, use as-is
+        finalImageUrl = upscaledImageUrl;
+        console.log(JSON.stringify({
+          requestId,
+          action: 'using_provided_url',
+          url: finalImageUrl.substring(0, 100),
+          timestamp: new Date().toISOString()
+        }));
       }
 
       // Save to generated_assets
@@ -311,13 +431,30 @@ serve(async (req) => {
         .single();
 
       if (assetError) {
-        console.error('Database save error (non-fatal):', assetError);
+        console.error(JSON.stringify({
+          requestId,
+          action: 'database_save_error',
+          error: assetError.message,
+          errorCode: assetError.code,
+          timestamp: new Date().toISOString()
+        }));
       } else {
         assetData = savedAsset;
-        console.log('Saved upscale to database:', assetData.id);
+        console.log(JSON.stringify({
+          requestId,
+          action: 'database_save_success',
+          assetId: assetData.id,
+          timestamp: new Date().toISOString()
+        }));
       }
     } catch (error) {
-      console.error('Error saving upscale (non-fatal):', error);
+      console.error(JSON.stringify({
+        requestId,
+        action: 'save_error',
+        error: error instanceof Error ? error.message : 'Unknown',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
+      }));
     }
 
     const result = { 
@@ -343,14 +480,26 @@ serve(async (req) => {
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
     console.error(JSON.stringify({
       requestId,
       action: 'upscale_error',
       timestamp: new Date().toISOString(),
       error: errorMessage,
-      duration,
-      stack: error instanceof Error ? error.stack : undefined
+      stack: errorStack,
+      duration_ms: duration,
+      userId
     }));
+    
+    // Return more specific error messages when possible
+    if (errorMessage.includes('LOVABLE_API_KEY')) {
+      return createErrorResponse('Service configuration error. Please contact support.', 500).response;
+    }
+    if (errorMessage.includes('parse') || errorMessage.includes('JSON')) {
+      return createErrorResponse('Invalid response from image service. Please try again.', 500).response;
+    }
+    
     return createErrorResponse(
       ERROR_MESSAGES.PROCESSING_FAILED,
       500

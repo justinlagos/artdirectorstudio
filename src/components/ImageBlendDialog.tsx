@@ -199,17 +199,54 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         return;
       }
 
-      // Convert files to base64
+      // Convert files to base64 with validation
+      console.log('🔄 [Blend] Converting files to base64...', {
+        imageCount: images.length,
+        fileNames: images.map(img => img.file.name),
+        fileSizes: images.map(img => `${(img.file.size / 1024 / 1024).toFixed(2)}MB`)
+      });
+
       const base64Images = await Promise.all(
-        images.map((img) => new Promise<string>((resolve, reject) => {
+        images.map((img, index) => new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
+          reader.onload = () => {
+            const result = reader.result as string;
+            
+            // Validate base64 format
+            if (!result.startsWith('data:image/')) {
+              console.error(`❌ [Blend] Invalid base64 format for image ${index + 1}`);
+              reject(new Error(`Image ${index + 1}: Invalid format`));
+              return;
+            }
+            
+            console.log(`✅ [Blend] Image ${index + 1} converted`, {
+              fileName: img.file.name,
+              base64Length: result.length,
+              estimatedSizeMB: (result.length / 1.33 / 1024 / 1024).toFixed(2)
+            });
+            resolve(result);
+          };
+          reader.onerror = (error) => {
+            console.error(`❌ [Blend] FileReader error for image ${index + 1}:`, error);
+            reject(new Error(`Failed to read image ${index + 1}`));
+          };
           reader.readAsDataURL(img.file);
         }))
       );
 
-      console.log('🚀 [Blend] Invoking blend-images edge function...');
+      // Final validation before API call
+      for (let i = 0; i < base64Images.length; i++) {
+        if (!base64Images[i] || !base64Images[i].startsWith('data:image/')) {
+          console.error(`❌ [Blend] Validation failed for image ${i + 1}`);
+          throw new Error(`Image ${i + 1} is invalid`);
+        }
+      }
+
+      console.log('🚀 [Blend] Invoking blend-images edge function...', {
+        imageCount: base64Images.length,
+        instructionLength: finalInstruction.length,
+        hasStylePresets: selectedStyles.length > 0
+      });
 
       interface BlendRequestPayload {
         images: string[];

@@ -129,16 +129,60 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
   };
 
   const processUpscale = async (item: QueueItem): Promise<string> => {
+    const itemId = item.id;
+    console.log(`[Batch Upscale] Starting for item ${itemId}`, {
+      fileName: item.file.name,
+      fileSize: item.file.size,
+      fileType: item.file.type,
+      targetSize,
+      idempotencyKey: item.idempotencyKey
+    });
+
+    // Validate file before processing
+    if (!item.file.type.startsWith('image/')) {
+      const error = `Invalid file type: ${item.file.type}. Expected image file.`;
+      console.error(`[Batch Upscale] Validation failed for item ${itemId}:`, error);
+      throw new Error(error);
+    }
+
+    const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+    if (item.file.size > MAX_FILE_SIZE) {
+      const error = `File too large: ${(item.file.size / 1024 / 1024).toFixed(2)}MB. Max 15MB.`;
+      console.error(`[Batch Upscale] Validation failed for item ${itemId}:`, error);
+      throw new Error(error);
+    }
+
     const base64Image = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
+      reader.onload = () => {
+        const result = reader.result as string;
+        console.log(`[Batch Upscale] File converted to base64 for item ${itemId}`, {
+          base64Length: result.length,
+          estimatedSizeMB: (result.length / 1.33 / 1024 / 1024).toFixed(2)
+        });
+        resolve(result);
+      };
+      reader.onerror = (error) => {
+        console.error(`[Batch Upscale] FileReader error for item ${itemId}:`, error);
+        reject(new Error('Failed to read file'));
+      };
       reader.readAsDataURL(item.file);
     });
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("Please sign in to use this feature.");
+    // Validate base64 image format
+    if (!base64Image.startsWith('data:image/')) {
+      const error = 'Invalid image format. Expected data URI.';
+      console.error(`[Batch Upscale] Validation failed for item ${itemId}:`, error);
+      throw new Error(error);
+    }
 
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error(`[Batch Upscale] No session for item ${itemId}`);
+      throw new Error("Please sign in to use this feature.");
+    }
+
+    console.log(`[Batch Upscale] Invoking edge function for item ${itemId}`);
     const { data, error } = await supabase.functions.invoke("upscale-image", {
       body: { 
         image: base64Image, 
@@ -148,8 +192,26 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
 
-    if (error) throw error;
-    if (!data?.image) throw new Error("No image returned");
+    if (error) {
+      console.error(`[Batch Upscale] Edge function error for item ${itemId}:`, {
+        error: error.message,
+        errorDetails: error
+      });
+      throw error;
+    }
+    
+    if (!data?.image) {
+      console.error(`[Batch Upscale] No image in response for item ${itemId}`, {
+        hasData: !!data,
+        dataKeys: data ? Object.keys(data) : []
+      });
+      throw new Error("No image returned");
+    }
+
+    console.log(`[Batch Upscale] Success for item ${itemId}`, {
+      imageLength: data.image.length,
+      hasThumbnail: !!data.thumbnail
+    });
 
     return data.image;
   };
@@ -204,33 +266,110 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
   };
 
   const processBlend = async (): Promise<string> => {
+    console.log('[Batch Blend] Starting blend operation', {
+      queueLength: queue.length,
+      instruction: blendInstruction || 'none',
+      fileNames: queue.map(q => q.file.name)
+    });
+
     if (queue.length !== 2) {
-      throw new Error("Blend requires exactly 2 images");
+      const error = `Blend requires exactly 2 images, got ${queue.length}`;
+      console.error('[Batch Blend] Validation failed:', error);
+      throw new Error(error);
+    }
+
+    // Validate all files before processing
+    const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i];
+      if (!item.file.type.startsWith('image/')) {
+        const error = `Image ${i + 1}: Invalid file type: ${item.file.type}`;
+        console.error('[Batch Blend] Validation failed:', error);
+        throw new Error(error);
+      }
+      if (item.file.size > MAX_FILE_SIZE) {
+        const error = `Image ${i + 1}: File too large: ${(item.file.size / 1024 / 1024).toFixed(2)}MB. Max 15MB.`;
+        console.error('[Batch Blend] Validation failed:', error);
+        throw new Error(error);
+      }
     }
 
     const images = await Promise.all(
-      queue.map(item => new Promise<string>((resolve, reject) => {
+      queue.map((item, index) => new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
+        reader.onload = () => {
+          const result = reader.result as string;
+          console.log(`[Batch Blend] Image ${index + 1} converted to base64`, {
+            fileName: item.file.name,
+            base64Length: result.length
+          });
+          
+          // Validate base64 format
+          if (!result.startsWith('data:image/')) {
+            reject(new Error(`Image ${index + 1}: Invalid base64 format`));
+            return;
+          }
+          resolve(result);
+        };
+        reader.onerror = (error) => {
+          console.error(`[Batch Blend] FileReader error for image ${index + 1}:`, error);
+          reject(new Error(`Failed to read image ${index + 1}`));
+        };
         reader.readAsDataURL(item.file);
       }))
     );
 
+    console.log('[Batch Blend] All images converted, validating format');
+    for (let i = 0; i < images.length; i++) {
+      if (!images[i].startsWith('data:image/')) {
+        const error = `Image ${i + 1}: Invalid image format`;
+        console.error('[Batch Blend] Validation failed:', error);
+        throw new Error(error);
+      }
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("Please sign in to use this feature.");
+    if (!session) {
+      console.error('[Batch Blend] No session found');
+      throw new Error("Please sign in to use this feature.");
+    }
+
+    const idempotencyKey = crypto.randomUUID();
+    console.log('[Batch Blend] Invoking blend-images edge function', {
+      imageCount: images.length,
+      instruction: blendInstruction || 'default',
+      idempotencyKey
+    });
 
     const { data, error } = await supabase.functions.invoke("blend-images", {
       body: { 
         images,
         instruction: blendInstruction || 'Blend these images seamlessly',
-        idempotencyKey: crypto.randomUUID()
+        idempotencyKey
       },
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
 
-    if (error) throw error;
-    if (!data?.image) throw new Error("No blended image returned");
+    if (error) {
+      console.error('[Batch Blend] Edge function error:', {
+        error: error.message,
+        errorDetails: error
+      });
+      throw error;
+    }
+    
+    if (!data?.image) {
+      console.error('[Batch Blend] No image in response', {
+        hasData: !!data,
+        dataKeys: data ? Object.keys(data) : []
+      });
+      throw new Error("No blended image returned");
+    }
+
+    console.log('[Batch Blend] Success', {
+      imageLength: data.image.length,
+      hasThumbnail: !!data.thumbnail
+    });
 
     return data.image;
   };
@@ -422,8 +561,17 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
         toast.success("Blend completed successfully!");
       } catch (error: any) {
-        console.error('Blend failed:', error);
         const errorMsg = mapErrorMessage(error);
+        console.error('[Batch Blend] Failed:', {
+          error: errorMsg,
+          errorDetails: error instanceof Error ? {
+            message: error.message,
+            stack: error.stack
+          } : error,
+          queueLength: queue.length,
+          fileNames: queue.map(q => q.file.name)
+        });
+        
         setQueue(prev => prev.map(q => ({ 
           ...q, 
           status: 'failed' as const, 
@@ -496,8 +644,18 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (error: any) {
-        console.error(`Failed to process item ${i}:`, error);
         const errorMsg = mapErrorMessage(error);
+        console.error(`[Batch] Failed to process item ${i}:`, {
+          itemId: item.id,
+          fileName: item.file.name,
+          operation,
+          error: errorMsg,
+          errorDetails: error instanceof Error ? {
+            message: error.message,
+            stack: error.stack
+          } : error
+        });
+        
         setQueue(prev => prev.map((q, idx) => 
           idx === i 
             ? { ...q, status: 'failed', error: errorMsg } 
