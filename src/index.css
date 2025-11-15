@@ -503,6 +503,32 @@ All colors MUST be HSL.
     }
   }
 
+  /* Mobile keyboard handling for Artie chat */
+  @media (max-width: 767px) {
+    /* Ensure input stays visible when keyboard opens */
+    .artie-chat-container {
+      height: 100vh;
+      height: 100dvh;
+      height: 100svh;
+      max-height: 100vh;
+      max-height: 100dvh;
+      max-height: 100svh;
+    }
+    
+    /* Prevent body scroll when keyboard is open */
+    body.keyboard-open {
+      position: fixed;
+      width: 100%;
+      overflow: hidden;
+    }
+  }
+
+  /* Touch manipulation for better mobile interaction */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* Hide scrollbar utility */
   .scrollbar-hide {
     -ms-overflow-style: none;

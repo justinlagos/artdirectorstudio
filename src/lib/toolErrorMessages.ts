@@ -22,7 +22,8 @@ export const TOOL_ERROR_MESSAGES = {
   
   // Processing errors
   PROCESSING_FAILED: "Processing failed. Please try again.",
-  UPLOAD_FAILED: "Upload failed. Check your connection and try again.",
+  UPLOAD_FAILED: "Failed to upload images. Check your connection and try again.",
+  STORAGE_UPLOAD_FAILED: "Failed to save image to storage. Please try again.",
   GENERATION_FAILED: "Generation failed. Adjust your inputs and try again.",
   
   // Generic fallback
@@ -55,6 +56,9 @@ export function mapErrorMessage(error: unknown): string {
     }
     if (error.includes('network') || error.includes('fetch')) {
       return TOOL_ERROR_MESSAGES.NETWORK_ERROR;
+    }
+    if (error.includes('storage') || error.includes('upload') || error.includes('Failed to save')) {
+      return TOOL_ERROR_MESSAGES.STORAGE_UPLOAD_FAILED;
     }
   }
   

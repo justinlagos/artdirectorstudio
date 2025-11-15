@@ -606,9 +606,12 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       console.error('[Batch SaveToDatabase] All upload attempts failed:', {
         error: uploadError.message,
         errorCode: uploadError.statusCode,
-        fileName
+        fileName,
+        userId: user.id,
+        operationType,
+        timestamp: new Date().toISOString()
       });
-      throw new Error(`Storage upload failed: ${uploadError.message}`);
+      throw new Error(`Failed to upload images: ${uploadError.message}`);
     }
 
     const { data: { publicUrl } } = supabase.storage
@@ -616,8 +619,13 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       .getPublicUrl(fileName);
 
     if (!publicUrl) {
-      console.error('[Batch SaveToDatabase] Failed to get public URL', { fileName });
-      throw new Error('Failed to get public URL for uploaded image');
+      console.error('[Batch SaveToDatabase] Failed to get public URL', { 
+        fileName,
+        userId: user.id,
+        operationType,
+        timestamp: new Date().toISOString()
+      });
+      throw new Error('Failed to upload images: Could not generate public URL');
     }
 
     console.log('[Batch SaveToDatabase] Got public URL', {
@@ -645,8 +653,17 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       .single();
 
     if (dbError) {
-      console.error('Failed to save to database:', dbError);
-      throw dbError;
+      console.error('[Batch SaveToDatabase] Failed to save to database:', {
+        error: dbError.message,
+        code: dbError.code,
+        details: dbError.details,
+        hint: dbError.hint,
+        fileName,
+        userId: user.id,
+        operationType,
+        timestamp: new Date().toISOString()
+      });
+      throw new Error(`Failed to upload images: Database save failed - ${dbError.message}`);
     }
     return assetData.id;
   };
@@ -802,15 +819,26 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
       } catch (error: any) {
         const errorMsg = mapErrorMessage(error);
+        const detailedError = error instanceof Error ? error.message : String(error);
+        
         console.error(`[Batch] Failed to process item ${i}:`, {
           itemId: item.id,
           fileName: item.file.name,
           operation,
           error: errorMsg,
+          detailedError,
           errorDetails: error instanceof Error ? {
             message: error.message,
-            stack: error.stack
-          } : error
+            stack: error.stack,
+            name: error.name
+          } : error,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Show specific error toast for this item
+        toast.error(`Failed to process ${item.file.name}`, {
+          description: errorMsg,
+          duration: 5000
         });
         
         setQueue(prev => prev.map((q, idx) => 
@@ -824,7 +852,23 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     if (!isPaused) {
       setIsProcessing(false);
       const completedCount = queue.filter(i => i.status === 'completed').length;
-      toast.success(`Batch processing completed! ${completedCount} of ${queue.length} items processed.`);
+      const failedCount = queue.filter(i => i.status === 'failed').length;
+      
+      console.log('[Batch] Processing completed', {
+        total: queue.length,
+        completed: completedCount,
+        failed: failedCount,
+        operation
+      });
+      
+      if (failedCount > 0) {
+        toast.error(`Batch processing completed with ${failedCount} failure(s)`, {
+          description: `${completedCount} succeeded, ${failedCount} failed`,
+          duration: 6000
+        });
+      } else {
+        toast.success(`Batch processing completed! ${completedCount} of ${queue.length} items processed.`);
+      }
     } else {
       setIsProcessing(false);
       toast.info("Batch processing paused");
@@ -1017,7 +1061,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
           {/* Stats Bar */}
           {queue.length > 0 && (
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-2 overflow-x-auto">
               <Card>
                 <CardContent className="p-3 text-center">
                   <div className="text-2xl font-bold">{stats.total}</div>
@@ -1137,9 +1181,9 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       );
 
   const footerContent = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 w-full">
       {!isProcessing && stats.completed > 0 && (
-        <Button variant="outline" onClick={clearCompleted} className="min-h-[44px]">
+        <Button variant="outline" onClick={clearCompleted} className="min-h-[44px] touch-manipulation">
           <Trash2 className="w-4 h-4 mr-2" />
           Clear Completed
         </Button>
@@ -1147,11 +1191,11 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
       {stats.completed > 0 && (
         <>
-          <Button variant="outline" onClick={handleViewAll} className="min-h-[44px]">
+          <Button variant="outline" onClick={handleViewAll} className="min-h-[44px] touch-manipulation">
             <Eye className="w-4 h-4 mr-2" />
             View All Results
           </Button>
-          <Button onClick={handleUseInStudio} className="min-h-[44px]">
+          <Button onClick={handleUseInStudio} className="min-h-[44px] touch-manipulation">
             <Wand2 className="w-4 h-4 mr-2" />
             Generate in Studio
           </Button>
@@ -1161,14 +1205,14 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       <div className="flex-1 min-w-[120px]" />
 
       {isProcessing && !isPaused && (
-        <Button variant="outline" onClick={handlePause} className="min-h-[44px]">
+        <Button variant="outline" onClick={handlePause} className="min-h-[44px] touch-manipulation">
           <Pause className="w-4 h-4 mr-2" />
           Pause
         </Button>
       )}
 
       {!isProcessing && isPaused && stats.pending > 0 && (
-        <Button onClick={handleResume} className="min-w-[140px] min-h-[44px]">
+        <Button onClick={handleResume} className="min-w-[140px] min-h-[44px] touch-manipulation">
           <Play className="w-4 h-4 mr-2" />
           Resume Processing
         </Button>
@@ -1178,7 +1222,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         <Button
           onClick={processQueue}
           disabled={stats.pending === 0}
-          className="min-w-[160px] min-h-[44px]"
+          className="min-w-[160px] min-h-[44px] touch-manipulation"
         >
           Process {stats.pending || 0} Image{stats.pending !== 1 ? 's' : ''}
         </Button>
@@ -1211,7 +1255,8 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       }
       description="Upload, queue, and monitor multiple image operations: Generate, Blend, Upscale, or Analyze."
       className="sm:max-w-5xl"
-      contentClassName="pb-6"
+      contentClassName="pb-6 overflow-y-auto max-h-[calc(96dvh-200px)]"
+      stickyFooterOnMobile={true}
       footer={footerContent}
     >
       {bodyContent}
