@@ -28,7 +28,6 @@ import {
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { FloatingCreditTracker } from "@/components/FloatingCreditTracker";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const ITEMS_PER_PAGE = 24;
@@ -428,7 +427,6 @@ const Inspire = () => {
           title="Sign in to Remix this project"
           description="Try ArtDirector Studio free. Sign in to open this project in Studio."
         />
-        <FloatingCreditTracker />
         </div>
       </TooltipProvider>
     </ErrorBoundary>

@@ -18,7 +18,6 @@ import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
 import { formatDistanceToNow } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
-import { FloatingCreditTracker } from "@/components/FloatingCreditTracker";
 import { getOptimizedImageUrl } from "@/lib/imageOptimization";
 import { ImageEditor } from "@/components/ImageEditor";
 
@@ -584,7 +583,6 @@ const History = () => {
         assetId={shareAssetId || ""}
         assetType={shareAssetType}
       />
-      <FloatingCreditTracker />
     </div>
   );
 };

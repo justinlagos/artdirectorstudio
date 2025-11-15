@@ -31,7 +31,6 @@ import { openStudioWithPrompt } from "@/lib/studio";
 import { useStudioStore } from "@/store/studioStore";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageSkeleton } from "@/components/skeletons/PageSkeleton";
-import { FloatingCreditTracker } from "@/components/FloatingCreditTracker";
 
 export interface Analysis {
   image_overview: string;
@@ -907,7 +906,6 @@ const Index = () => {
         title="Sign in to Remix this project"
         description="Try ArtDirector Studio free. Sign in to open this project in Studio."
       />
-      <FloatingCreditTracker />
       </div>
     </ErrorBoundary>
   );
