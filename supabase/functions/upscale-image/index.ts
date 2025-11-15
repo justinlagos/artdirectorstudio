@@ -17,6 +17,7 @@ serve(async (req) => {
 
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
+  let userId = 'unknown';
 
   try {
     // Check authentication
@@ -26,7 +27,6 @@ serve(async (req) => {
     }
 
     // Extract user ID from token for logging
-    let userId = 'unknown';
     try {
       const token = authHeader.replace('Bearer ', '');
       const payload = JSON.parse(atob(token.split('.')[1]));
@@ -376,7 +376,6 @@ serve(async (req) => {
                 requestId,
                 action: 'storage_upload_error',
                 error: uploadError.message,
-                errorCode: uploadError.statusCode,
                 timestamp: new Date().toISOString()
               }));
             } else {

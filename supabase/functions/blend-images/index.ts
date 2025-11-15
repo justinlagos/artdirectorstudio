@@ -25,6 +25,7 @@ serve(async (req) => {
 
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
+  let userId = 'unknown';
 
   try {
     const authHeader = req.headers.get('Authorization');
@@ -32,7 +33,6 @@ serve(async (req) => {
       return createErrorResponse(ERROR_MESSAGES.INVALID_INPUT, 401).response;
     }
 
-    let userId = 'unknown';
     try {
       const token = authHeader.replace('Bearer ', '');
       const payload = JSON.parse(atob(token.split('.')[1]));
@@ -381,7 +381,6 @@ serve(async (req) => {
                 requestId,
                 action: 'storage_upload_error',
                 error: uploadError.message,
-                errorCode: uploadError.statusCode,
                 timestamp: new Date().toISOString()
               }));
             } else {
