@@ -42,6 +42,8 @@ export const InspireApprovalPanel = () => {
   const fetchItems = async () => {
     try {
       setLoading(true);
+      console.log('[InspireApprovalPanel] Fetching items with filter:', filterStatus);
+      
       // @ts-ignore - Complex query with new fields
       let query = supabase
         .from("shared_assets")
@@ -71,7 +73,12 @@ export const InspireApprovalPanel = () => {
 
       // @ts-ignore - Complex query types
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('[InspireApprovalPanel] Query error:', error);
+        throw error;
+      }
+      
+      console.log(`[InspireApprovalPanel] Loaded ${data?.length || 0} items`);
       setItems((data as any) || []);
     } catch (error) {
       console.error("Error fetching items:", error);
@@ -185,7 +192,12 @@ export const InspireApprovalPanel = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Inspire Gallery Approval</CardTitle>
+          <div className="space-y-2">
+            <CardTitle>Inspire Gallery Management</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Note: Public shares are now auto-approved for Inspire. Use this panel to review, feature, or remove content.
+            </p>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Controls */}
@@ -201,6 +213,13 @@ export const InspireApprovalPanel = () => {
             </div>
             <div className="flex gap-2">
               <Button
+                variant={filterStatus === "all" ? "default" : "outline"}
+                onClick={() => setFilterStatus("all")}
+                size="sm"
+              >
+                All ({items.length})
+              </Button>
+              <Button
                 variant={filterStatus === "pending" ? "default" : "outline"}
                 onClick={() => setFilterStatus("pending")}
                 size="sm"
@@ -213,13 +232,6 @@ export const InspireApprovalPanel = () => {
                 size="sm"
               >
                 Approved
-              </Button>
-              <Button
-                variant={filterStatus === "all" ? "default" : "outline"}
-                onClick={() => setFilterStatus("all")}
-                size="sm"
-              >
-                All
               </Button>
             </div>
           </div>

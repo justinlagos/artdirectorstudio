@@ -276,7 +276,7 @@ const History = () => {
             My Projects
           </h1>
           <p className="text-lg text-muted-foreground">
-            View all your previous image analyses and generated content
+            All your generated images and analysis results in one place
           </p>
         </div>
 
