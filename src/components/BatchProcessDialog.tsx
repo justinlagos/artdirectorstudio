@@ -306,10 +306,16 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
     console.log(`[Batch Upscale] Success for item ${itemId}`, {
       imageLength: data.image.length,
-      hasThumbnail: !!data.thumbnail
+      hasThumbnail: !!data.thumbnail,
+      hasAssetId: !!data.assetId,
+      imageType: data.image.startsWith('http') ? 'url' : data.image.startsWith('data:') ? 'data-url' : 'unknown'
     });
 
-    return data.image;
+    // Return both image URL and assetId if available
+    return {
+      image: data.image,
+      assetId: data.assetId
+    };
   };
 
   const processAnalyze = async (item: QueueItem): Promise<any> => {
@@ -337,7 +343,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     return data;
   };
 
-  const processGenerate = async (item: QueueItem): Promise<string> => {
+  const processGenerate = async (item: QueueItem): Promise<{ image: string; assetId?: string }> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Please sign in to use this feature.");
 
@@ -358,10 +364,20 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     if (error) throw error;
     if (!data?.image) throw new Error("No image returned");
 
-    return data.image;
+    console.log('[Batch Generate] Success', {
+      imageLength: data.image.length,
+      hasAssetId: !!data.assetId,
+      imageType: data.image.startsWith('http') ? 'url' : data.image.startsWith('data:') ? 'data-url' : 'unknown'
+    });
+
+    // Return both image URL and assetId if available
+    return {
+      image: data.image,
+      assetId: data.assetId
+    };
   };
 
-  const processBlend = async (): Promise<string> => {
+  const processBlend = async (): Promise<{ image: string; assetId?: string }> => {
     console.log('[Batch Blend] Starting blend operation', {
       queueLength: queue.length,
       instruction: blendInstruction || 'none',
@@ -464,10 +480,16 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
     console.log('[Batch Blend] Success', {
       imageLength: data.image.length,
-      hasThumbnail: !!data.thumbnail
+      hasThumbnail: !!data.thumbnail,
+      hasAssetId: !!data.assetId,
+      imageType: data.image.startsWith('http') ? 'url' : data.image.startsWith('data:') ? 'data-url' : 'unknown'
     });
 
-    return data.image;
+    // Return both image URL and assetId if available
+    return {
+      image: data.image,
+      assetId: data.assetId
+    };
   };
 
   const saveToDatabase = async (
@@ -476,10 +498,67 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     size: string,
     sourceImage: string,
     duration: number,
-    analysisData?: any
+    analysisData?: any,
+    existingAssetId?: string
   ): Promise<string> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not found");
+
+    // If edge function already saved to database and returned assetId, just update it with batchItem flag
+    if (existingAssetId) {
+      console.log('[Batch SaveToDatabase] Edge function already saved asset, updating with batchItem flag', {
+        assetId: existingAssetId,
+        operationType
+      });
+
+      // First get the existing asset to preserve its params
+      const { data: existingAsset, error: fetchError } = await supabase
+        .from('generated_assets')
+        .select('params')
+        .eq('id', existingAssetId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError) {
+        console.warn('[Batch SaveToDatabase] Could not fetch existing asset, will create new entry:', {
+          error: fetchError.message,
+          assetId: existingAssetId
+        });
+        // Fall through to create new entry
+      } else {
+        // Merge existing params with batchItem flag
+        const updatedParams = {
+          ...(existingAsset.params || {}),
+          batchItem: true,
+          operation: operationType,
+          ...(size && { targetSize: size })
+        };
+
+        const { data: updatedAsset, error: updateError } = await supabase
+          .from('generated_assets')
+          .update({
+            params: updatedParams
+          })
+          .eq('id', existingAssetId)
+          .eq('user_id', user.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error('[Batch SaveToDatabase] Failed to update existing asset:', {
+            error: updateError.message,
+            assetId: existingAssetId
+          });
+          // Non-fatal - asset already exists, just log the error and fall through
+        } else {
+          console.log('[Batch SaveToDatabase] Successfully updated existing asset with batchItem flag', {
+            assetId: existingAssetId,
+            updatedParams
+          });
+          return existingAssetId;
+        }
+      }
+    }
 
     // For analyze, we don't have an image to save, just analysis data
     if (operationType === 'analyze') {
@@ -766,7 +845,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
           ));
         }, 2000);
 
-        const result = await processBlend();
+        const blendResult = await processBlend();
         const duration = Date.now() - itemStartTime;
         
         // Get original images as base64
@@ -778,12 +857,15 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
           }))
         );
         
+        const result = blendResult.image;
         const assetId = await saveToDatabase(
-          result, 
+          blendResult.image, 
           'blend', 
           'blended', 
           JSON.stringify(originalImages), 
-          duration
+          duration,
+          undefined,
+          blendResult.assetId
         );
 
         clearInterval(progressInterval);
@@ -849,7 +931,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         }, 2000);
 
         let result: string | any;
-        let assetId: string;
+        let assetId: string | undefined;
 
         const reader = new FileReader();
         const originalBase64 = await new Promise<string>((resolve) => {
@@ -858,16 +940,16 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         });
 
         if (operation === 'upscale') {
-          result = await processUpscale(item);
+          const upscaleResult = await processUpscale(item);
           console.log(`[Batch] Upscale result received for item ${i}`, {
-            resultType: typeof result,
-            resultLength: result?.length || 0,
-            resultPrefix: result?.substring(0, 50) || 'none',
-            isDataUrl: result?.startsWith('data:'),
-            isHttpUrl: result?.startsWith('http')
+            hasImage: !!upscaleResult.image,
+            hasAssetId: !!upscaleResult.assetId,
+            imageType: upscaleResult.image?.startsWith('http') ? 'url' : upscaleResult.image?.startsWith('data:') ? 'data-url' : 'unknown',
+            imageLength: upscaleResult.image?.length || 0
           });
           const duration = Date.now() - itemStartTime;
-          assetId = await saveToDatabase(result, 'upscale', targetSize, originalBase64, duration);
+          result = upscaleResult.image;
+          assetId = await saveToDatabase(upscaleResult.image, 'upscale', targetSize, originalBase64, duration, undefined, upscaleResult.assetId);
         } else if (operation === 'analyze') {
           result = await processAnalyze(item);
           console.log(`[Batch] Analyze result received for item ${i}`, {
@@ -877,16 +959,16 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
           const duration = Date.now() - itemStartTime;
           assetId = await saveToDatabase('', 'analyze', '', originalBase64, duration, result);
         } else if (operation === 'generate') {
-          result = await processGenerate(item);
+          const generateResult = await processGenerate(item);
           console.log(`[Batch] Generate result received for item ${i}`, {
-            resultType: typeof result,
-            resultLength: result?.length || 0,
-            resultPrefix: result?.substring(0, 50) || 'none',
-            isDataUrl: result?.startsWith('data:'),
-            isHttpUrl: result?.startsWith('http')
+            hasImage: !!generateResult.image,
+            hasAssetId: !!generateResult.assetId,
+            imageType: generateResult.image?.startsWith('http') ? 'url' : generateResult.image?.startsWith('data:') ? 'data-url' : 'unknown',
+            imageLength: generateResult.image?.length || 0
           });
           const duration = Date.now() - itemStartTime;
-          assetId = await saveToDatabase(result, 'generate', '1024x1024', originalBase64, duration);
+          result = generateResult.image;
+          assetId = await saveToDatabase(generateResult.image, 'generate', '1024x1024', originalBase64, duration, undefined, generateResult.assetId);
         }
 
         clearInterval(progressInterval);
