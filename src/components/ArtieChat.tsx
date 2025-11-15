@@ -1260,7 +1260,7 @@ export const ArtieChat = () => {
       />
 
       {/* Side Panel Drawer */}
-      <div className="fixed top-0 right-0 h-[100dvh] w-[90vw] sm:w-[460px] md:w-[520px] bg-background border-l border-border shadow-strong z-artie-panel flex flex-col animate-slide-in-right pointer-events-auto safe-bottom">
+      <div className="fixed top-0 right-0 h-[100dvh] w-[90vw] sm:w-[460px] md:w-[520px] bg-background border-l border-border shadow-strong z-[60] flex flex-col animate-slide-in-right pointer-events-auto safe-bottom">
         {/* Header - Fixed 56-64px */}
         <div className="h-14 md:h-16 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b border-border bg-surface-1">
           <div className="flex items-center gap-3">
@@ -1578,7 +1578,7 @@ export const ArtieChat = () => {
         </div>
 
         {/* Input Bar - Sticky bottom with elevation */}
-        <div className="flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)]">
+        <div className="flex-shrink-0 relative z-10 px-4 md:px-6 py-2 md:py-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)]">
           {/* File Upload Preview */}
           {uploadedFiles.length > 0 && (
             <div className="mb-2 md:mb-3 flex flex-wrap gap-1.5 md:gap-2">
@@ -1649,7 +1649,13 @@ export const ArtieChat = () => {
                   ? "Processing files..." 
                   : "Ask Artie or describe what you're working on..."
               }
-              className="flex-1 min-h-[40px] max-h-[120px] py-2.5 px-3 resize-none bg-background border-input focus-visible:ring-ring text-sm leading-relaxed"
+              className="flex-1 min-h-[40px] max-h-[120px] py-2.5 px-3 resize-none bg-background border-input focus-visible:ring-ring text-sm leading-relaxed text-foreground"
+              style={{
+                color: 'hsl(var(--foreground))',
+                WebkitTextFillColor: 'hsl(var(--foreground))',
+                WebkitTapHighlightColor: 'transparent',
+                caretColor: 'hsl(var(--foreground))'
+              }}
               disabled={isLoading || isUploading || !isOnline}
               rows={1}
             />

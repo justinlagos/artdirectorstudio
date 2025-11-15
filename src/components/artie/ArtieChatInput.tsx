@@ -39,7 +39,7 @@ export const ArtieChatInput = memo(({
   }, [inputValue]);
 
   return (
-    <div className="flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)]">
+    <div className="flex-shrink-0 relative z-10 px-4 md:px-6 py-2 md:py-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)]">
       {/* File Upload Preview */}
       {uploadedFiles.length > 0 && (
         <div className="mb-2 md:mb-3 flex flex-wrap gap-1.5 md:gap-2">
@@ -104,7 +104,13 @@ export const ArtieChatInput = memo(({
               ? "Processing files..." 
               : "Ask Artie or describe what you're working on..."
           }
-          className="flex-1 min-h-[40px] max-h-[120px] py-2.5 px-3 resize-none bg-background border-input focus-visible:ring-ring text-sm leading-relaxed"
+          className="flex-1 min-h-[40px] max-h-[120px] py-2.5 px-3 resize-none bg-background border-input focus-visible:ring-ring text-sm leading-relaxed text-foreground"
+          style={{
+            color: 'hsl(var(--foreground))',
+            WebkitTextFillColor: 'hsl(var(--foreground))',
+            WebkitTapHighlightColor: 'transparent',
+            caretColor: 'hsl(var(--foreground))'
+          }}
           disabled={isLoading || isUploading || !isOnline}
           rows={1}
         />

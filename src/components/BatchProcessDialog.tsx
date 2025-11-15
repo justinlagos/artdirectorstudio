@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
@@ -63,15 +64,43 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     }
   }, [open, initialOperation]);
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[Batch] File input triggered', {
+      hasFiles: !!e.target.files,
+      fileCount: e.target.files?.length || 0,
+      operation,
+      currentQueueLength: queue.length
+    });
+
     const files = Array.from(e.target.files || []);
+    
+    if (files.length === 0) {
+      console.warn('[Batch] No files selected');
+      return;
+    }
+
+    console.log('[Batch] Processing files', {
+      fileCount: files.length,
+      fileNames: files.map(f => f.name),
+      fileTypes: files.map(f => f.type),
+      fileSizes: files.map(f => `${(f.size / 1024 / 1024).toFixed(2)}MB`)
+    });
     
     // Validate file types
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     const invalidFiles = files.filter(file => !validTypes.includes(file.type));
     
     if (invalidFiles.length > 0) {
+      console.error('[Batch] Invalid file types', {
+        invalidFiles: invalidFiles.map(f => ({ name: f.name, type: f.type }))
+      });
       toast.error(`Unsupported file type. Please upload JPG, PNG, or WebP images only.`);
+      // Reset input to allow retry
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
     
@@ -80,7 +109,14 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
     
     if (oversizedFiles.length > 0) {
+      console.error('[Batch] Files too large', {
+        oversizedFiles: oversizedFiles.map(f => ({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)}MB` }))
+      });
       toast.error(`File too large. Maximum 15MB per file.`);
+      // Reset input to allow retry
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
     
@@ -89,26 +125,86 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     const requiredFiles = operation === 'blend' ? 2 : 1;
     
     if (operation === 'blend' && queue.length + files.length !== 2) {
+      console.error('[Batch] Blend requires exactly 2 images', {
+        currentQueue: queue.length,
+        newFiles: files.length,
+        total: queue.length + files.length
+      });
       toast.error('Blend requires exactly 2 images. Please upload 2 images.');
+      // Reset input to allow retry
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
     
     if (queue.length + files.length > maxFiles) {
+      console.error('[Batch] Too many files', {
+        currentQueue: queue.length,
+        newFiles: files.length,
+        maxFiles
+      });
       toast.error(`Maximum ${maxFiles} image${maxFiles > 1 ? 's' : ''} allowed for ${operation} operation.`);
+      // Reset input to allow retry
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
 
-    const newItems: QueueItem[] = files.map(file => ({
-      id: crypto.randomUUID(),
-      file,
-      preview: URL.createObjectURL(file),
-      status: 'pending',
-      progress: 0,
-      idempotencyKey: crypto.randomUUID(),
-    }));
+    console.log('[Batch] Creating queue items');
+    const newItems: QueueItem[] = files.map(file => {
+      const preview = URL.createObjectURL(file);
+      console.log('[Batch] Created preview for file', {
+        fileName: file.name,
+        previewUrl: preview.substring(0, 50)
+      });
+      return {
+        id: crypto.randomUUID(),
+        file,
+        preview,
+        status: 'pending',
+        progress: 0,
+        idempotencyKey: crypto.randomUUID(),
+      };
+    });
 
-    setQueue(prev => [...prev, ...newItems]);
+    console.log('[Batch] Adding items to queue', {
+      newItemsCount: newItems.length,
+      totalQueueLength: queue.length + newItems.length
+    });
+
+    setQueue(prev => {
+      const updated = [...prev, ...newItems];
+      console.log('[Batch] Queue updated', {
+        previousLength: prev.length,
+        newLength: updated.length
+      });
+      return updated;
+    });
+    
     toast.success(`${files.length} image${files.length > 1 ? 's' : ''} added to queue`);
+    
+    // Reset input to allow selecting same files again if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleUploadClick = () => {
+    console.log('[Batch] Upload button clicked', {
+      hasInputRef: !!fileInputRef.current,
+      operation,
+      isProcessing
+    });
+    
+    if (fileInputRef.current) {
+      // Force click on mobile - sometimes label clicks don't work
+      fileInputRef.current.click();
+    } else {
+      console.error('[Batch] File input ref is null');
+      toast.error('Upload input not available. Please refresh the page.');
+    }
   };
 
   const removeItem = (id: string) => {
@@ -413,8 +509,50 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     }
 
     // For other operations, save the image
-    const response = await fetch(imageDataUrl);
-    const blob = await response.blob();
+    console.log('[Batch SaveToDatabase] Starting image save', {
+      operationType,
+      imageDataUrlLength: imageDataUrl?.length || 0,
+      imageDataUrlPrefix: imageDataUrl?.substring(0, 50) || 'none',
+      userId: user.id
+    });
+
+    let blob: Blob;
+    try {
+      // Handle both data URLs and HTTP URLs
+      if (imageDataUrl.startsWith('data:')) {
+        // Convert data URL to blob
+        const base64Data = imageDataUrl.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        blob = new Blob([byteArray], { type: 'image/png' });
+        console.log('[Batch SaveToDatabase] Converted data URL to blob', {
+          blobSize: blob.size,
+          blobType: blob.type
+        });
+      } else {
+        // Fetch HTTP URL
+        const response = await fetch(imageDataUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+        }
+        blob = await response.blob();
+        console.log('[Batch SaveToDatabase] Fetched image from URL', {
+          blobSize: blob.size,
+          blobType: blob.type,
+          responseStatus: response.status
+        });
+      }
+    } catch (fetchError) {
+      console.error('[Batch SaveToDatabase] Failed to process image', {
+        error: fetchError instanceof Error ? fetchError.message : String(fetchError),
+        imageDataUrlPrefix: imageDataUrl?.substring(0, 50)
+      });
+      throw new Error(`Failed to process image: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
+    }
     
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -422,10 +560,16 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     // RLS policy requires first folder to be user ID
     const fileName = `${user.id}/batch/${yearMonth}/${uuid}.png`;
     
+    console.log('[Batch SaveToDatabase] Uploading to storage', {
+      fileName,
+      blobSize: blob.size,
+      blobType: blob.type
+    });
+    
     // Retry upload up to 3 times
     let uploadError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
-      const { error } = await supabase.storage
+      const { error, data } = await supabase.storage
         .from('generated-images')
         .upload(fileName, blob, {
           contentType: 'image/png',
@@ -435,38 +579,51 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
       if (!error) {
         uploadError = null;
+        console.log('[Batch SaveToDatabase] Upload successful', {
+          attempt: attempt + 1,
+          fileName,
+          uploadData: data
+        });
         break;
       }
       
       uploadError = error;
-      console.warn(`Upload attempt ${attempt + 1} failed:`, error);
+      console.warn(`[Batch SaveToDatabase] Upload attempt ${attempt + 1} failed:`, {
+        error: error.message,
+        errorCode: error.statusCode,
+        fileName
+      });
       
       if (attempt < 2) {
         // Wait before retry with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+        const delay = 1000 * Math.pow(2, attempt);
+        console.log(`[Batch SaveToDatabase] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
     if (uploadError) {
-      console.error('All upload attempts failed:', uploadError);
-      throw uploadError;
+      console.error('[Batch SaveToDatabase] All upload attempts failed:', {
+        error: uploadError.message,
+        errorCode: uploadError.statusCode,
+        fileName
+      });
+      throw new Error(`Storage upload failed: ${uploadError.message}`);
     }
 
     const { data: { publicUrl } } = supabase.storage
       .from('generated-images')
       .getPublicUrl(fileName);
 
-    // Verify file exists
-    const { error: headError } = await supabase.storage
-      .from('generated-images')
-      .list(fileName.split('/').slice(0, -1).join('/'), {
-        search: fileName.split('/').pop()
-      });
-
-    if (headError) {
-      console.error('File verification failed:', headError);
-      throw new Error('Upload succeeded but file verification failed');
+    if (!publicUrl) {
+      console.error('[Batch SaveToDatabase] Failed to get public URL', { fileName });
+      throw new Error('Failed to get public URL for uploaded image');
     }
+
+    console.log('[Batch SaveToDatabase] Got public URL', {
+      fileName,
+      publicUrl: publicUrl.substring(0, 100)
+    });
 
     const { data: assetData, error: dbError } = await supabase
       .from('generated_assets')
@@ -804,26 +961,55 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
               {/* Upload Button */}
               {!isProcessing && (
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                <div 
+                  className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors"
+                  onClick={handleUploadClick}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleUploadClick();
+                    }
+                  }}
+                  style={{ 
+                    cursor: 'pointer',
+                    WebkitTapHighlightColor: 'transparent',
+                    touchAction: 'manipulation'
+                  }}
+                >
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept="image/jpeg,image/jpg,image/png,image/webp"
                     multiple={operation !== 'blend'}
                     onChange={handleFileUpload}
-                    className="hidden"
+                    className="sr-only"
                     id="batch-upload"
+                    aria-label="Upload images"
+                    style={{
+                      position: 'absolute',
+                      width: '1px',
+                      height: '1px',
+                      padding: 0,
+                      margin: '-1px',
+                      overflow: 'hidden',
+                      clip: 'rect(0, 0, 0, 0)',
+                      whiteSpace: 'nowrap',
+                      borderWidth: 0
+                    }}
                   />
-                  <label htmlFor="batch-upload" className="cursor-pointer min-h-[44px] flex flex-col items-center justify-center">
+                  <div className="min-h-[44px] flex flex-col items-center justify-center pointer-events-none">
                     <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
                       {operation === 'blend' 
-                        ? 'Click to upload exactly 2 images' 
-                        : 'Click to add images (up to 10 total)'}
+                        ? 'Tap to upload exactly 2 images' 
+                        : 'Tap to add images (up to 10 total)'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Supports: JPG, PNG, WebP (max 15MB each)
                     </p>
-                  </label>
+                  </div>
                 </div>
               )}
             </CardContent>
