@@ -564,9 +564,20 @@ export const ImageGenerationDialog = () => {
         <TabsContent value="templates" className="mt-4">
           <PromptTemplates
             onSelect={(templatePrompt) => {
-              setPrompt(templatePrompt);
-              setBasePrompt(templatePrompt);
-              setStorePrompt(templatePrompt);
+              // Complement existing prompt instead of replacing it
+              const enhancedPrompt = prompt.trim() 
+                ? `${prompt.trim()}, ${templatePrompt}` 
+                : templatePrompt;
+              
+              if (enhancedPrompt.length > MAX_PROMPT_LENGTH) {
+                toast.error(`Combined prompt would exceed ${MAX_PROMPT_LENGTH} characters`);
+                return;
+              }
+              
+              setPrompt(enhancedPrompt);
+              setBasePrompt(enhancedPrompt);
+              setStorePrompt(enhancedPrompt);
+              toast.success("Template style added to your prompt");
             }}
           />
         </TabsContent>
