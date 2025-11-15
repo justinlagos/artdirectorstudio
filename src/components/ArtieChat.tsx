@@ -197,6 +197,11 @@ export const ArtieChat = () => {
     }
 
     try {
+      // Minimize Artie on desktop to avoid covering Studio
+      if (!isMobile) {
+        setIsOpen(false);
+        setIsMinimized(true);
+      }
       openStudioWithPrompt({
         basePrompt: "Refine this image",
         imageUrl: latestContextImage.url,
@@ -206,7 +211,7 @@ export const ArtieChat = () => {
       console.error('[ARTIE] Failed to open Studio:', error);
       toast.error("Unable to open image in Studio");
     }
-  }, [latestContextImage]);
+  }, [latestContextImage, isMobile]);
 
   const extractSupabaseImageUrls = useCallback((text: string) => {
     if (!text) return [];
@@ -513,6 +518,11 @@ export const ArtieChat = () => {
         : contextMemory.images[contextMemory.images.length - 1];
       
       if (targetImage) {
+        // Minimize Artie on desktop to avoid covering Studio
+        if (!isMobile) {
+          setIsOpen(false);
+          setIsMinimized(true);
+        }
         openStudioWithPrompt({
           basePrompt: "Refine this image",
           imageUrl: targetImage.url,
@@ -535,6 +545,11 @@ export const ArtieChat = () => {
         : contextMemory.images[contextMemory.images.length - 1];
       
       if (targetImage) {
+        // Minimize Artie on desktop to avoid covering Edit modal
+        if (!isMobile) {
+          setIsOpen(false);
+          setIsMinimized(true);
+        }
         setEditingImageUrl(targetImage.url);
         setEditorInstruction("");
         setEditorOpen(true);
@@ -1119,6 +1134,11 @@ export const ArtieChat = () => {
                 }
 
                 // Open Edit Image Modal with pre-filled instruction
+                // Minimize Artie on desktop to avoid covering Edit modal
+                if (!isMobile) {
+                  setIsOpen(false);
+                  setIsMinimized(true);
+                }
                 setEditingImageUrl(imageUrl);
                 setEditorInstruction(instruction);
                 setEditorOpen(true);
@@ -1399,6 +1419,11 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
+                                // Minimize Artie on desktop to avoid covering Studio
+                                if (!isMobile) {
+                                  setIsOpen(false);
+                                  setIsMinimized(true);
+                                }
                                 openStudioWithPrompt({
                                   basePrompt: "Refine this image",
                                   imageUrl: message.attachment?.url || "",
@@ -1414,10 +1439,14 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
+                                // Minimize Artie on desktop to avoid covering Edit modal
+                                if (!isMobile) {
+                                  setIsOpen(false);
+                                  setIsMinimized(true);
+                                }
                                 setEditingImageUrl(message.attachment?.url || "");
                                 setEditorInstruction("");
-                                setEditorInstruction("");
-        setEditorOpen(true);
+                                setEditorOpen(true);
                               }}
                               className="gap-1.5"
                             >
@@ -1476,6 +1505,11 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
+                                // Minimize Artie on desktop to avoid covering Studio
+                                if (!isMobile) {
+                                  setIsOpen(false);
+                                  setIsMinimized(true);
+                                }
                                 openStudioWithPrompt({
                                   basePrompt: "Refine this reference",
                                   imageUrl: url,
@@ -1491,10 +1525,14 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
+                                // Minimize Artie on desktop to avoid covering Edit modal
+                                if (!isMobile) {
+                                  setIsOpen(false);
+                                  setIsMinimized(true);
+                                }
                                 setEditingImageUrl(url);
                                 setEditorInstruction("");
-                                setEditorInstruction("");
-        setEditorOpen(true);
+                                setEditorOpen(true);
                               }}
                               className="gap-1.5"
                             >
