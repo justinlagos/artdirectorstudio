@@ -39,7 +39,7 @@ export const FooterActions = ({
       <Button
         onClick={onApply}
         disabled={isProcessing || !canApply}
-        className="flex-1 h-11"
+        className="flex-1 h-11 font-medium"
         size="default"
       >
         {isProcessing ? (
@@ -50,7 +50,7 @@ export const FooterActions = ({
         ) : (
           <>
             <Sparkles className="h-4 w-4 mr-2" />
-            Apply with AI
+            Apply Changes
           </>
         )}
       </Button>

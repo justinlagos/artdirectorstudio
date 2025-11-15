@@ -150,6 +150,67 @@ export const PreviewCanvas = ({
     setCurrentPos(null);
   };
 
+  // Touch event handlers for mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!onRegionSelect || !containerRef.current || !imageData) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    // Check if touch is within image bounds
+    if (x < imageData.offsetX || x > imageData.offsetX + (imageData.width * imageData.scale) ||
+        y < imageData.offsetY || y > imageData.offsetY + (imageData.height * imageData.scale)) {
+      return;
+    }
+    
+    setIsSelecting(true);
+    setStartPos({ x, y });
+    setCurrentPos({ x, y });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isSelecting || !startPos || !containerRef.current) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    setCurrentPos({ x, y });
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
+    e.preventDefault();
+    
+    const x = Math.max(imageData.offsetX, Math.min(startPos.x, currentPos.x));
+    const y = Math.max(imageData.offsetY, Math.min(startPos.y, currentPos.y));
+    const width = Math.abs(currentPos.x - startPos.x);
+    const height = Math.abs(currentPos.y - startPos.y);
+
+    // Convert to image coordinates
+    const imageX = (x - imageData.offsetX) / imageData.scale;
+    const imageY = (y - imageData.offsetY) / imageData.scale;
+    const imageWidth = width / imageData.scale;
+    const imageHeight = height / imageData.scale;
+
+    if (imageWidth > 10 && imageHeight > 10) {
+      onRegionSelect({ 
+        x: Math.max(0, imageX), 
+        y: Math.max(0, imageY), 
+        width: Math.min(imageWidth, imageData.width - Math.max(0, imageX)), 
+        height: Math.min(imageHeight, imageData.height - Math.max(0, imageY))
+      });
+    } else {
+      onRegionSelect(null);
+    }
+
+    setIsSelecting(false);
+    setStartPos(null);
+    setCurrentPos(null);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -158,7 +219,10 @@ export const PreviewCanvas = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      style={{ cursor: onRegionSelect ? (isSelecting ? "crosshair" : "crosshair") : "default" }}
+      onTouchStart={onRegionSelect ? handleTouchStart : undefined}
+      onTouchMove={onRegionSelect ? handleTouchMove : undefined}
+      onTouchEnd={onRegionSelect ? handleTouchEnd : undefined}
+      style={{ cursor: onRegionSelect ? (isSelecting ? "crosshair" : "crosshair") : "default", touchAction: onRegionSelect ? "none" : "auto" }}
     >
       <img
         ref={imageRef}

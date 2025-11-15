@@ -234,7 +234,15 @@ export const EditImageModal = ({
       
       if (result.success && result.image) {
         setPreviewUrl(result.image);
-        toast.success("Edits applied successfully!");
+        toast.success("Edits applied successfully!", {
+          description: result.assetId ? "Saved to My Projects" : "Image edited"
+        });
+        
+        // If assetId is returned, the image was saved to database
+        if (result.assetId) {
+          console.log('[EDIT-IMAGE] Image saved to My Projects:', result.assetId);
+        }
+        
         onImageEdited?.(result.image);
       } else {
         throw new Error(result.error || 'No image returned from edit');
@@ -262,7 +270,23 @@ export const EditImageModal = ({
     }
     
     if (instruction.length < 3) {
-      setInstructionError("Please describe what you want to change before applying edits.");
+      setInstructionError("Please describe what you want to change before applying edits. You can use the adjustment sliders, select a region, or type an instruction.");
+      return;
+    }
+    
+    // Include adjustments in the instruction if they were made
+    const hasAdjustments = Object.entries(adjustments).some(([key, value]) => {
+      const defaultVal = defaultAdjustments[key as keyof Adjustments];
+      return value !== defaultVal;
+    });
+    
+    // If user made adjustments but no instruction, ensure we use the generated instruction
+    if (hasAdjustments && !customInstruction.trim() && !regionInstruction.trim()) {
+      instruction = generateInstruction();
+    }
+    
+    if (instruction.length < 3) {
+      setInstructionError("Please adjust the sliders, select a region, or describe what you want to change before applying edits.");
       return;
     }
     
@@ -328,7 +352,7 @@ export const EditImageModal = ({
             Edit Image
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground text-left leading-relaxed">
-            Adjust colors, lighting, and exposure. Use advanced tools for region editing, object replacement, and retouching.
+            Adjust colors, lighting, and exposure. Use advanced tools for region editing, object replacement, and retouching. All edits are saved to My Projects automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -402,7 +426,7 @@ export const EditImageModal = ({
                 <TabsContent value="select" className="mt-6">
                   <div className="space-y-4">
                     <div className="text-sm text-muted-foreground leading-relaxed">
-                      Click and drag on the image to select a region for editing. You can also draw a freehand selection.
+                      Click and drag on the image to select a rectangular region for editing. The selected area will be highlighted in blue.
                     </div>
                     <SelectionTool
                       selectedRegion={selectedRegion}
@@ -422,14 +446,20 @@ export const EditImageModal = ({
                     onColorChange={setSelectedColor}
                     onApply={(color) => {
                       let instruction = "";
-                      if (selectedRegion) {
+                      if (selectedRegion && regionInstruction.trim()) {
+                        instruction = `${regionInstruction.trim()}. Change the color to ${color}`;
+                      } else if (selectedRegion) {
                         instruction = `Change the color of the selected region to ${color}`;
                       } else if (customInstruction.trim()) {
                         instruction = `${customInstruction.trim()}. Change the color to ${color}`;
                       } else {
-                        instruction = `Change the color of the main object to ${color}`;
+                        instruction = `Change the color of the main subject to ${color}`;
                       }
                       setCustomInstruction(instruction);
+                      // Update region instruction if region is selected
+                      if (selectedRegion) {
+                        setRegionInstruction(instruction);
+                      }
                       // Auto-submit if we have a valid instruction
                       if (instruction.trim().length >= 3) {
                         submitEdit(instruction);

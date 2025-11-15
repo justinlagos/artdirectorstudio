@@ -25,7 +25,10 @@ export const SelectionTool = ({
           <div className="space-y-1.5 flex-1">
             <Label className="text-sm font-medium">Select Area</Label>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Click and drag on the image to select a region, or draw a freehand outline. After selecting, describe what you want to change in that area.
+              Click and drag on the image to select a rectangular region. After selecting, describe what you want to change in that area.
+            </p>
+            <p className="text-xs text-muted-foreground/70 italic mt-2">
+              💡 Tip: On mobile, tap and drag to select. The selected area will be highlighted in blue.
             </p>
           </div>
         </div>
@@ -67,6 +70,11 @@ export const SelectionTool = ({
               Please provide a more detailed description (at least 3 characters).
             </AlertDescription>
           </Alert>
+        )}
+        {instruction.trim().length >= 3 && (
+          <p className="text-xs text-muted-foreground">
+            ✓ Ready to apply. Click "Apply with AI" to process this change.
+          </p>
         )}
       </div>
     </div>
