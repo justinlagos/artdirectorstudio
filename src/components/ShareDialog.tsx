@@ -56,7 +56,11 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
         // Update existing share
         const { data, error } = await supabase
           .from("shared_assets")
-          .update({ is_public: isPublic })
+          .update({ 
+            is_public: isPublic,
+            // Auto-approve for Inspire when made public
+            is_inspire_approved: isPublic ? true : existingShare.is_inspire_approved
+          })
           .eq("id", existingShare.id)
           .select()
           .single();
@@ -65,7 +69,12 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
         shareToken = data.share_token;
         shareId = data.id;
         viewCount = data.view_count;
-        toast.success("Share settings updated");
+        
+        if (isPublic) {
+          toast.success("Shared publicly and submitted to Inspire gallery");
+        } else {
+          toast.success("Share settings updated");
+        }
       } else {
         // Create new share
         shareToken = generateShareToken();
@@ -76,6 +85,8 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
             user_id: user.id,
             share_token: shareToken,
             is_public: isPublic,
+            // Auto-approve for Inspire when made public
+            is_inspire_approved: isPublic,
           })
           .select()
           .single();
@@ -83,7 +94,12 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
         if (error) throw error;
         shareId = data.id;
         viewCount = data.view_count;
-        toast.success("Share link created");
+        
+        if (isPublic) {
+          toast.success("Shared publicly and submitted to Inspire gallery");
+        } else {
+          toast.success("Share link created");
+        }
       }
 
       const url = `${window.location.origin}/shared/${shareToken}`;
@@ -211,7 +227,7 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
           <div className="flex-1 space-y-1">
             <p className="text-sm font-medium">How sharing works</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Generate a unique link to share your work. Toggle "Make Public" to also display it in the Inspire gallery where everyone can discover it.
+              Generate a unique link to share your work. Toggle "Share to Inspire" to automatically publish it in the Inspire gallery where everyone can discover and be inspired by it.
             </p>
           </div>
         </div>
@@ -220,10 +236,10 @@ export const ShareDialog = ({ open, onOpenChange, assetId, assetType }: ShareDia
       <div className="flex items-center justify-between space-x-2 p-3 rounded-lg border border-border/50 hover:border-border transition-colors min-h-[44px]">
         <div className="flex-1">
           <Label htmlFor="public-toggle" className="text-sm font-medium cursor-pointer">
-            Make Public
+            Share to Inspire Gallery
           </Label>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {isPublic ? "Visible in Inspire gallery" : "Share link only"}
+            {isPublic ? "Will appear in Inspire gallery" : "Share link only"}
           </p>
         </div>
         <Switch
