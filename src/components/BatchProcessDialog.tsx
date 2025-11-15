@@ -504,60 +504,126 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not found");
 
+    // STEP 1: Verify authentication BEFORE any operations
+    const { data: { session: authSession }, error: sessionError } = await supabase.auth.getSession();
+    console.log('[Batch SaveToDatabase] Authentication check', {
+      hasSession: !!authSession,
+      hasUser: !!user,
+      userId: user.id,
+      sessionError: sessionError?.message,
+      sessionExpiresAt: authSession?.expires_at,
+      accessTokenPresent: !!authSession?.access_token,
+      accessTokenLength: authSession?.access_token?.length || 0
+    });
+
+    if (!authSession) {
+      console.error('[Batch SaveToDatabase] No valid session found', {
+        userId: user.id,
+        sessionError: sessionError?.message
+      });
+      throw new Error('Failed to upload images: Please sign in to continue');
+    }
+
+    if (!authSession.access_token) {
+      console.error('[Batch SaveToDatabase] Session missing access token', {
+        userId: user.id,
+        sessionKeys: Object.keys(authSession)
+      });
+      throw new Error('Failed to upload images: Invalid session token');
+    }
+
     // If edge function already saved to database and returned assetId, just update it with batchItem flag
     if (existingAssetId) {
       console.log('[Batch SaveToDatabase] Edge function already saved asset, updating with batchItem flag', {
         assetId: existingAssetId,
-        operationType
+        operationType,
+        userId: user.id
       });
 
-      // First get the existing asset to preserve its params
-      const { data: existingAsset, error: fetchError } = await supabase
-        .from('generated_assets')
-        .select('params')
-        .eq('id', existingAssetId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (fetchError) {
-        console.warn('[Batch SaveToDatabase] Could not fetch existing asset, will create new entry:', {
-          error: fetchError.message,
-          assetId: existingAssetId
-        });
-        // Fall through to create new entry
-      } else {
-        // Merge existing params with batchItem flag
-        const updatedParams = {
-          ...(existingAsset.params || {}),
-          batchItem: true,
-          operation: operationType,
-          ...(size && { targetSize: size })
-        };
-
-        const { data: updatedAsset, error: updateError } = await supabase
+      try {
+        // First get the existing asset to preserve its params
+        const { data: existingAsset, error: fetchError } = await supabase
           .from('generated_assets')
-          .update({
-            params: updatedParams
-          })
+          .select('params, image_url')
           .eq('id', existingAssetId)
           .eq('user_id', user.id)
-          .select()
           .single();
 
-        if (updateError) {
-          console.error('[Batch SaveToDatabase] Failed to update existing asset:', {
-            error: updateError.message,
-            assetId: existingAssetId
-          });
-          // Non-fatal - asset already exists, just log the error and fall through
-        } else {
-          console.log('[Batch SaveToDatabase] Successfully updated existing asset with batchItem flag', {
+        if (fetchError) {
+          console.warn('[Batch SaveToDatabase] Could not fetch existing asset, will create new entry:', {
+            error: fetchError.message,
+            errorCode: fetchError.code,
+            errorDetails: fetchError.details,
+            errorHint: fetchError.hint,
             assetId: existingAssetId,
-            updatedParams
+            userId: user.id
           });
-          return existingAssetId;
+          // Fall through to create new entry
+        } else if (existingAsset) {
+          console.log('[Batch SaveToDatabase] Found existing asset, updating params', {
+            assetId: existingAssetId,
+            currentParams: existingAsset.params,
+            hasImageUrl: !!existingAsset.image_url
+          });
+
+          // Merge existing params with batchItem flag
+          const updatedParams = {
+            ...(existingAsset.params || {}),
+            batchItem: true,
+            operation: operationType,
+            ...(size && { targetSize: size })
+          };
+
+          const { data: updatedAsset, error: updateError } = await supabase
+            .from('generated_assets')
+            .update({
+              params: updatedParams
+            })
+            .eq('id', existingAssetId)
+            .eq('user_id', user.id)
+            .select()
+            .single();
+
+          if (updateError) {
+            console.error('[Batch SaveToDatabase] Failed to update existing asset:', {
+              error: updateError.message,
+              errorCode: updateError.code,
+              errorDetails: updateError.details,
+              errorHint: updateError.hint,
+              assetId: existingAssetId,
+              userId: user.id
+            });
+            // Non-fatal - asset already exists, just log the error and fall through
+          } else if (updatedAsset) {
+            console.log('[Batch SaveToDatabase] ✅ Successfully updated existing asset with batchItem flag', {
+              assetId: existingAssetId,
+              updatedParams,
+              imageUrl: updatedAsset.image_url?.substring(0, 100),
+              hasImageUrl: !!updatedAsset.image_url
+            });
+            
+            // CRITICAL: Return the assetId - the image URL is already in the edge function response
+            // The calling code will use the image URL from the edge function response as 'result'
+            return existingAssetId;
+          } else {
+            console.warn('[Batch SaveToDatabase] Update returned no data, falling through to re-upload', {
+              assetId: existingAssetId
+            });
+          }
         }
+      } catch (updateException) {
+        console.error('[Batch SaveToDatabase] Exception during asset update:', {
+          error: updateException instanceof Error ? updateException.message : String(updateException),
+          stack: updateException instanceof Error ? updateException.stack : undefined,
+          assetId: existingAssetId
+        });
+        // Fall through to re-upload
       }
+    } else {
+      console.log('[Batch SaveToDatabase] No existing assetId, will create new entry with re-upload', {
+        operationType,
+        userId: user.id
+      });
     }
 
     // For analyze, we don't have an image to save, just analysis data
@@ -595,12 +661,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       userId: user.id
     });
 
-    // Verify user session before proceeding
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      console.error('[Batch SaveToDatabase] No session found', { userId: user.id });
-      throw new Error('Failed to upload images: Please sign in to continue');
-    }
+    // Session already verified above, continue with blob conversion
 
     let blob: Blob;
     try {
@@ -619,15 +680,45 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       
       blob = await response.blob();
       
+      // CRITICAL: Validate blob exactly like Blend/Upscale do
       console.log('[Batch SaveToDatabase] Converted image to blob', {
         blobSize: blob.size,
         blobType: blob.type,
         responseStatus: response.status,
-        contentType: response.headers.get('content-type')
+        contentType: response.headers.get('content-type'),
+        blobConstructor: blob.constructor.name,
+        blobIsBlob: blob instanceof Blob,
+        blobIsFile: blob instanceof File
       });
       
-      if (!blob || blob.size === 0) {
-        throw new Error('Image blob is empty or invalid');
+      if (!blob) {
+        console.error('[Batch SaveToDatabase] Blob is null or undefined');
+        throw new Error('Image blob is null or undefined');
+      }
+
+      if (!(blob instanceof Blob)) {
+        console.error('[Batch SaveToDatabase] Blob is not a Blob instance', {
+          blobType: typeof blob,
+          blobConstructor: blob?.constructor?.name
+        });
+        throw new Error('Image blob is not a valid Blob instance');
+      }
+
+      if (blob.size === 0) {
+        console.error('[Batch SaveToDatabase] Blob size is zero', {
+          blobType: blob.type,
+          blobSize: blob.size
+        });
+        throw new Error('Image blob is empty (size is 0)');
+      }
+
+      // Validate MIME type
+      if (!blob.type || (!blob.type.startsWith('image/') && blob.type !== 'application/octet-stream')) {
+        console.warn('[Batch SaveToDatabase] Unexpected blob MIME type', {
+          blobType: blob.type,
+          blobSize: blob.size
+        });
+        // Don't throw - some browsers may not set MIME type correctly
       }
     } catch (fetchError) {
       console.error('[Batch SaveToDatabase] Failed to process image', {
@@ -639,32 +730,57 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       throw new Error(`Failed to process image: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
     }
     
+    // Generate filename EXACTLY like Blend/Upscale do
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    // RLS policy requires first folder to be user ID
-    let fileName = `${user.id}/batch/${yearMonth}/${crypto.randomUUID()}.png`;
+    const uuid = crypto.randomUUID();
+    // RLS policy requires first folder to be user ID - MUST match Blend/Upscale pattern
+    let fileName = `${user.id}/batch/${yearMonth}/${uuid}.png`;
     
-    console.log('[Batch SaveToDatabase] Uploading to storage', {
+    // Validate filename format matches working tools
+    if (!fileName.startsWith(user.id)) {
+      console.error('[Batch SaveToDatabase] Invalid filename format - does not start with userId', {
+        fileName,
+        userId: user.id
+      });
+      throw new Error('Invalid filename format for storage upload');
+    }
+
+    console.log('[Batch SaveToDatabase] Prepared for storage upload', {
       fileName,
+      fileNameLength: fileName.length,
       blobSize: blob.size,
-      blobType: blob.type
+      blobType: blob.type,
+      userId: user.id,
+      yearMonth,
+      uuid,
+      fileNameFormat: 'matches Blend/Upscale pattern'
     });
     
-    // Validate blob before upload
-    if (!blob || blob.size === 0) {
-      console.error('[Batch SaveToDatabase] Invalid blob before upload', {
+    // Final validation before upload - EXACTLY like Blend/Upscale
+    if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+      console.error('[Batch SaveToDatabase] ❌ Invalid blob before upload', {
+        blobExists: !!blob,
+        blobIsBlob: blob instanceof Blob,
         blobSize: blob?.size || 0,
         blobType: blob?.type || 'unknown',
-        fileName
+        fileName,
+        userId: user.id
       });
       throw new Error('Failed to upload images: Invalid or empty image blob');
     }
-    
-    console.log('[Batch SaveToDatabase] Validated blob, starting upload', {
+
+    // Verify bucket name matches working tools
+    const bucketName = 'generated-images';
+    console.log('[Batch SaveToDatabase] Final pre-upload validation', {
+      bucketName,
+      fileName,
       blobSize: blob.size,
       blobType: blob.type,
-      fileName,
-      userId: user.id
+      userId: user.id,
+      fileNameStartsWithUserId: fileName.startsWith(user.id),
+      fileNameEndsWithPng: fileName.endsWith('.png'),
+      blobIsValid: blob instanceof Blob && blob.size > 0
     });
     
     // Retry upload up to 3 times
@@ -677,11 +793,59 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
           userId: user.id
         });
         
-        // Ensure we have a valid session for storage upload
-        const { data: { session: uploadSession } } = await supabase.auth.getSession();
-        if (!uploadSession) {
-          throw new Error('Session expired. Please refresh and try again.');
+        // Verify session again before upload (may have expired during processing)
+        const { data: { session: uploadSession }, error: uploadSessionError } = await supabase.auth.getSession();
+        console.log(`[Batch SaveToDatabase] Pre-upload session check (attempt ${attempt + 1})`, {
+          hasSession: !!uploadSession,
+          hasAccessToken: !!uploadSession?.access_token,
+          tokenLength: uploadSession?.access_token?.length || 0,
+          sessionError: uploadSessionError?.message,
+          userId: user.id
+        });
+
+        if (!uploadSession || !uploadSession.access_token) {
+          const errorMsg = uploadSessionError?.message || 'Session expired';
+          console.error(`[Batch SaveToDatabase] Invalid session before upload (attempt ${attempt + 1}):`, {
+            error: errorMsg,
+            userId: user.id
+          });
+          throw new Error(`Session expired. Please refresh and try again. (${errorMsg})`);
         }
+
+        // Verify Supabase client is properly configured
+        const supabaseUrl = (supabase as any).supabaseUrl || (supabase as any).rest?.url;
+        console.log(`[Batch SaveToDatabase] Supabase client check (attempt ${attempt + 1})`, {
+          hasSupabaseClient: !!supabase,
+          supabaseUrl: supabaseUrl?.substring(0, 50) || 'unknown',
+          hasStorage: !!supabase.storage,
+          hasFrom: typeof supabase.storage?.from === 'function'
+        });
+
+        // Log full upload details before attempting
+        console.log(`[Batch SaveToDatabase] About to call storage.upload (attempt ${attempt + 1})`, {
+          bucket: 'generated-images',
+          fileName,
+          blobSize: blob.size,
+          blobType: blob.type,
+          contentType: 'image/png',
+          userId: user.id,
+          hasAccessToken: !!uploadSession.access_token,
+          fileNameStartsWithUserId: fileName.startsWith(user.id),
+          supabaseUrl: supabaseUrl?.substring(0, 50)
+        });
+
+        const uploadStartTime = Date.now();
+        
+        // CRITICAL: Log the exact call we're making (matches Blend/Upscale exactly)
+        console.log(`[Batch SaveToDatabase] Making storage.upload call...`, {
+          bucket: 'generated-images',
+          fileName,
+          options: {
+            contentType: 'image/png',
+            cacheControl: '3600',
+            upsert: false
+          }
+        });
 
         const { error, data } = await supabase.storage
           .from('generated-images')
@@ -690,6 +854,18 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
             cacheControl: '3600',
             upsert: false
           });
+        const uploadDuration = Date.now() - uploadStartTime;
+
+        console.log(`[Batch SaveToDatabase] Storage upload call completed (attempt ${attempt + 1})`, {
+          duration: uploadDuration,
+          hasError: !!error,
+          hasData: !!data,
+          errorMessage: error?.message,
+          errorCode: error?.statusCode,
+          errorName: error?.name,
+          dataPath: data?.path,
+          dataId: data?.id
+        });
 
         if (!error) {
           uploadError = null;
@@ -707,15 +883,42 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         }
         
         uploadError = error;
-        console.warn(`[Batch SaveToDatabase] Upload attempt ${attempt + 1} failed:`, {
-          error: error.message,
-          errorCode: error.statusCode,
-          errorName: error.name,
+        
+        // Log FULL error details including all properties
+        const errorDetails: any = {
+          message: error.message,
+          statusCode: error.statusCode,
+          name: error.name,
           fileName,
           userId: user.id,
           blobSize: blob.size,
-          fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
-        });
+          blobType: blob.type,
+          bucket: 'generated-images',
+          attempt: attempt + 1
+        };
+
+        // Try to extract all error properties
+        try {
+          errorDetails.fullErrorString = JSON.stringify(error, Object.getOwnPropertyNames(error));
+          errorDetails.errorKeys = Object.keys(error);
+          if (error instanceof Error) {
+            errorDetails.stack = error.stack;
+          }
+        } catch (stringifyError) {
+          errorDetails.stringifyError = String(stringifyError);
+        }
+
+        console.error(`[Batch SaveToDatabase] ❌ Upload attempt ${attempt + 1} FAILED:`, errorDetails);
+        
+        // If this is a Supabase error, log the full response structure
+        if (error && typeof error === 'object') {
+          console.error(`[Batch SaveToDatabase] Error object structure:`, {
+            constructor: error.constructor?.name,
+            prototype: Object.getPrototypeOf(error)?.constructor?.name,
+            ownProperties: Object.getOwnPropertyNames(error),
+            enumerableProperties: Object.keys(error)
+          });
+        }
         
         // Check for specific error types and generate new filename if needed
         if (error.message?.includes('duplicate') || error.message?.includes('already exists')) {
@@ -948,8 +1151,17 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
             imageLength: upscaleResult.image?.length || 0
           });
           const duration = Date.now() - itemStartTime;
-          result = upscaleResult.image;
+          result = upscaleResult.image; // Image URL from edge function
+          console.log(`[Batch] Calling saveToDatabase for item ${i}`, {
+            hasImage: !!result,
+            hasAssetId: !!upscaleResult.assetId,
+            willUseExistingAsset: !!upscaleResult.assetId
+          });
           assetId = await saveToDatabase(upscaleResult.image, 'upscale', targetSize, originalBase64, duration, undefined, upscaleResult.assetId);
+          console.log(`[Batch] saveToDatabase completed for item ${i}`, {
+            returnedAssetId: assetId,
+            hasResult: !!result
+          });
         } else if (operation === 'analyze') {
           result = await processAnalyze(item);
           console.log(`[Batch] Analyze result received for item ${i}`, {
@@ -967,17 +1179,50 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
             imageLength: generateResult.image?.length || 0
           });
           const duration = Date.now() - itemStartTime;
-          result = generateResult.image;
+          result = generateResult.image; // Image URL from edge function
+          console.log(`[Batch] Calling saveToDatabase for item ${i}`, {
+            hasImage: !!result,
+            hasAssetId: !!generateResult.assetId,
+            willUseExistingAsset: !!generateResult.assetId
+          });
           assetId = await saveToDatabase(generateResult.image, 'generate', '1024x1024', originalBase64, duration, undefined, generateResult.assetId);
+          console.log(`[Batch] saveToDatabase completed for item ${i}`, {
+            returnedAssetId: assetId,
+            hasResult: !!result
+          });
         }
 
         clearInterval(progressInterval);
 
-        setQueue(prev => prev.map((q, idx) => 
-          idx === i 
-            ? { ...q, status: 'completed', progress: 100, result, assetId } 
-            : q
-        ));
+        // CRITICAL: Log before marking as completed
+        console.log(`[Batch] Marking item ${i} as completed`, {
+          itemId: item.id,
+          fileName: item.file.name,
+          hasResult: !!result,
+          resultType: typeof result,
+          resultLength: result?.length || 0,
+          hasAssetId: !!assetId,
+          assetId: assetId
+        });
+
+        setQueue(prev => {
+          const updated = prev.map((q, idx) => 
+            idx === i 
+              ? { ...q, status: 'completed' as const, progress: 100, result, assetId } 
+              : q
+          );
+          
+          // Log the updated state
+          const completedItem = updated[i];
+          console.log(`[Batch] Item ${i} state after update:`, {
+            status: completedItem.status,
+            hasResult: !!completedItem.result,
+            hasAssetId: !!completedItem.assetId,
+            progress: completedItem.progress
+          });
+          
+          return updated;
+        });
 
         await new Promise(resolve => setTimeout(resolve, 500));
 
