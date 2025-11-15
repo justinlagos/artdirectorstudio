@@ -516,78 +516,39 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       userId: user.id
     });
 
+    // Verify user session before proceeding
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error('[Batch SaveToDatabase] No session found', { userId: user.id });
+      throw new Error('Failed to upload images: Please sign in to continue');
+    }
+
     let blob: Blob;
     try {
-      // Handle both data URLs and HTTP URLs
-      if (imageDataUrl.startsWith('data:')) {
-        // Convert data URL to blob
-        const commaIndex = imageDataUrl.indexOf(',');
-        if (commaIndex === -1) {
-          throw new Error('Invalid data URL format: missing comma separator');
-        }
-        
-        const base64Data = imageDataUrl.substring(commaIndex + 1);
-        if (!base64Data || base64Data.length === 0) {
-          throw new Error('Invalid data URL format: empty base64 data');
-        }
-        
-        console.log('[Batch SaveToDatabase] Converting data URL to blob', {
-          dataUrlPrefix: imageDataUrl.substring(0, 50),
-          base64Length: base64Data.length,
-          hasComma: commaIndex > -1
-        });
-        
-        try {
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          blob = new Blob([byteArray], { type: 'image/png' });
-          console.log('[Batch SaveToDatabase] Converted data URL to blob', {
-            blobSize: blob.size,
-            blobType: blob.type,
-            expectedSize: Math.ceil(base64Data.length * 0.75)
-          });
-        } catch (base64Error) {
-          console.error('[Batch SaveToDatabase] Base64 decode failed', {
-            error: base64Error instanceof Error ? base64Error.message : String(base64Error),
-            base64Length: base64Data.length,
-            base64Prefix: base64Data.substring(0, 20)
-          });
-          throw new Error(`Failed to decode base64 image data: ${base64Error instanceof Error ? base64Error.message : String(base64Error)}`);
-        }
-      } else if (imageDataUrl.startsWith('http://') || imageDataUrl.startsWith('https://')) {
-        // Fetch HTTP URL
-        console.log('[Batch SaveToDatabase] Fetching image from URL', {
-          url: imageDataUrl.substring(0, 100)
-        });
-        
-        const response = await fetch(imageDataUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'image/*'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-        }
-        
-        blob = await response.blob();
-        console.log('[Batch SaveToDatabase] Fetched image from URL', {
-          blobSize: blob.size,
-          blobType: blob.type,
-          responseStatus: response.status,
-          contentType: response.headers.get('content-type')
-        });
-        
-        if (!blob || blob.size === 0) {
-          throw new Error('Fetched blob is empty or invalid');
-        }
-      } else {
-        throw new Error(`Invalid image URL format: must be data: URL or http(s):// URL, got: ${imageDataUrl.substring(0, 50)}`);
+      // Use fetch() for both data URLs and HTTP URLs - simpler and more reliable
+      console.log('[Batch SaveToDatabase] Converting image to blob', {
+        imageDataUrlType: imageDataUrl.startsWith('data:') ? 'data-url' : imageDataUrl.startsWith('http') ? 'http-url' : 'unknown',
+        imageDataUrlPrefix: imageDataUrl.substring(0, 50),
+        imageDataUrlLength: imageDataUrl.length
+      });
+      
+      const response = await fetch(imageDataUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      }
+      
+      blob = await response.blob();
+      
+      console.log('[Batch SaveToDatabase] Converted image to blob', {
+        blobSize: blob.size,
+        blobType: blob.type,
+        responseStatus: response.status,
+        contentType: response.headers.get('content-type')
+      });
+      
+      if (!blob || blob.size === 0) {
+        throw new Error('Image blob is empty or invalid');
       }
     } catch (fetchError) {
       console.error('[Batch SaveToDatabase] Failed to process image', {
@@ -601,9 +562,8 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const uuid = crypto.randomUUID();
     // RLS policy requires first folder to be user ID
-    const fileName = `${user.id}/batch/${yearMonth}/${uuid}.png`;
+    let fileName = `${user.id}/batch/${yearMonth}/${crypto.randomUUID()}.png`;
     
     console.log('[Batch SaveToDatabase] Uploading to storage', {
       fileName,
@@ -638,6 +598,12 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
           userId: user.id
         });
         
+        // Ensure we have a valid session for storage upload
+        const { data: { session: uploadSession } } = await supabase.auth.getSession();
+        if (!uploadSession) {
+          throw new Error('Session expired. Please refresh and try again.');
+        }
+
         const { error, data } = await supabase.storage
           .from('generated-images')
           .upload(fileName, blob, {
@@ -648,12 +614,16 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
         if (!error) {
           uploadError = null;
+          // Use the path from the upload response if available, otherwise use fileName
+          const finalPath = data?.path || fileName;
           console.log('[Batch SaveToDatabase] Upload successful', {
             attempt: attempt + 1,
-            fileName,
+            fileName: finalPath,
             uploadData: data,
             path: data?.path
           });
+          // Update fileName to the final path for public URL generation
+          fileName = finalPath;
           break;
         }
         
@@ -664,8 +634,16 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
           errorName: error.name,
           fileName,
           userId: user.id,
-          blobSize: blob.size
+          blobSize: blob.size,
+          fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
         });
+        
+        // Check for specific error types and generate new filename if needed
+        if (error.message?.includes('duplicate') || error.message?.includes('already exists')) {
+          console.warn('[Batch SaveToDatabase] File already exists, trying with different name');
+          // Generate new filename for retry
+          fileName = `${user.id}/batch/${yearMonth}/${crypto.randomUUID()}.png`;
+        }
         
         if (attempt < 2) {
           // Wait before retry with exponential backoff
@@ -955,24 +933,33 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
     if (!isPaused) {
       setIsProcessing(false);
-      const completedCount = queue.filter(i => i.status === 'completed').length;
-      const failedCount = queue.filter(i => i.status === 'failed').length;
       
-      console.log('[Batch] Processing completed', {
-        total: queue.length,
-        completed: completedCount,
-        failed: failedCount,
-        operation
-      });
-      
-      if (failedCount > 0) {
-        toast.error(`Batch processing completed with ${failedCount} failure(s)`, {
-          description: `${completedCount} succeeded, ${failedCount} failed`,
-          duration: 6000
+      // Use a callback to get the current queue state
+      setQueue(prev => {
+        const completedCount = prev.filter(i => i.status === 'completed').length;
+        const failedCount = prev.filter(i => i.status === 'failed').length;
+        
+        console.log('[Batch] Processing completed', {
+          total: prev.length,
+          completed: completedCount,
+          failed: failedCount,
+          operation,
+          queueStatuses: prev.map(q => ({ id: q.id, status: q.status, fileName: q.file.name }))
         });
-      } else {
-        toast.success(`Batch processing completed! ${completedCount} of ${queue.length} items processed.`);
-      }
+        
+        if (failedCount > 0) {
+          toast.error(`Batch processing completed with ${failedCount} failure(s)`, {
+            description: `${completedCount} succeeded, ${failedCount} failed`,
+            duration: 6000
+          });
+        } else if (completedCount > 0) {
+          toast.success(`Batch processing completed! ${completedCount} of ${prev.length} items processed.`);
+        } else {
+          toast.error('Batch processing completed but no items were processed successfully.');
+        }
+        
+        return prev;
+      });
     } else {
       setIsProcessing(false);
       toast.info("Batch processing paused");
