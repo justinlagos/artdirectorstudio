@@ -83,28 +83,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               // Set user properties (async, don't block)
               supabase
                 .from("profiles")
-                .select("subscription_tier, credits")
+                .select("subscription_tier, free_credits")
                 .eq("id", session.user.id)
                 .single()
-                .then(({ data: profile }) => {
-                  if (profile) {
+                .then(({ data: profile, error: profileError }) => {
+                  if (profile && !profileError) {
                     analytics.setUserProperties({
                       subscription_tier: profile.subscription_tier || "free",
-                      credits: profile.credits || 0,
+                      credits: profile.free_credits || 0,
                     });
+                  } else if (profileError) {
+                    console.error("Error fetching user profile for analytics:", profileError);
                   }
-                })
-                .catch((error) => {
-                  console.error("Error fetching user profile for analytics:", error);
                 });
             } else if (event === "SIGNED_OUT") {
               analytics.reset();
               analytics.track("User Logged Out", {
-                success: true,
-              });
-            } else if (event === "SIGNED_UP" && session?.user) {
-              analytics.identify(session.user.id);
-              analytics.track("User Signed Up", {
                 success: true,
               });
             }
