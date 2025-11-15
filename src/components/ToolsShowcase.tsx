@@ -1,4 +1,4 @@
-import { Wand2, Blend, Maximize2, Grid3x3, MessageSquare, History } from "lucide-react";
+import { Wand2, Blend, Maximize2, MessageSquare, History } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
@@ -41,14 +41,6 @@ export const ToolsShowcase = () => {
       description: "Enhance image resolution while preserving quality",
       action: () => openTool("upscale"),
       gradient: "from-secondary/20 to-secondary/5"
-    },
-    {
-      id: "batch",
-      icon: Grid3x3,
-      title: "Batch",
-      description: "Process multiple images efficiently at once",
-      action: () => openTool("batch"),
-      gradient: "from-muted/40 to-muted/10"
     },
     {
       id: "artie",

@@ -91,7 +91,7 @@ export const OnboardingPopup = () => {
             </div>
             <h3 className="font-semibold">Enhance</h3>
             <p className="text-sm text-muted-foreground">
-              Blend, upscale, and batch-process with precision
+              Blend and upscale with precision
             </p>
           </div>
         </div>

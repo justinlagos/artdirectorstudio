@@ -159,22 +159,6 @@ export const BottomNav = () => {
 
             <button
               onClick={() => {
-                openTool('batch');
-                setToolsSheetOpen(false);
-              }}
-              className="flex flex-col items-center gap-3 p-6 rounded-xl bg-gradient-to-br from-secondary/10 to-secondary/5 border border-border/50 hover:border-secondary/30 active:scale-95 transition-all"
-            >
-              <div className="p-3 rounded-lg bg-background/80 border border-border/50">
-                <Sparkles className="w-6 h-6 text-secondary-foreground" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-sm">Batch</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Multiple images</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
                 navigate('/history');
                 setToolsSheetOpen(false);
               }}

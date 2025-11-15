@@ -7,7 +7,7 @@ import { UserMenu } from "./UserMenu";
 import { SubscriptionStatus } from "./SubscriptionStatus";
 import { TrialCreditsDisplay } from "./TrialCreditsDisplay";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { Menu, Sparkles, Home, Layers, Maximize2, ImageIcon, Wrench, ChevronDown, Palette } from "lucide-react";
+import { Menu, Sparkles, Home, Layers, Maximize2, Wrench, ChevronDown, Palette } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -59,13 +59,6 @@ export const Header = () => {
                     <div>
                       <p className="font-medium">Upscale</p>
                       <p className="text-xs text-muted-foreground">Enhance resolution</p>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openTool('batch')}>
-                    <ImageIcon className="mr-2 h-4 w-4" />
-                    <div>
-                      <p className="font-medium">Batch</p>
-                      <p className="text-xs text-muted-foreground">Process multiple images</p>
                     </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -168,17 +161,6 @@ export const Header = () => {
                             >
                               <Maximize2 className="mr-3 h-4 w-4" />
                               Upscale
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              className="justify-start min-h-[48px] w-full"
-                              onClick={() => {
-                                openTool('batch');
-                                setMobileMenuOpen(false);
-                              }}
-                            >
-                              <ImageIcon className="mr-3 h-4 w-4" />
-                              Batch
                             </Button>
                           </div>
                         </AccordionContent>

@@ -15,7 +15,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ImageBlendDialog } from "./ImageBlendDialog";
 import { ImageUpscaleDialog } from "./ImageUpscaleDialog";
-import { BatchProcessDialog } from "./BatchProcessDialog";
+// Batch feature temporarily disabled
+// import { BatchProcessDialog } from "./BatchProcessDialog";
 
 export const UnifiedToolsModal = () => {
   const { isOpen, activeTool, closeTool } = useToolsModal();
@@ -30,10 +31,11 @@ export const UnifiedToolsModal = () => {
         open={activeTool === "upscale"}
         onOpenChange={(open) => !open && closeTool()}
       />
-      <BatchProcessDialog
+      {/* Batch feature temporarily disabled */}
+      {/* <BatchProcessDialog
         open={activeTool === "batch"}
         onOpenChange={(open) => !open && closeTool()}
-      />
+      /> */}
     </>
   );
 };

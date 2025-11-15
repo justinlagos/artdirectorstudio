@@ -240,8 +240,9 @@ const History = () => {
     // IMPORTANT: Ensure all image types are shown, including 'generate' action
     const matchesType = 
       filterType === "all" || 
-      asset.type === filterType ||
-      (filterType === "batch" && isBatch);
+      asset.type === filterType;
+      // Batch feature temporarily disabled
+      // || (filterType === "batch" && isBatch);
     
     // Ensure generated images (type='image' with action='generate') are always shown
     const isGeneratedImage = asset.type === 'image' && (asset.action === 'generate' || asset.image_url);
@@ -315,7 +316,8 @@ const History = () => {
                   Prompts
                 </div>
               </SelectItem>
-              <SelectItem value="batch">Batch Results</SelectItem>
+              {/* Batch feature temporarily disabled */}
+              {/* <SelectItem value="batch">Batch Results</SelectItem> */}
             </SelectContent>
           </Select>
           <Button

@@ -119,37 +119,38 @@ export const ToolDialog = ({ trigger, title, description, toolType, onSubmit }: 
           </>
         );
 
-      case "batch":
-        return (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="batch-images">Upload Multiple Images</Label>
-              <Input id="batch-images" name="images" type="file" accept="image/*" multiple required />
-              <p className="text-xs text-muted-foreground">Select multiple images to process</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="batch-operation">Operation</Label>
-              <Select name="operation" defaultValue="analyze">
-                <SelectTrigger id="batch-operation">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="analyze">Analyze All</SelectItem>
-                  <SelectItem value="upscale">Upscale All</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="batch-prompt">Shared Prompt (Optional)</Label>
-              <Textarea 
-                id="batch-prompt" 
-                name="prompt"
-                placeholder="Apply this prompt to all images..."
-                rows={3}
-              />
-            </div>
-          </>
-        );
+      // Batch feature temporarily disabled
+      // case "batch":
+      //   return (
+      //     <>
+      //       <div className="space-y-2">
+      //         <Label htmlFor="batch-images">Upload Multiple Images</Label>
+      //         <Input id="batch-images" name="images" type="file" accept="image/*" multiple required />
+      //         <p className="text-xs text-muted-foreground">Select multiple images to process</p>
+      //       </div>
+      //       <div className="space-y-2">
+      //         <Label htmlFor="batch-operation">Operation</Label>
+      //         <Select name="operation" defaultValue="analyze">
+      //           <SelectTrigger id="batch-operation">
+      //             <SelectValue />
+      //           </SelectTrigger>
+      //           <SelectContent>
+      //             <SelectItem value="analyze">Analyze All</SelectItem>
+      //             <SelectItem value="upscale">Upscale All</SelectItem>
+      //           </SelectContent>
+      //         </Select>
+      //       </div>
+      //       <div className="space-y-2">
+      //         <Label htmlFor="batch-prompt">Shared Prompt (Optional)</Label>
+      //         <Textarea 
+      //           id="batch-prompt" 
+      //           name="prompt"
+      //           placeholder="Apply this prompt to all images..."
+      //           rows={3}
+      //         />
+      //       </div>
+      //     </>
+      //   );
 
       case "prompt":
         return (

@@ -35,7 +35,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { ImageBlendDialogEnhanced } from "@/components/ImageBlendDialogEnhanced";
 import { ImageUpscaleDialog } from "@/components/ImageUpscaleDialog";
-import { BatchProcessDialog } from "@/components/BatchProcessDialog";
+// Batch feature temporarily disabled
+// import { BatchProcessDialog } from "@/components/BatchProcessDialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -85,8 +86,9 @@ export const ResultsSection = ({
   const [isApplyingTweak, setIsApplyingTweak] = useState(false);
   const [showBlendDialog, setShowBlendDialog] = useState(false);
   const [showUpscaleDialog, setShowUpscaleDialog] = useState(false);
-  const [showBatchProcessDialog, setShowBatchProcessDialog] = useState(false);
-  const [batchProcessMode, setBatchProcessMode] = useState<"analyze" | "upscale">("analyze");
+  // Batch feature temporarily disabled
+  // const [showBatchProcessDialog, setShowBatchProcessDialog] = useState(false);
+  // const [batchProcessMode, setBatchProcessMode] = useState<"analyze" | "upscale">("analyze");
   const studioButtonRef = useRef<HTMLButtonElement | null>(null);
   const previousBodyOverflow = useRef<string | null>(null);
 
@@ -153,7 +155,8 @@ export const ResultsSection = ({
         setShowBatchGenerationDialog(false);
         setShowBlendDialog(false);
         setShowUpscaleDialog(false);
-        setShowBatchProcessDialog(false);
+        // Batch feature temporarily disabled
+        // setShowBatchProcessDialog(false);
       }
     };
 
@@ -165,15 +168,17 @@ export const ResultsSection = ({
   useEffect(() => {
     const hasOverlay = showBatchGenerationDialog ||
       showBlendDialog ||
-      showUpscaleDialog ||
-      showBatchProcessDialog;
+      showUpscaleDialog;
+      // Batch feature temporarily disabled
+      // || showBatchProcessDialog;
 
     console.log('[ResultsSection] Dialog state:', {
       hasOverlay,
       showBatchGenerationDialog,
       showBlendDialog,
-      showUpscaleDialog,
-      showBatchProcessDialog
+      showUpscaleDialog
+      // Batch feature temporarily disabled
+      // showBatchProcessDialog
     });
 
     if (hasOverlay) {
@@ -210,7 +215,8 @@ export const ResultsSection = ({
         previousBodyOverflow.current = null;
       }
     };
-  }, [showBatchGenerationDialog, showBlendDialog, showUpscaleDialog, showBatchProcessDialog]);
+  }, [showBatchGenerationDialog, showBlendDialog, showUpscaleDialog]);
+  // Batch feature temporarily disabled - removed showBatchProcessDialog from dependencies
 
   // Live preview with debounced regeneration (2s delay) + pulse animation
   useEffect(() => {
@@ -270,10 +276,11 @@ export const ResultsSection = ({
 
   const basePrompt = livePreviewPrompt || result.full_regeneration_prompt;
 
-  const openBatchProcess = (mode: "analyze" | "upscale") => {
-    setBatchProcessMode(mode);
-    setShowBatchProcessDialog(true);
-  };
+  // Batch feature temporarily disabled
+  // const openBatchProcess = (mode: "analyze" | "upscale") => {
+  //   setBatchProcessMode(mode);
+  //   setShowBatchProcessDialog(true);
+  // };
 
   const quickTools = [
     {
@@ -288,17 +295,22 @@ export const ResultsSection = ({
       caption: "Sharpen resolution",
       onClick: () => setShowUpscaleDialog(true)
     },
-    {
-      label: "Batch",
-      icon: Grid3x3,
-      caption: "Generate variations",
-      onClick: () => setShowBatchGenerationDialog(true)
-    },
+    // Batch feature temporarily disabled
+    // {
+    //   label: "Batch",
+    //   icon: Grid3x3,
+    //   caption: "Generate variations",
+    //   onClick: () => setShowBatchGenerationDialog(true)
+    // },
     {
       label: "Analyze",
       icon: Scan,
       caption: "Re-run diagnostics",
-      onClick: () => openBatchProcess("analyze")
+      onClick: () => {
+        // Batch feature temporarily disabled
+        // openBatchProcess("analyze")
+        toast.info("Batch processing is temporarily unavailable");
+      }
     }
   ];
 
@@ -661,11 +673,12 @@ export const ResultsSection = ({
         onOpenChange={setShowUpscaleDialog}
       />
 
-      <BatchProcessDialog
+      {/* Batch feature temporarily disabled */}
+      {/* <BatchProcessDialog
         open={showBatchProcessDialog}
         onOpenChange={setShowBatchProcessDialog}
         initialOperation={batchProcessMode}
-      />
+      /> */}
     </section>
   );
 };
