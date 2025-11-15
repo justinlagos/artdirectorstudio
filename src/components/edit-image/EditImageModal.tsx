@@ -203,26 +203,55 @@ export const EditImageModal = ({
         hasRegion: !!selectedRegion
       });
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-image`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        }
-      );
+      let response;
+      try {
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-image`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          }
+        );
+      } catch (fetchError) {
+        console.error('[EDIT-IMAGE] Fetch error:', fetchError);
+        const errorMessage = fetchError instanceof Error ? fetchError.message : 'Network error. Please check your connection and try again.';
+        setInstructionError(errorMessage);
+        toast.error("Connection Error", {
+          description: errorMessage
+        });
+        return;
+      }
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || 'Failed to apply edits';
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.error('[EDIT-IMAGE] Error response (non-JSON):', response.status, errorText);
+          const errorMessage = `Server error (${response.status}). Please try again.`;
+          setInstructionError(errorMessage);
+          toast.error(errorMessage);
+          return;
+        }
         
-        console.error('[EDIT-IMAGE] Error response:', errorMessage);
+        const errorMessage = errorData.error || `Server error (${response.status})`;
+        console.error('[EDIT-IMAGE] Error response:', {
+          status: response.status,
+          error: errorMessage,
+          requestId: errorData.requestId
+        });
         
         if (errorMessage.includes("instruction") || errorMessage.includes("required")) {
           setInstructionError("Please describe what you want to change before applying edits.");
+        } else if (errorMessage.includes("Unauthorized") || errorMessage.includes("session")) {
+          setInstructionError("Your session has expired. Please refresh the page and try again.");
+        } else if (errorMessage.includes("Access denied") || errorMessage.includes("upgrade")) {
+          setInstructionError(errorMessage);
         } else {
           setInstructionError(errorMessage);
         }
@@ -230,7 +259,17 @@ export const EditImageModal = ({
         return;
       }
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('[EDIT-IMAGE] Failed to parse response:', parseError);
+        setInstructionError("Failed to process server response. Please try again.");
+        toast.error("Response Error", {
+          description: "The server response could not be processed."
+        });
+        return;
+      }
       
       if (result.success && result.image) {
         setPreviewUrl(result.image);
@@ -245,7 +284,10 @@ export const EditImageModal = ({
         
         onImageEdited?.(result.image);
       } else {
-        throw new Error(result.error || 'No image returned from edit');
+        const errorMessage = result.error || 'No image returned from edit';
+        console.error('[EDIT-IMAGE] Invalid response:', result);
+        setInstructionError(errorMessage);
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('[EDIT-IMAGE] Edit error:', error);
