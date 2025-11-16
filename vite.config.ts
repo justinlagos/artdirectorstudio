@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    // Dedupe lodash to prevent multiple instances and default export issues
+    dedupe: ['lodash'],
   },
   build: {
     rollupOptions: {
@@ -94,5 +96,16 @@ export default defineConfig(({ mode }) => ({
       'mammoth',
       'html2canvas',
     ],
+    // Force ESM resolution for lodash to prevent default export issues
+    esbuildOptions: {
+      target: 'esnext',
+      // Handle lodash imports properly
+      plugins: [],
+    },
+    // Force commonjs interop for lodash
+    commonjsOptions: {
+      include: [/lodash/, /node_modules/],
+      transformMixedEsModules: true,
+    },
   },
 }));
