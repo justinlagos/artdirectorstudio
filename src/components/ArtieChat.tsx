@@ -546,16 +546,22 @@ export const ArtieChat = () => {
       
       if (targetImage) {
         // Close Artie completely on desktop to avoid covering Edit modal
+        // On mobile, ToolDrawer handles the modal properly, so we can keep Artie open
         if (!isMobile) {
           setIsOpen(false);
           setIsMinimized(false);
-        }
-        // Use setTimeout to ensure Artie closes before Dialog opens
-        setTimeout(() => {
+          // Use setTimeout to ensure Artie closes before modal opens
+          setTimeout(() => {
+            setEditingImageUrl(targetImage.url);
+            setEditorInstruction("");
+            setEditorOpen(true);
+          }, 100);
+        } else {
+          // On mobile, open immediately - ToolDrawer handles z-index properly
           setEditingImageUrl(targetImage.url);
           setEditorInstruction("");
           setEditorOpen(true);
-        }, 100);
+        }
       } else {
         toast.error("No image found", {
           description: "Couldn't find the image to edit",
@@ -1138,16 +1144,22 @@ export const ArtieChat = () => {
 
                 // Open Edit Image Modal with pre-filled instruction
                 // Close Artie completely on desktop to avoid covering Edit modal
+                // On mobile, ToolDrawer handles the modal properly, so we can keep Artie open
                 if (!isMobile) {
                   setIsOpen(false);
                   setIsMinimized(false);
-                }
-                // Use setTimeout to ensure Artie closes before Dialog opens
-                setTimeout(() => {
+                  // Use setTimeout to ensure Artie closes before modal opens
+                  setTimeout(() => {
+                    setEditingImageUrl(imageUrl);
+                    setEditorInstruction(instruction);
+                    setEditorOpen(true);
+                  }, 100);
+                } else {
+                  // On mobile, open immediately - ToolDrawer handles z-index properly
                   setEditingImageUrl(imageUrl);
                   setEditorInstruction(instruction);
                   setEditorOpen(true);
-                }, 100);
+                }
                 
                 accumulatedText += `\n\n✅ Opening Edit Image tool with instruction: "${instruction}"\n\nYou can review and adjust the settings before applying the changes.`;
                 setMessages(prev => 
@@ -1446,16 +1458,22 @@ export const ArtieChat = () => {
                               variant="secondary"
                               onClick={() => {
                                 // Close Artie completely on desktop to avoid covering Edit modal
+                                // On mobile, ToolDrawer handles the modal properly, so we can keep Artie open
                                 if (!isMobile) {
                                   setIsOpen(false);
                                   setIsMinimized(false);
-                                }
-                                // Use setTimeout to ensure Artie closes before Dialog opens
-                                setTimeout(() => {
+                                  // Use setTimeout to ensure Artie closes before modal opens
+                                  setTimeout(() => {
+                                    setEditingImageUrl(message.attachment?.url || "");
+                                    setEditorInstruction("");
+                                    setEditorOpen(true);
+                                  }, 100);
+                                } else {
+                                  // On mobile, open immediately - ToolDrawer handles z-index properly
                                   setEditingImageUrl(message.attachment?.url || "");
                                   setEditorInstruction("");
                                   setEditorOpen(true);
-                                }, 100);
+                                }
                               }}
                               className="gap-1.5"
                             >
@@ -1535,16 +1553,22 @@ export const ArtieChat = () => {
                               variant="secondary"
                               onClick={() => {
                                 // Close Artie completely on desktop to avoid covering Edit modal
+                                // On mobile, ToolDrawer handles the modal properly, so we can keep Artie open
                                 if (!isMobile) {
                                   setIsOpen(false);
                                   setIsMinimized(false);
-                                }
-                                // Use setTimeout to ensure Artie closes before Dialog opens
-                                setTimeout(() => {
+                                  // Use setTimeout to ensure Artie closes before modal opens
+                                  setTimeout(() => {
+                                    setEditingImageUrl(url);
+                                    setEditorInstruction("");
+                                    setEditorOpen(true);
+                                  }, 100);
+                                } else {
+                                  // On mobile, open immediately - ToolDrawer handles z-index properly
                                   setEditingImageUrl(url);
                                   setEditorInstruction("");
                                   setEditorOpen(true);
-                                }, 100);
+                                }
                               }}
                               className="gap-1.5"
                             >

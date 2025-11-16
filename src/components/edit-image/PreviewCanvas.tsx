@@ -222,7 +222,12 @@ export const PreviewCanvas = ({
       onTouchStart={onRegionSelect ? handleTouchStart : undefined}
       onTouchMove={onRegionSelect ? handleTouchMove : undefined}
       onTouchEnd={onRegionSelect ? handleTouchEnd : undefined}
-      style={{ cursor: onRegionSelect ? (isSelecting ? "crosshair" : "crosshair") : "default", touchAction: onRegionSelect ? "none" : "auto" }}
+      style={{ 
+        cursor: onRegionSelect ? (isSelecting ? "crosshair" : "crosshair") : "default", 
+        touchAction: onRegionSelect ? "none" : "auto",
+        WebkitTapHighlightColor: "transparent",
+        userSelect: "none"
+      }}
     >
       <img
         ref={imageRef}

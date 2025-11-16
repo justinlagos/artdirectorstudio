@@ -17,11 +17,11 @@ export const FooterActions = ({
   canApply,
 }: FooterActionsProps) => {
   return (
-    <div className="sticky bottom-0 left-0 right-0 bg-background border-t border-border px-6 py-4 mt-auto flex gap-3 shadow-[0_-1px_8px_rgba(0,0,0,0.08)]">
+    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
       <Button
         onClick={onReset}
         variant="outline"
-        className="flex-1 h-11"
+        className="flex-1 min-h-[44px] touch-manipulation"
         disabled={isProcessing}
       >
         <RotateCw className="h-4 w-4 mr-2" />
@@ -30,7 +30,7 @@ export const FooterActions = ({
       <Button
         onClick={onDownload}
         variant="outline"
-        className="flex-1 h-11"
+        className="flex-1 min-h-[44px] touch-manipulation"
         disabled={isProcessing}
       >
         <Download className="h-4 w-4 mr-2" />
@@ -39,7 +39,7 @@ export const FooterActions = ({
       <Button
         onClick={onApply}
         disabled={isProcessing || !canApply}
-        className="flex-1 h-11 font-medium"
+        className="flex-1 min-h-[44px] font-medium touch-manipulation"
         size="default"
       >
         {isProcessing ? (
