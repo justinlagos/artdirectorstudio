@@ -12,14 +12,29 @@ import { LoadingState } from "@/components/LoadingState";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
 import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 // Sentry is loaded asynchronously in main.tsx, so we don't import it here
 // This prevents blocking the app initialization
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
-// Lazy load heavy components
-const UnifiedToolsModal = lazy(() => import("./components/UnifiedToolsModal").then(m => ({ default: m.UnifiedToolsModal })));
-const ImageGenerationDialog = lazy(() => import("./components/ImageGenerationDialog").then(m => ({ default: m.ImageGenerationDialog })));
+// Lazy load heavy components with error handling
+const UnifiedToolsModal = lazy(() => 
+  import("./components/UnifiedToolsModal")
+    .then(m => ({ default: m.UnifiedToolsModal }))
+    .catch(err => {
+      console.error("Failed to load UnifiedToolsModal:", err);
+      return { default: () => null };
+    })
+);
+const ImageGenerationDialog = lazy(() => 
+  import("./components/ImageGenerationDialog")
+    .then(m => ({ default: m.ImageGenerationDialog }))
+    .catch(err => {
+      console.error("Failed to load ImageGenerationDialog:", err);
+      return { default: () => null };
+    })
+);
 
 // Lazy load non-critical routes
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -45,9 +60,23 @@ const SignedOut = lazy(() => import("./pages/SignedOut"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PresetGallery = lazy(() => import("./pages/PresetGallery"));
 
-// Lazy load heavy components
-const ArtieChat = lazy(() => import("./components/ArtieChat").then(m => ({ default: m.ArtieChat })));
-const TrialWelcomeToast = lazy(() => import("./components/TrialWelcomeToast").then(m => ({ default: m.TrialWelcomeToast })));
+// Lazy load heavy components with error handling
+const ArtieChat = lazy(() => 
+  import("./components/ArtieChat")
+    .then(m => ({ default: m.ArtieChat }))
+    .catch(err => {
+      console.error("Failed to load ArtieChat:", err);
+      return { default: () => null };
+    })
+);
+const TrialWelcomeToast = lazy(() => 
+  import("./components/TrialWelcomeToast")
+    .then(m => ({ default: m.TrialWelcomeToast }))
+    .catch(err => {
+      console.error("Failed to load TrialWelcomeToast:", err);
+      return { default: () => null };
+    })
+);
 
 // Configure QueryClient with aggressive caching for better performance
 const queryClient = new QueryClient({
@@ -138,20 +167,21 @@ const AppContent = () => {
   }, []);
 
   return (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <TooltipProvider delayDuration={300}>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <PageViewTracker />
-          <AuthProvider>
-            <GlobalKeyboardShortcuts />
-            <ToolsModalProvider>
-            <Suspense fallback={<LoadingState />}>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/" element={<Index />} />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <TooltipProvider delayDuration={300}>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <PageViewTracker />
+            <AuthProvider>
+              <GlobalKeyboardShortcuts />
+              <ToolsModalProvider>
+              <Suspense fallback={<LoadingState />}>
+                <Routes>
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/" element={<Index />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/admin" element={<Admin />} />
@@ -180,22 +210,27 @@ const AppContent = () => {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
-            <Suspense fallback={null}>
-              <ImageGenerationDialog />
-              <UnifiedToolsModal />
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense fallback={null}>
+                <ImageGenerationDialog />
+                <UnifiedToolsModal />
+              </Suspense>
+            </ErrorBoundary>
             <BottomNav />
             <OnlineStatusIndicator />
-            <Suspense fallback={null}>
-              <ArtieChat />
-              <TrialWelcomeToast />
-            </Suspense>
-            </ToolsModalProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+            <ErrorBoundary>
+              <Suspense fallback={null}>
+                <ArtieChat />
+                <TrialWelcomeToast />
+              </Suspense>
+            </ErrorBoundary>
+              </ToolsModalProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
   );
 };
 

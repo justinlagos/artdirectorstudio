@@ -12,11 +12,27 @@ setTimeout(() => {
   });
 }, 0);
 
-createRoot(document.getElementById("root")!).render(
-  <HelmetProvider>
-    <App />
-  </HelmetProvider>
-);
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
+
+try {
+  createRoot(rootElement).render(
+    <HelmetProvider>
+      <App />
+    </HelmetProvider>
+  );
+} catch (error) {
+  console.error("Failed to render app:", error);
+  rootElement.innerHTML = `
+    <div style="padding: 20px; font-family: system-ui;">
+      <h1>Application Error</h1>
+      <p>Failed to load the application. Please check the console for details.</p>
+      <pre>${error instanceof Error ? error.message : String(error)}</pre>
+    </div>
+  `;
+}
 
 // Register service worker for offline functionality
 registerServiceWorker();
