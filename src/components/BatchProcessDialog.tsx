@@ -224,7 +224,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     toast.success("Cleared completed items");
   };
 
-  const processUpscale = async (item: QueueItem): Promise<string> => {
+  const processUpscale = async (item: QueueItem): Promise<{ image: string, assetId?: string }> => {
     const itemId = item.id;
     console.log(`[Batch Upscale] Starting for item ${itemId}`, {
       fileName: item.file.name,
@@ -568,7 +568,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
           // Merge existing params with batchItem flag
           const updatedParams = {
-            ...(existingAsset.params || {}),
+            ...(existingAsset.params as Record<string, any> || {}),
             batchItem: true,
             operation: operationType,
             ...(size && { targetSize: size })
@@ -699,7 +699,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       if (!(blob instanceof Blob)) {
         console.error('[Batch SaveToDatabase] Blob is not a Blob instance', {
           blobType: typeof blob,
-          blobConstructor: blob?.constructor?.name
+          blobConstructor: (blob as any)?.constructor?.name
         });
         throw new Error('Image blob is not a valid Blob instance');
       }
@@ -861,7 +861,6 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
           hasError: !!error,
           hasData: !!data,
           errorMessage: error?.message,
-          errorCode: error?.statusCode,
           errorName: error?.name,
           dataPath: data?.path,
           dataId: data?.id
@@ -887,7 +886,6 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         // Log FULL error details including all properties
         const errorDetails: any = {
           message: error.message,
-          statusCode: error.statusCode,
           name: error.name,
           fileName,
           userId: user.id,

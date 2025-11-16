@@ -67,11 +67,20 @@ export const EditImageModal = ({
   const [selectedColor, setSelectedColor] = useState("#3B82F6");
   const [activeTab, setActiveTab] = useState<"adjustments" | "select" | "color" | "advanced">("adjustments");
   const [instructionError, setInstructionError] = useState<string | null>(null);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   useEffect(() => {
     setPreviewUrl(imageUrl);
     setCustomInstruction(initialInstruction);
+    setInstructionError(null);
+    setSelectedRegion(null);
+    setRegionInstruction("");
   }, [imageUrl, initialInstruction]);
+
+  // Update selection mode when switching to Select tab
+  useEffect(() => {
+    setIsSelectionMode(activeTab === "select");
+  }, [activeTab]);
 
   // Handle Escape key to clear selection
   useEffect(() => {

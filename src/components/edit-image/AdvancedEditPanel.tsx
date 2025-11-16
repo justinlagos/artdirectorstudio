@@ -12,11 +12,40 @@ interface AdvancedEditPanelProps {
   onSmoothBackground: () => void;
 }
 
-export const AdvancedEditPanel = ({
+interface AdvancedEditPanelProps {
+  onApplyEffect: (effect: string) => void;
+}
+
+export const AdvancedEditPanel = ({ onApplyEffect }: AdvancedEditPanelProps) => {
+  const effects = [
+    { id: 'background-cleanup', label: 'Background Cleanup', description: 'Remove distractions', icon: Sparkles },
+    { id: 'sharpen-subject', label: 'Sharpen Subject', description: 'Enhance details', icon: Wand2 },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Label className="text-sm font-medium">Advanced Effects</Label>
+      {effects.map((effect) => {
+        const Icon = effect.icon;
+        return (
+          <Button key={effect.id} variant="outline" className="w-full justify-start" onClick={() => onApplyEffect(effect.id)}>
+            <Icon className="h-4 w-4 mr-2" />
+            <div className="text-left">
+              <div className="font-medium text-sm">{effect.label}</div>
+              <div className="text-xs text-muted-foreground">{effect.description}</div>
+            </div>
+          </Button>
+        );
+      })}
+    </div>
+  );
+};
+
+const OldAdvancedEditPanel = ({
   onReplaceObject,
   onRemoveBlemish,
   onSmoothBackground,
-}: AdvancedEditPanelProps) => {
+}: { onReplaceObject: any; onRemoveBlemish: any; onSmoothBackground: any }) => {
   const [replaceInstruction, setReplaceInstruction] = useState("");
 
   return (

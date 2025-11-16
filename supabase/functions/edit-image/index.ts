@@ -350,19 +350,19 @@ serve(async (req) => {
           });
 
         if (uploadError) {
-          console.error(`[${requestId}] Storage upload error:`, uploadError.message, uploadError.statusCode);
+          console.error(`[${requestId}] Storage upload error:`, uploadError.message);
           throw new Error(`Storage upload failed: ${uploadError.message}`);
         }
 
         console.log(`[${requestId}] Storage upload successful`);
 
         // Get public URL
-        const { data: urlData, error: urlError } = supabaseAdmin.storage
+        const { data: urlData } = supabaseAdmin.storage
           .from('generated-images')
           .getPublicUrl(fileName);
         
-        if (urlError || !urlData?.publicUrl) {
-          console.error(`[${requestId}] Failed to get public URL:`, urlError);
+        if (!urlData?.publicUrl) {
+          console.error(`[${requestId}] Failed to get public URL`);
           throw new Error('Failed to get public URL for uploaded image');
         }
         

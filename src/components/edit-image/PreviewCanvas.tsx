@@ -170,7 +170,7 @@ export const PreviewCanvas = ({
     // Only prevent default for single touch (selection mode)
     // Allow multi-touch for pinch zoom
     if (e.touches.length === 1) {
-      e.preventDefault();
+    e.preventDefault();
       e.stopPropagation();
     } else {
       // Multi-touch: allow pan/zoom, don't select
@@ -198,7 +198,7 @@ export const PreviewCanvas = ({
     
     // Only prevent default for single touch (selection mode)
     if (e.touches.length === 1) {
-      e.preventDefault();
+    e.preventDefault();
       e.stopPropagation();
     } else {
       // Multi-touch: allow pan/zoom, cancel selection
@@ -219,7 +219,7 @@ export const PreviewCanvas = ({
     if (!isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
     
     if (e.touches.length === 0) {
-      e.preventDefault();
+    e.preventDefault();
       e.stopPropagation();
     }
     
