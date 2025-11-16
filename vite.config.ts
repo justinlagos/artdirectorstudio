@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import commonjs from "@originjs/vite-plugin-commonjs";
+import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -12,7 +12,11 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(), 
-    commonjs(), // Handle CommonJS modules like lodash
+    viteCommonjs({
+      // Specifically handle lodash and its dependencies
+      include: [/lodash/, /node_modules/],
+      transformMixedEsModules: true,
+    }),
     mode === "development" && componentTagger()
   ].filter(Boolean),
   resolve: {
@@ -26,6 +30,10 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
+          // Lodash - separate chunk to handle CommonJS properly
+          if (id.includes('node_modules/lodash')) {
+            return 'lodash-vendor';
+          }
           // React core
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/')) {
             return 'react-vendor';
@@ -93,9 +101,9 @@ export default defineConfig(({ mode }) => ({
       'react-router-dom',
       '@supabase/supabase-js',
       '@tanstack/react-query',
+      'lodash', // Explicitly include lodash for proper transformation
     ],
     exclude: [
-      'recharts',
       'jspdf',
       'pdfjs-dist',
       'mammoth',
@@ -106,11 +114,6 @@ export default defineConfig(({ mode }) => ({
       target: 'esnext',
       // Handle lodash imports properly
       plugins: [],
-    },
-    // Force commonjs interop for lodash
-    commonjsOptions: {
-      include: [/lodash/, /node_modules/],
-      transformMixedEsModules: true,
     },
   },
 }));
