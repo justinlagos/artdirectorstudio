@@ -381,7 +381,6 @@ serve(async (req) => {
                 requestId,
                 action: 'storage_upload_error',
                 error: uploadError.message,
-                errorCode: uploadError.statusCode,
                 fileName,
                 userId,
                 timestamp: new Date().toISOString()
@@ -391,19 +390,19 @@ serve(async (req) => {
             }
             
             // Get public URL - verify it's accessible
-            const { data: urlData, error: urlError } = supabaseAdmin.storage
+            const { data: urlData } = supabaseAdmin.storage
               .from('generated-images')
               .getPublicUrl(fileName);
             
-            if (urlError || !urlData?.publicUrl) {
+            if (!urlData?.publicUrl) {
               console.error(JSON.stringify({
                 requestId,
                 action: 'public_url_error',
-                error: urlError?.message || 'No public URL returned',
+                error: 'No public URL returned',
                 fileName,
                 timestamp: new Date().toISOString()
               }));
-              throw new Error(`Failed to get public URL: ${urlError?.message || 'Unknown error'}`);
+              throw new Error('Failed to get public URL');
             }
             
             finalImageUrl = urlData.publicUrl;
