@@ -1342,7 +1342,7 @@ export const ArtieChat = () => {
             </div>
             <div>
               <h3 className="font-semibold text-base md:text-lg">Artie</h3>
-              <p className="text-[10px] md:text-xs text-muted-foreground">
+              <p className="text-xs md:text-xs text-muted-foreground">
                 {isOnline ? "Creative Collaborator" : "Offline"}
               </p>
             </div>
@@ -1390,7 +1390,7 @@ export const ArtieChat = () => {
 
         {/* Quick Actions - Collapsible */}
         <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-surface-2">
-          <p className="text-[10px] md:text-xs font-medium text-muted-foreground mb-2 md:mb-3">Quick Actions</p>
+          <p className="text-xs md:text-xs font-medium text-muted-foreground mb-3 md:mb-3">Quick Actions</p>
           {/* Desktop: 2-row grid, Mobile: horizontal scroll */}
           <div className="hidden md:grid md:grid-cols-2 md:gap-2">
             {quickActions.map((action) => (
@@ -1609,7 +1609,7 @@ export const ArtieChat = () => {
                         : 'bg-surface-3 rounded-bl-sm'
                     )}
                   >
-                    <p className="text-[13px] md:text-sm leading-relaxed whitespace-pre-wrap" style={{ lineHeight: '1.6' }}>
+                    <p className="text-sm md:text-sm leading-relaxed whitespace-pre-wrap" style={{ lineHeight: '1.6' }}>
                       {message.text}
                     </p>
                   </div>

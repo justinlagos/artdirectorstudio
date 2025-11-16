@@ -270,7 +270,7 @@ const History = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       
-      <main className="flex-1 container mx-auto px-4 py-12 max-w-6xl">
+      <main className="flex-1 container mx-auto px-4 py-12 pb-20 md:pb-12 max-w-6xl">
         <div className="mb-12 animate-fade-in">
           <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight mb-3">
             My Projects
@@ -432,7 +432,7 @@ const History = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {filteredAssets.map((asset) => (
               <Card key={asset.id} className="glass-strong hover:shadow-strong transition-all duration-300 hover:-translate-y-1 group">
                 <CardContent className="p-6 space-y-4">

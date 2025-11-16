@@ -516,7 +516,7 @@ export const UniversalImageWorkspace = ({
         {/* Center: Image Preview - Full Width on Mobile */}
         <div className={cn(
           "flex items-center justify-center bg-muted/20 overflow-hidden",
-          isMobile ? "flex-1 w-full p-2" : "flex-1 p-4"
+          isMobile ? "flex-1 w-full p-3" : "flex-1 p-4"
         )}>
           <div className="w-full h-full flex items-center justify-center">
             <PreviewCanvas
@@ -525,8 +525,8 @@ export const UniversalImageWorkspace = ({
               selectedRegion={selectedRegion}
               onRegionSelect={activeTab === "select" ? setSelectedRegion : undefined}
               className={cn(
-                "rounded-lg shadow-2xl",
-                isMobile ? "w-full h-auto max-h-[50vh] object-contain" : "max-w-full max-h-full"
+                "rounded-lg shadow-2xl max-w-full",
+                isMobile ? "w-full h-auto max-h-[50dvh] object-contain" : "max-w-full max-h-full"
               )}
             />
           </div>
@@ -534,32 +534,32 @@ export const UniversalImageWorkspace = ({
 
         {/* Right: Tools Panel - Bottom Sheet on Mobile */}
         {isMobile ? (
-          <div className="border-t border-border/50 bg-background shrink-0 flex flex-col max-h-[calc(50vh-56px)] mb-14">
+          <div className="border-t border-border/50 bg-background shrink-0 flex flex-col max-h-[calc(50dvh-56px)] mb-16 safe-bottom">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
               <TabsList className="grid grid-cols-4 w-full rounded-none border-b border-border/50 h-12 shrink-0">
-                <TabsTrigger value="adjust" className="text-[10px] px-1">
+                <TabsTrigger value="adjust" className="text-xs md:text-[10px] px-2 touch-manipulation min-h-[44px]">
                   <span className="hidden sm:inline">Adjust</span>
                   <span className="sm:hidden">Adj</span>
                 </TabsTrigger>
-                <TabsTrigger value="select" className="text-[10px] px-1">
+                <TabsTrigger value="select" className="text-xs md:text-[10px] px-2 touch-manipulation min-h-[44px]">
                   <span className="hidden sm:inline">Select</span>
                   <span className="sm:hidden">Sel</span>
                 </TabsTrigger>
-                <TabsTrigger value="color" className="text-[10px] px-1">
+                <TabsTrigger value="color" className="text-xs md:text-[10px] px-2 touch-manipulation min-h-[44px]">
                   <span className="hidden sm:inline">Color</span>
                   <span className="sm:hidden">Col</span>
                 </TabsTrigger>
-                <TabsTrigger value="advanced" className="text-[10px] px-1">
+                <TabsTrigger value="advanced" className="text-xs md:text-[10px] px-2 touch-manipulation min-h-[44px]">
                   <span className="hidden sm:inline">Advanced</span>
                   <span className="sm:hidden">Adv</span>
                 </TabsTrigger>
               </TabsList>
 
               <div className="flex-1 overflow-y-auto overscroll-contain">
-                <div className="p-4 space-y-4 pb-safe">
+                <div className="p-4 md:p-4 space-y-4 md:space-y-4 pb-safe">
                   {/* Instruction Input - Always visible, auto-resize */}
                   <div className="space-y-2">
-                    <label className="text-xs font-medium">Editing Instruction</label>
+                    <label className="text-sm md:text-xs font-medium">Editing Instruction</label>
                     <textarea
                       placeholder="Describe what you want to change..."
                       value={customInstruction}
@@ -576,7 +576,7 @@ export const UniversalImageWorkspace = ({
                           e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }, 300);
                       }}
-                      className="w-full min-h-[60px] max-h-[200px] px-3 py-2 text-sm rounded-md border border-input bg-background resize-none"
+                      className="w-full min-h-[60px] max-h-[200px] px-3 py-2.5 text-sm md:text-sm rounded-md border border-input bg-background resize-none"
                       style={{ height: 'auto' }}
                     />
                     {instructionError && (
@@ -725,7 +725,7 @@ export const UniversalImageWorkspace = ({
       <div className={cn(
         "border-t border-border/50 flex items-center shrink-0 bg-background",
         isMobile 
-          ? "fixed bottom-0 left-0 right-0 z-10 h-14 px-2 gap-1 overflow-x-auto touch-manipulation safe-bottom" 
+          ? "fixed bottom-0 left-0 right-0 z-10 h-16 px-3 gap-2 overflow-x-auto touch-manipulation safe-bottom" 
           : "sticky bottom-0 h-16 px-4 justify-between"
       )}>
         {isMobile ? (
@@ -734,10 +734,10 @@ export const UniversalImageWorkspace = ({
               variant="outline"
               size="sm"
               onClick={handleReset}
-              className="gap-1.5 shrink-0 min-h-[44px] touch-manipulation"
+              className="gap-1.5 shrink-0 min-h-[44px] min-w-[44px] touch-manipulation"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span className="text-xs">Reset</span>
+              <RotateCcw className="h-4 w-4 md:h-3.5 md:w-3.5" />
+              <span className="text-xs md:text-xs">Reset</span>
             </Button>
             <Button
               variant="outline"

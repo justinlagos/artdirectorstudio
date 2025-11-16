@@ -70,7 +70,7 @@ export const BottomNav = () => {
     <>
       {/* Bottom Navigation Bar - Mobile Only */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[60] bg-background/95 backdrop-blur-lg border-t border-border/50 pb-safe">
-        <div className="grid grid-cols-5 h-16">
+        <div className="grid grid-cols-5 h-16 safe-bottom">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.isActive(location.pathname);
@@ -80,7 +80,7 @@ export const BottomNav = () => {
                 key={item.id}
                 onClick={item.action}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 transition-all duration-200 active:scale-95 min-h-[48px] relative",
+                  "flex flex-col items-center justify-center gap-1.5 transition-all duration-200 active:scale-95 min-h-[48px] relative touch-manipulation",
                   isActive 
                     ? "text-primary" 
                     : "text-muted-foreground hover:text-foreground"
@@ -93,7 +93,7 @@ export const BottomNav = () => {
                   )} 
                 />
                 <span className={cn(
-                  "text-[10px] font-medium transition-all",
+                  "text-xs md:text-[10px] font-medium transition-all",
                   isActive && "font-semibold"
                 )}>
                   {item.label}
