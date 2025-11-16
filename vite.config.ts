@@ -35,13 +35,33 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('node_modules/@supabase/')) {
             return 'supabase-vendor';
           }
+          // Large chart libraries (lazy loaded)
+          if (id.includes('node_modules/recharts')) {
+            return 'chart-vendor';
+          }
+          // PDF libraries (lazy loaded)
+          if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdfjs-dist')) {
+            return 'pdf-vendor';
+          }
+          // Document parsing (lazy loaded)
+          if (id.includes('node_modules/mammoth')) {
+            return 'document-vendor';
+          }
+          // Image processing (lazy loaded)
+          if (id.includes('node_modules/browser-image-compression') || id.includes('node_modules/html2canvas')) {
+            return 'image-vendor';
+          }
           // ArtieChat and subcomponents (lazy loaded)
           if (id.includes('components/artie/') || id.includes('components/ArtieChat')) {
             return 'artie-chat';
           }
-          // Large chart libraries
-          if (id.includes('node_modules/recharts') || id.includes('node_modules/jspdf')) {
-            return 'chart-vendor';
+          // Universal Image Workspace (lazy loaded)
+          if (id.includes('components/UniversalImageWorkspace') || id.includes('components/edit-image/')) {
+            return 'image-workspace';
+          }
+          // Analytics components (lazy loaded)
+          if (id.includes('components/admin/') || id.includes('components/UserAnalytics')) {
+            return 'analytics-vendor';
           }
         },
       },
@@ -49,5 +69,30 @@ export default defineConfig(({ mode }) => ({
     cssCodeSplit: true,
     minify: 'esbuild',
     chunkSizeWarningLimit: 1000,
+    // Enable source maps for better debugging in production
+    sourcemap: false,
+    // Optimize chunk size
+    target: 'esnext',
+    // Tree-shake unused exports
+    treeshake: {
+      moduleSideEffects: false,
+    },
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@supabase/supabase-js',
+      '@tanstack/react-query',
+    ],
+    exclude: [
+      'recharts',
+      'jspdf',
+      'pdfjs-dist',
+      'mammoth',
+      'html2canvas',
+    ],
   },
 }));

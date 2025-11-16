@@ -154,28 +154,74 @@ All colors MUST be HSL.
     -moz-osx-font-smoothing: grayscale;
   }
   
+  /* Consistent typography hierarchy */
   h1, h2, h3, h4, h5, h6 {
     @apply font-display font-semibold tracking-tight;
     letter-spacing: -0.02em;
+    @apply text-foreground;
   }
 
   h1 {
     @apply text-4xl md:text-5xl lg:text-6xl;
     line-height: 1.1;
+    @apply font-bold;
+    margin-bottom: 0.5em;
   }
 
   h2 {
     @apply text-3xl md:text-4xl;
     line-height: 1.2;
+    @apply font-semibold;
+    margin-bottom: 0.75em;
   }
 
   h3 {
     @apply text-2xl md:text-3xl;
     line-height: 1.3;
+    @apply font-semibold;
+    margin-bottom: 0.5em;
+  }
+
+  h4 {
+    @apply text-xl md:text-2xl;
+    line-height: 1.4;
+    @apply font-medium;
+    margin-bottom: 0.5em;
+  }
+
+  h5 {
+    @apply text-lg md:text-xl;
+    line-height: 1.4;
+    @apply font-medium;
+    margin-bottom: 0.375em;
+  }
+
+  h6 {
+    @apply text-base md:text-lg;
+    line-height: 1.5;
+    @apply font-medium;
+    margin-bottom: 0.25em;
   }
 
   p {
-    @apply leading-relaxed;
+    @apply leading-relaxed text-foreground;
+    margin-bottom: 1em;
+  }
+
+  /* Consistent spacing for common elements */
+  section {
+    @apply space-y-6 md:space-y-8;
+  }
+
+  /* Remove default margins from nested elements */
+  p:last-child,
+  h1:last-child,
+  h2:last-child,
+  h3:last-child,
+  h4:last-child,
+  h5:last-child,
+  h6:last-child {
+    margin-bottom: 0;
   }
 
   /* Smooth scrolling with reduced motion support - disabled on mobile for better performance */

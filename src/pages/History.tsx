@@ -276,7 +276,7 @@ const History = () => {
             My Projects
           </h1>
           <p className="text-lg text-muted-foreground">
-            All your generated images and analysis results in one place
+            All your creations automatically saved and organized
           </p>
         </div>
 
@@ -495,9 +495,16 @@ const History = () => {
                     </div>
                   </div>
 
-                  {/* Image with lazy loading */}
+                  {/* Image with lazy loading - Clickable to open workspace */}
                   {asset.image_url && (
-                    <div className="rounded-xl overflow-hidden border border-border/50 bg-muted flex items-center justify-center min-h-[200px]">
+                    <div 
+                      className="rounded-xl overflow-hidden border border-border/50 bg-muted flex items-center justify-center min-h-[200px] cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => {
+                        if (asset.image_url) {
+                          setEditingImageUrl(asset.image_url);
+                        }
+                      }}
+                    >
                       <img 
                         src={getOptimizedImageUrl(asset.image_url, { width: 800, quality: 85, format: 'webp' })}
                         alt="Generated content" 

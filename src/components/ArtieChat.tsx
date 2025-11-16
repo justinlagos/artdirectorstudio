@@ -545,23 +545,13 @@ export const ArtieChat = () => {
         : contextMemory.images[contextMemory.images.length - 1];
       
       if (targetImage) {
-        // Close Artie completely on desktop to avoid covering Edit modal
-        // On mobile, ToolDrawer handles the modal properly, so we can keep Artie open
-        if (!isMobile) {
-          setIsOpen(false);
-          setIsMinimized(false);
-          // Use setTimeout to ensure Artie closes before modal opens
-          setTimeout(() => {
-            setEditingImageUrl(targetImage.url);
-            setEditorInstruction("");
-            setEditorOpen(true);
-          }, 100);
-        } else {
-          // On mobile, open immediately - ToolDrawer handles z-index properly
-          setEditingImageUrl(targetImage.url);
-          setEditorInstruction("");
-          setEditorOpen(true);
-        }
+        // Close Artie to avoid covering workspace
+        setIsOpen(false);
+        setIsMinimized(false);
+        // Open workspace immediately - no delays
+        setEditingImageUrl(targetImage.url);
+        setEditorInstruction("");
+        setEditorOpen(true);
       } else {
         toast.error("No image found", {
           description: "Couldn't find the image to edit",

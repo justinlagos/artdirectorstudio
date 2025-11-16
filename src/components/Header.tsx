@@ -7,7 +7,7 @@ import { UserMenu } from "./UserMenu";
 import { SubscriptionStatus } from "./SubscriptionStatus";
 import { TrialCreditsDisplay } from "./TrialCreditsDisplay";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { Menu, Sparkles, Home, Layers, Maximize2, Wrench, ChevronDown, Palette } from "lucide-react";
+import { Menu, Sparkles, Home, Layers, Maximize2, Wrench, ChevronDown, Palette, FolderOpen } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -39,30 +39,19 @@ export const Header = () => {
             </Button>
             
             {user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1">
-                    Tools
-                    <ChevronDown className="h-3 w-3 opacity-50" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem onClick={() => openTool('blend')}>
-                    <Layers className="mr-2 h-4 w-4" />
-                    <div>
-                      <p className="font-medium">Blend</p>
-                      <p className="text-xs text-muted-foreground">Combine multiple visuals</p>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openTool('upscale')}>
-                    <Maximize2 className="mr-2 h-4 w-4" />
-                    <div>
-                      <p className="font-medium">Upscale</p>
-                      <p className="text-xs text-muted-foreground">Enhance resolution</p>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <Button variant="ghost" size="sm" onClick={() => openTool('blend')}>
+                  <Layers className="mr-2 h-4 w-4" />
+                  Blend
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => openTool('upscale')}>
+                  <Maximize2 className="mr-2 h-4 w-4" />
+                  Upscale
+                </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/history">My Projects</Link>
+                </Button>
+              </>
             )}
 
             <Button variant="ghost" size="sm" asChild>
@@ -130,42 +119,41 @@ export const Header = () => {
                   </Button>
                   
                   {user && (
-                    <Accordion type="single" collapsible className="w-full">
-                      <AccordionItem value="tools" className="border-none">
-                        <AccordionTrigger className="py-3 px-3 hover:no-underline hover:bg-muted/50 rounded-md text-base">
-                          <div className="flex items-center gap-3">
-                            <Wrench className="h-4 w-4" />
-                            <span className="font-normal text-sm">Tools</span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pb-1">
-                          <div className="flex flex-col space-y-0.5 pl-2">
-                            <Button 
-                              variant="ghost" 
-                              className="justify-start min-h-[48px] w-full"
-                              onClick={() => {
-                                openTool('blend');
-                                setMobileMenuOpen(false);
-                              }}
-                            >
-                              <Layers className="mr-3 h-4 w-4" />
-                              Blend
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              className="justify-start min-h-[48px] w-full"
-                              onClick={() => {
-                                openTool('upscale');
-                                setMobileMenuOpen(false);
-                              }}
-                            >
-                              <Maximize2 className="mr-3 h-4 w-4" />
-                              Upscale
-                            </Button>
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
+                    <>
+                      <Button 
+                        variant="ghost" 
+                        className="justify-start min-h-[48px] w-full"
+                        onClick={() => {
+                          openTool('blend');
+                          setMobileMenuOpen(false);
+                        }}
+                      >
+                        <Layers className="mr-3 h-4 w-4" />
+                        Blend
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        className="justify-start min-h-[48px] w-full"
+                        onClick={() => {
+                          openTool('upscale');
+                          setMobileMenuOpen(false);
+                        }}
+                      >
+                        <Maximize2 className="mr-3 h-4 w-4" />
+                        Upscale
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        asChild 
+                        className="justify-start min-h-[48px]"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link to="/history">
+                          <FolderOpen className="mr-3 h-4 w-4" />
+                          My Projects
+                        </Link>
+                      </Button>
+                    </>
                   )}
 
                   <Button 

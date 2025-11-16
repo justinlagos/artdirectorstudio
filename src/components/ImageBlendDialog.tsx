@@ -475,6 +475,21 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       if (assetData) {
         setBlendedAssetId(assetData.id);
         console.log('✅ [Blend] Saved to DB with share slug:', assetData.share_slug);
+        
+        // Track user behavior for intelligence
+        try {
+          const { learnFromUserAction } = await import('@/lib/intelligence/userBehavior');
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await learnFromUserAction(user.id, 'blend', publicUrl, {
+              imageCount: sourceImages.length,
+              styles: styles,
+            });
+          }
+        } catch (error) {
+          // Silently fail - intelligence is optional
+          console.error('[Blend] Error tracking behavior:', error);
+        }
       }
     } catch (error: unknown) {
       console.error('Error saving to My Projects:', error);

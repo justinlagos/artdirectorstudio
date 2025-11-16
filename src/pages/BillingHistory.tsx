@@ -11,7 +11,7 @@ import { Download, Mail, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
+import { createPDF } from "@/lib/pdfUtils";
 
 interface BillingEvent {
   id: string;
@@ -102,24 +102,29 @@ export default function BillingHistory() {
     );
   };
 
-  const downloadInvoice = (event: BillingEvent) => {
-    const doc = new jsPDF();
+  const downloadInvoice = async (event: BillingEvent) => {
+    try {
+      const doc = await createPDF();
 
-    doc.setFontSize(20);
-    doc.text("Invoice", 20, 20);
+      doc.setFontSize(20);
+      doc.text("Invoice", 20, 20);
 
-    doc.setFontSize(12);
-    doc.text(`Date: ${formatDate(event.created_at)}`, 20, 40);
-    doc.text(`Type: ${event.event_type}`, 20, 50);
-    doc.text(`Amount: ${formatAmount(event.amount_cents, event.currency)}`, 20, 60);
-    doc.text(`Status: ${event.status}`, 20, 70);
+      doc.setFontSize(12);
+      doc.text(`Date: ${formatDate(event.created_at)}`, 20, 40);
+      doc.text(`Type: ${event.event_type}`, 20, 50);
+      doc.text(`Amount: ${formatAmount(event.amount_cents, event.currency)}`, 20, 60);
+      doc.text(`Status: ${event.status}`, 20, 70);
 
-    if (event.stripe_invoice_id) {
-      doc.text(`Invoice ID: ${event.stripe_invoice_id}`, 20, 80);
+      if (event.stripe_invoice_id) {
+        doc.text(`Invoice ID: ${event.stripe_invoice_id}`, 20, 80);
+      }
+
+      doc.save(`invoice-${event.id}.pdf`);
+      toast.success("Invoice downloaded");
+    } catch (error) {
+      console.error("Error generating invoice:", error);
+      toast.error("Failed to generate invoice");
     }
-
-    doc.save(`invoice-${event.id}.pdf`);
-    toast.success("Invoice downloaded");
   };
 
   const emailInvoice = async (event: BillingEvent) => {

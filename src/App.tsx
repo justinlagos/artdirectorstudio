@@ -8,8 +8,6 @@ import { ThemeProvider } from "next-themes";
 import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToolsModalProvider } from "@/contexts/ToolsModalContext";
-import { UnifiedToolsModal } from "@/components/UnifiedToolsModal";
-import { ImageGenerationDialog } from "@/components/ImageGenerationDialog";
 import { LoadingState } from "@/components/LoadingState";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
@@ -18,6 +16,10 @@ import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
 // This prevents blocking the app initialization
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+
+// Lazy load heavy components
+const UnifiedToolsModal = lazy(() => import("./components/UnifiedToolsModal").then(m => ({ default: m.UnifiedToolsModal })));
+const ImageGenerationDialog = lazy(() => import("./components/ImageGenerationDialog").then(m => ({ default: m.ImageGenerationDialog })));
 
 // Lazy load non-critical routes
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -47,15 +49,21 @@ const PresetGallery = lazy(() => import("./pages/PresetGallery"));
 const ArtieChat = lazy(() => import("./components/ArtieChat").then(m => ({ default: m.ArtieChat })));
 const TrialWelcomeToast = lazy(() => import("./components/TrialWelcomeToast").then(m => ({ default: m.TrialWelcomeToast })));
 
-// Configure QueryClient with increased cache TTL and better defaults
+// Configure QueryClient with aggressive caching for better performance
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 minutes
-      gcTime: 30 * 60 * 1000, // 30 minutes - cache persists for 30 minutes (formerly cacheTime)
+      staleTime: 10 * 60 * 1000, // 10 minutes - data is fresh for 10 minutes
+      gcTime: 60 * 60 * 1000, // 60 minutes - cache persists for 1 hour (formerly cacheTime)
       refetchOnWindowFocus: false, // Don't refetch on window focus
       refetchOnReconnect: true, // Refetch on reconnect
+      refetchOnMount: false, // Don't refetch on mount if data is fresh
       retry: 1, // Retry failed requests once
+      // Use structural sharing to prevent unnecessary re-renders
+      structuralSharing: true,
+    },
+    mutations: {
+      retry: 1, // Retry failed mutations once
     },
   },
 });
@@ -172,8 +180,10 @@ const AppContent = () => {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
-            <ImageGenerationDialog />
-            <UnifiedToolsModal />
+            <Suspense fallback={null}>
+              <ImageGenerationDialog />
+              <UnifiedToolsModal />
+            </Suspense>
             <BottomNav />
             <OnlineStatusIndicator />
             <Suspense fallback={null}>

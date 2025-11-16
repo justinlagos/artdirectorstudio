@@ -346,6 +346,20 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       if (assetData) {
         setUpscaledAssetId(assetData.id);
         console.log('✅ [Upscale] Saved to DB with share slug:', assetData.share_slug);
+        
+        // Track user behavior for intelligence
+        try {
+          const { learnFromUserAction } = await import('@/lib/intelligence/userBehavior');
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await learnFromUserAction(user.id, 'upscale', publicUrl, {
+              targetSize: size,
+            });
+          }
+        } catch (error) {
+          // Silently fail - intelligence is optional
+          console.error('[Upscale] Error tracking behavior:', error);
+        }
       }
     } catch (error: unknown) {
       console.error('Error saving to My Projects:', error);

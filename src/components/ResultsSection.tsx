@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 import { GeneratedImagesGallery } from "@/components/GeneratedImagesGallery";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
-import jsPDF from "jspdf";
+import { createPDF } from "@/lib/pdfUtils";
 import { openStudioWithPrompt } from "@/lib/studio";
 
 interface ResultsSectionProps {
@@ -146,9 +146,10 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     toast.success("TXT file downloaded!");
   };
 
-  const handleDownloadPdf = () => {
-    const timestamp = new Date().toISOString().split('T')[0];
-    const doc = new jsPDF();
+  const handleDownloadPdf = async () => {
+    try {
+      const timestamp = new Date().toISOString().split('T')[0];
+      const doc = await createPDF();
     const margin = 15;
     const pageWidth = doc.internal.pageSize.getWidth();
     const maxWidth = pageWidth - 2 * margin;
@@ -208,6 +209,10 @@ Ready to use with: Midjourney, DALL·E, Firefly, Leonardo, Stable Diffusion`;
     
     doc.save(`prompt-reconstruction-${timestamp}.pdf`);
     toast.success("PDF downloaded!");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF");
+    }
   };
 
   const handleDownloadJson = () => {

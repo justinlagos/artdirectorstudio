@@ -596,76 +596,93 @@ const Index = () => {
       
       {/* Hero Section */}
       <section className="pt-20 pb-16 px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10 mb-4">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">AI-Powered Creative Director</span>
-          </div>
-          
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-            <span className="text-primary">Art Director Studio</span>
+        <div className="max-w-7xl mx-auto text-center space-y-8">
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight">
+            Create ideas at the speed of thought.
           </h1>
           
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Upload any image and get instant expert feedback on composition, lighting, 
-            color theory, and more. Perfect for designers, photographers, and creatives.
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto font-medium">
+            Your new creative superpower for images, concepts, variations, and production-ready visuals.
           </p>
 
           {!user && (
-            <div className="flex items-center justify-center gap-4 mt-8">
-              <Button size="lg" onClick={() => navigate("/auth")}>
-                Get Started Free
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => navigate("/auth")}>
-                Sign In
+            <div className="flex items-center justify-center gap-4 mt-10">
+              <Button size="lg" className="text-lg px-8 py-6 h-auto" onClick={() => navigate("/auth")}>
+                Start Creating
+                <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </div>
           )}
         </div>
       </section>
 
-      {/* What You Can Do Section - Only for non-authenticated users */}
+      {/* Sub Hero */}
       {!user && (
-        <section className="py-16 px-6 lg:px-8 bg-secondary/30">
+        <section className="pb-16 px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+              From zero to finished visuals in minutes.
+            </p>
+            <p className="text-base md:text-lg text-muted-foreground mt-4 leading-relaxed">
+              No friction. No overwhelm.
+            </p>
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
+              Only pure creative acceleration.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* How It Works Section - Only for non-authenticated users */}
+      {!user && (
+        <section className="py-20 px-6 lg:px-8 bg-secondary/30">
           <div className="max-w-7xl mx-auto">
-            <div className="text-center space-y-4 mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold">Get Started in 3 Simple Steps</h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                No experience required. Upload, analyze, and create stunning visuals in seconds.
-              </p>
+            <div className="text-center space-y-4 mb-16">
+              <h2 className="text-3xl md:text-5xl font-bold">How It Works</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <Card className="text-center hover-lift">
-                <CardContent className="pt-6">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    <Upload className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">1. Upload Your Image</h3>
-                  <p className="text-muted-foreground">
-                    Drop any image to get started. We support all common formats including JPG, PNG, and WebP.
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-6">
+              <Card className="text-center hover-lift border-0 shadow-lg">
+                <CardContent className="pt-8 pb-8">
+                  <div className="text-4xl font-bold text-primary mb-4">1</div>
+                  <h3 className="text-xl font-semibold mb-3">Type what you want</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Studio turns your idea into a visual instantly.
                   </p>
                 </CardContent>
               </Card>
-              <Card className="text-center hover-lift">
-                <CardContent className="pt-6">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    <Sparkles className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">2. Get AI Analysis</h3>
-                  <p className="text-muted-foreground">
-                    Our AI analyzes composition, lighting, colors, and provides professional insights instantly.
+              <Card className="text-center hover-lift border-0 shadow-lg">
+                <CardContent className="pt-8 pb-8">
+                  <div className="text-4xl font-bold text-primary mb-4">2</div>
+                  <h3 className="text-xl font-semibold mb-3">Refine with Artie</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    A smart art director that improves your concepts with precise, creative judgment.
                   </p>
                 </CardContent>
               </Card>
-              <Card className="text-center hover-lift">
-                <CardContent className="pt-6">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    <Wand2 className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">3. Generate Variations</h3>
-                  <p className="text-muted-foreground">
-                    Create stunning variations, apply tweaks, and refine until you achieve perfection.
+              <Card className="text-center hover-lift border-0 shadow-lg">
+                <CardContent className="pt-8 pb-8">
+                  <div className="text-4xl font-bold text-primary mb-4">3</div>
+                  <h3 className="text-xl font-semibold mb-3">Edit without learning curves</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Adjust color, lighting, objects, and compositions right in the browser.
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="text-center hover-lift border-0 shadow-lg">
+                <CardContent className="pt-8 pb-8">
+                  <div className="text-4xl font-bold text-primary mb-4">4</div>
+                  <h3 className="text-xl font-semibold mb-3">Upscale and Blend</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Finish your image with pro-quality tools, fast and clean.
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="text-center hover-lift border-0 shadow-lg">
+                <CardContent className="pt-8 pb-8">
+                  <div className="text-4xl font-bold text-primary mb-4">5</div>
+                  <h3 className="text-xl font-semibold mb-3">Everything saves itself</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Your ideas stay organized automatically in My Projects.
                   </p>
                 </CardContent>
               </Card>
@@ -815,53 +832,59 @@ const Index = () => {
         </section>
       )}
 
-      {/* Trust Section - Only show when no results */}
-      {!result && (
+      {/* Psychology-backed Trust Section - Only for non-authenticated users */}
+      {!user && (
         <section className="py-24 px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             <div className="text-center space-y-6 mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold">
-                Trusted by Creative Professionals
+              <h2 className="text-3xl md:text-5xl font-bold">
+                Why creators switch to us
               </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Join thousands of designers and photographers who use ArtDirector Studio
-                to elevate their creative work.
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 max-w-4xl mx-auto">
+              <div className="text-center p-6">
+                <p className="text-lg font-medium mb-2">No learning curve</p>
+              </div>
+              <div className="text-center p-6">
+                <p className="text-lg font-medium mb-2">No complicated tools</p>
+              </div>
+              <div className="text-center p-6">
+                <p className="text-lg font-medium mb-2">No messy workflow</p>
+              </div>
+            </div>
+
+            <div className="text-center mb-16">
+              <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
+                Just ideas turning into visuals, faster than ever
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-              <div className="glass rounded-2xl p-8">
-                <div className="text-4xl font-bold mb-2">10K+</div>
-                <div className="text-muted-foreground">Active Users</div>
-              </div>
-              <div className="glass rounded-2xl p-8">
-                <div className="text-4xl font-bold mb-2">100K+</div>
-                <div className="text-muted-foreground">Images Analyzed</div>
-              </div>
-              <div className="glass rounded-2xl p-8">
-                <div className="text-4xl font-bold mb-2">4.9★</div>
-                <div className="text-muted-foreground">User Rating</div>
+            <div className="text-center space-y-8 mb-16">
+              <h3 className="text-2xl md:text-3xl font-semibold">Made for</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-4xl mx-auto">
+                {['Designers', 'Marketers', 'Founders', 'Content creators', 'Art directors', 'Creative strategists'].map((role) => (
+                  <div key={role} className="p-4 rounded-lg border border-border/50 bg-background/50">
+                    <p className="text-sm font-medium">{role}</p>
+                  </div>
+                ))}
               </div>
             </div>
+          </div>
+        </section>
+      )}
 
-            <div className="text-center mt-12">
-              {user ? (
-                <Button size="lg" className="gap-2" onClick={() => {
-                  const studioSection = document.getElementById("studio-section");
-                  if (studioSection) {
-                    studioSection.scrollIntoView({ behavior: "smooth" });
-                  }
-                }}>
-                  <Sparkles className="w-5 h-5" />
-                  Start Analyzing Now
-                </Button>
-              ) : (
-                <Button size="lg" className="gap-2" onClick={() => navigate("/auth")}>
-                  <Sparkles className="w-5 h-5" />
-                  Start Analyzing for Free
-                </Button>
-              )}
-            </div>
+      {/* Final CTA - Only for non-authenticated users */}
+      {!user && (
+        <section className="py-20 px-6 lg:px-8 bg-primary/5">
+          <div className="max-w-4xl mx-auto text-center space-y-8">
+            <h2 className="text-3xl md:text-5xl font-bold">
+              Turn your ideas into visuals in seconds.
+            </h2>
+            <Button size="lg" className="text-lg px-8 py-6 h-auto" onClick={() => navigate("/auth")}>
+              Get started
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
           </div>
         </section>
       )}
