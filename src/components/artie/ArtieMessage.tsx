@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, Wand2, Edit, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { openStudioWithPrompt } from '@/lib/studio';
+import { ArtieImageThumbnail } from './ArtieImageThumbnail';
+import { generateExpertStudioPrompt } from '@/lib/artie/expertPromptGenerator';
 import type { Message, ContextImage } from './types';
 
 interface ArtieMessageProps {
@@ -42,46 +44,47 @@ export const ArtieMessage = memo(({
         <div className="space-y-2 w-full">
           {/* Attachment Preview */}
           {message.attachment && (
-            <div className="rounded-xl overflow-hidden border border-border bg-muted">
+            <div>
               {message.attachment.type === 'image' ? (
-                <div className="relative group">
-                  <img 
-                    src={message.attachment.url} 
-                    alt={message.attachment.name}
-                    className="w-full h-auto max-h-[250px] md:max-h-[300px] object-contain"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
+                <ArtieImageThumbnail
+                  imageUrl={message.attachment.url}
+                  imageName={message.attachment.name}
+                  onEdit={() => {
+                    if (message.attachment?.url) {
+                      onEditImage(message.attachment.url);
+                    }
+                  }}
+                  onOpenStudio={async () => {
+                    if (message.attachment?.url) {
+                      try {
+                        const expertAnalysis = await generateExpertStudioPrompt(message.attachment.url);
+                        openStudioWithPrompt({
+                          basePrompt: expertAnalysis.prompt,
+                          imageUrl: message.attachment.url,
+                          meta: {
+                            source: 'artie',
+                            suggestedEdits: expertAnalysis.suggestedEdits,
+                            analysis: expertAnalysis.analysis,
+                          },
+                        });
+                        toast.success("Opening in Studio", {
+                          description: "Expert analysis loaded",
+                        });
+                      } catch (error) {
+                        console.error('[ArtieMessage] Error generating expert prompt:', error);
                         openStudioWithPrompt({
                           basePrompt: "Refine this image",
-                          imageUrl: message.attachment?.url || "",
+                          imageUrl: message.attachment.url,
                         });
                         toast.success("Opening in Studio");
-                      }}
-                      className="gap-1.5"
-                    >
-                      <Wand2 className="h-3.5 w-3.5" />
-                      Open in Studio
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        if (message.attachment?.url) {
-                          onEditImage(message.attachment.url);
-                        }
-                      }}
-                      className="gap-1.5"
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                  </div>
-                </div>
+                      }
+                    }
+                  }}
+                  onUpscale={() => onChipAction("UPSCALE_IMAGE", message.id)}
+                  onBlend={() => onChipAction("BLEND_IMAGE", message.id)}
+                  onSave={() => onChipAction("SAVE_IMAGE", message.id)}
+                  onShare={() => onChipAction("SHARE_IMAGE", message.id)}
+                />
               ) : (
                 <>
                   <div className="bg-surface-3 px-3 py-2 flex items-center gap-2">
@@ -119,40 +122,40 @@ export const ArtieMessage = memo(({
           {inlineImageUrls.length > 0 && (
             <div className="grid grid-cols-1 gap-2">
               {inlineImageUrls.map((url, idx) => (
-                <div key={`${message.id}-inline-${idx}`} className="relative rounded-xl overflow-hidden border border-border bg-muted group">
-                  <img
-                    src={url}
-                    alt="Referenced image"
-                    className="w-full h-auto max-h-[220px] md:max-h-[260px] object-contain"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        openStudioWithPrompt({
-                          basePrompt: "Refine this reference",
-                          imageUrl: url,
-                        });
-                        toast.success("Opening in Studio");
-                      }}
-                      className="gap-1.5"
-                    >
-                      <Wand2 className="h-3.5 w-3.5" />
-                      Open in Studio
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => onEditImage(url)}
-                      className="gap-1.5"
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                  </div>
-                </div>
+                <ArtieImageThumbnail
+                  key={`${message.id}-inline-${idx}`}
+                  imageUrl={url}
+                  imageName="Referenced image"
+                  onEdit={() => onEditImage(url)}
+                  onOpenStudio={async () => {
+                    try {
+                      const expertAnalysis = await generateExpertStudioPrompt(url);
+                      openStudioWithPrompt({
+                        basePrompt: expertAnalysis.prompt,
+                        imageUrl: url,
+                        meta: {
+                          source: 'artie',
+                          suggestedEdits: expertAnalysis.suggestedEdits,
+                          analysis: expertAnalysis.analysis,
+                        },
+                      });
+                      toast.success("Opening in Studio", {
+                        description: "Expert analysis loaded",
+                      });
+                    } catch (error) {
+                      console.error('[ArtieMessage] Error generating expert prompt:', error);
+                      openStudioWithPrompt({
+                        basePrompt: "Refine this reference",
+                        imageUrl: url,
+                      });
+                      toast.success("Opening in Studio");
+                    }
+                  }}
+                  onUpscale={() => onChipAction("UPSCALE_IMAGE", message.id)}
+                  onBlend={() => onChipAction("BLEND_IMAGE", message.id)}
+                  onSave={() => onChipAction("SAVE_IMAGE", message.id)}
+                  onShare={() => onChipAction("SHARE_IMAGE", message.id)}
+                />
               ))}
             </div>
           )}

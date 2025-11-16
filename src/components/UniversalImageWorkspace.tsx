@@ -281,6 +281,23 @@ export const UniversalImageWorkspace = ({
       
       if (result.success && result.image) {
         setPreviewUrl(result.image);
+        
+        // Ensure the edited image is saved to database
+        // Edge function should save it, but verify and save if needed
+        const { ensureAssetSaved } = await import('@/lib/saveAsset');
+        await ensureAssetSaved({
+          imageUrl: result.image,
+          action: 'edit',
+          prompt: trimmedInstruction,
+          sourceUrls: [imageUrl],
+          params: {
+            instruction: trimmedInstruction,
+            adjustments: adjustments,
+            source: 'universal_workspace',
+          },
+          skipToast: true, // Edge function already shows toast
+        });
+        
         toast.success("Edits applied successfully!", {
           description: "Saved to My Projects"
         });
@@ -517,7 +534,7 @@ export const UniversalImageWorkspace = ({
 
         {/* Right: Tools Panel - Bottom Sheet on Mobile */}
         {isMobile ? (
-          <div className="border-t border-border/50 bg-background shrink-0 flex flex-col max-h-[50vh]">
+          <div className="border-t border-border/50 bg-background shrink-0 flex flex-col max-h-[calc(50vh-56px)] mb-14">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
               <TabsList className="grid grid-cols-4 w-full rounded-none border-b border-border/50 h-12 shrink-0">
                 <TabsTrigger value="adjust" className="text-[10px] px-1">
@@ -704,12 +721,12 @@ export const UniversalImageWorkspace = ({
         )}
       </div>
 
-      {/* Bottom: Actions - Sticky on Mobile */}
+      {/* Bottom: Actions - Fixed on Mobile, Sticky on Desktop */}
       <div className={cn(
         "border-t border-border/50 flex items-center shrink-0 bg-background",
         isMobile 
-          ? "sticky bottom-0 z-10 h-14 px-2 gap-1 overflow-x-auto" 
-          : "h-16 px-4 justify-between"
+          ? "fixed bottom-0 left-0 right-0 z-10 h-14 px-2 gap-1 overflow-x-auto touch-manipulation safe-bottom" 
+          : "sticky bottom-0 h-16 px-4 justify-between"
       )}>
         {isMobile ? (
           <>
@@ -717,7 +734,7 @@ export const UniversalImageWorkspace = ({
               variant="outline"
               size="sm"
               onClick={handleReset}
-              className="gap-1.5 shrink-0 h-10"
+              className="gap-1.5 shrink-0 min-h-[44px] touch-manipulation"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               <span className="text-xs">Reset</span>
@@ -726,7 +743,7 @@ export const UniversalImageWorkspace = ({
               variant="outline"
               size="sm"
               onClick={handleUpscale}
-              className="gap-1.5 shrink-0 h-10"
+              className="gap-1.5 shrink-0 min-h-[44px] touch-manipulation"
             >
               <Maximize2 className="h-3.5 w-3.5" />
               <span className="text-xs">Upscale</span>
@@ -735,7 +752,7 @@ export const UniversalImageWorkspace = ({
               variant="outline"
               size="sm"
               onClick={handleBlend}
-              className="gap-1.5 shrink-0 h-10"
+              className="gap-1.5 shrink-0 min-h-[44px] touch-manipulation"
             >
               <Layers className="h-3.5 w-3.5" />
               <span className="text-xs">Blend</span>
@@ -744,7 +761,7 @@ export const UniversalImageWorkspace = ({
               variant="outline"
               size="sm"
               onClick={handleDownload}
-              className="gap-1.5 shrink-0 h-10"
+              className="gap-1.5 shrink-0 min-h-[44px] touch-manipulation"
             >
               <Download className="h-3.5 w-3.5" />
               <span className="text-xs">Save</span>
@@ -753,7 +770,7 @@ export const UniversalImageWorkspace = ({
               size="sm"
               onClick={handleApply}
               disabled={isProcessing}
-              className="gap-1.5 shrink-0 h-10 ml-auto"
+              className="gap-1.5 shrink-0 min-h-[44px] ml-auto touch-manipulation"
             >
               {isProcessing ? "Applying..." : "Apply"}
             </Button>

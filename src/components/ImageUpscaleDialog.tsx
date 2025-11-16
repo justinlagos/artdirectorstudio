@@ -341,9 +341,29 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         .select()
         .single();
 
-      if (dbError) throw dbError;
-      
-      if (assetData) {
+      if (dbError) {
+        // If database save fails, try unified save utility as fallback
+        console.warn('[Upscale] Database save failed, trying unified save utility:', dbError);
+        const { ensureAssetSaved } = await import('@/lib/saveAsset');
+        const fallbackId = await ensureAssetSaved({
+          imageUrl: publicUrl,
+          action: 'upscale',
+          prompt: `Upscaled to ${size}`,
+          sourceUrls: [originalImage],
+          params: {
+            targetSize: size,
+            originalSize: sourceImage?.file.size
+          },
+          durationMs: duration,
+          skipToast: true,
+        });
+        if (fallbackId) {
+          setUpscaledAssetId(fallbackId);
+          console.log('✅ [Upscale] Saved via fallback utility:', fallbackId);
+        } else {
+          throw dbError;
+        }
+      } else if (assetData) {
         setUpscaledAssetId(assetData.id);
         console.log('✅ [Upscale] Saved to DB with share slug:', assetData.share_slug);
         

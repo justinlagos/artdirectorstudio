@@ -65,7 +65,6 @@ export const Header = () => {
           {user ? (
             <>
               <div className="hidden sm:flex items-center gap-2">
-                <TrialCreditsDisplay />
                 <SubscriptionStatus />
               </div>
               <ThemeToggle />

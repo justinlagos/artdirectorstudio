@@ -8,6 +8,7 @@ export * from './imageUnderstanding';
 export * from './promptIntelligence';
 export * from './userBehavior';
 export * from './visualTroubleshooting';
+export * from './styleConsistency';
 
 // Re-export types for convenience
 export type {

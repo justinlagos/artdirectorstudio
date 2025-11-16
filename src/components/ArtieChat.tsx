@@ -14,6 +14,13 @@ import { useRetryWithBackoff } from "@/hooks/useRetryWithBackoff";
 import { ImageEditor } from "./ImageEditor";
 import { extractTextFromBriefFile } from "@/lib/documentParser";
 import { openStudioWithPrompt } from "@/lib/studio";
+import { 
+  addImageToMemory, 
+  getAllImagesFromMemory, 
+  findImageByReference,
+  analyzeAndStoreImage 
+} from "@/lib/artie/imageMemory";
+import { generateExpertStudioPrompt } from "@/lib/artie/expertPromptGenerator";
 import type {
   Message,
   BriefAnalysis,
@@ -34,11 +41,13 @@ import type {
   RetryPayload,
   ImageAnalysis,
 } from "./artie/types";
-import { ArtieMessage } from "./artie/ArtieMessage";
-import { ArtieFloatingIcon } from "./artie/ArtieFloatingIcon";
-import { ArtieChatInput } from "./artie/ArtieChatInput";
-import { ArtieQuickActions } from "./artie/ArtieQuickActions";
-import { ArtieGenerationDialog } from "./artie/ArtieGenerationDialog";
+// Artie subcomponents - imported but currently using inline implementations
+// Keeping imports for potential future use
+// import { ArtieMessage } from "./artie/ArtieMessage";
+// import { ArtieFloatingIcon } from "./artie/ArtieFloatingIcon";
+// import { ArtieChatInput } from "./artie/ArtieChatInput";
+// import { ArtieQuickActions } from "./artie/ArtieQuickActions";
+// import { ArtieGenerationDialog } from "./artie/ArtieGenerationDialog";
 
 const SUPABASE_IMAGE_REGEX = /(https:\/\/[^\s]+\.supabase\.co\/storage\/v1\/object\/[^\s]+\.(?:jpg|jpeg|png|gif|webp))/gi;
 
@@ -221,40 +230,42 @@ export const ArtieChat = () => {
 
   const analyzeBriefDocument = useCallback(
     async (fileName: string, text: string): Promise<BriefAnalysis> => {
-      const trimmedText = text.length > 20000 ? text.slice(0, 20000) : text;
-      const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-brief`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+      // Use enhanced Creative Brief Intelligence
+      const { analyzeCreativeBrief } = await import('@/lib/artie/creativeBriefIntelligence');
+      const enhancedAnalysis = await analyzeCreativeBrief(fileName, text);
+      
+      // Convert to BriefAnalysis format for backward compatibility
+      const result: BriefAnalysis = {
+        summary: enhancedAnalysis.summary,
+        keyInsights: enhancedAnalysis.keyInsights,
+        targetAudience: enhancedAnalysis.targetAudience,
+        deliverables: enhancedAnalysis.deliverables,
+        tonalKeywords: enhancedAnalysis.tonalKeywords,
+        suggestedActions: [
+          ...(enhancedAnalysis.conceptIdeas?.slice(0, 2) || []),
+          ...(enhancedAnalysis.moodboardDirections?.slice(0, 1) || []),
+        ],
+        // Store full enhanced analysis for later use
+        enhancedAnalysis: {
+          summary: enhancedAnalysis.summary,
+          keyInsights: enhancedAnalysis.keyInsights,
+          targetAudience: enhancedAnalysis.targetAudience,
+          deliverables: enhancedAnalysis.deliverables,
+          tonalKeywords: enhancedAnalysis.tonalKeywords,
+          brandTone: enhancedAnalysis.brandTone,
+          visualDirection: enhancedAnalysis.visualDirection,
+          colorPalette: enhancedAnalysis.colorPalette,
+          styleKeywords: enhancedAnalysis.styleKeywords,
+          moodboardDirections: enhancedAnalysis.moodboardDirections,
+          conceptIdeas: enhancedAnalysis.conceptIdeas,
+          firstPostDrafts: enhancedAnalysis.firstPostDrafts,
+          brandStories: enhancedAnalysis.brandStories,
+          visualReferences: enhancedAnalysis.visualReferences,
+          constraints: enhancedAnalysis.constraints,
+          goals: enhancedAnalysis.goals,
         },
-        body: JSON.stringify({
-          filename: fileName,
-          text: trimmedText,
-        }),
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to analyze brief';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          // ignore
-        }
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      return {
-        summary: result.summary,
-        keyInsights: result.key_insights || result.keyInsights || [],
-        targetAudience: result.target_audience || result.targetAudience,
-        deliverables: result.deliverables,
-        tonalKeywords: result.tonal_keywords || result.tonalKeywords,
-        suggestedActions: result.suggested_actions || result.suggestedActions,
       };
+      return result;
     },
     []
   );
@@ -317,14 +328,30 @@ export const ArtieChat = () => {
         if (message.attachment?.type === 'image') {
           const key = `${message.id}|${message.attachment.url}`;
           if (!existingKeys.has(key)) {
-            additions.push({
+            const imageData: ContextImage = {
               url: message.attachment.url,
               messageId: message.id,
               name: message.attachment.name,
-              source: message.sender === 'user' ? 'user' : 'artie',
+              source: (message.sender === 'user' ? 'user' : 'artie') as 'user' | 'artie' | 'link',
               timestamp: message.timestamp.toISOString(),
-            });
+            };
+            additions.push(imageData);
             existingKeys.add(key);
+            
+            // Add to enhanced image memory system
+            addImageToMemory({
+              url: message.attachment.url,
+              type: message.sender === 'user' ? 'uploaded' : 'generated',
+              context_notes: message.text || undefined,
+              messageId: message.id,
+              source: message.sender === 'user' ? 'user' : 'artie',
+              name: message.attachment.name,
+            });
+            
+            // Analyze image in background (non-blocking)
+            analyzeAndStoreImage(message.attachment.url).catch(err => 
+              console.error('[Artie] Background image analysis failed:', err)
+            );
           }
         }
 
@@ -332,14 +359,30 @@ export const ArtieChat = () => {
         embeddedUrls.forEach((url, index) => {
           const key = `${message.id}|${url}`;
           if (!existingKeys.has(key)) {
-            additions.push({
+            const imageData: ContextImage = {
               url,
               messageId: `${message.id}-link-${index}`,
               name: 'Referenced Image',
-              source: 'link',
+              source: 'link' as const,
               timestamp: message.timestamp.toISOString(),
-            });
+            };
+            additions.push(imageData);
             existingKeys.add(key);
+            
+            // Add to enhanced image memory system
+            addImageToMemory({
+              url,
+              type: 'generated',
+              context_notes: message.text || undefined,
+              messageId: `${message.id}-link-${index}`,
+              source: 'link',
+              name: 'Referenced Image',
+            });
+            
+            // Analyze image in background (non-blocking)
+            analyzeAndStoreImage(url).catch(err => 
+              console.error('[Artie] Background image analysis failed:', err)
+            );
           }
         });
       });
@@ -523,13 +566,37 @@ export const ArtieChat = () => {
           setIsOpen(false);
           setIsMinimized(true);
         }
-        openStudioWithPrompt({
-          basePrompt: "Refine this image",
-          imageUrl: targetImage.url,
-        });
-        toast.success("Opening in Studio", {
-          description: "Your image has been loaded into the Studio editor",
-        });
+        
+        // Generate expert prompt with analysis
+        (async () => {
+          try {
+            const expertAnalysis = await generateExpertStudioPrompt(targetImage.url);
+            
+            openStudioWithPrompt({
+              basePrompt: expertAnalysis.prompt,
+              imageUrl: targetImage.url,
+              meta: {
+                source: 'artie',
+                suggestedEdits: expertAnalysis.suggestedEdits,
+                analysis: expertAnalysis.analysis,
+              },
+            });
+            
+            toast.success("Opening in Studio", {
+              description: "Expert analysis loaded with suggested edits",
+            });
+          } catch (error) {
+            console.error('[Artie] Error generating expert prompt:', error);
+            // Fallback to basic prompt
+            openStudioWithPrompt({
+              basePrompt: "Refine this image",
+              imageUrl: targetImage.url,
+            });
+            toast.success("Opening in Studio", {
+              description: "Your image has been loaded into the Studio editor",
+            });
+          }
+        })();
       } else {
         toast.error("No image found", {
           description: "Couldn't find the image to open in Studio",
@@ -1016,41 +1083,19 @@ export const ArtieChat = () => {
                   console.log('[ARTIE] Generated image data:', genData);
                   
                   if (genData.image) {
-                    // Verify the image was saved to database
-                    if (!genData.assetId) {
-                      console.warn('[ARTIE] Image generated but not saved to My Projects. Attempting fallback save...');
-                      try {
-                        const { data: { user } } = await supabase.auth.getUser();
-                        if (user) {
-                          const { data: savedAsset, error: saveError } = await supabase
-                            .from('generated_assets')
-                            .insert({
-                              user_id: user.id,
-                              type: 'image',
-                              action: 'generate',
-                              prompt: args.prompt,
-                              image_url: genData.image,
-                              params: {
-                                quality: args.quality || 'auto',
-                                size: args.size || '1024x1024',
-                                fallback_save: true
-                              }
-                            })
-                            .select()
-                            .single();
-
-                          if (saveError) {
-                            console.error('[ARTIE] Fallback save failed:', saveError);
-                          } else {
-                            console.log('[ARTIE] Fallback save successful:', savedAsset?.id);
-                          }
-                        }
-                      } catch (fallbackError) {
-                        console.error('[ARTIE] Fallback save exception:', fallbackError);
-                      }
-                    } else {
-                      console.log('[ARTIE] Image saved to My Projects:', genData.assetId);
-                    }
+                    // Ensure the image is saved to database using unified save utility
+                    const { ensureAssetSaved } = await import('@/lib/saveAsset');
+                    await ensureAssetSaved({
+                      imageUrl: genData.image,
+                      action: 'generate',
+                      prompt: args.prompt,
+                      params: {
+                        quality: args.quality || 'auto',
+                        size: args.size || '1024x1024',
+                        source: 'artie_chat',
+                      },
+                      skipToast: true, // Don't show duplicate toast
+                    });
 
                     accumulatedText = accumulatedText.replace(/✨ Generating image\.\.\.|⏳ Retrying \(attempt \d\/3\)\.\.\./g, '').trim();
                     accumulatedText += `\n\n✅ Image generated!`;
@@ -1132,24 +1177,16 @@ export const ArtieChat = () => {
                   continue;
                 }
 
-                // Open Edit Image Modal with pre-filled instruction
+                // Open Edit Image Modal with pre-filled instruction - INSTANT, no delays
                 // Close Artie completely on desktop to avoid covering Edit modal
-                // On mobile, ToolDrawer handles the modal properly, so we can keep Artie open
                 if (!isMobile) {
                   setIsOpen(false);
                   setIsMinimized(false);
-                  // Use setTimeout to ensure Artie closes before modal opens
-                  setTimeout(() => {
-                    setEditingImageUrl(imageUrl);
-                    setEditorInstruction(instruction);
-                    setEditorOpen(true);
-                  }, 100);
-                } else {
-                  // On mobile, open immediately - ToolDrawer handles z-index properly
-                  setEditingImageUrl(imageUrl);
-                  setEditorInstruction(instruction);
-                  setEditorOpen(true);
                 }
+                // Open immediately in the same event loop - no setTimeout
+                setEditingImageUrl(imageUrl);
+                setEditorInstruction(instruction);
+                setEditorOpen(true);
                 
                 accumulatedText += `\n\n✅ Opening Edit Image tool with instruction: "${instruction}"\n\nYou can review and adjust the settings before applying the changes.`;
                 setMessages(prev => 
@@ -1385,10 +1422,13 @@ export const ArtieChat = () => {
           </div>
         </div>
 
-        {/* Chat Body - Scrollable with proper spacing */}
+        {/* Chat Body - Scrollable with proper spacing, padding bottom for fixed input on mobile */}
         <div 
           ref={chatBodyRef}
-          className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-5 space-y-3 md:space-y-4 overscroll-contain"
+          className={cn(
+            "flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-5 space-y-3 md:space-y-4 overscroll-contain",
+            isMobile && "pb-[calc(80px+env(safe-area-inset-bottom))]"
+          )}
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {messages.map((message) => {
@@ -1626,8 +1666,15 @@ export const ArtieChat = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Bar - Sticky bottom with elevation */}
-        <div className="flex-shrink-0 relative z-[70] px-4 md:px-6 py-2 md:py-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)] safe-bottom" style={{ position: 'sticky', bottom: 0 }}>
+        {/* Input Bar - Fixed bottom on mobile, sticky on desktop */}
+        <div 
+          className={cn(
+            "flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)] safe-bottom",
+            isMobile 
+              ? "fixed bottom-0 left-0 right-0 z-[70] pb-[calc(0.5rem+env(safe-area-inset-bottom))]" 
+              : "relative z-[70] pb-2.5"
+          )}
+        >
           {/* File Upload Preview */}
           {uploadedFiles.length > 0 && (
             <div className="mb-2 md:mb-3 flex flex-wrap gap-1.5 md:gap-2">
@@ -1793,40 +1840,18 @@ export const ArtieChat = () => {
                       if (data.image || data.imageUrl) {
                         const imageUrl = data.image || data.imageUrl;
                         
-                        // Verify the image was saved to database
-                        if (!data.assetId) {
-                          console.warn('[ARTIE] Image generated but not saved to My Projects. Attempting fallback save...');
-                          try {
-                            const { data: { user } } = await supabase.auth.getUser();
-                            if (user) {
-                              const { data: savedAsset, error: saveError } = await supabase
-                                .from('generated_assets')
-                                .insert({
-                                  user_id: user.id,
-                                  type: 'image',
-                                  action: 'generate',
-                                  prompt: generationPrompt,
-                                  image_url: imageUrl,
-                                  params: {
-                                    ...generationOptions,
-                                    fallback_save: true
-                                  }
-                                })
-                                .select()
-                                .single();
-
-                              if (saveError) {
-                                console.error('[ARTIE] Fallback save failed:', saveError);
-                              } else {
-                                console.log('[ARTIE] Fallback save successful:', savedAsset?.id);
-                              }
-                            }
-                          } catch (fallbackError) {
-                            console.error('[ARTIE] Fallback save exception:', fallbackError);
-                          }
-                        } else {
-                          console.log('[ARTIE] Image saved to My Projects:', data.assetId);
-                        }
+                        // Ensure the image is saved to database using unified save utility
+                        const { ensureAssetSaved } = await import('@/lib/saveAsset');
+                        await ensureAssetSaved({
+                          imageUrl: imageUrl,
+                          action: 'generate',
+                          prompt: generationPrompt,
+                          params: {
+                            ...generationOptions,
+                            source: 'artie_generation_dialog',
+                          },
+                          skipToast: true, // Don't show duplicate toast
+                        });
 
                         setMessages(prev => prev.map(m => 
                           m.id === genMessageId
@@ -1870,44 +1895,15 @@ export const ArtieChat = () => {
         imageUrl={editingImageUrl}
         initialInstruction={editorInstruction}
         onImageEdited={async (newImageUrl) => {
-          // Verify the edited image was saved
-          try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              // Check if this image exists in generated_assets
-              const { data: existingAsset } = await supabase
-                .from('generated_assets')
-                .select('id')
-                .eq('image_url', newImageUrl)
-                .single();
-
-              if (!existingAsset) {
-                console.warn('[ARTIE] Edited image not found in My Projects. Attempting save...');
-                const { data: savedAsset, error: saveError } = await supabase
-                  .from('generated_assets')
-                  .insert({
-                    user_id: user.id,
-                    type: 'image',
-                    action: 'edit',
-                    image_url: newImageUrl,
-                    source_urls: [editingImageUrl],
-                    params: { source: 'artie_edit' }
-                  })
-                  .select()
-                  .single();
-
-                if (saveError) {
-                  console.error('[ARTIE] Failed to save edited image:', saveError);
-                } else {
-                  console.log('[ARTIE] Edited image saved to My Projects:', savedAsset?.id);
-                }
-              } else {
-                console.log('[ARTIE] Edited image already in My Projects:', existingAsset.id);
-              }
-            }
-          } catch (error) {
-            console.error('[ARTIE] Error verifying/saving edited image:', error);
-          }
+          // Ensure the edited image is saved to database using unified save utility
+          const { ensureAssetSaved } = await import('@/lib/saveAsset');
+          await ensureAssetSaved({
+            imageUrl: newImageUrl,
+            action: 'edit',
+            sourceUrls: [editingImageUrl],
+            params: { source: 'artie_edit' },
+            skipToast: true, // Workspace already shows toast
+          });
 
           // Add the edited image to context memory
         const imageMessageId =

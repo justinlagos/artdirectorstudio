@@ -31,6 +31,8 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
       size: options.size,
       background: options.background,
       referenceImageUrl: options.referenceImageUrl,
+      continuationStrength: options.continuationStrength,
+      previousPrompt: options.previousPrompt,
     },
     headers: {
       Authorization: `Bearer ${session.access_token}`,

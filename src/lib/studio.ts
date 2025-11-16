@@ -51,25 +51,67 @@ export function openStudioWithPrompt({
         // Get user preferences for personalization
         const userPreferences = await getUserPreferences(user.id);
 
-        // Synthesize context-locked prompt
+        // Determine intent and variation type
+        const isVariation = basePrompt && (
+          basePrompt.toLowerCase().includes('variation') ||
+          basePrompt.toLowerCase().includes('variation of') ||
+          basePrompt === "Refine this image"
+        );
+        
         const intent = basePrompt && basePrompt !== "Refine this image" 
           ? 'enhancement' 
           : 'variation';
 
-        const synthesized = synthesizeContextLockedPrompt({
-          userPrompt: basePrompt || "Refine this image",
-          imageUnderstanding: understanding,
-          userPreferences,
-          intent,
-          metadata: meta,
-        });
+        // Use style consistency for variations
+        if (isVariation && understanding) {
+          const { generateContextAwareVariation } = await import('@/lib/intelligence/styleConsistency');
+          
+          // Determine variation intensity from meta or default to moderate
+          const variationIntent = (meta?.variationIntent as 'subtle' | 'moderate' | 'major') || 'moderate';
+          
+          const variation = await generateContextAwareVariation(
+            basePrompt || "Create a variation",
+            imageUrl,
+            variationIntent,
+            userPreferences,
+            understanding
+          );
+          
+          // Update Studio with style-locked prompt and continuation strength
+          studioState.setPrompt(variation.prompt);
+          if (meta) {
+            studioState.setMeta({
+              ...meta,
+              continuationStrength: variation.continuationStrength,
+              styleLock: variation.styleLock,
+            });
+          } else {
+            studioState.setMeta({
+              continuationStrength: variation.continuationStrength,
+              styleLock: variation.styleLock,
+            });
+          }
+          
+          toast.success("Style-consistent variation ready", {
+            description: `Maintaining: ${variation.styleLock.slice(0, 2).join(', ')}`
+          });
+        } else {
+          // Use standard context-locked prompt for enhancements
+          const synthesized = synthesizeContextLockedPrompt({
+            userPrompt: basePrompt || "Refine this image",
+            imageUnderstanding: understanding,
+            userPreferences,
+            intent,
+            metadata: meta,
+          });
 
-        // Update Studio with intelligent prompt
-        studioState.setPrompt(synthesized.prompt);
-        
-        toast.success("Intelligent prompt generated", {
-          description: synthesized.reasoning || "Context-locked prompt created"
-        });
+          // Update Studio with intelligent prompt
+          studioState.setPrompt(synthesized.prompt);
+          
+          toast.success("Intelligent prompt generated", {
+            description: synthesized.reasoning || "Context-locked prompt created"
+          });
+        }
       } catch (error) {
         console.error('[Studio] Intelligence Framework error:', error);
         // Fallback to basic analysis

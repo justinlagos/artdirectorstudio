@@ -672,6 +672,31 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
 
       if (dbError) {
         console.error('Failed to save analysis to database:', dbError);
+        
+        // Try unified save utility as fallback
+        try {
+          const { ensureAssetSaved } = await import('@/lib/saveAsset');
+          const fallbackId = await ensureAssetSaved({
+            imageUrl: '', // No image for analysis
+            action: 'batch_analyze',
+            prompt: analysisData?.full_regeneration_prompt || 'Batch analysis',
+            sourceUrls: [sourceImage],
+            params: {
+              operation: 'analyze',
+              batchItem: true
+            },
+            analysisData: analysisData,
+            durationMs: duration,
+            skipToast: true,
+          });
+          if (fallbackId) {
+            console.log('[Batch SaveToDatabase] Analysis saved via unified utility fallback:', fallbackId);
+            return fallbackId;
+          }
+        } catch (fallbackError) {
+          console.error('[Batch SaveToDatabase] Unified utility fallback failed for analysis:', fallbackError);
+        }
+        
         throw dbError;
       }
       return assetData.id;
@@ -1031,6 +1056,32 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
         operationType,
         timestamp: new Date().toISOString()
       });
+      
+      // Try unified save utility as final fallback
+      console.warn('[Batch SaveToDatabase] Attempting unified save utility fallback');
+      try {
+        const { ensureAssetSaved } = await import('@/lib/saveAsset');
+        const fallbackId = await ensureAssetSaved({
+          imageUrl: publicUrl,
+          action: `batch_${operationType}` as any,
+          prompt: `Batch ${operationType} to ${size}`,
+          sourceUrls: [sourceImage],
+          params: {
+            operation: operationType,
+            targetSize: size,
+            batchItem: true
+          },
+          durationMs: duration,
+          skipToast: true,
+        });
+        if (fallbackId) {
+          console.log('[Batch SaveToDatabase] Saved via unified utility fallback:', fallbackId);
+          return fallbackId;
+        }
+      } catch (fallbackError) {
+        console.error('[Batch SaveToDatabase] Unified utility fallback also failed:', fallbackError);
+      }
+      
       throw new Error(`Failed to upload images: Database save failed - ${dbError.message}`);
     }
     return assetData.id;

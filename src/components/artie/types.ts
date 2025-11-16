@@ -27,6 +27,24 @@ export interface BriefAnalysis {
   deliverables?: string[];
   tonalKeywords?: string[];
   suggestedActions?: string[];
+  enhancedAnalysis?: {
+    summary: string;
+    keyInsights: string[];
+    targetAudience?: string;
+    deliverables?: string[];
+    tonalKeywords?: string[];
+    brandTone?: string;
+    visualDirection?: string[];
+    colorPalette?: string[];
+    styleKeywords?: string[];
+    moodboardDirections?: string[];
+    conceptIdeas?: string[];
+    firstPostDrafts?: string[];
+    brandStories?: string[];
+    visualReferences?: string[];
+    constraints?: string[];
+    goals?: string[];
+  };
 }
 
 export interface ActionChip {

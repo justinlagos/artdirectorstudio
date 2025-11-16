@@ -470,9 +470,30 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         .select()
         .single();
 
-      if (dbError) throw dbError;
-      
-      if (assetData) {
+      if (dbError) {
+        // If database save fails, try unified save utility as fallback
+        console.warn('[Blend] Database save failed, trying unified save utility:', dbError);
+        const { ensureAssetSaved } = await import('@/lib/saveAsset');
+        const fallbackId = await ensureAssetSaved({
+          imageUrl: publicUrl,
+          action: 'blend',
+          prompt: prompt,
+          sourceUrls: sourceImages,
+          params: {
+            imageCount: sourceImages.length,
+            instruction: prompt,
+            styles
+          },
+          durationMs: duration,
+          skipToast: true,
+        });
+        if (fallbackId) {
+          setBlendedAssetId(fallbackId);
+          console.log('✅ [Blend] Saved via fallback utility:', fallbackId);
+        } else {
+          throw dbError;
+        }
+      } else if (assetData) {
         setBlendedAssetId(assetData.id);
         console.log('✅ [Blend] Saved to DB with share slug:', assetData.share_slug);
         

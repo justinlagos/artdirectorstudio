@@ -169,10 +169,16 @@ export const ImageGenerationDialog = () => {
     }, 1200);
 
     try {
+      // Use continuation strength from meta (style consistency) if available, otherwise use calculated
+      const metaContinuationStrength = meta?.continuationStrength as number | undefined;
+      const finalContinuationStrength = metaContinuationStrength !== undefined
+        ? metaContinuationStrength
+        : (referenceImage ? continuationStrength : undefined);
+      
       const optionsWithReference = {
         ...options,
         referenceImageUrl: referenceImage || undefined,
-        continuationStrength: referenceImage ? continuationStrength : undefined,
+        continuationStrength: finalContinuationStrength,
         previousPrompt: previousGeneratedPrompt || undefined,
       };
       
@@ -348,7 +354,62 @@ export const ImageGenerationDialog = () => {
     toast.success("Prompt copied to clipboard!");
   };
 
-  const handleRegenerate = () => {
+  const handleRegenerate = async () => {
+    // If we have a reference image, use style consistency for variations
+    if (referenceImage && prompt) {
+      try {
+        const { generateContextAwareVariation } = await import('@/lib/intelligence/styleConsistency');
+        const { getUserPreferences } = await import('@/lib/intelligence/userBehavior');
+        const { getCachedUnderstanding } = await import('@/lib/intelligence/imageUnderstanding');
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          const userPreferences = await getUserPreferences(user.id);
+          const understanding = await getCachedUnderstanding(referenceImage);
+          
+          if (understanding) {
+            // Generate context-aware variation with style consistency
+            const variation = await generateContextAwareVariation(
+              prompt,
+              referenceImage,
+              'moderate', // Default to moderate variation
+              userPreferences,
+              understanding
+            );
+            
+            // Update prompt with style-locked version
+            setPrompt(variation.prompt);
+            setBasePrompt(variation.prompt);
+            setStorePrompt(variation.prompt);
+            
+            // Update continuation strength from style consistency
+            setContinuationStrength(variation.continuationStrength);
+            
+            // Update meta with style lock info
+            if (meta) {
+              setMeta({
+                ...meta,
+                continuationStrength: variation.continuationStrength,
+                styleLock: variation.styleLock,
+              });
+            } else {
+              setMeta({
+                continuationStrength: variation.continuationStrength,
+                styleLock: variation.styleLock,
+              });
+            }
+            
+            toast.success("Style-consistent variation ready", {
+              description: `Maintaining: ${variation.styleLock.slice(0, 2).join(', ')}`
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[Regenerate] Style consistency error:', error);
+        // Continue with normal regenerate
+      }
+    }
+    
     setGeneratedImage(null);
     setLastError(null);
     handleGenerate();
