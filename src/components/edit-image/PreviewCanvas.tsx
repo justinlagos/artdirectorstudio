@@ -95,6 +95,10 @@ export const PreviewCanvas = ({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!onRegionSelect || !containerRef.current || !imageData) return;
     
+    // Prevent default to stop any image dragging
+    e.preventDefault();
+    e.stopPropagation();
+    
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -113,6 +117,10 @@ export const PreviewCanvas = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isSelecting || !startPos || !containerRef.current) return;
     
+    // Prevent default to stop any image dragging
+    e.preventDefault();
+    e.stopPropagation();
+    
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -120,7 +128,12 @@ export const PreviewCanvas = ({
     setCurrentPos({ x, y });
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     if (!isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
     
     const x = Math.max(imageData.offsetX, Math.min(startPos.x, currentPos.x));
@@ -153,7 +166,17 @@ export const PreviewCanvas = ({
   // Touch event handlers for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!onRegionSelect || !containerRef.current || !imageData) return;
-    e.preventDefault();
+    
+    // Only prevent default for single touch (selection mode)
+    // Allow multi-touch for pinch zoom
+    if (e.touches.length === 1) {
+      e.preventDefault();
+      e.stopPropagation();
+    } else {
+      // Multi-touch: allow pan/zoom, don't select
+      return;
+    }
+    
     const touch = e.touches[0];
     const rect = containerRef.current.getBoundingClientRect();
     const x = touch.clientX - rect.left;
@@ -172,7 +195,19 @@ export const PreviewCanvas = ({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isSelecting || !startPos || !containerRef.current) return;
-    e.preventDefault();
+    
+    // Only prevent default for single touch (selection mode)
+    if (e.touches.length === 1) {
+      e.preventDefault();
+      e.stopPropagation();
+    } else {
+      // Multi-touch: allow pan/zoom, cancel selection
+      setIsSelecting(false);
+      setStartPos(null);
+      setCurrentPos(null);
+      return;
+    }
+    
     const touch = e.touches[0];
     const rect = containerRef.current.getBoundingClientRect();
     const x = touch.clientX - rect.left;
@@ -182,7 +217,11 @@ export const PreviewCanvas = ({
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
-    e.preventDefault();
+    
+    if (e.touches.length === 0) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     
     const x = Math.max(imageData.offsetX, Math.min(startPos.x, currentPos.x));
     const y = Math.max(imageData.offsetY, Math.min(startPos.y, currentPos.y));
@@ -233,8 +272,9 @@ export const PreviewCanvas = ({
         ref={imageRef}
         src={imageUrl}
         alt="Preview"
-        className="max-h-full w-auto h-auto object-contain transition-all duration-200"
+        className="max-h-full w-auto h-auto object-contain transition-all duration-200 pointer-events-none"
         style={{ filter: filterStyle }}
+        draggable={false}
       />
       {onRegionSelect && (
         <canvas

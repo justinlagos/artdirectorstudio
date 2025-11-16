@@ -1457,22 +1457,15 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                // Close Artie completely on desktop to avoid covering Edit modal
-                                // On mobile, ToolDrawer handles the modal properly, so we can keep Artie open
+                                // Set state immediately in the same event loop for instant opening
+                                const imageUrl = message.attachment?.url || "";
+                                setEditingImageUrl(imageUrl);
+                                setEditorInstruction("");
+                                setEditorOpen(true);
+                                // Minimize Artie on desktop to avoid covering Edit modal
                                 if (!isMobile) {
                                   setIsOpen(false);
                                   setIsMinimized(false);
-                                  // Use setTimeout to ensure Artie closes before modal opens
-                                  setTimeout(() => {
-                                    setEditingImageUrl(message.attachment?.url || "");
-                                    setEditorInstruction("");
-                                    setEditorOpen(true);
-                                  }, 100);
-                                } else {
-                                  // On mobile, open immediately - ToolDrawer handles z-index properly
-                                  setEditingImageUrl(message.attachment?.url || "");
-                                  setEditorInstruction("");
-                                  setEditorOpen(true);
                                 }
                               }}
                               className="gap-1.5"
@@ -1552,22 +1545,14 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                // Close Artie completely on desktop to avoid covering Edit modal
-                                // On mobile, ToolDrawer handles the modal properly, so we can keep Artie open
+                                // Set state immediately in the same event loop for instant opening
+                                setEditingImageUrl(url);
+                                setEditorInstruction("");
+                                setEditorOpen(true);
+                                // Minimize Artie on desktop to avoid covering Edit modal
                                 if (!isMobile) {
                                   setIsOpen(false);
                                   setIsMinimized(false);
-                                  // Use setTimeout to ensure Artie closes before modal opens
-                                  setTimeout(() => {
-                                    setEditingImageUrl(url);
-                                    setEditorInstruction("");
-                                    setEditorOpen(true);
-                                  }, 100);
-                                } else {
-                                  // On mobile, open immediately - ToolDrawer handles z-index properly
-                                  setEditingImageUrl(url);
-                                  setEditorInstruction("");
-                                  setEditorOpen(true);
                                 }
                               }}
                               className="gap-1.5"

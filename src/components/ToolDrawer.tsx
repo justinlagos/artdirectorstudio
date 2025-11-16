@@ -36,10 +36,11 @@ export const ToolDrawer = ({
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex max-h-[96dvh] flex-col rounded-t-[24px] border border-border/80 bg-background shadow-xl",
             "sm:mx-auto sm:w-full sm:max-w-4xl",
+            "md:inset-x-auto md:inset-y-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[24px] md:max-w-[1320px] md:w-[90vw] md:max-h-[90vh]",
             className,
           )}
         >
-          <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-muted" />
+          <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-muted md:hidden" />
           <div className="flex min-h-0 flex-1 flex-col">
             <header
               className={cn(
@@ -59,7 +60,7 @@ export const ToolDrawer = ({
 
             <div
               className={cn(
-                "flex-1 overflow-y-auto px-6 py-5",
+                "flex-1 overflow-y-auto",
                 "[&::-webkit-scrollbar]:w-2",
                 stickyFooterOnMobile
                   ? "pb-6 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:pb-5"
