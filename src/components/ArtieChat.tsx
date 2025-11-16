@@ -1894,7 +1894,46 @@ export const ArtieChat = () => {
         }}
         imageUrl={editingImageUrl}
         initialInstruction={editorInstruction}
-        onImageEdited={(newImageUrl) => {
+        onImageEdited={async (newImageUrl) => {
+          // Verify the edited image was saved
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              // Check if this image exists in generated_assets
+              const { data: existingAsset } = await supabase
+                .from('generated_assets')
+                .select('id')
+                .eq('image_url', newImageUrl)
+                .single();
+
+              if (!existingAsset) {
+                console.warn('[ARTIE] Edited image not found in My Projects. Attempting save...');
+                const { data: savedAsset, error: saveError } = await supabase
+                  .from('generated_assets')
+                  .insert({
+                    user_id: user.id,
+                    type: 'image',
+                    action: 'edit',
+                    image_url: newImageUrl,
+                    source_urls: [editingImageUrl],
+                    params: { source: 'artie_edit' }
+                  })
+                  .select()
+                  .single();
+
+                if (saveError) {
+                  console.error('[ARTIE] Failed to save edited image:', saveError);
+                } else {
+                  console.log('[ARTIE] Edited image saved to My Projects:', savedAsset?.id);
+                }
+              } else {
+                console.log('[ARTIE] Edited image already in My Projects:', existingAsset.id);
+              }
+            }
+          } catch (error) {
+            console.error('[ARTIE] Error verifying/saving edited image:', error);
+          }
+
           // Add the edited image to context memory
         const imageMessageId =
           typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -1921,7 +1960,8 @@ export const ArtieChat = () => {
             ]
           };
           setMessages(prev => [...prev, editedMessage]);
-          toast.success("Your edited image is ready!");
+          toast.success("Your edited image is ready and saved to My Projects!");
+          setEditorOpen(false);
         }}
       />
     </>
