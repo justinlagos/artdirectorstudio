@@ -48,9 +48,6 @@ export const Header = () => {
                   <Maximize2 className="mr-2 h-4 w-4" />
                   Upscale
                 </Button>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/history">My Projects</Link>
-                </Button>
               </>
             )}
 
@@ -140,17 +137,6 @@ export const Header = () => {
                       >
                         <Maximize2 className="mr-3 h-4 w-4" />
                         Upscale
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        asChild 
-                        className="justify-start min-h-[48px]"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <Link to="/history">
-                          <FolderOpen className="mr-3 h-4 w-4" />
-                          My Projects
-                        </Link>
                       </Button>
                     </>
                   )}
