@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -12,35 +11,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(), 
-    viteCommonjs({
-      // Only process JavaScript files in node_modules, specifically lodash
-      filter: (id) => {
-        // Extract the actual file path (remove query parameters)
-        const filePath = id.split('?')[0];
-        
-        // Only process if it's a JavaScript file in node_modules
-        if (!filePath.includes('node_modules')) return false;
-        
-        // Exclude HTML, CSS, SVG, and other non-JS files
-        if (filePath.endsWith('.html') || 
-            filePath.endsWith('.css') || 
-            filePath.endsWith('.svg') ||
-            filePath.endsWith('.png') ||
-            filePath.endsWith('.jpg') ||
-            filePath.endsWith('.jpeg') ||
-            filePath.endsWith('.gif') ||
-            filePath.endsWith('.webp')) {
-          return false;
-        }
-        
-        // Only process .js, .mjs files or lodash specifically
-        return filePath.includes('lodash') || 
-               filePath.endsWith('.js') || 
-               filePath.endsWith('.mjs') ||
-               filePath.endsWith('.cjs');
-      },
-      transformMixedEsModules: true,
-    }),
     mode === "development" && componentTagger()
   ].filter(Boolean),
   resolve: {
@@ -136,8 +106,8 @@ export default defineConfig(({ mode }) => ({
     // Force ESM resolution for lodash to prevent default export issues
     esbuildOptions: {
       target: 'esnext',
-      // Handle lodash imports properly
-      plugins: [],
+      // Handle lodash imports properly - convert CommonJS to ESM
+      format: 'esm',
     },
   },
 }));
