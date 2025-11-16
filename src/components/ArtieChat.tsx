@@ -1248,7 +1248,10 @@ export const ArtieChat = () => {
 
   // Persistent floating icon (always visible)
   const FloatingIcon = () => (
-    <div className="fixed bottom-6 right-4 md:bottom-8 md:right-6 z-40 pointer-events-auto">
+    <div className={cn(
+      "fixed right-4 md:right-6 z-[70] pointer-events-auto",
+      isMobile ? "bottom-20" : "bottom-6 md:bottom-8"
+    )}>
       {/* Contextual prompt bubble */}
       {showPrompt && contextualPrompt && !isMinimized && (
         <div 
