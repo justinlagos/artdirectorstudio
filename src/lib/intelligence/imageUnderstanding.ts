@@ -132,6 +132,33 @@ export async function analyzeImageDeep(imageUrl: string): Promise<ImageUnderstan
     });
 
     if (error) {
+      // Extract error details
+      let errorData: any = error;
+      
+      // Try to parse error context if available
+      if (error.context) {
+        try {
+          errorData = typeof error.context === 'string' 
+            ? JSON.parse(error.context) 
+            : error.context;
+        } catch {
+          errorData = error;
+        }
+      }
+      
+      // Check for 402 (credits exhausted)
+      if (errorData?.details?.aiStatus === 402 || 
+          errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402 ||
+          error.message?.includes('402') ||
+          error.message?.includes('Credits exhausted') ||
+          error.message?.includes('credits exhausted')) {
+        console.warn('[ImageUnderstanding] Credits exhausted, using cached or basic understanding');
+        // Don't throw - return cached or basic understanding instead
+        const cached = await getCachedUnderstanding(imageUrl);
+        return cached || getBasicUnderstanding(imageUrl);
+      }
+      
+      // For other errors, throw to be caught by outer catch
       throw error;
     }
 

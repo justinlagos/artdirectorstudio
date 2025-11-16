@@ -337,7 +337,31 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
 
-    if (error) throw error;
+    if (error) {
+      // Extract error details
+      let errorData: any = error;
+      if (error.context) {
+        try {
+          errorData = typeof error.context === 'string' 
+            ? JSON.parse(error.context) 
+            : error.context;
+        } catch {
+          errorData = error;
+        }
+      }
+      
+      // Check for 402 (credits exhausted)
+      if (errorData?.details?.aiStatus === 402 || 
+          errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402 ||
+          error.message?.includes('402') ||
+          error.message?.includes('Credits exhausted') ||
+          error.message?.includes('credits exhausted')) {
+        throw new Error("Your credits are used up. Choose a plan to continue.");
+      }
+      
+      throw error;
+    }
+    
     if (!data) throw new Error("No analysis returned");
 
     return data;

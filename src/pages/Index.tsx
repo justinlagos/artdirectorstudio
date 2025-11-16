@@ -310,13 +310,44 @@ const Index = () => {
 
         if (error) {
           console.error("Analysis error:", error);
+          
+          // Extract error details
+          let errorMessage = "Failed to analyze image. Please try again.";
+          let errorData: any = error;
+          
+          // Try to parse error context if available
+          if (error.context) {
+            try {
+              errorData = typeof error.context === 'string' 
+                ? JSON.parse(error.context) 
+                : error.context;
+            } catch {
+              errorData = error;
+            }
+          }
+          
+          // Check for 402 (credits exhausted) or specific error messages
+          if (errorData?.details?.aiStatus === 402 || 
+              errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402 ||
+              error.message?.includes('402') ||
+              error.message?.includes('Credits exhausted') ||
+              error.message?.includes('credits exhausted')) {
+            errorMessage = "Your credits are used up. Choose a plan to continue.";
+          } else if (errorData?.error) {
+            errorMessage = errorData.error;
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+          
           analytics.track("Image Analysis", {
             tool: "analyze",
             action: "analyze",
             success: false,
-            error_type: error.message?.substring(0, 50) || "unknown",
+            error_type: errorData?.errorType || error.message?.substring(0, 50) || "unknown",
+            status_code: errorData?.details?.aiStatus || errorData?.status,
           });
-          toast.error("Failed to analyze image. Please try again.");
+          
+          toast.error(errorMessage);
           setIsAnalyzing(false);
           setShowProgressiveFeedback(false);
           return;
