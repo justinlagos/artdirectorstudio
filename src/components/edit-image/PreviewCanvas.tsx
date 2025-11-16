@@ -92,8 +92,9 @@ export const PreviewCanvas = ({
     }
   }, [selectedRegion, isSelecting, startPos, currentPos, imageData]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (!onRegionSelect || !containerRef.current || !imageData) return;
+    e.preventDefault();
     
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -118,9 +119,9 @@ export const PreviewCanvas = ({
     const y = e.clientY - rect.top;
     
     setCurrentPos({ x, y });
-  };
+  }, [isSelecting, startPos]);
 
-  const handleMouseUp = () => {
+  const handlePointerUp = useCallback(() => {
     if (!isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
     
     const x = Math.max(imageData.offsetX, Math.min(startPos.x, currentPos.x));
@@ -148,7 +149,7 @@ export const PreviewCanvas = ({
     setIsSelecting(false);
     setStartPos(null);
     setCurrentPos(null);
-  };
+  }, [isSelecting, startPos, currentPos, onRegionSelect, imageData]);
 
   // Touch event handlers for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
