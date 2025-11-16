@@ -48,7 +48,10 @@ export const ColorPickerPanel = ({
                   : "border-border hover:border-primary/50"
               }`}
               style={{ backgroundColor: color.value }}
-              onClick={() => onColorChange(color.value)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onColorChange(color.value);
+              }}
               title={color.name}
             />
           ))}
@@ -76,7 +79,10 @@ export const ColorPickerPanel = ({
       </div>
 
       <Button
-        onClick={() => onApply(selectedColor)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onApply(selectedColor);
+        }}
         className="w-full"
         size="sm"
       >

@@ -51,7 +51,8 @@ export const AdvancedEditPanel = ({
               </Alert>
             )}
             <Button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 if (replaceInstruction.trim().length >= 3) {
                   onReplaceObject(`Replace the selected area with: ${replaceInstruction.trim()}`);
                   setReplaceInstruction("");
@@ -77,7 +78,10 @@ export const AdvancedEditPanel = ({
             </div>
             <div className="space-y-2">
               <Button
-                onClick={onRemoveBlemish}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveBlemish();
+                }}
                 variant="outline"
                 className="w-full justify-start"
                 size="sm"
@@ -87,7 +91,10 @@ export const AdvancedEditPanel = ({
                 <span className="ml-auto text-xs text-muted-foreground">Auto</span>
               </Button>
               <Button
-                onClick={onSmoothBackground}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSmoothBackground();
+                }}
                 variant="outline"
                 className="w-full justify-start"
                 size="sm"

@@ -19,7 +19,10 @@ export const FooterActions = ({
   return (
     <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
       <Button
-        onClick={onReset}
+        onClick={(e) => {
+          e.stopPropagation();
+          onReset();
+        }}
         variant="outline"
         className="flex-1 min-h-[44px] touch-manipulation"
         disabled={isProcessing}
@@ -28,7 +31,10 @@ export const FooterActions = ({
         Reset
       </Button>
       <Button
-        onClick={onDownload}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDownload();
+        }}
         variant="outline"
         className="flex-1 min-h-[44px] touch-manipulation"
         disabled={isProcessing}
@@ -37,7 +43,10 @@ export const FooterActions = ({
         Download
       </Button>
       <Button
-        onClick={onApply}
+        onClick={(e) => {
+          e.stopPropagation();
+          onApply();
+        }}
         disabled={isProcessing || !canApply}
         className="flex-1 min-h-[44px] font-medium touch-manipulation"
         size="default"

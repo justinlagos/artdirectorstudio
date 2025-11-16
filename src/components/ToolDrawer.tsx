@@ -36,9 +36,23 @@ export const ToolDrawer = ({
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex max-h-[96dvh] flex-col rounded-t-[24px] border border-border/80 bg-background shadow-xl",
             "sm:mx-auto sm:w-full sm:max-w-4xl",
-            "md:inset-x-auto md:inset-y-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[24px] md:max-w-[1320px] md:w-[90vw] md:max-h-[90vh]",
+            "md:inset-x-auto md:inset-y-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[24px] md:max-w-[1320px] md:w-[90vw] md:max-h-[90vh] md:bottom-auto",
             className,
           )}
+          onPointerDownOutside={(e) => {
+            // Prevent closing when clicking on interactive elements inside
+            const target = e.target as HTMLElement;
+            if (target.closest('button') || target.closest('[role="button"]') || target.closest('input') || target.closest('textarea') || target.closest('select') || target.closest('[data-radix-collection-item]')) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => {
+            // Prevent closing when clicking on interactive elements inside
+            const target = e.target as HTMLElement;
+            if (target.closest('button') || target.closest('[role="button"]') || target.closest('input') || target.closest('textarea') || target.closest('select') || target.closest('[data-radix-collection-item]')) {
+              e.preventDefault();
+            }
+          }}
         >
           <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-muted md:hidden" />
           <div className="flex min-h-0 flex-1 flex-col">
@@ -47,6 +61,8 @@ export const ToolDrawer = ({
                 "sticky top-0 z-20 border-b border-border/80 bg-background/95 px-6 pb-4 pt-5 text-left backdrop-blur supports-[backdrop-filter]:bg-background/70",
                 headerClassName,
               )}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
             >
               <DrawerTitle className="flex items-center gap-2 text-base font-semibold sm:text-lg">
                 {title}
@@ -69,6 +85,8 @@ export const ToolDrawer = ({
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
               data-studio-modal-body
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
             >
               {children}
             </div>
@@ -80,6 +98,8 @@ export const ToolDrawer = ({
                 "z-20 shrink-0 border-t border-border/80 bg-background/95 px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)]",
                 stickyFooterOnMobile ? "md:sticky md:bottom-0" : "sticky bottom-0",
               )}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
             >
               {footer}
             </footer>
