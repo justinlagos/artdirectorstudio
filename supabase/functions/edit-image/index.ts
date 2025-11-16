@@ -178,6 +178,45 @@ serve(async (req) => {
 
     // Call Lovable AI Gateway with image editing
     console.log(`[${requestId}] Calling Lovable AI Gateway for image editing...`);
+    
+    // Build instruction with region/mask context
+    let enhancedInstruction = trimmedInstruction;
+    if (region && typeof region === 'object' && region.x !== undefined) {
+      // Include region coordinates in instruction for better AI understanding
+      // Note: Region coordinates are in image pixels, we'll describe them as percentages
+      // The AI model will interpret the region from the instruction text
+      enhancedInstruction = `${trimmedInstruction} Apply this change ONLY to the rectangular region starting at coordinates (${Math.round(region.x)}, ${Math.round(region.y)}) with dimensions ${Math.round(region.width)}x${Math.round(region.height)} pixels. Keep the rest of the image completely unchanged.`;
+    } else if (region) {
+      enhancedInstruction = `${trimmedInstruction} Apply changes to the selected region only.`;
+    }
+    if (mask) {
+      enhancedInstruction += ` Use the provided mask to guide the editing precisely.`;
+    }
+
+    const aiRequestBody = {
+      model: "google/gemini-2.5-flash-image-preview",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `${enhancedInstruction} Generate with aspect ratio ${aspectRatio}.`
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: fullImageUrl
+              }
+            }
+          ]
+        }
+      ],
+      modalities: ["image", "text"]
+    };
+
+    console.log(`[${requestId}] AI request instruction length: ${enhancedInstruction.length}, has region: ${!!region}, has mask: ${!!mask}`);
+
     let aiResponse;
     try {
       aiResponse = await fetchWithRetry(
@@ -188,27 +227,7 @@ serve(async (req) => {
             Authorization: `Bearer ${LOVABLE_API_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash-image-preview",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: `${trimmedInstruction}. Generate with aspect ratio ${aspectRatio}.${region ? ` Apply changes to the selected region only.` : ''}${mask ? ` Use the provided mask to guide the editing.` : ''}`
-                  },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: fullImageUrl
-                    }
-                  }
-                ]
-              }
-            ],
-            modalities: ["image", "text"]
-          }),
+          body: JSON.stringify(aiRequestBody),
         },
         { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 60000 }
       );

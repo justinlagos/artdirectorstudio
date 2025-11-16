@@ -23,12 +23,17 @@ export const PreviewCanvas = ({
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
   const [currentPos, setCurrentPos] = useState<{ x: number; y: number } | null>(null);
   const [imageData, setImageData] = useState<{ width: number; height: number; scale: number; offsetX: number; offsetY: number } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!imageRef.current || !containerRef.current) return;
 
     const img = imageRef.current;
     const container = containerRef.current;
+    
+    setIsLoading(true);
+    setLoadError(null);
     
     const updateImageData = () => {
       const rect = container.getBoundingClientRect();
@@ -39,13 +44,25 @@ export const PreviewCanvas = ({
       const offsetY = (rect.height - displayHeight) / 2;
       
       setImageData({ width: img.naturalWidth, height: img.naturalHeight, scale, offsetX, offsetY });
+      setIsLoading(false);
     };
 
-    if (img.complete) {
+    const handleError = () => {
+      setIsLoading(false);
+      setLoadError("Failed to load image. Please check the URL and try again.");
+    };
+
+    if (img.complete && img.naturalWidth > 0) {
       updateImageData();
     } else {
       img.onload = updateImageData;
+      img.onerror = handleError;
     }
+
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
   }, [imageUrl]);
 
   useEffect(() => {
@@ -170,7 +187,7 @@ export const PreviewCanvas = ({
     // Only prevent default for single touch (selection mode)
     // Allow multi-touch for pinch zoom
     if (e.touches.length === 1) {
-    e.preventDefault();
+      e.preventDefault();
       e.stopPropagation();
     } else {
       // Multi-touch: allow pan/zoom, don't select
@@ -198,7 +215,7 @@ export const PreviewCanvas = ({
     
     // Only prevent default for single touch (selection mode)
     if (e.touches.length === 1) {
-    e.preventDefault();
+      e.preventDefault();
       e.stopPropagation();
     } else {
       // Multi-touch: allow pan/zoom, cancel selection
@@ -219,7 +236,7 @@ export const PreviewCanvas = ({
     if (!isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
     
     if (e.touches.length === 0) {
-    e.preventDefault();
+      e.preventDefault();
       e.stopPropagation();
     }
     
@@ -268,11 +285,30 @@ export const PreviewCanvas = ({
         userSelect: "none"
       }}
     >
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-muted-foreground">Loading image...</p>
+          </div>
+        </div>
+      )}
+      {loadError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+          <div className="text-center p-4">
+            <p className="text-sm text-destructive font-medium">Error loading image</p>
+            <p className="text-xs text-muted-foreground mt-1">{loadError}</p>
+          </div>
+        </div>
+      )}
       <img
         ref={imageRef}
         src={imageUrl}
         alt="Preview"
-        className="max-h-full w-auto h-auto object-contain transition-all duration-200 pointer-events-none"
+        className={cn(
+          "max-h-full w-auto h-auto object-contain transition-all duration-200 pointer-events-none",
+          isLoading || loadError ? "opacity-0" : "opacity-100"
+        )}
         style={{ filter: filterStyle }}
         draggable={false}
       />

@@ -67,7 +67,6 @@ export const EditImageModal = ({
   const [selectedColor, setSelectedColor] = useState("#3B82F6");
   const [activeTab, setActiveTab] = useState<"adjustments" | "select" | "color" | "advanced">("adjustments");
   const [instructionError, setInstructionError] = useState<string | null>(null);
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   useEffect(() => {
     setPreviewUrl(imageUrl);
@@ -75,11 +74,16 @@ export const EditImageModal = ({
     setInstructionError(null);
     setSelectedRegion(null);
     setRegionInstruction("");
+    setAdjustments(defaultAdjustments);
+    setSelectedPreset("None");
   }, [imageUrl, initialInstruction]);
 
-  // Update selection mode when switching to Select tab
+  // Clear region when switching away from Select tab
   useEffect(() => {
-    setIsSelectionMode(activeTab === "select");
+    if (activeTab !== "select" && selectedRegion) {
+      setSelectedRegion(null);
+      setRegionInstruction("");
+    }
   }, [activeTab]);
 
   // Handle Escape key to clear selection
@@ -165,6 +169,39 @@ export const EditImageModal = ({
         : `decrease exposure by ${Math.abs(Math.round(adjustments.exposure))}%`);
     }
 
+    if (adjustments.vibrance !== 100) {
+      const diff = adjustments.vibrance - 100;
+      if (Math.abs(diff) > 10) {
+        changes.push(diff > 0 
+          ? `increase vibrance by ${Math.round(diff)}%`
+          : `decrease vibrance by ${Math.abs(Math.round(diff))}%`);
+      }
+    }
+
+    if (Math.abs(adjustments.shadows) > 10) {
+      changes.push(adjustments.shadows > 0 
+        ? `lift shadows by ${Math.round(adjustments.shadows)}%`
+        : `darken shadows by ${Math.abs(Math.round(adjustments.shadows))}%`);
+    }
+
+    if (Math.abs(adjustments.highlights) > 10) {
+      changes.push(adjustments.highlights > 0 
+        ? `brighten highlights by ${Math.round(adjustments.highlights)}%`
+        : `reduce highlights by ${Math.abs(Math.round(adjustments.highlights))}%`);
+    }
+
+    if (Math.abs(adjustments.clarity) > 10) {
+      changes.push(adjustments.clarity > 0 
+        ? `increase clarity by ${Math.round(adjustments.clarity)}%`
+        : `decrease clarity by ${Math.abs(Math.round(adjustments.clarity))}%`);
+    }
+
+    if (Math.abs(adjustments.sharpness) > 10) {
+      changes.push(adjustments.sharpness > 0 
+        ? `sharpen by ${Math.round(adjustments.sharpness)}%`
+        : `soften by ${Math.abs(Math.round(adjustments.sharpness))}%`);
+    }
+
     if (changes.length === 0) {
       return "";
     }
@@ -218,8 +255,8 @@ export const EditImageModal = ({
         requestBody.mask = mask;
       }
 
-      // Add optional region if provided (when Select tab is active)
-      if (selectedRegion) {
+      // Add optional region if provided (only when Select tab is active)
+      if (selectedRegion && activeTab === "select") {
         requestBody.region = selectedRegion;
         console.log('[EDIT-IMAGE] Including region in request:', selectedRegion);
       }
@@ -381,12 +418,38 @@ export const EditImageModal = ({
     setRegionInstruction("");
     setCustomInstruction(initialInstruction);
     setInstructionError(null);
+    setActiveTab("adjustments");
   };
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(previewUrl);
-      const blob = await response.blob();
+      if (!previewUrl) {
+        toast.error("No image to download");
+        return;
+      }
+
+      // Handle CORS and data URLs
+      let blob: Blob;
+      if (previewUrl.startsWith('data:')) {
+        // Data URL - convert directly
+        const response = await fetch(previewUrl);
+        blob = await response.blob();
+      } else {
+        // Regular URL - try fetch with CORS handling
+        try {
+          const response = await fetch(previewUrl, { mode: 'cors' });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          blob = await response.blob();
+        } catch (fetchError) {
+          // Fallback: try to download via proxy or show helpful error
+          console.error('[EDIT-IMAGE] Download error:', fetchError);
+          toast.error("Download failed. The image may be protected. Try using the browser's right-click > Save Image.");
+          return;
+        }
+      }
+
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -397,7 +460,11 @@ export const EditImageModal = ({
       document.body.removeChild(a);
       toast.success("Image downloaded!");
     } catch (error) {
-      toast.error("Failed to download image");
+      console.error('[EDIT-IMAGE] Download error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error("Failed to download image", {
+        description: errorMessage
+      });
     }
   };
 
@@ -503,7 +570,7 @@ export const EditImageModal = ({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="adjustments" className="mt-4 max-h-[30vh] overflow-y-auto">
+            <TabsContent value="adjustments" className="mt-4 max-h-[35vh] overflow-y-auto">
               <AdjustmentsPanel
                 adjustments={adjustments}
                 onAdjustmentChange={(key, value) => {
@@ -552,15 +619,19 @@ export const EditImageModal = ({
                   } else {
                     instruction = `Change the color of the main subject to ${color}`;
                   }
+                  
+                  // Validate instruction before submitting
+                  if (instruction.trim().length < 3) {
+                    setInstructionError("Please describe which object to recolor or select a region first.");
+                    return;
+                  }
+                  
                   setCustomInstruction(instruction);
                   if (selectedRegion) {
                     setRegionInstruction(instruction);
                   }
-                  if (instruction.trim().length >= 3) {
-                    submitEdit(instruction);
-                  } else {
-                    setInstructionError("Please describe which object to recolor or select a region first.");
-                  }
+                  setInstructionError(null);
+                  submitEdit(instruction);
                 }}
               />
             </TabsContent>
