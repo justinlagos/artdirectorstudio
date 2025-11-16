@@ -1250,8 +1250,16 @@ export const ArtieChat = () => {
   // Using literal string for z-index to prevent Tailwind purging
   const FloatingIcon = () => (
     <div 
-      className="fixed bottom-20 right-4 opacity-100 visible pointer-events-auto"
-      style={{ zIndex: 9999 }}
+      data-artie-floating-icon
+      className="fixed bottom-20 right-4 md:bottom-6 md:right-6 opacity-100 visible pointer-events-auto"
+      style={{ 
+        zIndex: 9999,
+        position: 'fixed',
+        display: 'block',
+        visibility: 'visible',
+        opacity: 1,
+        pointerEvents: 'auto'
+      }}
     >
       {/* Contextual prompt bubble */}
       {showPrompt && contextualPrompt && !isMinimized && (
@@ -1307,12 +1315,13 @@ export const ArtieChat = () => {
   );
 
   // Always render floating button - it should be visible at all times
-  // When chat is closed, show only the button
+  // When chat is closed, show only the button (mobile and desktop)
   if (!isOpen) {
     return <FloatingIcon />;
   }
 
   // Side panel drawer - button still visible on desktop when chat is open
+  // On mobile, hide button when chat is open to avoid overlap
   return (
     <>
       {/* Floating button always visible on desktop when chat is open */}

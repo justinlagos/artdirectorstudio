@@ -88,12 +88,12 @@ export const Header = () => {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[300px]">
-              <SheetHeader>
+            <SheetContent side="right" className="w-[300px] flex flex-col">
+              <SheetHeader className="sticky top-0 z-10 bg-background border-b border-border pb-4 shrink-0">
                 <SheetTitle className="text-left">Menu</SheetTitle>
               </SheetHeader>
               
-              <div className="flex flex-col h-full py-6 space-y-6">
+              <div className="flex-1 overflow-y-auto py-6 space-y-6">
                 {/* User Info Section */}
                 {user && (
                   <div className="flex flex-col gap-3 pb-4 border-b border-border">

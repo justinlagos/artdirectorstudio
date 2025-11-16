@@ -37,11 +37,22 @@
     width: 100%;
     max-width: 100vw;
     position: relative;
+    /* Ensure fixed elements can escape */
+    isolation: isolate;
   }
   
   /* Ensure fixed elements can escape root container */
   #root > * {
     position: relative;
+  }
+  
+  /* Ensure Artie floating icon is always visible */
+  [data-artie-floating-icon] {
+    position: fixed !important;
+    z-index: 9999 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: block !important;
   }
 }
 
