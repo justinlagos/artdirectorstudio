@@ -13,8 +13,32 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(), 
     viteCommonjs({
-      // Specifically handle lodash and its dependencies
-      include: [/lodash/, /node_modules/],
+      // Only process JavaScript files in node_modules, specifically lodash
+      filter: (id) => {
+        // Extract the actual file path (remove query parameters)
+        const filePath = id.split('?')[0];
+        
+        // Only process if it's a JavaScript file in node_modules
+        if (!filePath.includes('node_modules')) return false;
+        
+        // Exclude HTML, CSS, SVG, and other non-JS files
+        if (filePath.endsWith('.html') || 
+            filePath.endsWith('.css') || 
+            filePath.endsWith('.svg') ||
+            filePath.endsWith('.png') ||
+            filePath.endsWith('.jpg') ||
+            filePath.endsWith('.jpeg') ||
+            filePath.endsWith('.gif') ||
+            filePath.endsWith('.webp')) {
+          return false;
+        }
+        
+        // Only process .js, .mjs files or lodash specifically
+        return filePath.includes('lodash') || 
+               filePath.endsWith('.js') || 
+               filePath.endsWith('.mjs') ||
+               filePath.endsWith('.cjs');
+      },
       transformMixedEsModules: true,
     }),
     mode === "development" && componentTagger()
