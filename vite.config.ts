@@ -12,7 +12,10 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    viteCommonjs(),
+    viteCommonjs({
+      // Include browser-image-compression in CommonJS transformation
+      include: ['browser-image-compression'],
+    }),
     mode === "development" && componentTagger()
   ].filter(Boolean),
   resolve: {
@@ -100,14 +103,13 @@ export default defineConfig(({ mode }) => ({
       '@supabase/supabase-js',
       '@tanstack/react-query',
       'lodash', // Explicitly include lodash for proper transformation
-      'browser-image-compression', // Pre-bundle to avoid Cordova issues
     ],
     exclude: [
       'jspdf',
       'pdfjs-dist',
       'mammoth',
       'html2canvas',
-      'browser-image-compression',
+      'browser-image-compression', // Exclude to avoid getOriginalSymbol errors
     ],
     // Force ESM resolution for lodash to prevent default export issues
     esbuildOptions: {
