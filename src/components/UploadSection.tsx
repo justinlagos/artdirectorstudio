@@ -3,7 +3,6 @@ import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import imageCompression from "browser-image-compression";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { OptimizedImage } from "@/components/ui/optimized-image";
@@ -51,6 +50,8 @@ export const UploadSection = ({
             maxWidthOrHeight: 2048,
             useWebWorker: true,
           };
+
+          const { default: imageCompression } = await import("browser-image-compression");
           const compressedFile = await imageCompression(file, options);
           const compressionRatio = ((1 - compressedFile.size / file.size) * 100).toFixed(0);
           toast.success(`Image compressed by ${compressionRatio}%`);
@@ -59,7 +60,7 @@ export const UploadSection = ({
           onFileSelect(file);
         }
       } catch (error) {
-        console.error("Compression error:", error);
+        console.error("Compression error or library failed to load:", error);
         toast.error("Failed to compress image, using original");
         onFileSelect(file);
       }
