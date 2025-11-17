@@ -107,6 +107,7 @@ export default defineConfig(({ mode }) => ({
       'pdfjs-dist',
       'mammoth',
       'html2canvas',
+      'browser-image-compression',
     ],
     // Force ESM resolution for lodash to prevent default export issues
     esbuildOptions: {
