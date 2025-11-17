@@ -346,6 +346,25 @@ All colors MUST be HSL.
     @apply -translate-y-0.5 shadow-medium;
   }
 
+  /* Premium landing page utilities */
+  .premium-card {
+    @apply bg-card border border-border/50 rounded-xl md:rounded-2xl p-8 md:p-10 transition-all duration-300;
+  }
+
+  .premium-card:hover {
+    @apply shadow-medium scale-[1.02] -translate-y-1;
+  }
+
+  /* Smooth section transitions */
+  .section-fade-in {
+    animation: fade-in 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Premium spacing for landing sections */
+  .landing-section {
+    @apply py-20 md:py-28 px-6 lg:px-8;
+  }
+
   /* Interactive card */
   .interactive-card {
     @apply transition-all duration-300 ease-smooth cursor-pointer;
