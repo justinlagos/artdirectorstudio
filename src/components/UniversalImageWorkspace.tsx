@@ -603,8 +603,8 @@ export const UniversalImageWorkspace = ({
                         setSelectedRegion(null);
                         setRegionInstruction("");
                       }}
-                      regionInstruction={regionInstruction}
-                      onRegionInstructionChange={setRegionInstruction}
+                      instruction={regionInstruction}
+                      onInstructionChange={setRegionInstruction}
                     />
                   </TabsContent>
 
@@ -612,13 +612,23 @@ export const UniversalImageWorkspace = ({
                     <ColorPickerPanel
                       selectedColor={selectedColor}
                       onColorChange={setSelectedColor}
+                      onApply={(color) => {
+                        console.log("Apply color:", color);
+                      }}
                     />
                   </TabsContent>
 
                   <TabsContent value="advanced" className="mt-0">
                     <AdvancedEditPanel
-                      customInstruction={customInstruction}
-                      onInstructionChange={setCustomInstruction}
+                      onReplaceObject={(instruction) => {
+                        console.log("Replace object:", instruction);
+                      }}
+                      onRemoveBlemish={() => {
+                        console.log("Remove blemish");
+                      }}
+                      onSmoothBackground={() => {
+                        console.log("Smooth background");
+                      }}
                     />
                   </TabsContent>
                 </div>
@@ -696,8 +706,8 @@ export const UniversalImageWorkspace = ({
                         setSelectedRegion(null);
                         setRegionInstruction("");
                       }}
-                      regionInstruction={regionInstruction}
-                      onRegionInstructionChange={setRegionInstruction}
+                      instruction={regionInstruction}
+                      onInstructionChange={setRegionInstruction}
                     />
                   </TabsContent>
 
@@ -705,13 +715,23 @@ export const UniversalImageWorkspace = ({
                     <ColorPickerPanel
                       selectedColor={selectedColor}
                       onColorChange={setSelectedColor}
+                      onApply={(color) => {
+                        console.log("Apply color:", color);
+                      }}
                     />
                   </TabsContent>
 
                   <TabsContent value="advanced" className="mt-0">
                     <AdvancedEditPanel
-                      customInstruction={customInstruction}
-                      onInstructionChange={setCustomInstruction}
+                      onReplaceObject={(instruction) => {
+                        console.log("Replace object:", instruction);
+                      }}
+                      onRemoveBlemish={() => {
+                        console.log("Remove blemish");
+                      }}
+                      onSmoothBackground={() => {
+                        console.log("Smooth background");
+                      }}
                     />
                   </TabsContent>
                 </div>
