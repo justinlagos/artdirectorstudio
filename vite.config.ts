@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Fix browser-image-compression Cordova import issue
+      "cordova/modulemapper": path.resolve(__dirname, "./src/lib/utils/empty.ts"),
     },
     // Dedupe lodash to prevent multiple instances and default export issues
     dedupe: ['lodash'],
@@ -98,6 +100,7 @@ export default defineConfig(({ mode }) => ({
       '@supabase/supabase-js',
       '@tanstack/react-query',
       'lodash', // Explicitly include lodash for proper transformation
+      'browser-image-compression', // Pre-bundle to avoid Cordova issues
     ],
     exclude: [
       'jspdf',
