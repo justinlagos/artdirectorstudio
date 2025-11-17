@@ -16,6 +16,8 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Stub out cordova imports for browser-image-compression (not needed in web)
+      "cordova/modulemapper": path.resolve(__dirname, "./src/lib/stubs/cordova-stub.js"),
     },
     // Dedupe lodash to prevent multiple instances and default export issues
     dedupe: ['lodash'],
@@ -100,8 +102,8 @@ export default defineConfig(({ mode }) => ({
     exclude: [
       'jspdf',
       'pdfjs-dist',
-      'mammoth',
       'html2canvas',
+      'browser-image-compression', // Exclude from optimization - has cordova imports that break in web
     ],
     // Force ESM resolution for lodash to prevent default export issues
     esbuildOptions: {

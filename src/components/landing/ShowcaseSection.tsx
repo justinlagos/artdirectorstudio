@@ -13,11 +13,15 @@ export const ShowcaseSection = () => {
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const containerRef = useRef<HTMLElement | null>(null);
 
-  const { projects } = useInspireFeed({
+  // Safely get projects with error handling
+  const feedResult = useInspireFeed({
     filter: "featured",
     pageSize: 6,
     realtimeKey: "landing-showcase",
   });
+  
+  const projects = Array.isArray(feedResult?.projects) ? feedResult.projects : [];
+  const error = feedResult?.error || null;
 
   useEffect(() => {
     const node = containerRef.current;
@@ -56,7 +60,7 @@ export const ShowcaseSection = () => {
     navigate("/auth");
   };
 
-  const featuredProjects = projects.slice(0, 6);
+  const featuredProjects = Array.isArray(projects) ? projects.slice(0, 6) : [];
 
   return (
     <>
@@ -77,7 +81,7 @@ export const ShowcaseSection = () => {
           </div>
 
           {/* Showcase Grid */}
-          {featuredProjects.length > 0 ? (
+          {!error && featuredProjects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {featuredProjects.map((project, index) => (
                 <div
@@ -121,7 +125,9 @@ export const ShowcaseSection = () => {
             </div>
           ) : (
             <div className="text-center py-16">
-              <p className="text-muted-foreground text-lg">Featured work coming soon</p>
+              <p className="text-muted-foreground text-lg">
+                {error ? "Unable to load featured work" : "Featured work coming soon"}
+              </p>
             </div>
           )}
         </div>

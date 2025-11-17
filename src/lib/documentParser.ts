@@ -1,6 +1,7 @@
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import mammoth from "mammoth";
+// Dynamic import for mammoth to avoid CommonJS issues
+let mammoth: any = null;
 
 GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -38,8 +39,17 @@ export const extractTextFromPdf = async (file: File) => {
 };
 
 export const extractTextFromDocx = async (file: File) => {
+  // Lazy load mammoth only when needed
+  if (!mammoth) {
+    try {
+      mammoth = await import("mammoth");
+    } catch (error) {
+      console.error("Failed to load mammoth:", error);
+      throw new Error("Document parsing is not available");
+    }
+  }
   const arrayBuffer = await file.arrayBuffer();
-  const { value } = await mammoth.extractRawText({ arrayBuffer });
+  const { value } = await mammoth.default.extractRawText({ arrayBuffer });
   return cleanText(value || "");
 };
 

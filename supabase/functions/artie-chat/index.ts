@@ -11,11 +11,55 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, attachments, contextMemory } = await req.json();
+    // Validate request has body
+    if (!req.body) {
+      return new Response(
+        JSON.stringify({ error: 'Request body is required' }), 
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }), 
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const { messages, attachments, contextMemory } = requestData;
+    
+    // Validate required fields
+    if (!messages || !Array.isArray(messages)) {
+      return new Response(
+        JSON.stringify({ error: 'Messages array is required' }), 
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+      console.error('LOVABLE_API_KEY is not configured');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error: LOVABLE_API_KEY is not configured' }), 
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Enhanced system prompt with brief understanding capabilities
@@ -274,12 +318,29 @@ Remember: You're a creative mind that happens to live inside the interface.`;
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
+      let errorMessage = 'AI service unavailable';
+      try {
+        const errorText = await response.text();
+        console.error('AI gateway error:', response.status, errorText);
+        // Try to parse as JSON for more detailed error
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
+        } catch {
+          // If not JSON, use the text (truncated if too long)
+          errorMessage = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText || errorMessage;
+        }
+      } catch (textError) {
+        console.error('Error reading error response:', textError);
+      }
       return new Response(
-        JSON.stringify({ error: 'AI service unavailable' }), 
-        { 
+        JSON.stringify({ 
+          error: errorMessage,
           status: response.status,
+          details: 'The AI service returned an error. Please try again.'
+        }), 
+        { 
+          status: response.status >= 400 && response.status < 600 ? response.status : 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );

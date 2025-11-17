@@ -84,6 +84,11 @@ const Index = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('[Index] Component mounted/updated', { user: !!user, loading });
+  }, [user, loading]);
 
   // Pull-to-refresh functionality
   const handleRefresh = async () => {
@@ -580,9 +585,29 @@ const Index = () => {
     setResult(updatedResult);
   };
 
-  if (loading) {
+  // Add timeout fallback for loading state to prevent infinite loading
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  
+  useEffect(() => {
+    if (loading) {
+      const timer = setTimeout(() => {
+        console.warn('[Index] Loading timeout - forcing render');
+        setLoadingTimeout(true);
+      }, 3000); // 3 second timeout
+      
+      return () => clearTimeout(timer);
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [loading]);
+  
+  // Show skeleton only if loading and not timed out
+  if (loading && !loadingTimeout) {
     return <PageSkeleton />;
   }
+  
+  // Log render state
+  console.log('[Index] Rendering page', { user: !!user, loading, loadingTimeout });
 
   return (
     <ErrorBoundary>
@@ -592,24 +617,40 @@ const Index = () => {
           isRefreshing={isRefreshing}
           threshold={80}
         />
-        <Header />
+        <ErrorBoundary>
+          <Header />
+        </ErrorBoundary>
       
         {/* Premium Landing Page - Only for non-authenticated users */}
         {!user && (
           <>
-            <HeroSection user={user} />
-            <EmotionalValueSection />
-            <CoreFeaturesSection />
-            <ShowcaseSection />
-            <ProofSection />
-            <PricingSection />
-            <FinalCTASection />
+            <ErrorBoundary fallback={<div className="py-20 text-center">Hero section unavailable</div>}>
+              <HeroSection user={user} />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={null}>
+              <EmotionalValueSection />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={null}>
+              <CoreFeaturesSection />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={<div className="py-20 text-center">Showcase unavailable</div>}>
+              <ShowcaseSection />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={null}>
+              <ProofSection />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={null}>
+              <PricingSection />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={null}>
+              <FinalCTASection />
+            </ErrorBoundary>
           </>
         )}
 
       {/* Studio Section - Only for authenticated users */}
       {user && (
-        <div id="studio-section" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 md:pb-16 space-y-6 md:space-y-8">
+        <div id="studio-section" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6 md:pb-16 space-y-6 md:space-y-8">
           <OnboardingPopup />
           
           <UploadSection
@@ -645,7 +686,9 @@ const Index = () => {
       )}
 
 
-      <Footer />
+        <ErrorBoundary>
+          <Footer />
+        </ErrorBoundary>
       
       {/* Keyboard Shortcuts Guide */}
       <KeyboardShortcutsGuide 

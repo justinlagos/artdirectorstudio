@@ -851,9 +851,18 @@ export const ArtieChat = () => {
           contextualInput = `Context: ${contextParts.join(' | ')}\n\nUser message: ${contextualInput}`;
         }
         
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.error('[ARTIE] Session error:', sessionError);
+          throw new Error('Authentication error. Please sign in again.');
+        }
         if (!session?.access_token) {
           throw new Error('No active session. Please sign in.');
+        }
+
+        // Validate environment variable
+        if (!import.meta.env.VITE_SUPABASE_URL) {
+          throw new Error('Configuration error: VITE_SUPABASE_URL is not set');
         }
 
         const response = await fetch(CHAT_URL, {
@@ -861,6 +870,7 @@ export const ArtieChat = () => {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
           },
           body: JSON.stringify({
             messages: messages
@@ -907,7 +917,61 @@ export const ArtieChat = () => {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to get response from Artie');
+          // Try to extract error message from response
+          let errorMessage = 'Failed to get response from Artie';
+          const contentType = response.headers.get('content-type');
+          
+          try {
+            // Clone response to read it without consuming the original
+            const clonedResponse = response.clone();
+            
+            if (contentType?.includes('application/json')) {
+              const errorData = await clonedResponse.json();
+              errorMessage = errorData.error || errorData.message || errorData.details || errorMessage;
+              console.error('[ARTIE] Edge function error:', {
+                status: response.status,
+                statusText: response.statusText,
+                error: errorData
+              });
+            } else {
+              // Try to read as text
+              const errorText = await clonedResponse.text();
+              console.error('[ARTIE] Edge function error (text):', {
+                status: response.status,
+                statusText: response.statusText,
+                body: errorText
+              });
+              if (errorText) {
+                // Try to parse as JSON if it looks like JSON
+                try {
+                  const parsed = JSON.parse(errorText);
+                  errorMessage = parsed.error || parsed.message || errorMessage;
+                } catch {
+                  // Not JSON, use text (truncated if too long)
+                  errorMessage = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText;
+                }
+              }
+            }
+          } catch (readError) {
+            console.error('[ARTIE] Edge function error (could not read body):', {
+              status: response.status,
+              statusText: response.statusText,
+              readError
+            });
+            // Use status-based default messages
+            if (response.status === 401) {
+              errorMessage = 'Authentication failed. Please sign in again.';
+            } else if (response.status === 403) {
+              errorMessage = 'Access denied. Please check your permissions.';
+            } else if (response.status === 404) {
+              errorMessage = 'Artie service not found. Please contact support.';
+            } else if (response.status === 500) {
+              errorMessage = 'Server error. Please try again later.';
+            } else if (response.status === 503) {
+              errorMessage = 'Service temporarily unavailable. Please try again.';
+            }
+          }
+          throw new Error(errorMessage);
         }
 
         const reader = response.body?.getReader();
@@ -1204,12 +1268,24 @@ export const ArtieChat = () => {
         console.error('[ARTIE] Chat error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         
+        // Provide more helpful error messages
+        let userFriendlyMessage = errorMessage;
+        if (errorMessage.includes('LOVABLE_API_KEY')) {
+          userFriendlyMessage = 'Server configuration error. Please contact support.';
+        } else if (errorMessage.includes('No active session') || errorMessage.includes('Authentication')) {
+          userFriendlyMessage = 'Please sign in to use Artie.';
+        } else if (errorMessage.includes('VITE_SUPABASE_URL')) {
+          userFriendlyMessage = 'Configuration error. Please contact support.';
+        } else if (errorMessage.includes('AI service unavailable') || errorMessage.includes('AI gateway')) {
+          userFriendlyMessage = 'AI service is temporarily unavailable. Please try again in a moment.';
+        } else if (errorMessage === 'Failed to get response from Artie') {
+          userFriendlyMessage = 'Temporary issue connecting to Artie. Please retry.';
+        }
+        
         // Add error message with retry capability
         const errorMsg: Message = {
           id: (Date.now() + 2).toString(),
-          text: `❌ ${errorMessage === 'Failed to get response from Artie' 
-            ? 'Temporary issue connecting to Artie. Please retry.' 
-            : `Error: ${errorMessage}`}`,
+          text: `❌ ${userFriendlyMessage}`,
           sender: 'artie',
           timestamp: new Date(),
           error: true,
@@ -1222,8 +1298,8 @@ export const ArtieChat = () => {
           return [...filtered, errorMsg];
         });
         
-        toast.error("Connection Error", {
-          description: "Couldn't reach Artie. Check your connection and retry.",
+        toast.error("Artie Error", {
+          description: userFriendlyMessage,
           action: {
             label: "Retry",
             onClick: () => handleSend(contextData)
@@ -1281,16 +1357,28 @@ export const ArtieChat = () => {
       <Tooltip open={!hasSeenTooltip && !isOpen && !isMinimized} delayDuration={300}>
         <TooltipTrigger asChild>
           <button
-            onClick={() => isMinimized ? handleRestore() : setIsOpen(true)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (isMinimized) {
+                handleRestore();
+              } else {
+                setIsOpen(true);
+                setIsMinimized(false);
+              }
+            }}
             aria-label="Chat with Artie"
+            type="button"
             className={cn(
               "relative h-14 w-14 md:h-16 md:w-16 rounded-full shadow-strong transition-all duration-300",
               "bg-gradient-to-br from-primary to-primary/80",
               "hover:scale-110 hover:shadow-2xl",
               "flex items-center justify-center group",
+              "cursor-pointer",
               !isOpen && !isMinimized && "animate-glow-pulse",
               isMinimized && "ring-2 ring-primary ring-offset-2 ring-offset-background"
             )}
+            style={{ pointerEvents: 'auto' }}
           >
             {/* Glow ring */}
             <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse pointer-events-none" />
