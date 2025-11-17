@@ -13,24 +13,25 @@ import { Footer } from "@/components/Footer";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import { KeyboardShortcutsGuide } from "@/components/KeyboardShortcutsGuide";
-import { FeaturedPresetsCarousel } from "@/components/FeaturedPresetsCarousel";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Sparkles, Wand2, Upload, ArrowRight, Keyboard } from "lucide-react";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
+import { Keyboard } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useKeyboardShortcuts, KeyboardShortcut, getModifierKey } from "@/hooks/useKeyboardShortcuts";
 import type { GenerationOptions } from "@/components/ImageGenerationDialog";
-import { LandingFeaturedInspire } from "@/components/LandingFeaturedInspire";
-import { GuestActionDialog } from "@/components/GuestActionDialog";
-import type { InspireProject } from "@/types/inspire";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { useStudioStore } from "@/store/studioStore";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageSkeleton } from "@/components/skeletons/PageSkeleton";
+// Premium Landing Page Components
+import { HeroSection } from "@/components/landing/HeroSection";
+import { EmotionalValueSection } from "@/components/landing/EmotionalValueSection";
+import { CoreFeaturesSection } from "@/components/landing/CoreFeaturesSection";
+import { ShowcaseSection } from "@/components/landing/ShowcaseSection";
+import { ProofSection } from "@/components/landing/ProofSection";
+import { PricingSection } from "@/components/landing/PricingSection";
+import { FinalCTASection } from "@/components/landing/FinalCTASection";
 
 export interface Analysis {
   image_overview: string;
@@ -83,7 +84,6 @@ const Index = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
-  const [landingGuestDialogOpen, setLandingGuestDialogOpen] = useState(false);
 
   // Pull-to-refresh functionality
   const handleRefresh = async () => {
@@ -98,18 +98,6 @@ const Index = () => {
     enabled: !!user && !!selectedFile && !!result,
   });
 
-  // Fetch featured testimonials
-  const { data: testimonials } = useQuery({
-    queryKey: ["testimonials"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("testimonials")
-        .select("*")
-        .eq("featured", true)
-        .order("display_order", { ascending: true });
-      return data;
-    },
-  });
 
   // Scroll to studio section when authenticated user arrives
   useEffect(() => {
@@ -242,25 +230,6 @@ const Index = () => {
     enabled: !loading
   });
 
-  const handleLandingUseInStudio = (project: InspireProject) => {
-    if (!project) return;
-
-    if (!user) {
-      setLandingGuestDialogOpen(true);
-      return;
-    }
-
-    openStudioWithPrompt({
-      basePrompt: project.asset?.prompt ?? "",
-      imageUrl: project.asset?.image_url ?? undefined,
-      meta: { source: "landing" },
-    });
-  };
-
-  const handleLandingGuestSignIn = () => {
-    setLandingGuestDialogOpen(false);
-    navigate("/auth");
-  };
 
   const handleFileSelect = (file: File) => {
     if (!user) {
@@ -625,150 +594,18 @@ const Index = () => {
         />
         <Header />
       
-      {/* Hero Section */}
-      <section className="pt-20 pb-16 px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center space-y-8">
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight">
-            Create ideas at the speed of thought.
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto font-medium">
-            Your new creative superpower for images, concepts, variations, and production-ready visuals.
-          </p>
-
-          {!user && (
-            <div className="flex items-center justify-center gap-4 mt-10">
-              <Button size="lg" className="text-lg px-8 py-6 h-auto" onClick={() => navigate("/auth")}>
-                Start Creating
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Sub Hero */}
-      {!user && (
-        <section className="pb-16 px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto text-center">
-            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
-              From zero to finished visuals in minutes.
-            </p>
-            <p className="text-base md:text-lg text-muted-foreground mt-4 leading-relaxed">
-              No friction. No overwhelm.
-            </p>
-            <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-              Only pure creative acceleration.
-            </p>
-          </div>
-        </section>
-      )}
-
-      {/* How It Works Section - Only for non-authenticated users */}
-      {!user && (
-        <section className="py-20 px-6 lg:px-8 bg-secondary/30">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center space-y-4 mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold">How It Works</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-6">
-              <Card className="text-center hover-lift border-0 shadow-lg">
-                <CardContent className="pt-8 pb-8">
-                  <div className="text-4xl font-bold text-primary mb-4">1</div>
-                  <h3 className="text-xl font-semibold mb-3">Type what you want</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Studio turns your idea into a visual instantly.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="text-center hover-lift border-0 shadow-lg">
-                <CardContent className="pt-8 pb-8">
-                  <div className="text-4xl font-bold text-primary mb-4">2</div>
-                  <h3 className="text-xl font-semibold mb-3">Refine with Artie</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    A smart art director that improves your concepts with precise, creative judgment.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="text-center hover-lift border-0 shadow-lg">
-                <CardContent className="pt-8 pb-8">
-                  <div className="text-4xl font-bold text-primary mb-4">3</div>
-                  <h3 className="text-xl font-semibold mb-3">Edit without learning curves</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Adjust color, lighting, objects, and compositions right in the browser.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="text-center hover-lift border-0 shadow-lg">
-                <CardContent className="pt-8 pb-8">
-                  <div className="text-4xl font-bold text-primary mb-4">4</div>
-                  <h3 className="text-xl font-semibold mb-3">Upscale and Blend</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Finish your image with pro-quality tools, fast and clean.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="text-center hover-lift border-0 shadow-lg">
-                <CardContent className="pt-8 pb-8">
-                  <div className="text-4xl font-bold text-primary mb-4">5</div>
-                  <h3 className="text-xl font-semibold mb-3">Everything saves itself</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Your ideas stay organized automatically in My Projects.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Testimonials Section - Only for non-authenticated users */}
-      {!user && testimonials && testimonials.length > 0 && (
-        <section className="py-16 px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center space-y-4 mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold">Loved by Creatives Worldwide</h2>
-              <p className="text-lg text-muted-foreground">
-                See what our users say about ArtDirector Studio
-              </p>
-            </div>
-            <Carousel
-              opts={{
-                align: "start",
-                loop: true,
-              }}
-              className="w-full"
-            >
-              <CarouselContent className="-ml-4">
-                {testimonials.map((testimonial) => (
-                  <CarouselItem key={testimonial.id} className="pl-4 md:basis-1/2 lg:basis-1/3">
-                    <Card className="h-full hover-lift">
-                      <CardContent className="p-6">
-                        <div className="flex items-start gap-4 mb-4">
-                          <Avatar className="w-12 h-12">
-                            <AvatarImage src={testimonial.avatar_url || undefined} alt={testimonial.name} />
-                            <AvatarFallback>{testimonial.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="font-semibold">{testimonial.name}</div>
-                            <div className="text-sm text-muted-foreground">{testimonial.role}</div>
-                          </div>
-                        </div>
-                        <p className="text-muted-foreground leading-relaxed">{testimonial.content}</p>
-                      </CardContent>
-                    </Card>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="hidden md:flex" />
-              <CarouselNext className="hidden md:flex" />
-            </Carousel>
-          </div>
-        </section>
-      )}
-
-      {/* Featured Presets Carousel */}
-      <FeaturedPresetsCarousel />
+        {/* Premium Landing Page - Only for non-authenticated users */}
+        {!user && (
+          <>
+            <HeroSection user={user} />
+            <EmotionalValueSection />
+            <CoreFeaturesSection />
+            <ShowcaseSection />
+            <ProofSection />
+            <PricingSection />
+            <FinalCTASection />
+          </>
+        )}
 
       {/* Studio Section - Only for authenticated users */}
       {user && (
@@ -807,124 +644,6 @@ const Index = () => {
         </div>
       )}
 
-      {/* How It Works - Only show when no results */}
-      {!result && (
-        <section className="py-24 px-6 lg:px-8 bg-secondary/30">
-          <div className="max-w-7xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
-              How It Works
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                {
-                  title: "Analyze",
-                  description: "Upload your image and let AI understand its composition, style, and elements",
-                  icon: (
-                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8"/>
-                      <path d="m21 21-4.35-4.35"/>
-                    </svg>
-                  ),
-                },
-                {
-                  title: "Generate",
-                  description: "Create new visuals based on your prompt and refined parameters",
-                  icon: (
-                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-                      <path d="M5 3v4"/>
-                      <path d="M19 17v4"/>
-                      <path d="M3 5h4"/>
-                      <path d="M17 19h4"/>
-                    </svg>
-                  ),
-                },
-                {
-                  title: "Refine",
-                  description: "Iterate and enhance with precision controls until it's perfect",
-                  icon: (
-                    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-                      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
-                      <path d="M2 2l7.586 7.586"/>
-                      <circle cx="11" cy="11" r="2"/>
-                    </svg>
-                  ),
-                },
-              ].map((step, index) => (
-                <div key={index} className="glass rounded-2xl p-8 text-center hover-lift transition-all duration-300">
-                  <div className="flex items-center justify-center mb-4 text-foreground">{step.icon}</div>
-                  <h3 className="text-2xl font-display font-semibold mb-3">{step.title}</h3>
-                  <p className="text-muted-foreground">{step.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Psychology-backed Trust Section - Only for non-authenticated users */}
-      {!user && (
-        <section className="py-24 px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center space-y-6 mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold">
-                Why creators switch to us
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 max-w-4xl mx-auto">
-              <div className="text-center p-6">
-                <p className="text-lg font-medium mb-2">No learning curve</p>
-              </div>
-              <div className="text-center p-6">
-                <p className="text-lg font-medium mb-2">No complicated tools</p>
-              </div>
-              <div className="text-center p-6">
-                <p className="text-lg font-medium mb-2">No messy workflow</p>
-              </div>
-            </div>
-
-            <div className="text-center mb-16">
-              <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
-                Just ideas turning into visuals, faster than ever
-              </p>
-            </div>
-
-            <div className="text-center space-y-8 mb-16">
-              <h3 className="text-2xl md:text-3xl font-semibold">Made for</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-4xl mx-auto">
-                {['Designers', 'Marketers', 'Founders', 'Content creators', 'Art directors', 'Creative strategists'].map((role) => (
-                  <div key={role} className="p-4 rounded-lg border border-border/50 bg-background/50">
-                    <p className="text-sm font-medium">{role}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Final CTA - Only for non-authenticated users */}
-      {!user && (
-        <section className="py-20 px-6 lg:px-8 bg-primary/5">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
-            <h2 className="text-3xl md:text-5xl font-bold">
-              Turn your ideas into visuals in seconds.
-            </h2>
-            <Button size="lg" className="text-lg px-8 py-6 h-auto" onClick={() => navigate("/auth")}>
-              Get started
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-          </div>
-        </section>
-      )}
-
-      <section className="px-6 lg:px-8 pb-16">
-        <div className="mx-auto w-full max-w-7xl">
-          <LandingFeaturedInspire onUseInStudio={handleLandingUseInStudio} />
-        </div>
-      </section>
 
       <Footer />
       
@@ -953,13 +672,6 @@ const Index = () => {
         </Tooltip>
       )}
 
-      <GuestActionDialog
-        open={landingGuestDialogOpen}
-        onOpenChange={setLandingGuestDialogOpen}
-        onSignIn={handleLandingGuestSignIn}
-        title="Sign in to Remix this project"
-        description="Try ArtDirector Studio free. Sign in to open this project in Studio."
-      />
       </div>
     </ErrorBoundary>
   );
