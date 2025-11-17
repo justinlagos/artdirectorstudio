@@ -7,6 +7,7 @@ import { analytics } from "@/lib/analytics";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LoadingState } from "@/components/LoadingState";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,7 +111,8 @@ const History = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, refetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -267,8 +269,9 @@ const History = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Header />
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background flex flex-col">
+        <Header />
       
       <main className="flex-1 container mx-auto px-4 py-12 pb-20 md:pb-12 max-w-6xl">
         <div className="mb-12 animate-fade-in">
@@ -590,7 +593,8 @@ const History = () => {
         assetId={shareAssetId || ""}
         assetType={shareAssetType}
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };
 
