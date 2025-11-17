@@ -109,9 +109,11 @@ export async function generateConceptIdeas(
         userPrompt: basePrompt,
         imageUnderstanding: undefined,
         userPreferences: undefined,
-        intent: 'new-generation',
+        intent: 'concept_generation',
         metadata: {
-          style: briefAnalysis.styleKeywords?.join(', '),
+          targetAudience: briefAnalysis.targetAudience,
+          brandTone: briefAnalysis.brandTone,
+          styleKeywords: briefAnalysis.styleKeywords,
         },
       });
       

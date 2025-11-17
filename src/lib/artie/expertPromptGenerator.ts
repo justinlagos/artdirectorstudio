@@ -49,33 +49,33 @@ export async function generateExpertStudioPrompt(
       }
     }
 
-    // Build expert analysis using correct nested structure
+    // Build expert analysis
     const analysis = {
-      lighting: typeof understanding.lighting === 'object' ? understanding.lighting.type : 'neutral',
-      color: understanding.colorPalette?.dominant?.join(', ') || 'balanced',
-      composition: typeof understanding.composition === 'object' ? understanding.composition.framing : 'standard',
-      style: typeof understanding.style === 'object' ? understanding.style.category : 'realistic',
-      issues: understanding.technical?.shadows?.issues || [],
-      strengths: understanding.improvements?.overall?.length ? [] : ['well-composed', 'good exposure'],
+      lighting: understanding.lightingConditions || 'neutral',
+      color: understanding.colorPalette?.join(', ') || 'balanced',
+      composition: understanding.composition || 'standard',
+      style: understanding.style || 'realistic',
+      issues: understanding.technicalIssues || [],
+      strengths: understanding.potentialImprovements?.length ? [] : ['well-composed', 'good exposure'],
     };
 
-    // Generate suggested edits based on technical assessment
+    // Generate suggested edits
     const suggestedEdits: string[] = [];
     
-    if (understanding.technical?.exposure === 'underexposed') {
+    if (understanding.technicalIssues?.includes('underexposed')) {
       suggestedEdits.push("Brighten overall exposure while preserving highlights");
     }
-    if (understanding.technical?.exposure === 'overexposed') {
+    if (understanding.technicalIssues?.includes('overexposed')) {
       suggestedEdits.push("Recover highlight details and balance exposure");
     }
-    if (understanding.technical?.shadows?.quality === 'uneven') {
+    if (understanding.technicalIssues?.includes('uneven lighting')) {
       suggestedEdits.push("Even out lighting across the image");
     }
-    if (understanding.improvements?.color?.length) {
+    if (understanding.potentialImprovements?.some(imp => imp.includes('color'))) {
       suggestedEdits.push("Enhance color harmony and saturation");
     }
-    if (understanding.improvements?.composition?.length) {
-      suggestedEdits.push("Optimize composition and framing");
+    if (understanding.potentialImprovements?.some(imp => imp.includes('depth'))) {
+      suggestedEdits.push("Increase depth of field and visual separation");
     }
 
     // If no specific issues, suggest creative enhancements
@@ -94,73 +94,72 @@ export async function generateExpertStudioPrompt(
     }
 
     // Add image context
-    if (understanding.subject) {
-      promptParts.push(`Based on: ${understanding.subject}`);
+    if (understanding.summary) {
+      promptParts.push(`Based on: ${understanding.summary}`);
     }
 
     // Add technical observations
     const observations: string[] = [];
-    if (understanding.lighting && typeof understanding.lighting === 'object' && understanding.lighting.type !== 'mixed') {
-      observations.push(`${understanding.lighting.type} lighting`);
+    if (understanding.lightingConditions && understanding.lightingConditions !== 'unknown') {
+      observations.push(`${understanding.lightingConditions} lighting`);
     }
-    if (understanding.colorPalette?.dominant?.length) {
-      observations.push(`color palette: ${understanding.colorPalette.dominant.slice(0, 3).join(', ')}`);
+    if (understanding.colorPalette?.length) {
+      observations.push(`color palette: ${understanding.colorPalette.slice(0, 3).join(', ')}`);
     }
-    if (understanding.style && typeof understanding.style === 'object') {
-      observations.push(`${understanding.style.category} style`);
+    if (understanding.style && understanding.style !== 'unknown') {
+      observations.push(`${understanding.style} style`);
     }
-    if (understanding.composition && typeof understanding.composition === 'object') {
-      observations.push(`${understanding.composition.framing} composition`);
+    if (understanding.composition && understanding.composition !== 'unknown') {
+      observations.push(`${understanding.composition} composition`);
     }
 
     if (observations.length > 0) {
-      promptParts.push(observations.join(', '));
+      promptParts.push(`Current characteristics: ${observations.join(', ')}`);
     }
 
-    // Add improvement focus
-    if (understanding.improvements?.overall?.length) {
-      promptParts.push(`Focus on: ${understanding.improvements.overall.join(', ')}`);
+    // Add improvement suggestions
+    if (understanding.potentialImprovements?.length) {
+      promptParts.push(`Consider: ${understanding.potentialImprovements.slice(0, 3).join(', ')}`);
     }
 
-    // Add user preferences if available
-    if (preferences) {
-      const preferenceDetails: string[] = [];
-      
-      if (preferences.preferredStyles?.length) {
-        preferenceDetails.push(`Preferred styles: ${preferences.preferredStyles.slice(0, 3).join(', ')}`);
-      }
-
-      if (preferenceDetails.length > 0) {
-        promptParts.push(preferenceDetails.join(', '));
-      }
+    // Incorporate user preferences
+    if (preferences?.preferredStyles?.length) {
+      promptParts.push(`User prefers: ${preferences.preferredStyles.slice(0, 2).join(', ')} styles`);
     }
 
-    // Construct final prompt
-    const prompt = promptParts.length > 0 
-      ? promptParts.join('. ') 
-      : "Refine this image with professional quality adjustments";
+    // Build final prompt
+    let expertPrompt = promptParts.join('. ');
+    
+    // If no user intent, provide a default enhancement prompt
+    if (!userIntent || userIntent === "Refine this image") {
+      expertPrompt = `Refine this image while maintaining its core identity. ${expertPrompt}`;
+    }
 
     return {
-      prompt,
-      suggestedEdits,
+      prompt: expertPrompt,
+      suggestedEdits: suggestedEdits.slice(0, 3),
       analysis,
     };
-
   } catch (error) {
-    console.error('Error generating expert prompt:', error);
+    console.error('[ExpertPrompt] Error generating expert prompt:', error);
     
-    // Return safe fallback
+    // Fallback to basic prompt
     return {
-      prompt: userIntent || "Refine this image",
-      suggestedEdits: ["Enhance overall quality"],
+      prompt: userIntent || "Refine this image with professional adjustments",
+      suggestedEdits: [
+        "Enhance overall visual quality",
+        "Optimize color and lighting",
+        "Refine composition"
+      ],
       analysis: {
         lighting: 'neutral',
         color: 'balanced',
         composition: 'standard',
         style: 'realistic',
         issues: [],
-        strengths: ['original character'],
+        strengths: [],
       },
     };
   }
 }
+

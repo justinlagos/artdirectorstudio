@@ -3,11 +3,11 @@ import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import imageCompression from "browser-image-compression";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import { getModifierKey } from "@/hooks/useKeyboardShortcuts";
-import { compressImage } from "@/lib/imageCompression";
 
 interface UploadSectionProps {
   onFileSelect: (file: File) => void;
@@ -46,11 +46,12 @@ export const UploadSection = ({
         // Only compress if file is larger than 1MB
         if (file.size > 1024 * 1024) {
           toast.info("Compressing image...");
-          const compressedFile = await compressImage(file, {
+          const options = {
             maxSizeMB: 1,
             maxWidthOrHeight: 2048,
             useWebWorker: true,
-          });
+          };
+          const compressedFile = await imageCompression(file, options);
           const compressionRatio = ((1 - compressedFile.size / file.size) * 100).toFixed(0);
           toast.success(`Image compressed by ${compressionRatio}%`);
           onFileSelect(compressedFile);
@@ -58,7 +59,7 @@ export const UploadSection = ({
           onFileSelect(file);
         }
       } catch (error) {
-        console.error("Compression error or library failed to load:", error);
+        console.error("Compression error:", error);
         toast.error("Failed to compress image, using original");
         onFileSelect(file);
       }

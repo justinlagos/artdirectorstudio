@@ -83,7 +83,6 @@ export const ImageGenerationDialog = () => {
   const [lastError, setLastError] = useState<string | null>(null);
   const [continuationStrength, setContinuationStrength] = useState<number>(1.0);
   const [previousGeneratedPrompt, setPreviousGeneratedPrompt] = useState<string>("");
-  const [meta, setMeta] = useState<any>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const generationStartTime = useRef<number>(0);
 

@@ -807,8 +807,8 @@ const Index = () => {
         </div>
       )}
 
-      {/* How It Works - Only show for logged-in users when no results */}
-      {user && !result && (
+      {/* How It Works - Only show when no results */}
+      {!result && (
         <section className="py-24 px-6 lg:px-8 bg-secondary/30">
           <div className="max-w-7xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">

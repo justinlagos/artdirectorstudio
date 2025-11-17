@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { viteCommonjs } from '@originjs/vite-plugin-commonjs';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -11,18 +10,12 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
-    react(),
-    viteCommonjs({
-      // Include browser-image-compression in CommonJS transformation
-      include: ['browser-image-compression'],
-    }),
+    react(), 
     mode === "development" && componentTagger()
   ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Fix browser-image-compression Cordova import issue
-      "cordova/modulemapper": path.resolve(__dirname, "./src/lib/utils/empty.ts"),
     },
     // Dedupe lodash to prevent multiple instances and default export issues
     dedupe: ['lodash'],
@@ -109,7 +102,6 @@ export default defineConfig(({ mode }) => ({
       'pdfjs-dist',
       'mammoth',
       'html2canvas',
-      'browser-image-compression', // Exclude to avoid getOriginalSymbol errors
     ],
     // Force ESM resolution for lodash to prevent default export issues
     esbuildOptions: {
