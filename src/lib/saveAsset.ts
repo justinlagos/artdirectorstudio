@@ -44,17 +44,19 @@ export async function saveAsset(options: SaveAssetOptions): Promise<string | nul
     }
 
     // Insert new asset
+    const paramsJson = options.params ? (options.params as any) : null;
+    const analysisJson = options.analysisData ? (options.analysisData as any) : null;
     const { data: assetData, error: dbError } = await supabase
       .from('generated_assets')
       .insert([{
         user_id: user.id,
-        type: 'image',
+        type: 'image' as const,
         action: options.action,
         image_url: options.imageUrl,
         prompt: options.prompt || `${options.action} image`,
         source_urls: options.sourceUrls || null,
-        params: options.params || {},
-        analysis_data: options.analysisData || null,
+        params: paramsJson,
+        analysis_data: analysisJson,
         duration_ms: options.durationMs || null,
       }])
       .select()

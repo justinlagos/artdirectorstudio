@@ -51,30 +51,30 @@ export async function generateExpertStudioPrompt(
 
     // Build expert analysis
     const analysis = {
-      lighting: understanding.lightingConditions || 'neutral',
-      color: understanding.colorPalette?.join(', ') || 'balanced',
-      composition: understanding.composition || 'standard',
-      style: understanding.style || 'realistic',
-      issues: understanding.technicalIssues || [],
-      strengths: understanding.potentialImprovements?.length ? [] : ['well-composed', 'good exposure'],
+      lighting: understanding.lighting?.type || 'neutral',
+      color: understanding.colorPalette?.dominant?.join(', ') || 'balanced',
+      composition: understanding.composition?.framing || 'standard',
+      style: understanding.style?.category || 'realistic',
+      issues: understanding.technical?.shadows?.issues || [],
+      strengths: understanding.improvements?.overall?.length ? [] : ['well-composed', 'good exposure'],
     };
 
     // Generate suggested edits
     const suggestedEdits: string[] = [];
     
-    if (understanding.technicalIssues?.includes('underexposed')) {
+    if (understanding.technical?.exposure === 'underexposed') {
       suggestedEdits.push("Brighten overall exposure while preserving highlights");
     }
-    if (understanding.technicalIssues?.includes('overexposed')) {
+    if (understanding.technical?.exposure === 'overexposed') {
       suggestedEdits.push("Recover highlight details and balance exposure");
     }
-    if (understanding.technicalIssues?.includes('uneven lighting')) {
+    if (understanding.technical?.shadows?.quality === 'uneven') {
       suggestedEdits.push("Even out lighting across the image");
     }
-    if (understanding.potentialImprovements?.some(imp => imp.includes('color'))) {
+    if (understanding.improvements?.color?.length) {
       suggestedEdits.push("Enhance color harmony and saturation");
     }
-    if (understanding.potentialImprovements?.some(imp => imp.includes('depth'))) {
+    if (understanding.improvements?.composition?.some(imp => imp.includes('depth'))) {
       suggestedEdits.push("Increase depth of field and visual separation");
     }
 
@@ -93,24 +93,27 @@ export async function generateExpertStudioPrompt(
       promptParts.push(userIntent);
     }
 
-    // Add image context
-    if (understanding.summary) {
-      promptParts.push(`Based on: ${understanding.summary}`);
+    // Add image context (create summary from subject and background)
+    const summary = understanding.subject 
+      ? `${understanding.subject}${understanding.background ? ` with ${understanding.background}` : ''}`
+      : understanding.sceneType;
+    if (summary) {
+      promptParts.push(`Based on: ${summary}`);
     }
 
     // Add technical observations
     const observations: string[] = [];
-    if (understanding.lightingConditions && understanding.lightingConditions !== 'unknown') {
-      observations.push(`${understanding.lightingConditions} lighting`);
+    if (understanding.lighting?.type && understanding.lighting.type !== 'natural') {
+      observations.push(`${understanding.lighting.type} lighting`);
     }
-    if (understanding.colorPalette?.length) {
-      observations.push(`color palette: ${understanding.colorPalette.slice(0, 3).join(', ')}`);
+    if (understanding.colorPalette?.dominant?.length) {
+      observations.push(`color palette: ${understanding.colorPalette.dominant.slice(0, 3).join(', ')}`);
     }
-    if (understanding.style && understanding.style !== 'unknown') {
-      observations.push(`${understanding.style} style`);
+    if (understanding.style?.category) {
+      observations.push(`${understanding.style.category} style`);
     }
-    if (understanding.composition && understanding.composition !== 'unknown') {
-      observations.push(`${understanding.composition} composition`);
+    if (understanding.composition?.framing) {
+      observations.push(`${understanding.composition.framing} composition`);
     }
 
     if (observations.length > 0) {
@@ -118,8 +121,8 @@ export async function generateExpertStudioPrompt(
     }
 
     // Add improvement suggestions
-    if (understanding.potentialImprovements?.length) {
-      promptParts.push(`Consider: ${understanding.potentialImprovements.slice(0, 3).join(', ')}`);
+    if (understanding.improvements?.overall?.length) {
+      promptParts.push(`Consider: ${understanding.improvements.overall.slice(0, 3).join(', ')}`);
     }
 
     // Incorporate user preferences

@@ -24,13 +24,13 @@ export function extractStyleMetadata(
   understanding: ImageUnderstanding
 ): StyleMetadata {
   return {
-    colorPalette: understanding.colorPalette || [],
-    lighting: understanding.lighting || 'natural',
-    mood: understanding.mood || 'neutral',
-    composition: understanding.composition || 'balanced',
-    artisticStyle: understanding.style || 'realistic',
-    technique: understanding.technique || 'photography',
-    subjectMatter: understanding.subjectMatter || '',
+    colorPalette: understanding.colorPalette?.dominant || [],
+    lighting: understanding.lighting?.type || 'natural',
+    mood: understanding.mood?.primary || 'neutral',
+    composition: understanding.composition?.framing || 'balanced',
+    artisticStyle: understanding.style?.category || 'realistic',
+    technique: understanding.style?.technique || 'photography',
+    subjectMatter: understanding.subject || '',
     visualElements: understanding.objects || [],
   };
 }
@@ -144,10 +144,10 @@ export async function generateContextAwareVariation(
     if (userPreferences.preferredStyles?.length) {
       styleMetadata.artisticStyle = userPreferences.preferredStyles[0];
     }
-    if (userPreferences.preferredColorPalettes?.length) {
+    if (userPreferences.preferredColors?.length) {
       styleMetadata.colorPalette = [
         ...styleMetadata.colorPalette,
-        ...userPreferences.preferredColorPalettes.slice(0, 2),
+        ...userPreferences.preferredColors.slice(0, 2),
       ];
     }
   }
