@@ -46,7 +46,7 @@ export async function saveAsset(options: SaveAssetOptions): Promise<string | nul
     // Insert new asset
     const { data: assetData, error: dbError } = await supabase
       .from('generated_assets')
-      .insert({
+      .insert([{
         user_id: user.id,
         type: 'image',
         action: options.action,
@@ -56,7 +56,7 @@ export async function saveAsset(options: SaveAssetOptions): Promise<string | nul
         params: options.params || {},
         analysis_data: options.analysisData || null,
         duration_ms: options.durationMs || null,
-      })
+      }])
       .select()
       .single();
 

@@ -20,7 +20,7 @@ const COLOR_PRESETS = [
 interface ColorPickerPanelProps {
   selectedColor: string;
   onColorChange: (color: string) => void;
-  onApply: (color: string) => void;
+  onApply?: (color: string) => void;
 }
 
 export const ColorPickerPanel = ({
@@ -78,16 +78,18 @@ export const ColorPickerPanel = ({
         </div>
       </div>
 
-      <Button
-        onClick={(e) => {
-          e.stopPropagation();
-          onApply(selectedColor);
-        }}
-        className="w-full"
-        size="sm"
-      >
-        Apply Color Change
-      </Button>
+      {onApply && (
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            onApply(selectedColor);
+          }}
+          className="w-full"
+          size="sm"
+        >
+          Apply Color Change
+        </Button>
+      )}
     </div>
   );
 };

@@ -7,8 +7,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 interface SelectionToolProps {
   selectedRegion: { x: number; y: number; width: number; height: number } | null;
   onClearSelection: () => void;
-  onInstructionChange: (instruction: string) => void;
-  instruction: string;
+  onInstructionChange?: (instruction: string) => void;
+  instruction?: string;
+  regionInstruction?: string;
+  onRegionInstructionChange?: (instruction: string) => void;
 }
 
 export const SelectionTool = ({
@@ -16,7 +18,11 @@ export const SelectionTool = ({
   onClearSelection,
   onInstructionChange,
   instruction,
+  regionInstruction,
+  onRegionInstructionChange,
 }: SelectionToolProps) => {
+  const actualInstruction = regionInstruction ?? instruction ?? "";
+  const actualOnChange = onRegionInstructionChange ?? onInstructionChange ?? (() => {});
   if (!selectedRegion) {
     return (
       <div className="p-4 rounded-lg border border-border bg-muted/30">
@@ -63,18 +69,18 @@ export const SelectionTool = ({
         <Textarea
           id="region-instruction"
           placeholder="e.g., remove the background, change color to blue, add text, replace with a different object..."
-          value={instruction}
-          onChange={(e) => onInstructionChange(e.target.value)}
+          value={actualInstruction}
+          onChange={(e) => actualOnChange(e.target.value)}
           className="text-sm min-h-[80px] resize-none"
         />
-        {instruction.trim().length > 0 && instruction.trim().length < 3 && (
+        {actualInstruction.trim().length > 0 && actualInstruction.trim().length < 3 && (
           <Alert variant="destructive" className="py-2">
             <AlertDescription className="text-xs">
               Please provide a more detailed description (at least 3 characters).
             </AlertDescription>
           </Alert>
         )}
-        {instruction.trim().length >= 3 && (
+        {actualInstruction.trim().length >= 3 && (
           <p className="text-xs text-muted-foreground">
             ✓ Ready to apply. Click "Apply with AI" to process this change.
           </p>
