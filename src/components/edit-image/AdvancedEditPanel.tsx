@@ -7,17 +7,26 @@ import { Eraser, Replace, Sparkles, Wand2, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AdvancedEditPanelProps {
-  onReplaceObject: (instruction: string) => void;
-  onRemoveBlemish: () => void;
-  onSmoothBackground: () => void;
+  onReplaceObject?: (instruction: string) => void;
+  onRemoveBlemish?: () => void;
+  onSmoothBackground?: () => void;
+  customInstruction?: string;
+  onInstructionChange?: (instruction: string) => void;
+  onApplyEffect?: (effect: string) => void;
 }
 
 export const AdvancedEditPanel = ({
   onReplaceObject,
   onRemoveBlemish,
   onSmoothBackground,
+  customInstruction,
+  onInstructionChange,
+  onApplyEffect,
 }: AdvancedEditPanelProps) => {
   const [replaceInstruction, setReplaceInstruction] = useState("");
+  
+  const actualInstruction = customInstruction ?? replaceInstruction;
+  const actualOnChange = onInstructionChange ?? setReplaceInstruction;
 
   return (
     <div className="space-y-4">
@@ -39,11 +48,11 @@ export const AdvancedEditPanel = ({
             <Textarea
               id="replace-instruction"
               placeholder="e.g., Replace the car with a bicycle, Replace the sky with a sunset, Replace the person with a statue..."
-              value={replaceInstruction}
-              onChange={(e) => setReplaceInstruction(e.target.value)}
+              value={actualInstruction}
+              onChange={(e) => actualOnChange(e.target.value)}
               className="min-h-[100px] resize-none text-sm"
             />
-            {replaceInstruction.trim().length > 0 && replaceInstruction.trim().length < 3 && (
+            {actualInstruction.trim().length > 0 && actualInstruction.trim().length < 3 && (
               <Alert variant="destructive" className="py-2">
                 <AlertDescription className="text-xs">
                   Please provide a more detailed description (at least 3 characters).
@@ -53,14 +62,20 @@ export const AdvancedEditPanel = ({
             <Button
               onClick={(e) => {
                 e.stopPropagation();
-                if (replaceInstruction.trim().length >= 3) {
-                  onReplaceObject(`Replace the selected area with: ${replaceInstruction.trim()}`);
-                  setReplaceInstruction("");
+                if (actualInstruction.trim().length >= 3) {
+                  if (onReplaceObject) {
+                    onReplaceObject(`Replace the selected area with: ${actualInstruction.trim()}`);
+                  } else if (onApplyEffect) {
+                    onApplyEffect(`Replace the selected area with: ${actualInstruction.trim()}`);
+                  }
+                  if (!customInstruction) {
+                    setReplaceInstruction("");
+                  }
                 }
               }}
               className="w-full"
               size="sm"
-              disabled={!replaceInstruction.trim() || replaceInstruction.trim().length < 3}
+              disabled={!actualInstruction.trim() || actualInstruction.trim().length < 3}
             >
               <Replace className="h-4 w-4 mr-2" />
               Replace Object

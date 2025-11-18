@@ -185,12 +185,12 @@ export async function analyzeAndStoreImage(imageUrl: string): Promise<void> {
     const understanding = await analyzeImageDeep(imageUrl);
     
     updateImageAnalysis(imageUrl, {
-      objects: understanding.objectsInScene,
-      lighting: understanding.lightingConditions,
-      mood: understanding.mood,
-      colorPalette: understanding.colorPalette,
-      style: understanding.style,
-      composition: understanding.composition,
+      objects: understanding.objects || [],
+      lighting: understanding.lighting?.type || 'natural',
+      mood: understanding.mood?.primary || 'neutral',
+      colorPalette: understanding.colorPalette?.dominant || [],
+      style: understanding.style?.category || 'realistic',
+      composition: understanding.composition?.framing || 'medium',
     });
   } catch (error) {
     console.error('[ImageMemory] Failed to analyze image:', error);
