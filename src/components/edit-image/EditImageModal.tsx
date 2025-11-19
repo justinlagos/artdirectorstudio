@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ToolDrawer } from "@/components/ToolDrawer";
+import { ArtieModal } from "@/components/artie/ArtieModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -365,17 +365,23 @@ export const EditImageModal = ({
   };
 
   const handleApply = () => {
+    // Validate that there are changes
+    if (!hasChanges()) {
+      setInstructionError("Please add an editing instruction or adjust the image settings before applying changes.");
+      return;
+    }
+    
     // Priority: region instruction > custom instruction > auto-generated from adjustments
     let instruction = "";
     
-    // If Select tab is active and region is selected, require region instruction
+    // If Select tab is active and region is selected, prefer region instruction
     if (activeTab === "select" && selectedRegion) {
       if (regionInstruction.trim().length >= 3) {
         instruction = regionInstruction.trim();
       } else if (customInstruction.trim().length >= 3) {
         instruction = customInstruction.trim();
       } else {
-        setInstructionError("Describe what you want to change.");
+        setInstructionError("Please describe what you want to change in the selected region.");
         return;
       }
     } else if (selectedRegion && regionInstruction.trim().length >= 3) {
@@ -387,26 +393,11 @@ export const EditImageModal = ({
     }
     
     if (instruction.length < 3) {
-      setInstructionError("Describe what you want to change.");
+      setInstructionError("Please add an editing instruction or adjust the image settings before applying changes.");
       return;
     }
     
-    // Include adjustments in the instruction if they were made
-    const hasAdjustments = Object.entries(adjustments).some(([key, value]) => {
-      const defaultVal = defaultAdjustments[key as keyof Adjustments];
-      return value !== defaultVal;
-    });
-    
-    // If user made adjustments but no instruction, ensure we use the generated instruction
-    if (hasAdjustments && !customInstruction.trim() && !regionInstruction.trim()) {
-      instruction = generateInstruction();
-    }
-    
-    if (instruction.length < 3) {
-      setInstructionError("Describe what you want to change.");
-      return;
-    }
-    
+    setInstructionError(null);
     submitEdit(instruction);
   };
 
@@ -468,14 +459,29 @@ export const EditImageModal = ({
     }
   };
 
-  const canApply = () => {
-    // Priority: region instruction > custom instruction > auto-generated from adjustments
-    if (selectedRegion && regionInstruction.trim().length >= 3) return true;
+  const hasChanges = () => {
+    // Check if there's a custom instruction
     if (customInstruction.trim().length >= 3) return true;
     
-    // Only allow auto-generated instruction if adjustments have been made
-    const instruction = generateInstruction();
-    return instruction.length >= 3;
+    // Check if there's a region instruction
+    if (selectedRegion && regionInstruction.trim().length >= 3) return true;
+    
+    // Check if adjustments differ from defaults
+    const hasAdjustments = Object.entries(adjustments).some(([key, value]) => {
+      const defaultVal = defaultAdjustments[key as keyof Adjustments];
+      return value !== defaultVal;
+    });
+    
+    if (hasAdjustments) {
+      const instruction = generateInstruction();
+      return instruction.length >= 3;
+    }
+    
+    return false;
+  };
+
+  const canApply = () => {
+    return hasChanges();
   };
 
   const applyPreset = (presetName: string) => {
@@ -500,7 +506,7 @@ export const EditImageModal = ({
   );
 
   return (
-    <ToolDrawer
+    <ArtieModal
       open={open}
       onOpenChange={onOpenChange}
       title={
@@ -511,169 +517,181 @@ export const EditImageModal = ({
       }
       description={isMobile ? "Make lighting, color and object-level edits." : "Adjust light, color and details. Use region tools for object changes and retouching. Changes are saved to My Projects."}
       footer={footerContent}
-      stickyFooterOnMobile
       contentClassName={cn(
-        "pb-0",
-        isMobile ? "px-4 py-4" : "px-0 py-0"
+        "flex flex-col min-h-0",
+        !isMobile && "overflow-hidden h-full"
       )}
-      className="z-[65]"
+      maxWidth="full"
     >
       {isMobile ? (
-        // Mobile: Vertical stacked layout
-        <div className="space-y-4">
-          {/* Image Preview */}
-          <div className="w-full">
+        // Mobile: Image at top, tools in bottom sheet
+        <div className="flex flex-col min-h-0">
+          {/* Image Preview - ~60% viewport height */}
+          <div className="flex-shrink-0 w-full mb-4" style={{ height: "60vh", maxHeight: "400px", minHeight: "300px" }}>
             <PreviewCanvas
               imageUrl={previewUrl}
               filterStyle={generateFilterStyle(adjustments)}
               selectedRegion={selectedRegion}
               onRegionSelect={activeTab === "select" ? setSelectedRegion : undefined}
-              className="rounded-xl min-h-[250px] max-h-[40vh] w-full"
+              isSelectionMode={activeTab === "select"}
+              className="rounded-xl w-full h-full"
             />
           </div>
 
-          {/* Instruction Input - Always visible */}
-          <div className="space-y-2">
-            <Label htmlFor="custom-instruction" className="text-sm font-medium">Editing Instruction</Label>
-            <Textarea
-              id="custom-instruction"
-              placeholder="Describe what you want to change… brighten the image, clean the background, change the jacket to red."
-              value={customInstruction}
-              onChange={(e) => {
-                setCustomInstruction(e.target.value);
-                setInstructionError(null);
-              }}
-              className="resize-none min-h-[80px] text-sm"
-            />
-            {instructionError && (
-              <p className="text-sm text-destructive mt-1">{instructionError}</p>
-            )}
-          </div>
-
-          {/* Tools Tabs */}
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-9">
-              <TabsTrigger value="adjustments" className="text-xs">
-                Adjustments
-              </TabsTrigger>
-              <TabsTrigger value="select" className="text-xs">
-                <MousePointer2 className="h-3 w-3 mr-1" />
-                Select
-              </TabsTrigger>
-              <TabsTrigger value="color" className="text-xs">
-                <Palette className="h-3 w-3 mr-1" />
-                Color
-              </TabsTrigger>
-              <TabsTrigger value="advanced" className="text-xs">
-                <Wand2 className="h-3 w-3 mr-1" />
-                Advanced
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="adjustments" className="mt-4 max-h-[35vh] overflow-y-auto">
-              <AdjustmentsPanel
-                adjustments={adjustments}
-                onAdjustmentChange={(key, value) => {
-                  setAdjustments(prev => ({ ...prev, [key]: value }));
-                }}
-                selectedPreset={selectedPreset}
-                onPresetChange={applyPreset}
-                presets={FILTER_PRESETS}
-              />
-            </TabsContent>
-
-            <TabsContent value="select" className="mt-4">
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Tap and drag on the image to select a rectangular region for editing.
-                </p>
-                {!selectedRegion && (
-                  <p className="text-xs text-muted-foreground italic">
-                    Draw a region on the image to apply this change.
-                  </p>
-                )}
-                <SelectionTool
-                  selectedRegion={selectedRegion}
-                  onClearSelection={() => {
-                    setSelectedRegion(null);
-                    setRegionInstruction("");
-                  }}
-                  onInstructionChange={setRegionInstruction}
-                  instruction={regionInstruction}
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="color" className="mt-4">
-              <ColorPickerPanel
-                selectedColor={selectedColor}
-                onColorChange={setSelectedColor}
-                onApply={(color) => {
-                  let instruction = "";
-                  if (selectedRegion && regionInstruction.trim()) {
-                    instruction = `${regionInstruction.trim()}. Change the color to ${color}`;
-                  } else if (selectedRegion) {
-                    instruction = `Change the color of the selected region to ${color}`;
-                  } else if (customInstruction.trim()) {
-                    instruction = `${customInstruction.trim()}. Change the color to ${color}`;
-                  } else {
-                    instruction = `Change the color of the main subject to ${color}`;
-                  }
-                  
-                  // Validate instruction before submitting
-                  if (instruction.trim().length < 3) {
-                    setInstructionError("Please describe which object to recolor or select a region first.");
-                    return;
-                  }
-                  
-                  setCustomInstruction(instruction);
-                  if (selectedRegion) {
-                    setRegionInstruction(instruction);
-                  }
+          {/* Tools Panel - Scrollable bottom sheet */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Instruction Input - Always visible at top */}
+            <div className="space-y-2 flex-shrink-0 mb-4">
+              <Label htmlFor="custom-instruction" className="text-sm font-medium">Editing Instruction</Label>
+              <Textarea
+                id="custom-instruction"
+                placeholder="Describe what you want to change… brighten the image, clean the background, change the jacket to red."
+                value={customInstruction}
+                onChange={(e) => {
+                  setCustomInstruction(e.target.value);
                   setInstructionError(null);
-                  submitEdit(instruction);
                 }}
+                className="resize-none min-h-[80px] text-sm"
               />
-            </TabsContent>
+              {instructionError && (
+                <Alert variant="destructive" className="py-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">{instructionError}</AlertDescription>
+                </Alert>
+              )}
+            </div>
 
-            <TabsContent value="advanced" className="mt-4">
-              <AdvancedEditPanel
-                onReplaceObject={(instruction) => {
-                  setCustomInstruction(instruction);
-                  submitEdit(instruction);
-                }}
-                onRemoveBlemish={() => {
-                  const instruction = "Remove blemishes and imperfections while maintaining natural skin texture";
-                  setCustomInstruction(instruction);
-                  submitEdit(instruction);
-                }}
-                onSmoothBackground={() => {
-                  const instruction = "Smooth and blur the background while keeping the subject sharp";
-                  setCustomInstruction(instruction);
-                  submitEdit(instruction);
-                }}
-              />
-            </TabsContent>
-          </Tabs>
+            {/* Tools Tabs - Scrollable */}
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full flex-1 flex flex-col min-h-0">
+              <TabsList className="grid w-full grid-cols-4 h-9 flex-shrink-0">
+                <TabsTrigger value="adjustments" className="text-xs">
+                  Adjust
+                </TabsTrigger>
+                <TabsTrigger value="select" className="text-xs">
+                  <MousePointer2 className="h-3 w-3 mr-1" />
+                  Select
+                </TabsTrigger>
+                <TabsTrigger value="color" className="text-xs">
+                  <Palette className="h-3 w-3 mr-1" />
+                  Color
+                </TabsTrigger>
+                <TabsTrigger value="advanced" className="text-xs">
+                  <Wand2 className="h-3 w-3 mr-1" />
+                  Advanced
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="flex-1 overflow-y-auto mt-4 min-h-0">
+                <TabsContent value="adjustments" className="mt-0">
+                  <AdjustmentsPanel
+                    adjustments={adjustments}
+                    onAdjustmentChange={(key, value) => {
+                      setAdjustments(prev => ({ ...prev, [key]: value }));
+                    }}
+                    selectedPreset={selectedPreset}
+                    onPresetChange={applyPreset}
+                    presets={FILTER_PRESETS}
+                  />
+                </TabsContent>
+
+                <TabsContent value="select" className="mt-0">
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Tap and drag on the image to select a rectangular region for editing.
+                    </p>
+                    {!selectedRegion && (
+                      <p className="text-xs text-muted-foreground italic">
+                        Draw a region on the image to apply this change.
+                      </p>
+                    )}
+                    <SelectionTool
+                      selectedRegion={selectedRegion}
+                      onClearSelection={() => {
+                        setSelectedRegion(null);
+                        setRegionInstruction("");
+                      }}
+                      onInstructionChange={setRegionInstruction}
+                      instruction={regionInstruction}
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="color" className="mt-0">
+                  <ColorPickerPanel
+                    selectedColor={selectedColor}
+                    onColorChange={setSelectedColor}
+                    onApply={(color) => {
+                      let instruction = "";
+                      if (selectedRegion && regionInstruction.trim()) {
+                        instruction = `${regionInstruction.trim()}. Change the color to ${color}`;
+                      } else if (selectedRegion) {
+                        instruction = `Change the color of the selected region to ${color}`;
+                      } else if (customInstruction.trim()) {
+                        instruction = `${customInstruction.trim()}. Change the color to ${color}`;
+                      } else {
+                        instruction = `Change the color of the main subject to ${color}`;
+                      }
+                      
+                      // Validate instruction before submitting
+                      if (instruction.trim().length < 3) {
+                        setInstructionError("Please describe which object to recolor or select a region first.");
+                        return;
+                      }
+                      
+                      setCustomInstruction(instruction);
+                      if (selectedRegion) {
+                        setRegionInstruction(instruction);
+                      }
+                      setInstructionError(null);
+                      submitEdit(instruction);
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="advanced" className="mt-0">
+                  <AdvancedEditPanel
+                    onReplaceObject={(instruction) => {
+                      setCustomInstruction(instruction);
+                      submitEdit(instruction);
+                    }}
+                    onRemoveBlemish={() => {
+                      const instruction = "Remove blemishes and imperfections while maintaining natural skin texture";
+                      setCustomInstruction(instruction);
+                      submitEdit(instruction);
+                    }}
+                    onSmoothBackground={() => {
+                      const instruction = "Smooth and blur the background while keeping the subject sharp";
+                      setCustomInstruction(instruction);
+                      submitEdit(instruction);
+                    }}
+                  />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </div>
         </div>
       ) : (
         // Desktop: Two-column layout
-        <div className="flex gap-6 h-full max-h-[calc(90vh-180px)] px-6">
-          {/* Left Column: Image Preview (60-65%) */}
-          <div className="flex-1 min-w-0 flex items-center justify-center" style={{ flex: "0 0 60%" }}>
+        <div className={cn(
+          "grid gap-6 h-full min-h-0 flex-1",
+          "grid-cols-[1fr_400px]"
+        )}>
+          {/* Left Column: Image Preview - Centered, constrained height */}
+          <div className="flex items-center justify-center min-h-0 overflow-hidden">
             <PreviewCanvas
               imageUrl={previewUrl}
               filterStyle={generateFilterStyle(adjustments)}
               selectedRegion={selectedRegion}
               onRegionSelect={activeTab === "select" ? setSelectedRegion : undefined}
-              className="rounded-xl w-full h-full max-h-full object-contain"
+              isSelectionMode={activeTab === "select"}
+              className="rounded-xl w-full h-full max-h-full"
             />
           </div>
 
-          {/* Right Column: Controls (35-40%) */}
-          <div className="flex-1 min-w-0 flex flex-col space-y-4 overflow-y-auto pr-2" style={{ flex: "0 0 40%", maxHeight: "100%" }}>
-            {/* Instruction Input */}
-            <div className="space-y-2 flex-shrink-0">
+          {/* Right Column: Tools Panel - Scrollable */}
+          <div className="flex flex-col min-h-0 overflow-hidden border-l border-border pl-6">
+            {/* Instruction Input - Fixed at top */}
+            <div className="space-y-2 flex-shrink-0 mb-4">
               <Label htmlFor="custom-instruction" className="text-sm font-medium">Editing Instruction</Label>
               <Textarea
                 id="custom-instruction"
@@ -686,15 +704,18 @@ export const EditImageModal = ({
                 className="resize-none min-h-[100px] text-sm"
               />
               {instructionError && (
-                <p className="text-sm text-destructive mt-1">{instructionError}</p>
+                <Alert variant="destructive" className="py-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">{instructionError}</AlertDescription>
+                </Alert>
               )}
             </div>
 
-            {/* Tools Tabs */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full flex-shrink-0">
-              <TabsList className="grid w-full grid-cols-4 h-10">
+            {/* Tools Tabs - Scrollable */}
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full flex-1 flex flex-col min-h-0">
+              <TabsList className="grid w-full grid-cols-4 h-10 flex-shrink-0">
                 <TabsTrigger value="adjustments" className="text-sm">
-                  Adjustments
+                  Adjust
                 </TabsTrigger>
                 <TabsTrigger value="select" className="text-sm">
                   <MousePointer2 className="h-3.5 w-3.5 mr-1.5" />
@@ -710,91 +731,93 @@ export const EditImageModal = ({
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="adjustments" className="mt-4">
-                <AdjustmentsPanel
-                  adjustments={adjustments}
-                  onAdjustmentChange={(key, value) => {
-                    setAdjustments(prev => ({ ...prev, [key]: value }));
-                  }}
-                  selectedPreset={selectedPreset}
-                  onPresetChange={applyPreset}
-                  presets={FILTER_PRESETS}
-                />
-              </TabsContent>
-
-              <TabsContent value="select" className="mt-4">
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Click and drag on the image to select a rectangular region for editing. The selected area will be highlighted in blue.
-                  </p>
-                  {!selectedRegion && (
-                    <p className="text-sm text-muted-foreground italic">
-                      Draw a region on the image to apply this change.
-                    </p>
-                  )}
-                  <SelectionTool
-                    selectedRegion={selectedRegion}
-                    onClearSelection={() => {
-                      setSelectedRegion(null);
-                      setRegionInstruction("");
+              <div className="flex-1 overflow-y-auto mt-4 min-h-0">
+                <TabsContent value="adjustments" className="mt-0">
+                  <AdjustmentsPanel
+                    adjustments={adjustments}
+                    onAdjustmentChange={(key, value) => {
+                      setAdjustments(prev => ({ ...prev, [key]: value }));
                     }}
-                    onInstructionChange={setRegionInstruction}
-                    instruction={regionInstruction}
+                    selectedPreset={selectedPreset}
+                    onPresetChange={applyPreset}
+                    presets={FILTER_PRESETS}
                   />
-                </div>
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="color" className="mt-4">
-                <ColorPickerPanel
-                  selectedColor={selectedColor}
-                  onColorChange={setSelectedColor}
-                  onApply={(color) => {
-                    let instruction = "";
-                    if (selectedRegion && regionInstruction.trim()) {
-                      instruction = `${regionInstruction.trim()}. Change the color to ${color}`;
-                    } else if (selectedRegion) {
-                      instruction = `Change the color of the selected region to ${color}`;
-                    } else if (customInstruction.trim()) {
-                      instruction = `${customInstruction.trim()}. Change the color to ${color}`;
-                    } else {
-                      instruction = `Change the color of the main subject to ${color}`;
-                    }
-                    setCustomInstruction(instruction);
-                    if (selectedRegion) {
-                      setRegionInstruction(instruction);
-                    }
-                    if (instruction.trim().length >= 3) {
+                <TabsContent value="select" className="mt-0">
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Click and drag on the image to select a rectangular region for editing. Panning is disabled in Select mode.
+                    </p>
+                    {!selectedRegion && (
+                      <p className="text-sm text-muted-foreground italic">
+                        Draw a region on the image to apply this change.
+                      </p>
+                    )}
+                    <SelectionTool
+                      selectedRegion={selectedRegion}
+                      onClearSelection={() => {
+                        setSelectedRegion(null);
+                        setRegionInstruction("");
+                      }}
+                      onInstructionChange={setRegionInstruction}
+                      instruction={regionInstruction}
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="color" className="mt-0">
+                  <ColorPickerPanel
+                    selectedColor={selectedColor}
+                    onColorChange={setSelectedColor}
+                    onApply={(color) => {
+                      let instruction = "";
+                      if (selectedRegion && regionInstruction.trim()) {
+                        instruction = `${regionInstruction.trim()}. Change the color to ${color}`;
+                      } else if (selectedRegion) {
+                        instruction = `Change the color of the selected region to ${color}`;
+                      } else if (customInstruction.trim()) {
+                        instruction = `${customInstruction.trim()}. Change the color to ${color}`;
+                      } else {
+                        instruction = `Change the color of the main subject to ${color}`;
+                      }
+                      setCustomInstruction(instruction);
+                      if (selectedRegion) {
+                        setRegionInstruction(instruction);
+                      }
+                      if (instruction.trim().length >= 3) {
+                        submitEdit(instruction);
+                      } else {
+                        setInstructionError("Please describe which object to recolor or select a region first.");
+                      }
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="advanced" className="mt-0">
+                  <AdvancedEditPanel
+                    onReplaceObject={(instruction) => {
+                      setCustomInstruction(instruction);
                       submitEdit(instruction);
-                    } else {
-                      setInstructionError("Please describe which object to recolor or select a region first.");
-                    }
-                  }}
-                />
-              </TabsContent>
-
-              <TabsContent value="advanced" className="mt-4">
-                <AdvancedEditPanel
-                  onReplaceObject={(instruction) => {
-                    setCustomInstruction(instruction);
-                    submitEdit(instruction);
-                  }}
-                  onRemoveBlemish={() => {
-                    const instruction = "Remove blemishes and imperfections while maintaining natural skin texture";
-                    setCustomInstruction(instruction);
-                    submitEdit(instruction);
-                  }}
-                  onSmoothBackground={() => {
-                    const instruction = "Smooth and blur the background while keeping the subject sharp";
-                    setCustomInstruction(instruction);
-                    submitEdit(instruction);
-                  }}
-                />
-              </TabsContent>
+                    }}
+                    onRemoveBlemish={() => {
+                      const instruction = "Remove blemishes and imperfections while maintaining natural skin texture";
+                      setCustomInstruction(instruction);
+                      submitEdit(instruction);
+                    }}
+                    onSmoothBackground={() => {
+                      const instruction = "Smooth and blur the background while keeping the subject sharp";
+                      setCustomInstruction(instruction);
+                      submitEdit(instruction);
+                    }}
+                  />
+                </TabsContent>
+              </div>
             </Tabs>
           </div>
         </div>
       )}
-    </ToolDrawer>
+    </ArtieModal>
   );
 };
 

@@ -1,6 +1,5 @@
-// Export UniversalImageWorkspace as ImageEditor for backward compatibility
-// This provides the new full-screen workspace experience
-export { UniversalImageWorkspace as ImageEditor } from "./UniversalImageWorkspace";
+// Export EditImageModalWrapper as ImageEditor for standardized modal experience
+export { EditImageModalWrapper as ImageEditor } from "./edit-image/EditImageModalWrapper";
 
 // Keep the old interface for compatibility
 export interface ImageEditorProps {

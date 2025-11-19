@@ -6,6 +6,7 @@ interface PreviewCanvasProps {
   filterStyle?: string;
   selectedRegion?: { x: number; y: number; width: number; height: number } | null;
   onRegionSelect?: (region: { x: number; y: number; width: number; height: number } | null) => void;
+  isSelectionMode?: boolean;
   className?: string;
 }
 
@@ -14,6 +15,7 @@ export const PreviewCanvas = ({
   filterStyle,
   selectedRegion,
   onRegionSelect,
+  isSelectionMode = false,
   className,
 }: PreviewCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,14 +86,33 @@ export const PreviewCanvas = ({
       const regionWidth = selectedRegion.width * imageData.scale;
       const regionHeight = selectedRegion.height * imageData.scale;
 
-      // Draw semi-transparent overlay
-      ctx.fillStyle = "rgba(59, 130, 246, 0.3)";
+      // Draw dark overlay outside selection
+      ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Clear the selection area (punch through)
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillRect(regionX, regionY, regionWidth, regionHeight);
+      
+      // Reset composite operation
+      ctx.globalCompositeOperation = "source-over";
+
+      // Draw semi-transparent highlight inside selection
+      ctx.fillStyle = "rgba(59, 130, 246, 0.2)";
       ctx.fillRect(regionX, regionY, regionWidth, regionHeight);
 
-      // Draw border
+      // Draw border with handles
       ctx.strokeStyle = "rgb(59, 130, 246)";
       ctx.lineWidth = 2;
       ctx.strokeRect(regionX, regionY, regionWidth, regionHeight);
+      
+      // Draw corner handles
+      const handleSize = 8;
+      ctx.fillStyle = "rgb(59, 130, 246)";
+      ctx.fillRect(regionX - handleSize/2, regionY - handleSize/2, handleSize, handleSize);
+      ctx.fillRect(regionX + regionWidth - handleSize/2, regionY - handleSize/2, handleSize, handleSize);
+      ctx.fillRect(regionX - handleSize/2, regionY + regionHeight - handleSize/2, handleSize, handleSize);
+      ctx.fillRect(regionX + regionWidth - handleSize/2, regionY + regionHeight - handleSize/2, handleSize, handleSize);
     }
 
     // Draw temporary selection while dragging
@@ -101,8 +122,22 @@ export const PreviewCanvas = ({
       const width = Math.abs(currentPos.x - startPos.x);
       const height = Math.abs(currentPos.y - startPos.y);
 
+      // Draw dark overlay outside selection
+      ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Clear the selection area (punch through)
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillRect(x, y, width, height);
+      
+      // Reset composite operation
+      ctx.globalCompositeOperation = "source-over";
+
+      // Draw semi-transparent highlight inside selection
       ctx.fillStyle = "rgba(59, 130, 246, 0.2)";
       ctx.fillRect(x, y, width, height);
+      
+      // Draw border
       ctx.strokeStyle = "rgb(59, 130, 246)";
       ctx.lineWidth = 2;
       ctx.strokeRect(x, y, width, height);
@@ -110,9 +145,10 @@ export const PreviewCanvas = ({
   }, [selectedRegion, isSelecting, startPos, currentPos, imageData]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!onRegionSelect || !containerRef.current || !imageData) return;
+    // Only handle selection if in selection mode
+    if (!isSelectionMode || !onRegionSelect || !containerRef.current || !imageData) return;
     
-    // Prevent default to stop any image dragging
+    // Prevent default to stop any image dragging/panning
     e.preventDefault();
     e.stopPropagation();
     
@@ -132,9 +168,9 @@ export const PreviewCanvas = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isSelecting || !startPos || !containerRef.current) return;
+    if (!isSelectionMode || !isSelecting || !startPos || !containerRef.current) return;
     
-    // Prevent default to stop any image dragging
+    // Prevent default to stop any image dragging/panning
     e.preventDefault();
     e.stopPropagation();
     
@@ -146,12 +182,12 @@ export const PreviewCanvas = ({
   };
 
   const handleMouseUp = (e?: React.MouseEvent) => {
-    if (e) {
+    if (e && isSelectionMode) {
       e.preventDefault();
       e.stopPropagation();
     }
     
-    if (!isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
+    if (!isSelectionMode || !isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
     
     const x = Math.max(imageData.offsetX, Math.min(startPos.x, currentPos.x));
     const y = Math.max(imageData.offsetY, Math.min(startPos.y, currentPos.y));
@@ -182,10 +218,11 @@ export const PreviewCanvas = ({
 
   // Touch event handlers for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (!onRegionSelect || !containerRef.current || !imageData) return;
+    // Only handle selection if in selection mode
+    if (!isSelectionMode || !onRegionSelect || !containerRef.current || !imageData) return;
     
     // Only prevent default for single touch (selection mode)
-    // Allow multi-touch for pinch zoom
+    // Allow multi-touch for pinch zoom (but don't select)
     if (e.touches.length === 1) {
       e.preventDefault();
       e.stopPropagation();
@@ -211,7 +248,7 @@ export const PreviewCanvas = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isSelecting || !startPos || !containerRef.current) return;
+    if (!isSelectionMode || !isSelecting || !startPos || !containerRef.current) return;
     
     // Only prevent default for single touch (selection mode)
     if (e.touches.length === 1) {
@@ -233,9 +270,9 @@ export const PreviewCanvas = ({
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
+    if (!isSelectionMode || !isSelecting || !startPos || !currentPos || !onRegionSelect || !imageData) return;
     
-    if (e.touches.length === 0) {
+    if (e.touches.length === 0 && isSelectionMode) {
       e.preventDefault();
       e.stopPropagation();
     }
@@ -271,18 +308,19 @@ export const PreviewCanvas = ({
     <div
       ref={containerRef}
       className={cn("relative rounded-xl overflow-hidden bg-muted flex items-center justify-center border border-border/50 shadow-sm", className)}
-      onMouseDown={onRegionSelect ? handleMouseDown : undefined}
+      onMouseDown={isSelectionMode ? handleMouseDown : undefined}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onTouchStart={onRegionSelect ? handleTouchStart : undefined}
-      onTouchMove={onRegionSelect ? handleTouchMove : undefined}
-      onTouchEnd={onRegionSelect ? handleTouchEnd : undefined}
+      onTouchStart={isSelectionMode ? handleTouchStart : undefined}
+      onTouchMove={isSelectionMode ? handleTouchMove : undefined}
+      onTouchEnd={isSelectionMode ? handleTouchEnd : undefined}
       style={{ 
-        cursor: onRegionSelect ? (isSelecting ? "crosshair" : "crosshair") : "default", 
-        touchAction: onRegionSelect ? "none" : "auto",
+        cursor: isSelectionMode ? (isSelecting ? "crosshair" : "crosshair") : "default", 
+        touchAction: isSelectionMode ? "none" : "auto",
         WebkitTapHighlightColor: "transparent",
-        userSelect: "none"
+        userSelect: "none",
+        pointerEvents: "auto"
       }}
     >
       {isLoading && (
@@ -312,7 +350,7 @@ export const PreviewCanvas = ({
         style={{ filter: filterStyle }}
         draggable={false}
       />
-      {onRegionSelect && (
+      {(isSelectionMode || selectedRegion) && (
         <canvas
           ref={canvasRef}
           className="absolute inset-0 pointer-events-none"

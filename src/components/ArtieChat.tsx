@@ -14,6 +14,7 @@ import { useRetryWithBackoff } from "@/hooks/useRetryWithBackoff";
 import { ImageEditor } from "./ImageEditor";
 import { extractTextFromBriefFile } from "@/lib/documentParser";
 import { openStudioWithPrompt } from "@/lib/studio";
+import { ArtieModal } from "./artie/ArtieModal";
 import { 
   addImageToMemory, 
   getAllImagesFromMemory, 
@@ -122,6 +123,17 @@ export const ArtieChat = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingImageUrl, setEditingImageUrl] = useState<string>("");
   const [editorInstruction, setEditorInstruction] = useState<string>("");
+
+  // Debug: Monitor editor state changes
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[ArtieChat] Editor state changed:', {
+        editorOpen,
+        editingImageUrl: editingImageUrl ? `${editingImageUrl.substring(0, 50)}...` : 'empty',
+        editorInstruction: editorInstruction ? `${editorInstruction.substring(0, 30)}...` : 'empty'
+      });
+    }
+  }, [editorOpen, editingImageUrl, editorInstruction]);
 
   const registerContextImage = useCallback(
     (image: {
@@ -428,16 +440,80 @@ export const ArtieChat = () => {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isOpen, isMinimized, showGenerationDialog]);
 
-  // Prevent body scroll when chat is open
+  // Prevent body scroll when chat is open - properly save and restore
+  const bodyScrollLockRef = useRef<{
+    overflow: string;
+    position: string;
+    top: string;
+    width: string;
+    scrollY: number;
+  } | null>(null);
+
   useEffect(() => {
     if (isOpen) {
+      // Save current body styles and scroll position
+      bodyScrollLockRef.current = {
+        overflow: document.body.style.overflow || '',
+        position: document.body.style.position || '',
+        top: document.body.style.top || '',
+        width: document.body.style.width || '',
+        scrollY: window.scrollY,
+      };
+
+      // Lock body scroll
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${window.scrollY}px`;
+      document.body.style.width = '100%';
+
+      if (import.meta.env.DEV) {
+        console.log('[Artie] Scroll locked, saved position:', window.scrollY);
+      }
     } else {
-      document.body.style.overflow = '';
+      // Restore body scroll
+      if (bodyScrollLockRef.current) {
+        document.body.style.overflow = bodyScrollLockRef.current.overflow;
+        document.body.style.position = bodyScrollLockRef.current.position;
+        document.body.style.top = bodyScrollLockRef.current.top;
+        document.body.style.width = bodyScrollLockRef.current.width;
+
+        // Restore scroll position
+        window.scrollTo(0, bodyScrollLockRef.current.scrollY);
+
+        if (import.meta.env.DEV) {
+          console.log('[Artie] Scroll restored, position:', bodyScrollLockRef.current.scrollY);
+        }
+
+        bodyScrollLockRef.current = null;
+      } else {
+        // Fallback: ensure overflow is restored
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+      }
     }
-    
+
     return () => {
-      document.body.style.overflow = '';
+      // Cleanup on unmount - always restore scroll
+      if (bodyScrollLockRef.current) {
+        document.body.style.overflow = bodyScrollLockRef.current.overflow;
+        document.body.style.position = bodyScrollLockRef.current.position;
+        document.body.style.top = bodyScrollLockRef.current.top;
+        document.body.style.width = bodyScrollLockRef.current.width;
+        window.scrollTo(0, bodyScrollLockRef.current.scrollY);
+        bodyScrollLockRef.current = null;
+
+        if (import.meta.env.DEV) {
+          console.log('[Artie] Cleanup: Scroll restored on unmount');
+        }
+      } else {
+        // Defensive cleanup
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+      }
     };
   }, [isOpen]);
 
@@ -493,20 +569,39 @@ export const ArtieChat = () => {
     setInputValue(action.prompt);
     setIsMinimized(false);
     setIsOpen(true);
+    // Focus input after opening
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 100);
   };
 
-  const handleMinimize = () => {
-    setIsMinimized(true);
-    setIsOpen(false);
-    toast.success("Artie minimized", {
-      description: "Click the icon to restore",
-    });
-  };
-
-  const handleRestore = () => {
+  const handleOpen = useCallback(() => {
     setIsMinimized(false);
     setIsOpen(true);
-  };
+    // Focus input after opening (small delay for animation)
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 100);
+  }, []);
+
+  const handleMinimize = useCallback(() => {
+    setIsMinimized(true);
+    setIsOpen(false);
+  }, []);
+
+  const handleRestore = useCallback(() => {
+    setIsMinimized(false);
+    setIsOpen(true);
+    // Focus input after restoring
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 100);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setIsOpen(false);
+    setIsMinimized(false);
+  }, []);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -606,24 +701,74 @@ export const ArtieChat = () => {
     }
     
     if (action === "EDIT_IMAGE") {
-      // Find the image from this message or the most recent one
-      const targetImage = messageId 
-        ? contextMemory.images.find(img => img.messageId === messageId)
-        : contextMemory.images[contextMemory.images.length - 1];
+      // Find the image from multiple sources:
+      // 1. From the message's attachment (most reliable)
+      // 2. From contextMemory by messageId
+      // 3. From the most recent image in contextMemory
       
-      if (targetImage) {
-        // Close Artie to avoid covering workspace
-        setIsOpen(false);
-        setIsMinimized(false);
-        // Open workspace immediately - no delays
-        setEditingImageUrl(targetImage.url);
-        setEditorInstruction("");
-        setEditorOpen(true);
-      } else {
-        toast.error("No image found", {
-          description: "Couldn't find the image to edit",
-        });
+      let targetImageUrl: string | null = null;
+      
+      // First, try to find the message and get its attachment
+      if (messageId) {
+        const targetMessage = messages.find(m => m.id === messageId);
+        if (targetMessage?.attachment?.type === 'image' && targetMessage.attachment.url) {
+          targetImageUrl = targetMessage.attachment.url;
+          console.log('[ArtieChat] EDIT_IMAGE: Found image from message attachment:', targetImageUrl);
+        }
       }
+      
+      // If not found in attachment, try contextMemory
+      if (!targetImageUrl) {
+        const targetImage = messageId 
+          ? contextMemory.images.find(img => img.messageId === messageId)
+          : contextMemory.images[contextMemory.images.length - 1];
+        
+        if (targetImage?.url) {
+          targetImageUrl = targetImage.url;
+          console.log('[ArtieChat] EDIT_IMAGE: Found image from contextMemory:', targetImageUrl);
+        }
+      }
+      
+      // Defensive logging
+      if (!targetImageUrl) {
+        console.error('[ArtieChat] EDIT_IMAGE: No image found', {
+          messageId,
+          hasMessageAttachment: messageId ? messages.find(m => m.id === messageId)?.attachment : false,
+          contextMemoryImagesCount: contextMemory.images.length,
+          contextMemoryImages: contextMemory.images.map(img => ({ messageId: img.messageId, url: img.url }))
+        });
+        toast.error("No image found", {
+          description: "Couldn't find the image to edit. Please try uploading the image again.",
+        });
+        return;
+      }
+      
+      // Validate URL
+      if (!targetImageUrl || targetImageUrl.trim() === '') {
+        console.error('[ArtieChat] EDIT_IMAGE: Invalid image URL:', targetImageUrl);
+        toast.error("Invalid image", {
+          description: "The image URL is invalid or empty.",
+        });
+        return;
+      }
+      
+      console.log('[ArtieChat] EDIT_IMAGE: Opening editor with URL:', targetImageUrl);
+      
+      // Close Artie to avoid covering workspace
+      setIsOpen(false);
+      setIsMinimized(false);
+      
+      // Open workspace immediately - no delays
+      setEditingImageUrl(targetImageUrl);
+      setEditorInstruction("");
+      setEditorOpen(true);
+      
+      console.log('[ArtieChat] EDIT_IMAGE: State set', {
+        editorOpen: true,
+        editingImageUrl: targetImageUrl,
+        editorInstruction: ""
+      });
+      
       return;
     }
     
@@ -1323,26 +1468,21 @@ export const ArtieChat = () => {
   };
 
   // Persistent floating icon (always visible)
-  // Using literal string for z-index to prevent Tailwind purging
   const FloatingIcon = () => (
     <div 
       data-artie-floating-icon
-      className="fixed bottom-20 right-4 md:bottom-6 md:right-6 opacity-100 visible pointer-events-auto"
-      style={{ 
-        zIndex: 9999,
-        position: 'fixed',
-        display: 'block',
-        visibility: 'visible',
-        opacity: 1,
-        pointerEvents: 'auto'
-      }}
+      className={cn(
+        "fixed opacity-100 visible pointer-events-auto z-[70]",
+        // Mobile: above bottom nav (z-[60])
+        isMobile ? "bottom-20 right-4" : "bottom-6 right-6"
+      )}
     >
       {/* Contextual prompt bubble */}
       {showPrompt && contextualPrompt && !isMinimized && (
         <div 
           className="absolute bottom-full right-0 mb-3 animate-slide-up pointer-events-auto"
           onClick={() => {
-            setIsOpen(true);
+            handleOpen();
             setShowPrompt(false);
           }}
         >
@@ -1363,11 +1503,10 @@ export const ArtieChat = () => {
               if (isMinimized) {
                 handleRestore();
               } else {
-                setIsOpen(true);
-                setIsMinimized(false);
+                handleOpen();
               }
             }}
-            aria-label="Chat with Artie"
+            aria-label={isMinimized ? "Restore Artie" : "Chat with Artie"}
             type="button"
             className={cn(
               "relative h-14 w-14 md:h-16 md:w-16 rounded-full shadow-strong transition-all duration-300",
@@ -1417,16 +1556,31 @@ export const ArtieChat = () => {
       
       {/* Backdrop - Click to close */}
       <button 
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 animate-fade-in cursor-default"
-        onClick={() => setIsOpen(false)}
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[74] animate-fade-in cursor-default"
+        onClick={handleClose}
         aria-label="Close chat"
         type="button"
       />
 
-      {/* Side Panel Drawer */}
-      <div className="fixed top-0 right-0 h-[100dvh] h-[100svh] w-[90vw] sm:w-[460px] md:w-[520px] bg-background border-l border-border shadow-strong z-[60] flex flex-col animate-slide-in-right pointer-events-auto safe-bottom">
-        {/* Header - Fixed 56-64px */}
-        <div className="h-14 md:h-16 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b border-border bg-surface-1">
+      {/* Side Panel Drawer - Opens from right */}
+      <div 
+        data-artie-panel
+        className={cn(
+          "fixed z-[75] flex flex-col bg-background shadow-strong pointer-events-auto safe-bottom",
+          // Mobile: full width, slides from right
+          "top-0 right-0 left-auto h-[100dvh] h-[100svh] w-[90vw] border-l border-border",
+          // Desktop: right-side panel with margins and rounded corners
+          "md:top-4 md:right-4 md:bottom-4 md:left-auto md:h-auto md:max-h-[calc(100vh-2rem)] md:w-[480px] md:max-w-[560px] md:rounded-lg md:border md:border-border md:shadow-xl",
+          // Animation: slide in from right
+          "animate-slide-in-right"
+        )}
+        style={{
+          // Ensure it starts off-screen right and animates in smoothly
+          willChange: 'transform',
+        }}
+      >
+        {/* Header - Fixed height with proper padding */}
+        <div className="h-14 md:h-16 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b border-border bg-background">
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="h-9 w-9 md:h-10 md:w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-subtle">
@@ -1477,8 +1631,9 @@ export const ArtieChat = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setIsOpen(false)}
+              onClick={handleClose}
               className="h-8 w-8 hover:bg-muted"
+              aria-label="Close chat"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -1486,7 +1641,7 @@ export const ArtieChat = () => {
         </div>
 
         {/* Quick Actions - Collapsible */}
-        <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-surface-2">
+        <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-background">
           <p className="text-xs md:text-xs font-medium text-muted-foreground mb-3 md:mb-3">Quick Actions</p>
           {/* Desktop: 2-row grid, Mobile: horizontal scroll */}
           <div className="hidden md:grid md:grid-cols-2 md:gap-2">
@@ -1521,12 +1676,17 @@ export const ArtieChat = () => {
           </div>
         </div>
 
-        {/* Chat Body - Scrollable with proper spacing, padding bottom for fixed input on mobile */}
+        {/* Chat Body - Scrollable with proper spacing and padding */}
         <div 
           ref={chatBodyRef}
           className={cn(
-            "flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-5 space-y-3 md:space-y-4 overscroll-contain",
-            isMobile && "pb-[calc(80px+env(safe-area-inset-bottom))]"
+            "flex-1 overflow-y-auto overscroll-contain",
+            "px-4 md:px-6 py-4 md:py-5",
+            "space-y-3 md:space-y-4",
+            // Mobile: padding bottom for fixed input
+            isMobile && "pb-[calc(80px+env(safe-area-inset-bottom))]",
+            // Desktop: padding bottom for sticky input
+            !isMobile && "pb-4"
           )}
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
@@ -1732,7 +1892,7 @@ export const ArtieChat = () => {
                           key={idx}
                           variant="outline"
                           size="sm"
-                          onClick={() => handleChipAction(chip.action)}
+                          onClick={() => handleChipAction(chip.action, message.id)}
                           className="text-xs h-7 hover:bg-accent hover:border-primary/20"
                         >
                           {chip.label}
@@ -1768,10 +1928,12 @@ export const ArtieChat = () => {
         {/* Input Bar - Fixed bottom on mobile, sticky on desktop */}
         <div 
           className={cn(
-            "flex-shrink-0 px-4 md:px-6 py-2 md:py-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)] safe-bottom",
+            "flex-shrink-0 border-t border-border bg-background",
+            "px-4 md:px-6 py-3 md:py-4",
+            "shadow-[0_-1px_8px_rgba(0,0,0,0.08)]",
             isMobile 
-              ? "fixed bottom-0 left-0 right-0 z-[70] pb-[calc(0.5rem+env(safe-area-inset-bottom))]" 
-              : "relative z-[70] pb-2.5"
+              ? "fixed bottom-0 left-0 right-0 z-[76] pb-[calc(0.75rem+env(safe-area-inset-bottom))] safe-bottom bg-background" 
+              : "sticky bottom-0 z-10 bg-background"
           )}
         >
           {/* File Upload Preview */}
@@ -1874,121 +2036,132 @@ export const ArtieChat = () => {
       </div>
 
       {/* Image Generation Dialog */}
-      {showGenerationDialog && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm pointer-events-auto">
-          <div className="bg-card border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto p-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Generate Image</h3>
-                <p className="text-sm text-muted-foreground">Artie has prepared this prompt for you.</p>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Prompt</label>
-                <textarea
-                  value={generationPrompt}
-                  onChange={(e) => setGenerationPrompt(e.target.value)}
-                  className="w-full min-h-[120px] p-3 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/50 outline-none resize-y"
-                  placeholder="Describe the image you want to generate..."
-                />
-              </div>
+      <ArtieModal
+        open={showGenerationDialog}
+        onOpenChange={(open) => {
+          setShowGenerationDialog(open);
+          if (!open) {
+            setGenerationPrompt("");
+          }
+        }}
+        title={
+          <div className="flex items-center gap-2">
+            <Zap className="h-5 w-5" />
+            Generate Image
+          </div>
+        }
+        description="Artie has prepared this prompt for you."
+        maxWidth="2xl"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowGenerationDialog(false);
+                setGenerationPrompt("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!generationPrompt.trim()) {
+                  toast.error("Please enter a prompt");
+                  return;
+                }
 
-              <div className="flex gap-2 justify-end pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowGenerationDialog(false);
-                    setGenerationPrompt("");
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    if (!generationPrompt.trim()) {
-                      toast.error("Please enter a prompt");
-                      return;
-                    }
+                try {
+                  setShowGenerationDialog(false);
+                  
+                  // Add a message showing generation started
+                  const genMessageId = Date.now().toString();
+                  setMessages(prev => [...prev, {
+                    id: genMessageId,
+                    text: `Generating: "${generationPrompt.slice(0, 100)}..." ✨`,
+                    sender: 'artie',
+                    timestamp: new Date()
+                  }]);
 
-                    try {
-                      setShowGenerationDialog(false);
-                      
-                      // Add a message showing generation started
-                      const genMessageId = Date.now().toString();
-                      setMessages(prev => [...prev, {
-                        id: genMessageId,
-                        text: `Generating: "${generationPrompt.slice(0, 100)}..." ✨`,
-                        sender: 'artie',
-                        timestamp: new Date()
-                      }]);
+                  const { data: { session } } = await supabase.auth.getSession();
+                  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session?.access_token}`,
+                    },
+                    body: JSON.stringify({ 
+                      prompt: generationPrompt,
+                      ...generationOptions
+                    })
+                  });
 
-                      const { data: { session } } = await supabase.auth.getSession();
-                      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${session?.access_token}`,
-                        },
-                        body: JSON.stringify({ 
-                          prompt: generationPrompt,
-                          ...generationOptions
-                        })
-                      });
-
-                      const data = await response.json();
-                      if (data.image || data.imageUrl) {
-                        const imageUrl = data.image || data.imageUrl;
-                        
-                        // Ensure the image is saved to database using unified save utility
-                        const { ensureAssetSaved } = await import('@/lib/saveAsset');
-                        await ensureAssetSaved({
-                          imageUrl: imageUrl,
-                          action: 'generate',
-                          prompt: generationPrompt,
-                          params: {
-                            ...generationOptions,
-                            source: 'artie_generation_dialog',
-                          },
-                          skipToast: true, // Don't show duplicate toast
-                        });
-
-                        setMessages(prev => prev.map(m => 
-                          m.id === genMessageId
-                            ? { ...m, text: `Generated successfully! 🎨\n\n![Generated Image](${imageUrl})`, attachment: { type: 'image' as const, url: imageUrl, name: 'Generated' } }
-                            : m
-                        ));
-                        toast.success("Image generated successfully!");
-                        refetchCredits();
-                      } else {
-                        throw new Error(data.error || 'Generation failed');
-                      }
-                    } catch (error: unknown) {
-                      console.error('Generation error:', error);
-                      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                      toast.error("Generation failed", {
-                        description: errorMessage,
-                      });
-                    }
+                  const data = await response.json();
+                  if (data.image || data.imageUrl) {
+                    const imageUrl = data.image || data.imageUrl;
                     
-                    setGenerationPrompt("");
-                  }}
-                  className="gap-2"
-                >
-                  <Zap className="h-4 w-4" />
-                  Generate (1 credit)
-                </Button>
-              </div>
-            </div>
+                    // Ensure the image is saved to database using unified save utility
+                    const { ensureAssetSaved } = await import('@/lib/saveAsset');
+                    await ensureAssetSaved({
+                      imageUrl: imageUrl,
+                      action: 'generate',
+                      prompt: generationPrompt,
+                      params: {
+                        ...generationOptions,
+                        source: 'artie_generation_dialog',
+                      },
+                      skipToast: true, // Don't show duplicate toast
+                    });
+
+                    setMessages(prev => prev.map(m => 
+                      m.id === genMessageId
+                        ? { ...m, text: `Generated successfully! 🎨\n\n![Generated Image](${imageUrl})`, attachment: { type: 'image' as const, url: imageUrl, name: 'Generated' } }
+                        : m
+                    ));
+                    toast.success("Image generated successfully!");
+                    refetchCredits();
+                  } else {
+                    throw new Error(data.error || 'Generation failed');
+                  }
+                } catch (error: unknown) {
+                  console.error('Generation error:', error);
+                  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                  toast.error("Generation failed", {
+                    description: errorMessage,
+                  });
+                }
+                
+                setGenerationPrompt("");
+              }}
+              className="gap-2"
+            >
+              <Zap className="h-4 w-4" />
+              Generate (1 credit)
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Prompt</label>
+            <textarea
+              value={generationPrompt}
+              onChange={(e) => setGenerationPrompt(e.target.value)}
+              className="w-full min-h-[120px] p-3 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/50 outline-none resize-y"
+              placeholder="Describe the image you want to generate..."
+            />
           </div>
         </div>
-      )}
+      </ArtieModal>
 
       <ImageEditor
         open={editorOpen}
         onOpenChange={(open) => {
+          console.log('[ArtieChat] ImageEditor onOpenChange:', open, { editingImageUrl, editorOpen });
           setEditorOpen(open);
           if (!open) {
             setEditorInstruction("");
+            // Clear image URL when closing to ensure clean state
+            setEditingImageUrl("");
           }
         }}
         imageUrl={editingImageUrl}

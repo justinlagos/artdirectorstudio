@@ -424,11 +424,32 @@ export const UniversalImageWorkspace = ({
     navigate('/history');
   };
 
-  if (!open) return null;
+  // Defensive logging
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[UniversalImageWorkspace] Props changed:', {
+        open,
+        imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : 'empty',
+        initialInstruction: initialInstruction ? `${initialInstruction.substring(0, 30)}...` : 'empty'
+      });
+    }
+  }, [open, imageUrl, initialInstruction]);
+
+  if (!open) {
+    if (import.meta.env.DEV && imageUrl) {
+      console.log('[UniversalImageWorkspace] Not rendering because open=false, but imageUrl exists:', imageUrl);
+    }
+    return null;
+  }
+
+  if (!imageUrl || imageUrl.trim() === '') {
+    console.error('[UniversalImageWorkspace] Cannot render: imageUrl is empty or invalid');
+    return null;
+  }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background flex flex-col">
-      {/* Header */}
+    <div className="h-full flex flex-col">
+      {/* Header - Internal header for workspace controls */}
       <div className="h-14 border-b border-border/50 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-3">
           <Button

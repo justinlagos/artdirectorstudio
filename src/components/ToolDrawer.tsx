@@ -34,11 +34,15 @@ export const ToolDrawer = ({
         <DrawerOverlay className="backdrop-blur-sm" />
         <DrawerPrimitive.Content
           className={cn(
-            "fixed inset-x-0 bottom-0 z-50 flex max-h-[96dvh] flex-col rounded-t-[24px] border border-border/80 bg-background shadow-xl",
+            "fixed z-50 flex max-h-[96dvh] flex-col border border-border/80 bg-background shadow-xl",
+            "inset-x-0 bottom-0 rounded-t-[24px]",
             "sm:mx-auto sm:w-full sm:max-w-4xl",
-            "md:inset-x-auto md:inset-y-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[24px] md:max-w-[1320px] md:w-[90vw] md:max-h-[90vh] md:bottom-auto",
+            "md:inset-x-auto md:inset-y-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:bottom-auto md:rounded-[24px] md:max-w-[1320px] md:w-[90vw] md:max-h-[90vh]",
             className,
           )}
+          style={{
+            willChange: 'transform',
+          }}
           onPointerDownOutside={(e) => {
             // Prevent closing when clicking on interactive elements inside
             const target = e.target as HTMLElement;

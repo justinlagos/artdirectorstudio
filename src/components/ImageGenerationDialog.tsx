@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import {
   Download,
   Wand2,
@@ -14,6 +15,8 @@ import {
   RectangleVertical,
   RotateCcw,
   Clock,
+  Image as ImageIcon,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
@@ -24,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { ToolDrawer } from "./ToolDrawer";
+import { ArtieModal } from "./artie/ArtieModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useModalStore } from "@/store/modalStore";
 import { useStudioStore } from "@/store/studioStore";
@@ -526,145 +529,175 @@ export const ImageGenerationDialog = () => {
   };
 
   const bodyContent = (
-    <div className="space-y-4">
-      {/* Show generated image first if it exists */}
-      {generatedImage && (
-        <div className="space-y-3 border-b border-border pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wand2 className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Your Generated Image</span>
-              {generationTime > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {generationTime}s
-                </Badge>
-              )}
-            </div>
-          </div>
-          
-          <div ref={imageContainerRef}>
-            <ImageContainer
-              src={generatedImage}
-              alt="Generated result"
-              maxHeight="max-h-[400px]"
-              containerClassName="border-2 border-primary/20 shadow-lg"
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/10 p-3 text-xs">
-            <div className="flex gap-3 text-muted-foreground">
-              <span>{options.size}</span>
-              <span>•</span>
-              <span className="capitalize">{options.quality} quality</span>
-              <span>•</span>
-              <span className="capitalize">{options.background} BG</span>
-            </div>
-            <span className="text-muted-foreground">
-              {new Date().toLocaleTimeString()}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {referenceImage && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-foreground">Reference Image</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setReferenceImage(null);
-                setStoreImage(undefined);
-                setPreviousGeneratedPrompt("");
-                setContinuationStrength(1.0);
-              }}
-            >
-              Remove
-            </Button>
-          </div>
-          <ImageContainer
-            src={referenceImage}
-            alt="Reference inspiration"
-            maxHeight="max-h-[200px]"
-            objectFit="cover"
-          />
-          {previousGeneratedPrompt && continuationStrength < 1.0 && (
-            <div className="rounded-lg border border-border/30 bg-muted/10 p-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-medium">Context Strength</span>
-                <span className={`text-xs font-semibold ${getContinuationDescription(continuationStrength).colorClass}`}>
-                  {Math.round((1 - continuationStrength) * 100)}%
-                </span>
+    <div className={cn(
+      "flex flex-col min-h-0",
+      !isMobile ? "grid grid-cols-[42%_58%] gap-6" : "space-y-4"
+    )}>
+      {/* Left Column: Reference Image Card (Desktop) or Top (Mobile) */}
+      <div className="flex flex-col">
+        {/* Generated Image (shown when available) */}
+        {generatedImage && (
+          <div className="mb-4 space-y-3 border-b border-border pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wand2 className="h-5 w-5 text-primary" />
+                <span className="font-semibold">Your Generated Image</span>
+                {generationTime > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {generationTime}s
+                  </Badge>
+                )}
               </div>
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className={`h-full transition-all duration-300 ${
-                    continuationStrength <= 0.3 ? 'bg-blue-500' :
-                    continuationStrength <= 0.6 ? 'bg-yellow-500' :
-                    continuationStrength <= 0.8 ? 'bg-orange-500' :
-                    'bg-red-500'
-                  }`}
-                  style={{ width: `${(1 - continuationStrength) * 100}%` }}
+            </div>
+            
+            <div ref={imageContainerRef}>
+              <ImageContainer
+                src={generatedImage}
+                alt="Generated result"
+                maxHeight="max-h-[320px]"
+                containerClassName="border-2 border-primary/20 shadow-lg rounded-lg"
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/10 p-3 text-xs">
+              <div className="flex gap-3 text-muted-foreground">
+                <span>{options.size}</span>
+                <span>•</span>
+                <span className="capitalize">{options.quality} quality</span>
+                <span>•</span>
+                <span className="capitalize">{options.background} BG</span>
+              </div>
+              <span className="text-muted-foreground">
+                {new Date().toLocaleTimeString()}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Reference Image Card */}
+        {referenceImage && (
+          <div className="relative rounded-xl border border-border bg-card p-4 flex flex-col" style={{ minHeight: isMobile ? 'auto' : '400px' }}>
+            {/* Remove button in top-right */}
+            <div className="absolute top-3 right-3 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setReferenceImage(null);
+                  setStoreImage(undefined);
+                  setPreviousGeneratedPrompt("");
+                  setContinuationStrength(1.0);
+                }}
+                className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Large preview */}
+            <div className="flex-1 min-h-[300px] mb-3">
+              <ImageContainer
+                src={referenceImage}
+                alt="Reference inspiration"
+                maxHeight="max-h-[400px]"
+                objectFit="contain"
+                containerClassName="rounded-lg overflow-hidden w-full h-full"
+              />
+            </div>
+            
+            {/* Meta info (optional) */}
+            {previousGeneratedPrompt && continuationStrength < 1.0 && (
+              <div className="rounded-lg border border-border/30 bg-muted/10 p-3 mt-auto">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-medium">Context Strength</span>
+                  <span className={`text-xs font-semibold ${getContinuationDescription(continuationStrength).colorClass}`}>
+                    {Math.round((1 - continuationStrength) * 100)}%
+                  </span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ${
+                      continuationStrength <= 0.3 ? 'bg-blue-500' :
+                      continuationStrength <= 0.6 ? 'bg-yellow-500' :
+                      continuationStrength <= 0.8 ? 'bg-orange-500' :
+                      'bg-red-500'
+                    }`}
+                    style={{ width: `${(1 - continuationStrength) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {getContinuationDescription(continuationStrength).description}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Placeholder when no reference image */}
+        {!referenceImage && !generatedImage && (
+          <div className="flex-1 rounded-xl border border-dashed border-border/50 bg-muted/20 flex items-center justify-center p-8">
+            <div className="text-center space-y-2">
+              <ImageIcon className="h-8 w-8 text-muted-foreground mx-auto" />
+              <p className="text-sm text-muted-foreground">No reference image</p>
+              <p className="text-xs text-muted-foreground/70">Upload an image to use as reference</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right Column: Tabs and Controls (Desktop) or Below (Mobile) */}
+      <div className="flex flex-col min-h-0">
+        <Tabs defaultValue="templates" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-3 shrink-0">
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="presets">Presets</TabsTrigger>
+            <TabsTrigger value="custom">Custom Prompt</TabsTrigger>
+          </TabsList>
+
+          {/* Scrollable tabs content */}
+          <div className="flex-1 overflow-y-auto min-h-0 mt-4">
+            <TabsContent value="templates" className="mt-0">
+              <PromptTemplates
+                  onSelect={(templatePrompt) => {
+                    // If we have an existing prompt/image, use template as a variation modifier
+                    // Otherwise, use template as the base prompt
+                    let enhancedPrompt = "";
+                    
+                    if (prompt.trim() || referenceImage) {
+                      // Template acts as a variation modifier
+                      // Extract the style/technique from template and apply it to existing context
+                      const templateStyle = templatePrompt.includes(',') 
+                        ? templatePrompt.split(',').slice(0, 2).join(',') // Get first 2 style elements
+                        : templatePrompt;
+                      
+                      enhancedPrompt = prompt.trim()
+                        ? `${prompt.trim()}, ${templateStyle}`
+                        : referenceImage
+                          ? `Variation: ${templateStyle}`
+                          : templatePrompt;
+                    } else {
+                      // No existing context, use template as base
+                      enhancedPrompt = templatePrompt;
+                    }
+                    
+                    if (enhancedPrompt.length > MAX_PROMPT_LENGTH) {
+                      toast.error(`Combined prompt would exceed ${MAX_PROMPT_LENGTH} characters`);
+                      return;
+                    }
+                    
+                    setPrompt(enhancedPrompt);
+                    setBasePrompt(enhancedPrompt);
+                    setStorePrompt(enhancedPrompt);
+                    toast.success(
+                      prompt.trim() || referenceImage 
+                        ? "Template applied as variation" 
+                        : "Template applied to prompt"
+                    );
+                  }}
                 />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {getContinuationDescription(continuationStrength).description}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+            </TabsContent>
 
-      <Tabs defaultValue="templates" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="presets">Presets</TabsTrigger>
-          <TabsTrigger value="custom">Custom Prompt</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="templates" className="mt-4">
-          <PromptTemplates
-            onSelect={(templatePrompt) => {
-              // If we have an existing prompt/image, use template as a variation modifier
-              // Otherwise, use template as the base prompt
-              let enhancedPrompt = "";
-              
-              if (prompt.trim() || referenceImage) {
-                // Template acts as a variation modifier
-                // Extract the style/technique from template and apply it to existing context
-                const templateStyle = templatePrompt.includes(',') 
-                  ? templatePrompt.split(',').slice(0, 2).join(',') // Get first 2 style elements
-                  : templatePrompt;
-                
-                enhancedPrompt = prompt.trim()
-                  ? `${prompt.trim()}, ${templateStyle}`
-                  : referenceImage
-                    ? `Variation: ${templateStyle}`
-                    : templatePrompt;
-              } else {
-                // No existing context, use template as base
-                enhancedPrompt = templatePrompt;
-              }
-              
-              if (enhancedPrompt.length > MAX_PROMPT_LENGTH) {
-                toast.error(`Combined prompt would exceed ${MAX_PROMPT_LENGTH} characters`);
-                return;
-              }
-              
-              setPrompt(enhancedPrompt);
-              setBasePrompt(enhancedPrompt);
-              setStorePrompt(enhancedPrompt);
-              toast.success(
-                prompt.trim() || referenceImage 
-                  ? "Template applied as variation" 
-                  : "Template applied to prompt"
-              );
-            }}
-          />
-        </TabsContent>
-
-        <TabsContent value="presets" className="mt-4 space-y-4">
+            <TabsContent value="presets" className="mt-0 space-y-4">
           <div className="space-y-2 rounded-xl border border-accent/20 bg-accent/5 p-4">
             <div className="flex items-center gap-2">
               <Label className="text-base font-semibold">Your Base Prompt</Label>
@@ -736,48 +769,65 @@ export const ImageGenerationDialog = () => {
               />
             </CollapsibleContent>
           </Collapsible>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="custom" className="mt-4 space-y-4">
-          {recentPrompts.length > 0 && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Recent Prompts
-              </Label>
-              <Select onValueChange={(value) => setPrompt(value)} disabled={isGenerating}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Load a recent prompt..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {recentPrompts.map((recentPrompt, idx) => (
-                    <SelectItem key={idx} value={recentPrompt}>
-                      {recentPrompt.slice(0, 60)}...
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+            <TabsContent value="custom" className="mt-0 space-y-4">
+              {/* Large textarea for custom prompt */}
+              <div className="space-y-3">
+                <EnhancedPromptEditor
+                  value={prompt}
+                  onChange={handlePromptChange}
+                  label="Image Prompt"
+                  placeholder="Describe the image you want to generate..."
+                  disabled={isGenerating}
+                />
+                
+                {/* Subtle helper copy */}
+                <p className="text-xs text-muted-foreground">
+                  Be specific about style, composition, colors, mood, and any important details.
+                </p>
+              </div>
 
-          {prompt.length > MAX_PROMPT_LENGTH * 0.9 && (
-            <Alert variant={prompt.length > MAX_PROMPT_LENGTH ? "destructive" : "default"}>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                {prompt.length > MAX_PROMPT_LENGTH
-                  ? `Prompt exceeds maximum length by ${prompt.length - MAX_PROMPT_LENGTH} characters. Please shorten it.`
-                  : `Approaching character limit: ${prompt.length}/${MAX_PROMPT_LENGTH}`}
-              </AlertDescription>
-            </Alert>
-          )}
+              {/* Recent prompts (optional, collapsible) */}
+              {recentPrompts.length > 0 && (
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-between text-xs">
+                      <span className="flex items-center gap-2">
+                        <Clock className="h-3 w-3" />
+                        Recent Prompts ({recentPrompts.length})
+                      </span>
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 pt-2">
+                    <Select onValueChange={(value) => setPrompt(value)} disabled={isGenerating}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Load a recent prompt..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {recentPrompts.map((recentPrompt, idx) => (
+                          <SelectItem key={idx} value={recentPrompt}>
+                            {recentPrompt.slice(0, 60)}...
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
 
-          <EnhancedPromptEditor
-            value={prompt}
-            onChange={handlePromptChange}
-            label="Image Prompt"
-            placeholder="Describe the image you want to generate..."
-            disabled={isGenerating}
-          />
+              {/* Character limit warning */}
+              {prompt.length > MAX_PROMPT_LENGTH * 0.9 && (
+                <Alert variant={prompt.length > MAX_PROMPT_LENGTH ? "destructive" : "default"}>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {prompt.length > MAX_PROMPT_LENGTH
+                      ? `Prompt exceeds maximum length by ${prompt.length - MAX_PROMPT_LENGTH} characters. Please shorten it.`
+                      : `Approaching character limit: ${prompt.length}/${MAX_PROMPT_LENGTH}`}
+                  </AlertDescription>
+                </Alert>
+              )}
 
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <CollapsibleTrigger asChild>
@@ -865,79 +915,132 @@ export const ImageGenerationDialog = () => {
               </div>
             </CollapsibleContent>
           </Collapsible>
-        </TabsContent>
-      </Tabs>
-
-      {isGenerating && (
-        <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-foreground">{generationStage}</p>
-            <span className="text-xs text-muted-foreground">{progress}%</span>
+            </TabsContent>
           </div>
-          <Progress value={progress} className="w-full" />
-          <p className="text-xs text-muted-foreground text-center">
-            This usually takes 8-15 seconds
-          </p>
-        </div>
-      )}
 
-      {lastError && !isGenerating && (
-        <Alert variant="destructive" className="border-destructive/50">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex items-start justify-between gap-2">
-            <div className="flex-1">
-              <p className="font-semibold">Generation failed</p>
-              <p className="text-sm mt-1">{lastError}</p>
+          {/* Status messages - outside scrollable area */}
+          {isGenerating && (
+            <div className="mt-4 space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4 shrink-0">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-foreground">{generationStage}</p>
+                <span className="text-xs text-muted-foreground">{progress}%</span>
+              </div>
+              <Progress value={progress} className="w-full" />
+              <p className="text-xs text-muted-foreground text-center">
+                This usually takes 8-15 seconds
+              </p>
             </div>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={handleRetry}
-              className="shrink-0"
-            >
-              <RotateCcw className="mr-1.5 h-3 w-3" />
-              Retry
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+          )}
 
+          {lastError && !isGenerating && (
+            <Alert variant="destructive" className="mt-4 border-destructive/50 shrink-0">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="font-semibold">Generation failed</p>
+                  <p className="text-sm mt-1">{lastError}</p>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={handleRetry}
+                  className="shrink-0"
+                >
+                  <RotateCcw className="mr-1.5 h-3 w-3" />
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+        </Tabs>
+      </div>
     </div>
   );
 
   const footerContent = (
-    <div className="studio-modal-footer flex flex-col gap-3">
-      {generatedImage ? (
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button onClick={handleRegenerate} className="min-h-[48px] w-full sm:flex-1">
-            <Wand2 className="mr-2 h-4 w-4" />
-            Generate Again
-          </Button>
-          <Button variant="outline" onClick={handleDownload} className="min-h-[48px] w-full sm:flex-1">
-            <Download className="mr-2 h-4 w-4" />
-            Download
-          </Button>
-        </div>
-      ) : (
-        <Button
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          className="min-h-[48px] w-full"
-          size="lg"
-        >
-          <Wand2 className="mr-2 h-4 w-4" />
-          {isGenerating ? "Generating..." : "Generate"}
-        </Button>
-      )}
-      <Button variant="ghost" onClick={handleCopyPrompt} className="w-full">
-        <Copy className="mr-2 h-4 w-4" /> Copy Prompt
-      </Button>
+    <div className={cn(
+      "flex items-center gap-4",
+      isMobile ? "flex-col" : "justify-between"
+    )}>
+      {/* Left: Credit usage text */}
+      <div className="text-xs text-muted-foreground shrink-0">
+        This generation uses 1 credit
+      </div>
+      
+      {/* Right: Actions */}
+      <div className={cn(
+        "flex items-center gap-2",
+        isMobile ? "w-full flex-col" : "ml-auto"
+      )}>
+        {generatedImage ? (
+          <>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleCopyPrompt} 
+              className={cn(
+                "shrink-0",
+                isMobile ? "w-full" : ""
+              )}
+            >
+              <Copy className="mr-2 h-3 w-3" /> Copy Prompt
+            </Button>
+            <Button 
+              onClick={handleRegenerate} 
+              className={cn(
+                "min-h-[44px]",
+                isMobile ? "w-full" : ""
+              )}
+            >
+              <Wand2 className="mr-2 h-4 w-4" />
+              Generate Again
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleDownload} 
+              className={cn(
+                "min-h-[44px]",
+                isMobile ? "w-full" : ""
+              )}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleCopyPrompt} 
+              className={cn(
+                "shrink-0",
+                isMobile ? "w-full" : ""
+              )}
+            >
+              <Copy className="mr-2 h-3 w-3" /> Copy Prompt
+            </Button>
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className={cn(
+                "min-h-[44px]",
+                isMobile ? "w-full" : "min-w-[140px]"
+              )}
+              size={isMobile ? "lg" : "default"}
+            >
+              <Wand2 className="mr-2 h-4 w-4" />
+              {isGenerating ? "Generating..." : "Generate"}
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 
   return (
     <ErrorBoundary onReset={handleClose}>
-      <ToolDrawer
+      <ArtieModal
         open={isGenerateModalOpen}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
@@ -951,13 +1054,12 @@ export const ImageGenerationDialog = () => {
           </div>
         }
         description="Craft new variations instantly with your prompt and optional reference image."
-        contentClassName="studio-modal-body"
-        className="studio-modal-wrapper"
+        contentClassName="flex flex-col min-h-0"
         footer={footerContent}
-        stickyFooterOnMobile
+        maxWidth="full"
       >
         {bodyContent}
-      </ToolDrawer>
+      </ArtieModal>
     </ErrorBoundary>
   );
 };

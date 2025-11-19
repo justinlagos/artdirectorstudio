@@ -548,6 +548,31 @@ All colors MUST be HSL.
   .z-modal-backdrop {
     z-index: 40;
   }
+
+  /* Fix ToolDrawer positioning glitch on desktop */
+  /* Ensure desktop modals are positioned correctly to prevent bottom-left flash */
+  @media (min-width: 768px) {
+    [data-vaul-drawer] {
+      /* Override bottom positioning on desktop - let Tailwind classes handle top/left */
+      bottom: auto !important;
+      /* Ensure transform is applied for centering */
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  /* Ensure Artie chat panel opens from right side */
+  [data-artie-panel] {
+    /* Force right-side positioning */
+    left: auto !important;
+    right: 0 !important;
+  }
+
+  @media (min-width: 768px) {
+    [data-artie-panel] {
+      right: 1rem !important;
+      left: auto !important;
+    }
+  }
   
   .z-modal-content {
     z-index: 50;
@@ -582,6 +607,17 @@ All colors MUST be HSL.
   @media (max-width: 767px) {
     body {
       padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    }
+    
+    /* Ensure bottom navigation stays pinned and visible */
+    nav[class*="fixed"][class*="bottom-0"] {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      z-index: 60 !important;
+      transform: translateZ(0); /* Force hardware acceleration */
+      -webkit-transform: translateZ(0);
     }
   }
 
