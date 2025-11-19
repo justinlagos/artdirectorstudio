@@ -1,8 +1,9 @@
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface ArtieModalProps {
   open: boolean;
@@ -39,65 +40,9 @@ export const ArtieModal = ({
   preventBodyScroll = true,
 }: ArtieModalProps) => {
   const isMobile = useIsMobile();
-  const scrollLockRef = useRef<{
-    overflow: string;
-    position: string;
-    top: string;
-    width: string;
-    scrollY: number;
-  } | null>(null);
 
-  // Handle scroll locking
-  useEffect(() => {
-    if (!preventBodyScroll) return;
-
-    if (open) {
-      // Save current body styles and scroll position
-      scrollLockRef.current = {
-        overflow: document.body.style.overflow || "",
-        position: document.body.style.position || "",
-        top: document.body.style.top || "",
-        width: document.body.style.width || "",
-        scrollY: window.scrollY,
-      };
-
-      // Lock body scroll
-      document.body.style.overflow = "hidden";
-      document.body.style.position = "fixed";
-      document.body.style.top = `-${window.scrollY}px`;
-      document.body.style.width = "100%";
-
-      if (import.meta.env.DEV) {
-        console.log("[ArtieModal] Scroll locked");
-      }
-    } else {
-      // Restore body scroll
-      if (scrollLockRef.current) {
-        document.body.style.overflow = scrollLockRef.current.overflow;
-        document.body.style.position = scrollLockRef.current.position;
-        document.body.style.top = scrollLockRef.current.top;
-        document.body.style.width = scrollLockRef.current.width;
-        window.scrollTo(0, scrollLockRef.current.scrollY);
-        scrollLockRef.current = null;
-
-        if (import.meta.env.DEV) {
-          console.log("[ArtieModal] Scroll restored");
-        }
-      }
-    }
-
-    return () => {
-      // Cleanup on unmount
-      if (scrollLockRef.current) {
-        document.body.style.overflow = scrollLockRef.current.overflow;
-        document.body.style.position = scrollLockRef.current.position;
-        document.body.style.top = scrollLockRef.current.top;
-        document.body.style.width = scrollLockRef.current.width;
-        window.scrollTo(0, scrollLockRef.current.scrollY);
-        scrollLockRef.current = null;
-      }
-    };
-  }, [open, preventBodyScroll]);
+  // Use centralized scroll lock manager
+  useScrollLock(open, 'artie-modal', preventBodyScroll);
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -105,7 +50,7 @@ export const ArtieModal = ({
         {/* Overlay - Semi-transparent dark overlay, click closes modal */}
         <DialogPrimitive.Overlay
           className={cn(
-            "fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm",
+            "fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "duration-200"
@@ -115,7 +60,7 @@ export const ArtieModal = ({
         {/* Content */}
         <DialogPrimitive.Content
           className={cn(
-            "fixed z-[81]",
+            "fixed z-[91]",
             // Mobile: bottom sheet with safe-area padding
             isMobile
               ? [

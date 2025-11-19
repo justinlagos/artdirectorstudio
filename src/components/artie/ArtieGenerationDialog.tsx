@@ -33,7 +33,7 @@ export const ArtieGenerationDialog = memo(({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm pointer-events-auto">
+    <div className="fixed inset-0 z-[85] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm pointer-events-auto">
       <div className="bg-card border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto p-6">
         <div className="space-y-4">
           <div>

@@ -440,82 +440,9 @@ export const ArtieChat = () => {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isOpen, isMinimized, showGenerationDialog]);
 
-  // Prevent body scroll when chat is open - properly save and restore
-  const bodyScrollLockRef = useRef<{
-    overflow: string;
-    position: string;
-    top: string;
-    width: string;
-    scrollY: number;
-  } | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      // Save current body styles and scroll position
-      bodyScrollLockRef.current = {
-        overflow: document.body.style.overflow || '',
-        position: document.body.style.position || '',
-        top: document.body.style.top || '',
-        width: document.body.style.width || '',
-        scrollY: window.scrollY,
-      };
-
-      // Lock body scroll
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${window.scrollY}px`;
-      document.body.style.width = '100%';
-
-      if (import.meta.env.DEV) {
-        console.log('[Artie] Scroll locked, saved position:', window.scrollY);
-      }
-    } else {
-      // Restore body scroll
-      if (bodyScrollLockRef.current) {
-        document.body.style.overflow = bodyScrollLockRef.current.overflow;
-        document.body.style.position = bodyScrollLockRef.current.position;
-        document.body.style.top = bodyScrollLockRef.current.top;
-        document.body.style.width = bodyScrollLockRef.current.width;
-
-        // Restore scroll position
-        window.scrollTo(0, bodyScrollLockRef.current.scrollY);
-
-        if (import.meta.env.DEV) {
-          console.log('[Artie] Scroll restored, position:', bodyScrollLockRef.current.scrollY);
-        }
-
-        bodyScrollLockRef.current = null;
-      } else {
-        // Fallback: ensure overflow is restored
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-      }
-    }
-
-    return () => {
-      // Cleanup on unmount - always restore scroll
-      if (bodyScrollLockRef.current) {
-        document.body.style.overflow = bodyScrollLockRef.current.overflow;
-        document.body.style.position = bodyScrollLockRef.current.position;
-        document.body.style.top = bodyScrollLockRef.current.top;
-        document.body.style.width = bodyScrollLockRef.current.width;
-        window.scrollTo(0, bodyScrollLockRef.current.scrollY);
-        bodyScrollLockRef.current = null;
-
-        if (import.meta.env.DEV) {
-          console.log('[Artie] Cleanup: Scroll restored on unmount');
-        }
-      } else {
-        // Defensive cleanup
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-      }
-    };
-  }, [isOpen]);
+  // NOTE: Artie panel does NOT lock body scroll - only its internal content scrolls
+  // This allows the page to scroll normally when Artie is open, and modals can
+  // properly lock scroll when they open
 
   // Show tooltip on first 3 visits
   useEffect(() => {
@@ -1472,8 +1399,8 @@ export const ArtieChat = () => {
     <div 
       data-artie-floating-icon
       className={cn(
-        "fixed opacity-100 visible pointer-events-auto z-[70]",
-        // Mobile: above bottom nav (z-[60])
+        "fixed opacity-100 visible pointer-events-auto z-[45]",
+        // Mobile: above bottom nav (z-[60]), but below modals
         isMobile ? "bottom-20 right-4" : "bottom-6 right-6"
       )}
     >
@@ -1556,7 +1483,7 @@ export const ArtieChat = () => {
       
       {/* Backdrop - Click to close */}
       <button 
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[74] animate-fade-in cursor-default"
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[50] animate-fade-in cursor-default"
         onClick={handleClose}
         aria-label="Close chat"
         type="button"
@@ -1566,7 +1493,7 @@ export const ArtieChat = () => {
       <div 
         data-artie-panel
         className={cn(
-          "fixed z-[75] flex flex-col bg-background shadow-strong pointer-events-auto safe-bottom",
+          "fixed z-[51] flex flex-col bg-background shadow-strong pointer-events-auto safe-bottom",
           // Mobile: full width, slides from right
           "top-0 right-0 left-auto h-[100dvh] h-[100svh] w-[90vw] border-l border-border",
           // Desktop: right-side panel with margins and rounded corners
@@ -1577,6 +1504,8 @@ export const ArtieChat = () => {
         style={{
           // Ensure it starts off-screen right and animates in smoothly
           willChange: 'transform',
+          // Ensure flex container allows scrolling
+          minHeight: 0,
         }}
       >
         {/* Header - Fixed height with proper padding */}
@@ -1680,7 +1609,7 @@ export const ArtieChat = () => {
         <div 
           ref={chatBodyRef}
           className={cn(
-            "flex-1 overflow-y-auto overscroll-contain",
+            "flex-1 overflow-y-auto overscroll-contain min-h-0",
             "px-4 md:px-6 py-4 md:py-5",
             "space-y-3 md:space-y-4",
             // Mobile: padding bottom for fixed input

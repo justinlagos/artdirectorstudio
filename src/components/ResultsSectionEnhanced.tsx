@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import {
   Copy,
   RefreshCw,
@@ -90,7 +91,6 @@ export const ResultsSection = ({
   // const [showBatchProcessDialog, setShowBatchProcessDialog] = useState(false);
   // const [batchProcessMode, setBatchProcessMode] = useState<"analyze" | "upscale">("analyze");
   const studioButtonRef = useRef<HTMLButtonElement | null>(null);
-  const previousBodyOverflow = useRef<string | null>(null);
 
   const ensureStudioButtonVisible = () => {
     if (!studioButtonRef.current || typeof window === 'undefined' || window.innerWidth >= 768) {
@@ -164,59 +164,12 @@ export const ResultsSection = ({
     return () => window.removeEventListener('keydown', handleEscape);
   }, []);
 
-  // Enhanced body overflow management with defensive cleanup
-  useEffect(() => {
-    const hasOverlay = showBatchGenerationDialog ||
-      showBlendDialog ||
-      showUpscaleDialog;
-      // Batch feature temporarily disabled
-      // || showBatchProcessDialog;
-
-    console.log('[ResultsSection] Dialog state:', {
-      hasOverlay,
-      showBatchGenerationDialog,
-      showBlendDialog,
-      showUpscaleDialog
-      // Batch feature temporarily disabled
-      // showBatchProcessDialog
-    });
-
-    if (hasOverlay) {
-      if (previousBodyOverflow.current === null && document.body) {
-        previousBodyOverflow.current = document.body.style.overflow || '';
-        console.log('[ResultsSection] Saving body overflow:', previousBodyOverflow.current);
-      }
-      if (document.body) {
-        document.body.style.overflow = 'hidden';
-        console.log('[ResultsSection] Body overflow set to hidden');
-      }
-    } else if (previousBodyOverflow.current !== null && document.body) {
-      console.log('[ResultsSection] Restoring body overflow:', previousBodyOverflow.current);
-      document.body.style.overflow = previousBodyOverflow.current;
-      previousBodyOverflow.current = null;
-      
-      // Defensive fallback: ensure overflow is restored after 100ms
-      setTimeout(() => {
-        if (document.body && !hasOverlay) {
-          const currentOverflow = document.body.style.overflow;
-          if (currentOverflow === 'hidden') {
-            console.log('[ResultsSection] Defensive cleanup: forcing overflow restore');
-            document.body.style.overflow = '';
-          }
-        }
-      }, 100);
-    }
-
-    return () => {
-      // Cleanup on unmount
-      if (previousBodyOverflow.current !== null && document.body) {
-        console.log('[ResultsSection] Cleanup: restoring body overflow on unmount');
-        document.body.style.overflow = previousBodyOverflow.current;
-        previousBodyOverflow.current = null;
-      }
-    };
-  }, [showBatchGenerationDialog, showBlendDialog, showUpscaleDialog]);
-  // Batch feature temporarily disabled - removed showBatchProcessDialog from dependencies
+  // Use centralized scroll lock manager for dialogs
+  useScrollLock(showBatchGenerationDialog, 'results-batch-generation-dialog');
+  useScrollLock(showBlendDialog, 'results-blend-dialog');
+  useScrollLock(showUpscaleDialog, 'results-upscale-dialog');
+  // Batch feature temporarily disabled
+  // useScrollLock(showBatchProcessDialog, 'results-batch-process-dialog');
 
   // Live preview with debounced regeneration (2s delay) + pulse animation
   useEffect(() => {
