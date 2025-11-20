@@ -1223,13 +1223,21 @@ export const ArtieChat = () => {
                   )
                 );
                 
-                // Set generation dialog data
-                setGenerationPrompt(args.prompt);
-                setGenerationOptions({
-                  quality: args.quality || 'auto',
-                  size: args.size || '1024x1024'
+                // Get the most recent image from context for reference
+                const recentImage = contextMemory.images[contextMemory.images.length - 1];
+                
+                // Open Studio with full visual context
+                await openStudioWithPrompt({
+                  basePrompt: args.prompt,
+                  imageUrl: recentImage?.url || args.referenceImage,
+                  meta: {
+                    source: 'artie',
+                    conversationContext: messages.slice(-5).map(m => m.text).join('\n'),
+                    styleTags: [],
+                    quality: args.quality || 'auto',
+                    size: args.size || '1024x1024'
+                  }
                 });
-                setShowGenerationDialog(true);
                 
               } else if (toolCall.function.name === 'open_upscale') {
                 trackWorkflowAction('upscaling');
@@ -1242,9 +1250,26 @@ export const ArtieChat = () => {
                   )
                 );
                 
+                // Get image from context or args
+                const imageUrl = args.imageUrl || contextMemory.images[contextMemory.images.length - 1]?.url;
+                const recentImage = contextMemory.images[contextMemory.images.length - 1];
+                
+                // Update visual context before opening tool
+                const { useVisualContextStore } = await import('@/store/visualContextStore');
+                const visualContext = useVisualContextStore.getState();
+                if (imageUrl) {
+                  visualContext.updateImage(imageUrl);
+                  visualContext.addOperation({
+                    tool: 'upscale',
+                    imageUrl,
+                    params: { scaleFactor: args.scaleFactor || '2' }
+                  });
+                }
+                
                 openTool('upscale', {
                   scaleFactor: args.scaleFactor || '2',
-                  ...(args.imageUrl && { imageUrl: args.imageUrl })
+                  imageUrl,
+                  contextPrompt: visualContext.basePrompt
                 });
                 
               } else if (toolCall.function.name === 'open_blend') {
@@ -1258,9 +1283,25 @@ export const ArtieChat = () => {
                   )
                 );
                 
+                // Get recent images for blending context
+                const recentImages = contextMemory.images.slice(-2);
+                
+                // Update visual context
+                const { useVisualContextStore } = await import('@/store/visualContextStore');
+                const visualContext = useVisualContextStore.getState();
+                if (recentImages.length > 0) {
+                  visualContext.updateImage(recentImages[0].url);
+                  visualContext.addOperation({
+                    tool: 'blend',
+                    params: { mode: args.mode || 'merge', ratio: args.ratio || 50 }
+                  });
+                }
+                
                 openTool('blend', {
                   mode: args.mode || 'merge',
-                  ratio: args.ratio || 50
+                  ratio: args.ratio || 50,
+                  image1Url: recentImages[0]?.url,
+                  image2Url: recentImages[1]?.url
                 });
                 
               } else if (toolCall.function.name === 'generate_image') {

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { ArtieModal } from "@/components/artie/ArtieModal";
 import { UniversalImageWorkspace } from "@/components/UniversalImageWorkspace";
 import { Edit } from "lucide-react";
+import { useVisualContextStore } from "@/store/visualContextStore";
 
 interface EditImageModalWrapperProps {
   open: boolean;
@@ -18,16 +19,22 @@ export const EditImageModalWrapper = ({
   initialInstruction = "",
   onImageEdited,
 }: EditImageModalWrapperProps) => {
+  const visualContext = useVisualContextStore(state => ({
+    basePrompt: state.basePrompt,
+    analysisData: state.analysisData,
+  }));
+
   // Debug: Log modal state changes
   useEffect(() => {
     if (import.meta.env.DEV) {
       console.log('[EditImageModalWrapper] Modal state:', {
         open,
         hasImageUrl: !!imageUrl,
-        imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : 'empty'
+        imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : 'empty',
+        hasVisualContext: !!(visualContext.basePrompt || visualContext.analysisData)
       });
     }
-  }, [open, imageUrl]);
+  }, [open, imageUrl, visualContext]);
 
   // Don't render if no image URL
   if (!imageUrl && !open) {
@@ -54,7 +61,7 @@ export const EditImageModalWrapper = ({
           open={open}
           onOpenChange={onOpenChange}
           imageUrl={imageUrl}
-          initialInstruction={initialInstruction}
+          initialInstruction={initialInstruction || visualContext.basePrompt || ""}
           onImageEdited={onImageEdited}
           sourceType="edit"
         />
