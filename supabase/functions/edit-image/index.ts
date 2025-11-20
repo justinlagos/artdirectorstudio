@@ -183,8 +183,6 @@ serve(async (req) => {
     let enhancedInstruction = trimmedInstruction;
     if (region && typeof region === 'object' && region.x !== undefined) {
       // Include region coordinates in instruction for better AI understanding
-      // Note: Region coordinates are in image pixels, we'll describe them as percentages
-      // The AI model will interpret the region from the instruction text
       enhancedInstruction = `${trimmedInstruction} Apply this change ONLY to the rectangular region starting at coordinates (${Math.round(region.x)}, ${Math.round(region.y)}) with dimensions ${Math.round(region.width)}x${Math.round(region.height)} pixels. Keep the rest of the image completely unchanged.`;
     } else if (region) {
       enhancedInstruction = `${trimmedInstruction} Apply changes to the selected region only.`;
@@ -193,7 +191,8 @@ serve(async (req) => {
       enhancedInstruction += ` Use the provided mask to guide the editing precisely.`;
     }
 
-    const aiRequestBody = {
+    // FIX: Build AI request with structured region parameters if supported
+    const aiRequestBody: any = {
       model: "google/gemini-2.5-flash-image-preview",
       messages: [
         {
@@ -206,7 +205,16 @@ serve(async (req) => {
             {
               type: "image_url",
               image_url: {
-                url: fullImageUrl
+                url: fullImageUrl,
+                // Include structured region if available (for models that support it)
+                ...(region && typeof region === 'object' && region.x !== undefined && {
+                  region: {
+                    x: Math.round(region.x),
+                    y: Math.round(region.y),
+                    width: Math.round(region.width),
+                    height: Math.round(region.height)
+                  }
+                })
               }
             }
           ]
@@ -214,6 +222,11 @@ serve(async (req) => {
       ],
       modalities: ["image", "text"]
     };
+
+    // Add mask parameter if provided
+    if (mask) {
+      aiRequestBody.mask = mask;
+    }
 
     console.log(`[${requestId}] AI request instruction length: ${enhancedInstruction.length}, has region: ${!!region}, has mask: ${!!mask}`);
 
@@ -321,6 +334,40 @@ serve(async (req) => {
     }
 
     console.log(`[${requestId}] Image extracted, format: ${editedImageUrl.startsWith('data:image/') ? 'base64' : 'url'}, length: ${editedImageUrl.length}`);
+
+    // FIX: Validate image URL before processing
+    const isValidImageUrl = (url: string): boolean => {
+      if (!url || typeof url !== 'string') return false;
+      
+      try {
+        // Allow data URIs and HTTPS URLs
+        if (url.startsWith('data:image/')) return true;
+        
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:') return false;
+        
+        // Verify Supabase storage URLs or allowed external domains
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        if (url.startsWith(`${supabaseUrl}/storage/`)) return true;
+        
+        // Allow Lovable AI gateway and Google storage URLs
+        if (url.includes('ai.gateway.lovable.dev') || url.includes('storage.googleapis.com')) {
+          return true;
+        }
+        
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    if (!isValidImageUrl(editedImageUrl)) {
+      console.error(`[${requestId}] Invalid image URL format: ${editedImageUrl.substring(0, 100)}`);
+      return new Response(
+        JSON.stringify({ error: "Generated image URL is invalid or from untrusted source" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Upload to storage if it's base64, otherwise use the URL directly
     let finalImageUrl = editedImageUrl;
