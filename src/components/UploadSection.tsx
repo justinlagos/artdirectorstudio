@@ -148,16 +148,16 @@ export const UploadSection = ({
             </p>
           </div>
         ) : (
-          <div className="relative space-y-6 animate-fade-in">
-            <div className="inline-flex p-6 rounded-2xl bg-accent/50 group-hover:bg-accent transition-colors duration-300">
-              <Upload className="w-12 h-12 text-muted-foreground group-hover:text-foreground transition-colors duration-300" />
-            </div>
-            <div className="space-y-3">
-              <p className="text-xl font-medium">
-                Drop your image here
+          <div className="relative z-10 space-y-4">
+            <Upload className="w-12 h-12 mx-auto text-muted-foreground group-hover:text-foreground transition-colors" />
+            <div className="space-y-2">
+              <p className="text-lg font-medium text-foreground">
+                Drop a visual or layout here
               </p>
-              <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                or click to browse • PNG or JPG • up to 15MB
+              <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+                Artie will analyze it, pull out what matters, and suggest next-step visuals.
+                <br />
+                <span className="text-xs opacity-70">(PNG or JPG, max 15MB)</span>
               </p>
             </div>
           </div>

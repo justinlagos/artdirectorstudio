@@ -71,11 +71,11 @@ export const ArtieModal = ({
                   "data-[state=open]:animate-in data-[state=closed]:animate-out",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                   "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-                  "duration-[260ms]",
+                  "duration-300",
                 ]
-              : // Desktop: centered modal with fade+scale animation
+              : // Desktop: centered modal with fade+scale animation ONLY
                 [
-                  "left-1/2 top-1/2",
+                  "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
                   "rounded-2xl border border-border bg-background shadow-xl",
                   "w-[90vw] max-h-[90vh]",
                   maxWidthClasses[maxWidth],
@@ -86,16 +86,10 @@ export const ArtieModal = ({
                   "data-[state=open]:animate-in data-[state=closed]:animate-out",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                   "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-                  "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
-                  "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-                  "duration-[260ms]",
+                  "duration-300",
                 ],
             className
           )}
-          style={!isMobile ? {
-            transform: 'translate(-50%, -50%)',
-            WebkitTransform: 'translate(-50%, -50%)',
-          } : undefined}
           onOpenAutoFocus={(e) => {
             // Prevent auto focus on mobile to avoid keyboard opening
             if (isMobile) {

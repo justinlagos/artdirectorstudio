@@ -31,7 +31,7 @@ import { PremiumValue } from "@/components/landing/PremiumValue";
 import { ShowcaseSection } from "@/components/landing/ShowcaseSection";
 import { ProofSection } from "@/components/landing/ProofSection";
 import { PricingSection } from "@/components/landing/PricingSection";
-import { FinalCTASection } from "@/components/landing/FinalCTASection";
+import { LandingInspirePreview } from "@/components/landing/LandingInspirePreview";
 
 export interface Analysis {
   image_overview: string;
@@ -635,12 +635,11 @@ const Index = () => {
             <ErrorBoundary fallback={null}>
               <PremiumFeatures />
             </ErrorBoundary>
+            
             <ErrorBoundary fallback={null}>
-              <PremiumValue />
+              <LandingInspirePreview />
             </ErrorBoundary>
-            <ErrorBoundary fallback={null}>
-              <PremiumFeatures />
-            </ErrorBoundary>
+            
             <ErrorBoundary fallback={<div className="py-20 text-center">Showcase unavailable</div>}>
               <ShowcaseSection />
             </ErrorBoundary>

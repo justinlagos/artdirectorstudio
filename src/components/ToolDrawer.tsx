@@ -38,8 +38,13 @@ export const ToolDrawer = ({
             // Mobile: bottom sheet with rounded-t-2xl
             "inset-x-0 bottom-0 rounded-t-2xl",
             "sm:mx-auto sm:w-full sm:max-w-[820px]",
-            // Desktop: centered modal with rounded-2xl, max-w-[820px]
+            // Desktop: centered modal with rounded-2xl, proper centering
             "md:inset-x-auto md:inset-y-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:bottom-auto md:rounded-2xl md:max-w-[820px] md:w-[90vw] md:max-h-[90vh]",
+            // Animation: fade + slide (no position jumping)
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95",
+            "duration-300",
             className,
           )}
           style={{
