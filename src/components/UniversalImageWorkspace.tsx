@@ -89,14 +89,9 @@ export const UniversalImageWorkspace = ({
       setAdjustments(defaultAdjustments);
       loadVersionsHistory();
       analyzeImageForFixes();
-      // Prevent body scroll when workspace is open
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+      // Note: Body scroll lock is handled by EditImageModalWrapper's ArtieModal
+      // Do NOT manually set document.body.style.overflow here
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [open, imageUrl, initialInstruction]);
 
   const analyzeImageForFixes = async () => {
