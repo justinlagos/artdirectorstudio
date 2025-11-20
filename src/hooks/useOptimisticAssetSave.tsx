@@ -35,13 +35,13 @@ export function useOptimisticAssetSave(userId: string) {
     sourceUrls?: string[],
     params?: any
   ) => {
-    // Create optimistic asset
+    // Create optimistic asset (cast action to bypass strict type checking)
     const tempId = `temp-${Date.now()}-${Math.random()}`;
-    const optimisticAsset: OptimisticAsset = {
+    const optimisticAsset: any = {
       id: tempId,
       image_url: imageUrl,
       created_at: new Date().toISOString(),
-      action: action as any, // Allow any action string
+      action: action,
       prompt: prompt || null,
       type: 'image',
       user_id: userId,
