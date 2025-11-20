@@ -20,6 +20,11 @@ import { useNavigate } from "react-router-dom";
 import { getCachedUnderstanding, analyzeImageDeep } from "@/lib/intelligence/imageUnderstanding";
 import { getQuickFixes, getFixAdjustments } from "@/lib/intelligence/visualTroubleshooting";
 import { useIntelligence } from "@/hooks/useIntelligence";
+import { 
+  generateInstructionFromAdjustments, 
+  generateFilterStyle, 
+  DEFAULT_ADJUSTMENTS 
+} from "@/lib/imageEditing/instructionGenerator";
 
 interface UniversalImageWorkspaceProps {
   open: boolean;
@@ -30,19 +35,8 @@ interface UniversalImageWorkspaceProps {
   sourceType?: 'studio' | 'blend' | 'upscale' | 'edit';
 }
 
-const defaultAdjustments: Adjustments = {
-  brightness: 100,
-  contrast: 100,
-  saturation: 100,
-  hue: 0,
-  warmth: 0,
-  exposure: 0,
-  sharpness: 0,
-  vibrance: 100,
-  shadows: 0,
-  highlights: 0,
-  clarity: 0,
-};
+// Use centralized default adjustments
+const defaultAdjustments = DEFAULT_ADJUSTMENTS;
 
 interface ImageVersion {
   id: string;
@@ -162,19 +156,9 @@ export const UniversalImageWorkspace = ({
     }
   };
 
-  const generateFilterStyle = (adj: Adjustments) => {
-    const filters = [
-      `brightness(${adj.brightness}%)`,
-      `contrast(${adj.contrast}%)`,
-      `saturate(${adj.saturation}%)`,
-      `hue-rotate(${adj.hue}deg)`,
-      adj.warmth > 0 ? `sepia(${Math.abs(adj.warmth)}%)` : `saturate(${100 + adj.warmth}%)`,
-      `brightness(${100 + adj.exposure}%)`,
-    ];
-    return filters.join(' ');
-  };
-
+  // Use centralized instruction generation
   const generateInstruction = (): string => {
+    // Priority: region instruction > custom instruction > adjustments
     if (selectedRegion && regionInstruction.trim()) {
       return regionInstruction.trim();
     }
@@ -183,40 +167,8 @@ export const UniversalImageWorkspace = ({
       return customInstruction.trim();
     }
 
-    const changes: string[] = [];
-    
-    if (adjustments.brightness !== 100) {
-      const diff = adjustments.brightness - 100;
-      if (Math.abs(diff) > 10) {
-        changes.push(diff > 0 
-          ? `increase brightness by ${Math.round(diff)}%`
-          : `decrease brightness by ${Math.abs(Math.round(diff))}%`);
-      }
-    }
-    
-    if (adjustments.contrast !== 100) {
-      const diff = adjustments.contrast - 100;
-      if (Math.abs(diff) > 10) {
-        changes.push(diff > 0 
-          ? `increase contrast by ${Math.round(diff)}%`
-          : `decrease contrast by ${Math.abs(Math.round(diff))}%`);
-      }
-    }
-    
-    if (adjustments.saturation !== 100) {
-      const diff = adjustments.saturation - 100;
-      if (Math.abs(diff) > 10) {
-        changes.push(diff > 0 
-          ? `increase saturation by ${Math.round(diff)}%`
-          : `decrease saturation by ${Math.abs(Math.round(diff))}%`);
-      }
-    }
-
-    if (changes.length === 0) {
-      return "";
-    }
-
-    return `Adjust the image to ${changes.join(', ')}. Maintain the overall composition and subject matter.`;
+    // Generate from adjustments using centralized function
+    return generateInstructionFromAdjustments(adjustments);
   };
 
   const submitEdit = async (instruction: string) => {

@@ -15,6 +15,11 @@ import { SelectionTool } from "./SelectionTool";
 import { ColorPickerPanel } from "./ColorPickerPanel";
 import { AdvancedEditPanel } from "./AdvancedEditPanel";
 import { FooterActions } from "./FooterActions";
+import { 
+  generateInstructionFromAdjustments, 
+  generateFilterStyle, 
+  DEFAULT_ADJUSTMENTS 
+} from "@/lib/imageEditing/instructionGenerator";
 
 interface EditImageModalProps {
   open: boolean;
@@ -35,19 +40,8 @@ const FILTER_PRESETS = [
   { name: "Cinematic", adjustments: { contrast: 125, shadows: -15, highlights: 15, saturation: 95 } },
 ];
 
-const defaultAdjustments: Adjustments = {
-  brightness: 100,
-  contrast: 100,
-  saturation: 100,
-  hue: 0,
-  warmth: 0,
-  exposure: 0,
-  sharpness: 0,
-  vibrance: 100,
-  shadows: 0,
-  highlights: 0,
-  clarity: 0,
-};
+// Use centralized default adjustments
+const defaultAdjustments = DEFAULT_ADJUSTMENTS;
 
 export const EditImageModal = ({
   open,
@@ -101,18 +95,7 @@ export const EditImageModal = ({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [open, selectedRegion, activeTab]);
 
-  const generateFilterStyle = (adj: Adjustments) => {
-    const filters = [
-      `brightness(${adj.brightness}%)`,
-      `contrast(${adj.contrast}%)`,
-      `saturate(${adj.saturation}%)`,
-      `hue-rotate(${adj.hue}deg)`,
-      adj.warmth > 0 ? `sepia(${Math.abs(adj.warmth)}%)` : `saturate(${100 + adj.warmth}%)`,
-      `brightness(${100 + adj.exposure}%)`,
-    ];
-    return filters.join(' ');
-  };
-
+  // Use centralized instruction generation
   const generateInstruction = (): string => {
     // Priority: region instruction > custom instruction > adjustments
     if (selectedRegion && regionInstruction.trim()) {
@@ -123,90 +106,8 @@ export const EditImageModal = ({
       return customInstruction.trim();
     }
 
-    // Generate from adjustments
-    const changes: string[] = [];
-    
-    if (adjustments.brightness !== 100) {
-      const diff = adjustments.brightness - 100;
-      if (Math.abs(diff) > 10) {
-        changes.push(diff > 0 
-          ? `increase brightness by ${Math.round(diff)}%`
-          : `decrease brightness by ${Math.abs(Math.round(diff))}%`);
-      }
-    }
-    
-    if (adjustments.contrast !== 100) {
-      const diff = adjustments.contrast - 100;
-      if (Math.abs(diff) > 10) {
-        changes.push(diff > 0 
-          ? `increase contrast by ${Math.round(diff)}%`
-          : `decrease contrast by ${Math.abs(Math.round(diff))}%`);
-      }
-    }
-    
-    if (adjustments.saturation !== 100) {
-      const diff = adjustments.saturation - 100;
-      if (Math.abs(diff) > 10) {
-        changes.push(diff > 0 
-          ? `make colors more vibrant by ${Math.round(diff)}%`
-          : `reduce color saturation by ${Math.abs(Math.round(diff))}%`);
-      }
-    }
-
-    if (Math.abs(adjustments.hue) > 5) {
-      changes.push(`shift color hue by ${Math.round(adjustments.hue)} degrees`);
-    }
-
-    if (Math.abs(adjustments.warmth) > 10) {
-      changes.push(adjustments.warmth > 0 
-        ? `add warm tones (${Math.round(adjustments.warmth)}% warmer)`
-        : `add cool tones (${Math.abs(Math.round(adjustments.warmth))}% cooler)`);
-    }
-
-    if (Math.abs(adjustments.exposure) > 10) {
-      changes.push(adjustments.exposure > 0 
-        ? `increase exposure by ${Math.round(adjustments.exposure)}%`
-        : `decrease exposure by ${Math.abs(Math.round(adjustments.exposure))}%`);
-    }
-
-    if (adjustments.vibrance !== 100) {
-      const diff = adjustments.vibrance - 100;
-      if (Math.abs(diff) > 10) {
-        changes.push(diff > 0 
-          ? `increase vibrance by ${Math.round(diff)}%`
-          : `decrease vibrance by ${Math.abs(Math.round(diff))}%`);
-      }
-    }
-
-    if (Math.abs(adjustments.shadows) > 10) {
-      changes.push(adjustments.shadows > 0 
-        ? `lift shadows by ${Math.round(adjustments.shadows)}%`
-        : `darken shadows by ${Math.abs(Math.round(adjustments.shadows))}%`);
-    }
-
-    if (Math.abs(adjustments.highlights) > 10) {
-      changes.push(adjustments.highlights > 0 
-        ? `brighten highlights by ${Math.round(adjustments.highlights)}%`
-        : `reduce highlights by ${Math.abs(Math.round(adjustments.highlights))}%`);
-    }
-
-    if (Math.abs(adjustments.clarity) > 10) {
-      changes.push(adjustments.clarity > 0 
-        ? `increase clarity by ${Math.round(adjustments.clarity)}%`
-        : `decrease clarity by ${Math.abs(Math.round(adjustments.clarity))}%`);
-    }
-
-    if (Math.abs(adjustments.sharpness) > 10) {
-      changes.push(adjustments.sharpness > 0 
-        ? `sharpen by ${Math.round(adjustments.sharpness)}%`
-        : `soften by ${Math.abs(Math.round(adjustments.sharpness))}%`);
-    }
-
-    if (changes.length === 0) {
-      return "";
-    }
-
-    return `Adjust the image to ${changes.join(', ')}. Maintain the overall composition and subject matter.`;
+    // Generate from adjustments using centralized function
+    return generateInstructionFromAdjustments(adjustments);
   };
 
   const submitEdit = async (instruction: string, mask?: string) => {
