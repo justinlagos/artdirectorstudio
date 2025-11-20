@@ -28,6 +28,13 @@ class ScrollLockManager {
    * Returns a cleanup function
    */
   lock(source: ScrollLockSource): () => void {
+    if (import.meta.env.DEV) {
+      console.log(`[ScrollLock] Lock requested by: ${source}`, {
+        currentLocks: Array.from(this.locks),
+        isLocked: this.isLocked()
+      });
+    }
+    
     this.locks.add(source);
     this.updateScrollLock();
     
@@ -40,6 +47,13 @@ class ScrollLockManager {
    * Release scroll lock for a source
    */
   unlock(source: ScrollLockSource): void {
+    if (import.meta.env.DEV) {
+      console.log(`[ScrollLock] Unlock requested by: ${source}`, {
+        currentLocks: Array.from(this.locks),
+        isLocked: this.isLocked()
+      });
+    }
+    
     this.locks.delete(source);
     this.updateScrollLock();
   }
@@ -49,6 +63,17 @@ class ScrollLockManager {
    */
   isLocked(): boolean {
     return this.locks.size > 0;
+  }
+
+  /**
+   * Get current state for debugging
+   */
+  getState() {
+    return {
+      activeLocks: Array.from(this.locks),
+      isLocked: this.isLocked(),
+      lockCount: this.locks.size
+    };
   }
 
   /**
@@ -105,9 +130,10 @@ class ScrollLockManager {
   }
 
   /**
-   * Force cleanup (for edge cases)
+   * Force cleanup (for edge cases and error recovery)
    */
   forceUnlock(): void {
+    console.warn('[ScrollLock] Force unlock all - recovering from error state');
     this.locks.clear();
     if (this.savedStyles) {
       document.body.style.overflow = this.savedStyles.overflow;
@@ -120,6 +146,19 @@ class ScrollLockManager {
       this.savedStyles = null;
     }
   }
+}
+
+// Safety: Global error handler to recover from scroll lock issues
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', () => {
+    // If critical error and too many locks, force unlock
+    setTimeout(() => {
+      const manager = scrollLockManager;
+      if (manager.getState().lockCount > 3) {
+        manager.forceUnlock();
+      }
+    }, 1000);
+  });
 }
 
 // Singleton instance
