@@ -1,5 +1,6 @@
 import { useModalStore } from "@/store/modalStore";
 import { useStudioStore } from "@/store/studioStore";
+import { useVisualContextStore } from "@/store/visualContextStore";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { analyzeImageDeep, getCachedUnderstanding } from "@/lib/intelligence/imageUnderstanding";
@@ -19,6 +20,20 @@ export async function openStudioWithPrompt({
 }: OpenStudioOptions): Promise<void> {
   const studioState = useStudioStore.getState();
   const modalState = useModalStore.getState();
+  const visualContext = useVisualContextStore.getState();
+
+  // Update visual context for cross-tool continuity
+  if (imageUrl) {
+    visualContext.updateImage(imageUrl);
+    visualContext.addOperation({
+      tool: 'artie',
+      prompt: basePrompt,
+      imageUrl,
+    });
+  }
+  if (basePrompt) {
+    visualContext.updatePrompt(basePrompt);
+  }
 
   // If an image is provided, generate Creative Director analysis FIRST before opening modal
   // This prevents context drift by ensuring prompt is ready immediately
@@ -61,10 +76,16 @@ export async function openStudioWithPrompt({
               ...creativePrompt.metadata,
               source: meta.source || 'studio',
             });
+            visualContext.setContext({
+              analysisData: creativePrompt.metadata,
+            });
           } else {
             studioState.setMeta({
               ...creativePrompt.metadata,
               source: 'studio',
+            });
+            visualContext.setContext({
+              analysisData: creativePrompt.metadata,
             });
           }
 
@@ -115,4 +136,5 @@ export function closeStudioModal(): void {
   const studioState = useStudioStore.getState();
   modalState.closeGenerateModal();
   studioState.reset();
+  // Note: visualContextStore persists across modal closes for continuity
 }

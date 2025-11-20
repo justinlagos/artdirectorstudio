@@ -28,11 +28,11 @@ export const HeroSection = ({ user }: HeroSectionProps) => {
           }`}
         >
           <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight leading-[1.1] text-foreground max-w-5xl mx-auto">
-            Turn ideas into visuals with the clarity of a world-class creative partner.
+            Your creative partner, inside your workspace.
           </h1>
           
           <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-normal">
-            Your art director, visual brainstormer, and concept engine in one place.
+            Artie and Studio work together to cut ideation time from hours to minutes.
             <br className="hidden md:block" />
             <span className="block mt-2 md:mt-0 md:inline">Built for designers who move fast and think big.</span>
           </p>
@@ -50,7 +50,7 @@ export const HeroSection = ({ user }: HeroSectionProps) => {
               className="text-base md:text-lg px-8 md:px-10 py-6 md:py-7 h-auto font-medium rounded-lg shadow-subtle hover:shadow-medium transition-all duration-300 hover:scale-[1.02]"
               onClick={() => navigate("/auth")}
             >
-              Start creating
+              Start with Artie
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             
@@ -58,13 +58,10 @@ export const HeroSection = ({ user }: HeroSectionProps) => {
               variant="outline" 
               size="lg" 
               className="text-base md:text-lg px-8 md:px-10 py-6 md:py-7 h-auto font-medium rounded-lg border-2 hover:bg-accent transition-all duration-300 hover:scale-[1.02]"
-              onClick={() => {
-                const showcase = document.getElementById("showcase-section");
-                showcase?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
+              onClick={() => navigate("/auth")}
             >
               <Play className="w-5 h-5 mr-2" />
-              See examples
+              Open Studio
             </Button>
           </div>
         )}
