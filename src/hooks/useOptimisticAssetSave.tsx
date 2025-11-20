@@ -61,10 +61,10 @@ export function useOptimisticAssetSave(userId: string) {
     ]);
 
     try {
-      // Actual save
+      // Actual save (cast action to expected type)
       const saved = await saveAsset({
         imageUrl,
-        action,
+        action: action as 'generate' | 'edit' | 'upscale' | 'blend' | 'batch_analyze' | 'batch_upscale' | 'batch_blend',
         prompt,
         sourceUrls,
         params,
