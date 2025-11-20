@@ -68,7 +68,6 @@ export const PremiumFeatures = () => {
       y: 0,
       transition: {
         duration: 0.5,
-        ease: [0.4, 0, 0.2, 1],
       },
     },
   };
@@ -84,7 +83,7 @@ export const PremiumFeatures = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-          transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+          transition={{ duration: 0.6 }}
           className="text-center mb-16 md:mb-20 space-y-4"
         >
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">

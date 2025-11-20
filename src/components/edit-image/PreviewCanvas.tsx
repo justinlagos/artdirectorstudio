@@ -357,13 +357,7 @@ export const PreviewCanvas = ({
         WebkitTapHighlightColor: "transparent",
         userSelect: "none",
         pointerEvents: "auto",
-        // Prevent image dragging completely
-        WebkitUserDrag: "none",
-        KhtmlUserDrag: "none",
-        MozUserDrag: "none",
-        OUserDrag: "none",
-        userDrag: "none"
-      }}
+      } as React.CSSProperties}
     >
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
@@ -393,14 +387,8 @@ export const PreviewCanvas = ({
           filter: filterStyle,
           // Smooth filter transitions for real-time previews
           transition: "filter 150ms cubic-bezier(0.4, 0, 0.2, 1)",
-          // Prevent all forms of dragging
-          WebkitUserDrag: "none",
-          KhtmlUserDrag: "none",
-          MozUserDrag: "none",
-          OUserDrag: "none",
-          userDrag: "none",
           pointerEvents: "none"
-        }}
+        } as React.CSSProperties}
         draggable={false}
         onDragStart={(e) => e.preventDefault()}
         onContextMenu={(e) => {

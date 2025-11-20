@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { ArtieModal } from "@/components/artie/ArtieModal";
 import { UniversalImageWorkspace } from "@/components/UniversalImageWorkspace";
 import { Edit } from "lucide-react";
@@ -17,6 +18,22 @@ export const EditImageModalWrapper = ({
   initialInstruction = "",
   onImageEdited,
 }: EditImageModalWrapperProps) => {
+  // Debug: Log modal state changes
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[EditImageModalWrapper] Modal state:', {
+        open,
+        hasImageUrl: !!imageUrl,
+        imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : 'empty'
+      });
+    }
+  }, [open, imageUrl]);
+
+  // Don't render if no image URL
+  if (!imageUrl && !open) {
+    return null;
+  }
+
   return (
     <ArtieModal
       open={open}

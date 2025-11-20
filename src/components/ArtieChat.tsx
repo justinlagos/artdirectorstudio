@@ -740,18 +740,13 @@ export const ArtieChat = () => {
       setIsOpen(false);
       setIsMinimized(false);
       
-      // Use requestAnimationFrame to ensure Artie minimizes before Edit opens
-      requestAnimationFrame(() => {
+      // Use setTimeout to ensure Artie closes before Edit opens (fixes desktop instant-open bug)
+      setTimeout(() => {
         setEditingImageUrl(targetImageUrl);
         setEditorInstruction("");
         setEditorOpen(true);
-      });
-      
-      console.log('[ArtieChat] EDIT_IMAGE: State set', {
-        editorOpen: true,
-        editingImageUrl: targetImageUrl,
-        editorInstruction: ""
-      });
+        console.log('[ArtieChat] EDIT_IMAGE: Modal opened');
+      }, 150);
       
       return;
     }
@@ -1428,12 +1423,12 @@ export const ArtieChat = () => {
                 // Minimize Artie cleanly first
                 setIsOpen(false);
                 setIsMinimized(false);
-                // Use requestAnimationFrame to ensure Artie minimizes before Edit opens
-                requestAnimationFrame(() => {
+                // Use setTimeout to ensure Artie closes before Edit opens (fixes desktop instant-open bug)
+                setTimeout(() => {
                   setEditingImageUrl(imageUrl);
                   setEditorInstruction(instruction);
                   setEditorOpen(true);
-                });
+                }, 150);
                 
                 accumulatedText += `\n\n✅ Opening Edit Image tool with instruction: "${instruction}"\n\nYou can review and adjust the settings before applying the changes.`;
                 setMessages(prev => 
@@ -1807,12 +1802,12 @@ export const ArtieChat = () => {
                                 // Minimize Artie cleanly first, then open Edit Image
                                 setIsOpen(false);
                                 setIsMinimized(false);
-                                // Use requestAnimationFrame to ensure Artie minimizes before Edit opens
-                                requestAnimationFrame(() => {
+                                // Use setTimeout to ensure Artie closes before Edit opens (fixes desktop instant-open bug)
+                                setTimeout(() => {
                                   setEditingImageUrl(imageUrl);
                                   setEditorInstruction("");
                                   setEditorOpen(true);
-                                });
+                                }, 150);
                               }}
                               className="gap-1.5"
                             >
@@ -1901,12 +1896,12 @@ export const ArtieChat = () => {
                                 // Minimize Artie cleanly first
                                 setIsOpen(false);
                                 setIsMinimized(false);
-                                // Use requestAnimationFrame to ensure Artie minimizes before Edit opens
-                                requestAnimationFrame(() => {
+                                // Use setTimeout to ensure Artie closes before Edit opens (fixes desktop instant-open bug)
+                                setTimeout(() => {
                                   setEditingImageUrl(url);
                                   setEditorInstruction("");
                                   setEditorOpen(true);
-                                });
+                                }, 150);
                               }}
                               className="gap-1.5"
                             >
