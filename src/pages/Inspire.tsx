@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { InspireProactiveSuggestions } from "@/components/InspireProactiveSuggestions";
 
 const ITEMS_PER_PAGE = 24;
 
@@ -326,7 +327,11 @@ const Inspire = () => {
             </div>
           </section>
 
-          <section>
+          <section className="space-y-8">
+            {projects.length >= 3 && (
+              <InspireProactiveSuggestions viewedProjects={projects.slice(0, 10)} />
+            )}
+            
             <InspireGrid
               ref={loaderRef}
               projects={projects}
