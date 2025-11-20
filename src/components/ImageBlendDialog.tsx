@@ -739,7 +739,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           Blend Images
         </>
       }
-      description="Upload 2-3 images and blend them into a unified composition"
+      description="Combine multiple images into a unified visual. Upload 2-4 images, choose a style, and let AI blend them seamlessly."
       contentClassName="pb-6"
       footer={footerContent}
     >

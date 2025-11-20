@@ -659,7 +659,7 @@ export const ImageGenerationDialog = () => {
             <TabsContent value="templates" className="mt-0">
               <div className="mb-4">
                 <p className="text-sm text-muted-foreground">
-                  Choose a template to guide your generation. Templates provide structured art direction for consistent results.
+                  Choose a template to guide the AI's creative direction, or switch to Custom for full control.
                 </p>
               </div>
               <PromptTemplates

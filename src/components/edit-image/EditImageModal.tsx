@@ -515,7 +515,7 @@ export const EditImageModal = ({
           Edit Image
         </div>
       }
-      description={isMobile ? "Adjust lighting, colors, and composition with AI assistance" : "Adjust lighting, colors, and composition. Use Select to edit specific regions. All edits are automatically saved to My Projects."}
+      description={isMobile ? "Adjust colors, lighting, and composition with AI-powered transformations" : "Adjust colors, lighting, and composition. Select regions for targeted edits, or apply AI-powered transformations across your entire image."}
       footer={footerContent}
       contentClassName={cn(
         "flex flex-col min-h-0",
