@@ -530,7 +530,7 @@ export const ImageGenerationDialog = () => {
 
   const bodyContent = (
     <div className={cn(
-      "flex flex-col min-h-0 p-6 md:p-8",
+      "flex flex-col min-h-0",
       !isMobile ? "grid grid-cols-[42%_58%] gap-8" : "space-y-6"
     )}>
       {/* Left Column: Reference Image Card (Desktop) or Top (Mobile) */}
