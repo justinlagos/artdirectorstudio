@@ -147,13 +147,13 @@ export function useScrollLock(
   shouldLock: boolean = true
 ): void {
   useEffect(() => {
-    if (!shouldLock) return;
-
-    if (isOpen) {
-      return scrollLockManager.lock(source);
-    } else {
-      scrollLockManager.unlock(source);
+    // Only lock when explicitly requested
+    if (!shouldLock || !isOpen) {
+      return;
     }
+
+    // Lock and return cleanup function consistently
+    return scrollLockManager.lock(source);
   }, [isOpen, source, shouldLock]);
 
   // Cleanup on unmount
