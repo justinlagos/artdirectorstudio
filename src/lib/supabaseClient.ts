@@ -4,7 +4,7 @@ import type {
   RealtimePostgresChangesPayload,
   SupabaseClient,
 } from "@supabase/supabase-js";
-import { supabaseAnon } from "@/lib/publicSupabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import type { InspireProject } from "@/types/inspire";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -37,7 +37,8 @@ const SELECT_COLUMNS = `
   )
 `;
 
-const inspireClient: SupabaseClient<Database> = supabaseAnon;
+// Use main supabase client for public Inspire queries (no auth needed)
+const inspireClient: SupabaseClient<Database> = supabase;
 
 export const qualifiesForPublicInspire = (project: InspireProject | null | undefined) => {
   if (!project || project.is_deleted) {
