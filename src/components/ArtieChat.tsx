@@ -387,83 +387,102 @@ export const ArtieChat = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Track processed images to prevent duplicate processing
+  const processedImagesRef = useRef<Set<string>>(new Set());
+
+  // Initialize processed images ref with images already in contextMemory
   useEffect(() => {
-    setContextMemory((prev) => {
-      const existingKeys = new Set(prev.images.map((img) => `${img.messageId}|${img.url}`));
-      const additions: ContextImage[] = [];
+    contextMemory.images.forEach((img) => {
+      processedImagesRef.current.add(`${img.messageId}|${img.url}`);
+    });
+  }, []); // Only run once on mount
 
-      messages.forEach((message) => {
-        if (message.attachment?.type === 'image') {
-          const key = `${message.id}|${message.attachment.url}`;
-          if (!existingKeys.has(key)) {
-            const imageData: ContextImage = {
-              url: message.attachment.url,
-              messageId: message.id,
-              name: message.attachment.name,
-              source: (message.sender === 'user' ? 'user' : 'artie') as 'user' | 'artie' | 'link',
-              timestamp: message.timestamp.toISOString(),
-            };
-            additions.push(imageData);
-            existingKeys.add(key);
-            
-            // Add to enhanced image memory system
-            addImageToMemory({
-              url: message.attachment.url,
-              type: message.sender === 'user' ? 'uploaded' : 'generated',
-              context_notes: message.text || undefined,
-              messageId: message.id,
-              source: message.sender === 'user' ? 'user' : 'artie',
-              name: message.attachment.name,
-            });
-            
-            // Analyze image in background (non-blocking)
-            analyzeAndStoreImage(message.attachment.url).catch(err => 
-              console.error('[Artie] Background image analysis failed:', err)
-            );
-          }
+  useEffect(() => {
+    const additions: ContextImage[] = [];
+    const imagesToProcess: Array<{ url: string; messageId: string; name?: string; source: ContextImage['source']; text?: string }> = [];
+
+    messages.forEach((message) => {
+      if (message.attachment?.type === 'image') {
+        const key = `${message.id}|${message.attachment.url}`;
+        if (!processedImagesRef.current.has(key)) {
+          processedImagesRef.current.add(key);
+          const imageData: ContextImage = {
+            url: message.attachment.url,
+            messageId: message.id,
+            name: message.attachment.name,
+            source: (message.sender === 'user' ? 'user' : 'artie') as 'user' | 'artie' | 'link',
+            timestamp: message.timestamp.toISOString(),
+          };
+          additions.push(imageData);
+          imagesToProcess.push({
+            url: message.attachment.url,
+            messageId: message.id,
+            name: message.attachment.name,
+            source: message.sender === 'user' ? 'user' : 'artie',
+            text: message.text,
+          });
         }
-
-        const embeddedUrls = extractSupabaseImageUrls(message.text);
-        embeddedUrls.forEach((url, index) => {
-          const key = `${message.id}|${url}`;
-          if (!existingKeys.has(key)) {
-            const imageData: ContextImage = {
-              url,
-              messageId: `${message.id}-link-${index}`,
-              name: 'Referenced Image',
-              source: 'link' as const,
-              timestamp: message.timestamp.toISOString(),
-            };
-            additions.push(imageData);
-            existingKeys.add(key);
-            
-            // Add to enhanced image memory system
-            addImageToMemory({
-              url,
-              type: 'generated',
-              context_notes: message.text || undefined,
-              messageId: `${message.id}-link-${index}`,
-              source: 'link',
-              name: 'Referenced Image',
-            });
-            
-            // Analyze image in background (non-blocking)
-            analyzeAndStoreImage(url).catch(err => 
-              console.error('[Artie] Background image analysis failed:', err)
-            );
-          }
-        });
-      });
-
-      if (additions.length === 0) {
-        return prev;
       }
 
-      return {
-        ...prev,
-        images: [...prev.images, ...additions],
-      };
+      const embeddedUrls = extractSupabaseImageUrls(message.text);
+      embeddedUrls.forEach((url, index) => {
+        const key = `${message.id}|${url}`;
+        if (!processedImagesRef.current.has(key)) {
+          processedImagesRef.current.add(key);
+          const imageData: ContextImage = {
+            url,
+            messageId: `${message.id}-link-${index}`,
+            name: 'Referenced Image',
+            source: 'link' as const,
+            timestamp: message.timestamp.toISOString(),
+          };
+          additions.push(imageData);
+          imagesToProcess.push({
+            url,
+            messageId: `${message.id}-link-${index}`,
+            name: 'Referenced Image',
+            source: 'link',
+            text: message.text,
+          });
+        }
+      });
     });
+
+    // Only update contextMemory if there are new additions
+    if (additions.length > 0) {
+      setContextMemory((prev) => {
+        // Double-check against current state to prevent duplicates
+        const existingKeys = new Set(prev.images.map((img) => `${img.messageId}|${img.url}`));
+        const newAdditions = additions.filter((img) => !existingKeys.has(`${img.messageId}|${img.url}`));
+        
+        if (newAdditions.length === 0) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          images: [...prev.images, ...newAdditions],
+        };
+      });
+
+      // Process images OUTSIDE of state setter to avoid side effects during state updates
+      imagesToProcess.forEach(({ url, messageId, name, source, text }) => {
+        // Add to enhanced image memory system
+        addImageToMemory({
+          url,
+          type: source === 'user' ? 'uploaded' : 'generated',
+          context_notes: text || undefined,
+          messageId,
+          source,
+          name,
+        });
+        
+        // Analyze image in background (non-blocking)
+        analyzeAndStoreImage(url).catch(err => 
+          console.error('[Artie] Background image analysis failed:', err)
+        );
+      });
+    }
   }, [messages, extractSupabaseImageUrls]);
 
   // Custom event listener for mobile bottom nav
