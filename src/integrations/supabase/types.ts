@@ -340,6 +340,7 @@ export type Database = {
           action: string | null
           analysis_data: Json | null
           created_at: string
+          deleted_at: string | null
           duration_ms: number | null
           id: string
           image_url: string | null
@@ -355,6 +356,7 @@ export type Database = {
           action?: string | null
           analysis_data?: Json | null
           created_at?: string
+          deleted_at?: string | null
           duration_ms?: number | null
           id?: string
           image_url?: string | null
@@ -370,6 +372,7 @@ export type Database = {
           action?: string | null
           analysis_data?: Json | null
           created_at?: string
+          deleted_at?: string | null
           duration_ms?: number | null
           id?: string
           image_url?: string | null
@@ -892,6 +895,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      cleanup_deleted_assets: { Args: { days_old?: number }; Returns: number }
       has_active_subscription: {
         Args: { user_id_param: string }
         Returns: boolean
@@ -908,6 +912,8 @@ export type Database = {
         Returns: undefined
       }
       reset_daily_usage: { Args: never; Returns: undefined }
+      soft_delete_asset: { Args: { asset_id: string }; Returns: undefined }
+      undelete_asset: { Args: { asset_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
