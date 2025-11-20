@@ -46,6 +46,10 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('node_modules/@supabase/')) {
             return 'supabase-vendor';
           }
+          // Framer Motion (animations)
+          if (id.includes('node_modules/framer-motion')) {
+            return 'animation-vendor';
+          }
           // Large chart libraries (lazy loaded)
           if (id.includes('node_modules/recharts')) {
             return 'chart-vendor';
@@ -62,6 +66,14 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('node_modules/browser-image-compression') || id.includes('node_modules/html2canvas')) {
             return 'image-vendor';
           }
+          // Lucide icons - split by usage
+          if (id.includes('node_modules/lucide-react')) {
+            return 'icons-vendor';
+          }
+          // Intelligence features (lazy loaded)
+          if (id.includes('src/lib/intelligence/')) {
+            return 'intelligence';
+          }
           // ArtieChat and subcomponents (lazy loaded)
           if (id.includes('components/artie/') || id.includes('components/ArtieChat')) {
             return 'artie-chat';
@@ -69,6 +81,12 @@ export default defineConfig(({ mode }) => ({
           // Universal Image Workspace (lazy loaded)
           if (id.includes('components/UniversalImageWorkspace') || id.includes('components/edit-image/')) {
             return 'image-workspace';
+          }
+          // Modal components (lazy loaded)
+          if (id.includes('components/ImageGenerationDialog') || 
+              id.includes('components/ImageBlendDialog') || 
+              id.includes('components/ImageUpscaleDialog')) {
+            return 'modals';
           }
           // Analytics components (lazy loaded)
           if (id.includes('components/admin/') || id.includes('components/UserAnalytics')) {
@@ -80,14 +98,12 @@ export default defineConfig(({ mode }) => ({
     cssCodeSplit: true,
     minify: 'esbuild',
     chunkSizeWarningLimit: 1000,
-    // Enable source maps for better debugging in production
     sourcemap: false,
-    // Optimize chunk size
     target: 'esnext',
-    // Tree-shake unused exports
     treeshake: {
       moduleSideEffects: false,
     },
+    reportCompressedSize: true,
   },
   // Optimize dependencies
   optimizeDeps: {
