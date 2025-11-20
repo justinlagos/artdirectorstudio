@@ -531,15 +531,15 @@ export const ImageGenerationDialog = () => {
   const bodyContent = (
     <div className={cn(
       "flex flex-col min-h-0",
-      !isMobile ? "grid grid-cols-[42%_58%] gap-6" : "space-y-4"
+      !isMobile ? "grid grid-cols-[42%_58%] gap-8" : "space-y-6"
     )}>
       {/* Left Column: Reference Image Card (Desktop) or Top (Mobile) */}
       <div className="flex flex-col">
         {/* Generated Image (shown when available) */}
         {generatedImage && (
-          <div className="mb-4 space-y-3 border-b border-border pb-4">
+          <div className="mb-6 space-y-4 border-b border-border pb-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <Wand2 className="h-5 w-5 text-primary" />
                 <span className="font-semibold">Your Generated Image</span>
                 {generationTime > 0 && (
@@ -559,8 +559,8 @@ export const ImageGenerationDialog = () => {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/10 p-3 text-xs">
-              <div className="flex gap-3 text-muted-foreground">
+            <div className="flex items-center justify-between rounded-xl border border-border/30 bg-muted/10 p-4 text-xs">
+              <div className="flex gap-4 text-muted-foreground">
                 <span>{options.size}</span>
                 <span>•</span>
                 <span className="capitalize">{options.quality} quality</span>
@@ -576,7 +576,7 @@ export const ImageGenerationDialog = () => {
 
         {/* Reference Image Card */}
         {referenceImage && (
-          <div className="relative rounded-xl border border-border bg-card p-4 flex flex-col" style={{ minHeight: isMobile ? 'auto' : '400px' }}>
+          <div className="relative rounded-2xl border border-border bg-card p-6 flex flex-col" style={{ minHeight: isMobile ? 'auto' : '400px' }}>
             {/* Remove button in top-right */}
             <div className="absolute top-3 right-3 z-10">
               <Button
@@ -595,20 +595,20 @@ export const ImageGenerationDialog = () => {
             </div>
             
             {/* Large preview */}
-            <div className="flex-1 min-h-[300px] mb-3">
+            <div className="flex-1 min-h-[300px] mb-4">
               <ImageContainer
                 src={referenceImage}
                 alt="Reference inspiration"
                 maxHeight="max-h-[400px]"
                 objectFit="contain"
-                containerClassName="rounded-lg overflow-hidden w-full h-full"
+                containerClassName="rounded-xl overflow-hidden w-full h-full"
               />
             </div>
             
             {/* Meta info (optional) */}
             {previousGeneratedPrompt && continuationStrength < 1.0 && (
-              <div className="rounded-lg border border-border/30 bg-muted/10 p-3 mt-auto">
-                <div className="flex items-center justify-between mb-1.5">
+              <div className="rounded-xl border border-border/30 bg-muted/10 p-4 mt-auto">
+                <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium">Context Strength</span>
                   <span className={`text-xs font-semibold ${getContinuationDescription(continuationStrength).colorClass}`}>
                     {Math.round((1 - continuationStrength) * 100)}%
@@ -625,7 +625,7 @@ export const ImageGenerationDialog = () => {
                     style={{ width: `${(1 - continuationStrength) * 100}%` }}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-2">
                   {getContinuationDescription(continuationStrength).description}
                 </p>
               </div>
@@ -635,8 +635,8 @@ export const ImageGenerationDialog = () => {
         
         {/* Placeholder when no reference image */}
         {!referenceImage && !generatedImage && (
-          <div className="flex-1 rounded-xl border border-dashed border-border/50 bg-muted/20 flex items-center justify-center p-8">
-            <div className="text-center space-y-2">
+          <div className="flex-1 rounded-2xl border border-dashed border-border/50 bg-muted/20 flex items-center justify-center p-8">
+            <div className="text-center space-y-3">
               <ImageIcon className="h-8 w-8 text-muted-foreground mx-auto" />
               <p className="text-sm text-muted-foreground">No reference image</p>
               <p className="text-xs text-muted-foreground/70">Upload an image to use as reference</p>
@@ -698,8 +698,8 @@ export const ImageGenerationDialog = () => {
             </TabsContent>
 
             <TabsContent value="presets" className="mt-0 space-y-4">
-          <div className="space-y-2 rounded-xl border border-accent/20 bg-accent/5 p-4">
-            <div className="flex items-center gap-2">
+          <div className="space-y-3 rounded-2xl border border-accent/20 bg-accent/5 p-6">
+            <div className="flex items-center gap-3">
               <Label className="text-base font-semibold">Your Base Prompt</Label>
               <Badge variant="secondary" className="text-xs">
                 Primary
@@ -719,8 +719,8 @@ export const ImageGenerationDialog = () => {
           <Separator />
 
           {selectedPreset && (
-            <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-2.5">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-center gap-3">
                 <div className="h-4 w-4 flex-shrink-0">{selectedPreset.icon}</div>
                 <div>
                   <div className="text-sm font-medium">{selectedPreset.name}</div>
@@ -800,7 +800,7 @@ export const ImageGenerationDialog = () => {
                       <ChevronDown className="h-3 w-3" />
                     </Button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 pt-2">
+                  <CollapsibleContent className="space-y-3 pt-3">
                     <Select onValueChange={(value) => setPrompt(value)} disabled={isGenerating}>
                       <SelectTrigger>
                         <SelectValue placeholder="Load a recent prompt..." />
@@ -838,7 +838,7 @@ export const ImageGenerationDialog = () => {
                 />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-4 pt-4">
+            <CollapsibleContent className="space-y-4 pt-6">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="quality">Quality</Label>
@@ -959,7 +959,7 @@ export const ImageGenerationDialog = () => {
 
   const footerContent = (
     <div className={cn(
-      "flex items-center gap-4",
+      "flex items-center gap-6",
       isMobile ? "flex-col" : "justify-between"
     )}>
       {/* Left: Credit usage text */}
@@ -969,7 +969,7 @@ export const ImageGenerationDialog = () => {
       
       {/* Right: Actions */}
       <div className={cn(
-        "flex items-center gap-2",
+        "flex items-center gap-3",
         isMobile ? "w-full flex-col" : "ml-auto"
       )}>
         {generatedImage ? (

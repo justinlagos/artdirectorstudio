@@ -545,6 +545,9 @@ export const UniversalImageWorkspace = ({
               filterStyle={generateFilterStyle(adjustments)}
               selectedRegion={selectedRegion}
               onRegionSelect={activeTab === "select" ? setSelectedRegion : undefined}
+              isSelectionMode={activeTab === "select"}
+              selectedColor={activeTab === "color" ? selectedColor : undefined}
+              isColorMode={activeTab === "color"}
               className={cn(
                 "rounded-lg shadow-2xl max-w-full",
                 isMobile ? "w-full h-auto max-h-[50dvh] object-contain" : "max-w-full max-h-full"
@@ -556,7 +559,16 @@ export const UniversalImageWorkspace = ({
         {/* Right: Tools Panel - Bottom Sheet on Mobile */}
         {isMobile ? (
           <div className="border-t border-border/50 bg-background shrink-0 flex flex-col max-h-[calc(50dvh-56px)] mb-16 safe-bottom">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
+            <Tabs 
+              value={activeTab} 
+              onValueChange={(v) => {
+                // Smooth tab switching without reflow
+                requestAnimationFrame(() => {
+                  setActiveTab(v as any);
+                });
+              }} 
+              className="flex-1 flex flex-col"
+            >
               <TabsList className="grid grid-cols-4 w-full rounded-none border-b border-border/50 h-12 shrink-0">
                 <TabsTrigger value="adjust" className="text-xs md:text-[10px] px-2 touch-manipulation min-h-[44px]">
                   <span className="hidden sm:inline">Adjust</span>
@@ -648,7 +660,16 @@ export const UniversalImageWorkspace = ({
           </div>
         ) : (
           <div className="w-80 border-l border-border/50 bg-background shrink-0 flex flex-col">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
+            <Tabs 
+              value={activeTab} 
+              onValueChange={(v) => {
+                // Smooth tab switching without reflow
+                requestAnimationFrame(() => {
+                  setActiveTab(v as any);
+                });
+              }} 
+              className="flex-1 flex flex-col"
+            >
               <TabsList className="grid grid-cols-4 w-full rounded-none border-b border-border/50 h-12">
                 <TabsTrigger value="adjust" className="text-xs">Adjust</TabsTrigger>
                 <TabsTrigger value="select" className="text-xs">Select</TabsTrigger>

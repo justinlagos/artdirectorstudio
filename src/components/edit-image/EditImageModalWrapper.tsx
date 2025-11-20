@@ -22,17 +22,17 @@ export const EditImageModalWrapper = ({
       open={open}
       onOpenChange={onOpenChange}
       title={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Edit className="h-5 w-5" />
           Edit Image
         </div>
       }
       description="Adjust, select regions, apply colors, and make advanced edits to your image."
       maxWidth="full"
-      contentClassName="p-0"
+      contentClassName="p-0 h-full flex flex-col min-h-0"
       preventBodyScroll={true}
     >
-      <div className="h-[calc(90vh-200px)] min-h-[600px] max-h-[800px] overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <UniversalImageWorkspace
           open={open}
           onOpenChange={onOpenChange}

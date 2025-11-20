@@ -34,10 +34,12 @@ export const ToolDrawer = ({
         <DrawerOverlay className="backdrop-blur-sm" />
         <DrawerPrimitive.Content
           className={cn(
-            "fixed z-50 flex max-h-[96dvh] flex-col border border-border/80 bg-background shadow-xl",
-            "inset-x-0 bottom-0 rounded-t-[24px]",
-            "sm:mx-auto sm:w-full sm:max-w-4xl",
-            "md:inset-x-auto md:inset-y-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:bottom-auto md:rounded-[24px] md:max-w-[1320px] md:w-[90vw] md:max-h-[90vh]",
+            "fixed z-50 flex max-h-[96dvh] flex-col border border-border bg-background shadow-xl",
+            // Mobile: bottom sheet with rounded-t-2xl
+            "inset-x-0 bottom-0 rounded-t-2xl",
+            "sm:mx-auto sm:w-full sm:max-w-[820px]",
+            // Desktop: centered modal with rounded-2xl, max-w-[820px]
+            "md:inset-x-auto md:inset-y-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:bottom-auto md:rounded-2xl md:max-w-[820px] md:w-[90vw] md:max-h-[90vh]",
             className,
           )}
           style={{
@@ -62,7 +64,7 @@ export const ToolDrawer = ({
           <div className="flex min-h-0 flex-1 flex-col">
             <header
               className={cn(
-                "sticky top-0 z-20 border-b border-border/80 bg-background/95 px-6 pb-4 pt-5 text-left backdrop-blur supports-[backdrop-filter]:bg-background/70",
+                "sticky top-0 z-20 border-b border-border bg-background px-6 py-6 pb-4 text-left",
                 headerClassName,
               )}
               onClick={(e) => e.stopPropagation()}
@@ -80,11 +82,13 @@ export const ToolDrawer = ({
 
             <div
               className={cn(
-                "flex-1 overflow-y-auto",
+                "flex-1 overflow-y-auto overscroll-contain min-h-0",
                 "[&::-webkit-scrollbar]:w-2",
+                // Consistent padding: px-6 py-6
+                "px-6 py-6",
                 stickyFooterOnMobile
-                  ? "pb-6 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:pb-5"
-                  : "supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.25rem+env(safe-area-inset-bottom))]",
+                  ? "pb-6 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+                  : "supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
                 contentClassName,
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
@@ -99,7 +103,7 @@ export const ToolDrawer = ({
           {footer && (
             <footer
               className={cn(
-                "z-20 shrink-0 border-t border-border/80 bg-background/95 px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)]",
+                "z-20 shrink-0 border-t border-border bg-background px-6 py-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
                 stickyFooterOnMobile ? "md:sticky md:bottom-0" : "sticky bottom-0",
               )}
               onClick={(e) => e.stopPropagation()}

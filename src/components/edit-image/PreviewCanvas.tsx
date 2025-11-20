@@ -7,6 +7,8 @@ interface PreviewCanvasProps {
   selectedRegion?: { x: number; y: number; width: number; height: number } | null;
   onRegionSelect?: (region: { x: number; y: number; width: number; height: number } | null) => void;
   isSelectionMode?: boolean;
+  selectedColor?: string;
+  isColorMode?: boolean;
   className?: string;
 }
 
@@ -16,6 +18,8 @@ export const PreviewCanvas = ({
   selectedRegion,
   onRegionSelect,
   isSelectionMode = false,
+  selectedColor,
+  isColorMode = false,
   className,
 }: PreviewCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -106,13 +110,45 @@ export const PreviewCanvas = ({
       ctx.lineWidth = 2;
       ctx.strokeRect(regionX, regionY, regionWidth, regionHeight);
       
-      // Draw corner handles
-      const handleSize = 8;
+      // Draw corner handles (larger and more visible)
+      const handleSize = 10;
+      const handleBorder = 2;
+      ctx.fillStyle = "rgb(255, 255, 255)";
+      ctx.fillRect(regionX - handleSize/2 - handleBorder, regionY - handleSize/2 - handleBorder, handleSize + handleBorder*2, handleSize + handleBorder*2);
+      ctx.fillRect(regionX + regionWidth - handleSize/2 - handleBorder, regionY - handleSize/2 - handleBorder, handleSize + handleBorder*2, handleSize + handleBorder*2);
+      ctx.fillRect(regionX - handleSize/2 - handleBorder, regionY + regionHeight - handleSize/2 - handleBorder, handleSize + handleBorder*2, handleSize + handleBorder*2);
+      ctx.fillRect(regionX + regionWidth - handleSize/2 - handleBorder, regionY + regionHeight - handleSize/2 - handleBorder, handleSize + handleBorder*2, handleSize + handleBorder*2);
+      
       ctx.fillStyle = "rgb(59, 130, 246)";
       ctx.fillRect(regionX - handleSize/2, regionY - handleSize/2, handleSize, handleSize);
       ctx.fillRect(regionX + regionWidth - handleSize/2, regionY - handleSize/2, handleSize, handleSize);
       ctx.fillRect(regionX - handleSize/2, regionY + regionHeight - handleSize/2, handleSize, handleSize);
       ctx.fillRect(regionX + regionWidth - handleSize/2, regionY + regionHeight - handleSize/2, handleSize, handleSize);
+    }
+
+    // Draw color preview overlay when in color mode
+    if (isColorMode && selectedColor) {
+      if (selectedRegion && imageData) {
+        // Apply color overlay to selected region only
+        const regionX = imageData.offsetX + (selectedRegion.x * imageData.scale);
+        const regionY = imageData.offsetY + (selectedRegion.y * imageData.scale);
+        const regionWidth = selectedRegion.width * imageData.scale;
+        const regionHeight = selectedRegion.height * imageData.scale;
+        
+        ctx.fillStyle = selectedColor + "80"; // Add 50% opacity
+        ctx.fillRect(regionX, regionY, regionWidth, regionHeight);
+      } else {
+        // Apply color overlay to entire image
+        if (imageData) {
+          const imageX = imageData.offsetX;
+          const imageY = imageData.offsetY;
+          const imageWidth = imageData.width * imageData.scale;
+          const imageHeight = imageData.height * imageData.scale;
+          
+          ctx.fillStyle = selectedColor + "60"; // Add 40% opacity for full image
+          ctx.fillRect(imageX, imageY, imageWidth, imageHeight);
+        }
+      }
     }
 
     // Draw temporary selection while dragging
@@ -142,7 +178,7 @@ export const PreviewCanvas = ({
       ctx.lineWidth = 2;
       ctx.strokeRect(x, y, width, height);
     }
-  }, [selectedRegion, isSelecting, startPos, currentPos, imageData]);
+  }, [selectedRegion, isSelecting, startPos, currentPos, imageData, isColorMode, selectedColor]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // Only handle selection if in selection mode
@@ -316,11 +352,17 @@ export const PreviewCanvas = ({
       onTouchMove={isSelectionMode ? handleTouchMove : undefined}
       onTouchEnd={isSelectionMode ? handleTouchEnd : undefined}
       style={{ 
-        cursor: isSelectionMode ? (isSelecting ? "crosshair" : "crosshair") : "default", 
+        cursor: isSelectionMode ? "crosshair" : "default", 
         touchAction: isSelectionMode ? "none" : "auto",
         WebkitTapHighlightColor: "transparent",
         userSelect: "none",
-        pointerEvents: "auto"
+        pointerEvents: "auto",
+        // Prevent image dragging completely
+        WebkitUserDrag: "none",
+        KhtmlUserDrag: "none",
+        MozUserDrag: "none",
+        OUserDrag: "none",
+        userDrag: "none"
       }}
     >
       {isLoading && (
@@ -344,11 +386,29 @@ export const PreviewCanvas = ({
         src={imageUrl}
         alt="Preview"
         className={cn(
-          "max-h-full w-auto h-auto object-contain transition-all duration-200 pointer-events-none",
+          "max-h-full w-auto h-auto object-contain pointer-events-none select-none",
           isLoading || loadError ? "opacity-0" : "opacity-100"
         )}
-        style={{ filter: filterStyle }}
+        style={{ 
+          filter: filterStyle,
+          // Smooth filter transitions for real-time previews
+          transition: "filter 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+          // Prevent all forms of dragging
+          WebkitUserDrag: "none",
+          KhtmlUserDrag: "none",
+          MozUserDrag: "none",
+          OUserDrag: "none",
+          userDrag: "none",
+          pointerEvents: "none"
+        }}
         draggable={false}
+        onDragStart={(e) => e.preventDefault()}
+        onContextMenu={(e) => {
+          // Prevent right-click drag on some browsers
+          if (isSelectionMode) {
+            e.preventDefault();
+          }
+        }}
       />
       {(isSelectionMode || selectedRegion) && (
         <canvas

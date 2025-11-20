@@ -218,21 +218,22 @@ export const ArtieChat = () => {
     }
 
     try {
-      // Minimize Artie on desktop to avoid covering Studio
-      if (!isMobile) {
-        setIsOpen(false);
-        setIsMinimized(true);
-      }
-      openStudioWithPrompt({
-        basePrompt: "Refine this image",
-        imageUrl: latestContextImage.url,
+      // Minimize Artie cleanly first, then open Studio
+      setIsOpen(false);
+      setIsMinimized(true);
+      // Use requestAnimationFrame to ensure Artie minimizes before Studio opens
+      requestAnimationFrame(() => {
+        openStudioWithPrompt({
+          basePrompt: "Refine this image",
+          imageUrl: latestContextImage.url,
+        });
+        toast.success("Opening latest image in Studio");
       });
-      toast.success("Opening latest image in Studio");
     } catch (error) {
       console.error('[ARTIE] Failed to open Studio:', error);
       toast.error("Unable to open image in Studio");
     }
-  }, [latestContextImage, isMobile]);
+  }, [latestContextImage]);
 
   const extractSupabaseImageUrls = useCallback((text: string) => {
     if (!text) return [];
@@ -681,14 +682,16 @@ export const ArtieChat = () => {
       
       console.log('[ArtieChat] EDIT_IMAGE: Opening editor with URL:', targetImageUrl);
       
-      // Close Artie to avoid covering workspace
+      // Minimize Artie cleanly first
       setIsOpen(false);
       setIsMinimized(false);
       
-      // Open workspace immediately - no delays
-      setEditingImageUrl(targetImageUrl);
-      setEditorInstruction("");
-      setEditorOpen(true);
+      // Use requestAnimationFrame to ensure Artie minimizes before Edit opens
+      requestAnimationFrame(() => {
+        setEditingImageUrl(targetImageUrl);
+        setEditorInstruction("");
+        setEditorOpen(true);
+      });
       
       console.log('[ArtieChat] EDIT_IMAGE: State set', {
         editorOpen: true,
@@ -1313,16 +1316,15 @@ export const ArtieChat = () => {
                   continue;
                 }
 
-                // Open Edit Image Modal with pre-filled instruction - INSTANT, no delays
-                // Close Artie completely on desktop to avoid covering Edit modal
-                if (!isMobile) {
-                  setIsOpen(false);
-                  setIsMinimized(false);
-                }
-                // Open immediately in the same event loop - no setTimeout
-                setEditingImageUrl(imageUrl);
-                setEditorInstruction(instruction);
-                setEditorOpen(true);
+                // Minimize Artie cleanly first
+                setIsOpen(false);
+                setIsMinimized(false);
+                // Use requestAnimationFrame to ensure Artie minimizes before Edit opens
+                requestAnimationFrame(() => {
+                  setEditingImageUrl(imageUrl);
+                  setEditorInstruction(instruction);
+                  setEditorOpen(true);
+                });
                 
                 accumulatedText += `\n\n✅ Opening Edit Image tool with instruction: "${instruction}"\n\nYou can review and adjust the settings before applying the changes.`;
                 setMessages(prev => 
@@ -1399,8 +1401,8 @@ export const ArtieChat = () => {
     <div 
       data-artie-floating-icon
       className={cn(
-        "fixed opacity-100 visible pointer-events-auto z-[45]",
-        // Mobile: above bottom nav (z-[60]), but below modals
+        "fixed opacity-100 visible pointer-events-auto z-[70]",
+        // Mobile: above bottom nav (z-[60]), but below modals (z-[90]+)
         isMobile ? "bottom-20 right-4" : "bottom-6 right-6"
       )}
     >
@@ -1481,35 +1483,45 @@ export const ArtieChat = () => {
       {/* Floating button always visible on desktop when chat is open */}
       {!isMobile && <FloatingIcon />}
       
-      {/* Backdrop - Click to close */}
+      {/* Backdrop - Click to close - DO NOT lock scroll */}
       <button 
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[50] animate-fade-in cursor-default"
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[75] cursor-default"
         onClick={handleClose}
         aria-label="Close chat"
         type="button"
+        style={{
+          opacity: isOpen ? 1 : 0,
+          pointerEvents: isOpen ? 'auto' : 'none',
+          transition: 'opacity 260ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       />
 
-      {/* Side Panel Drawer - Opens from right */}
+      {/* Side Panel Drawer - Opens from right with unified animation */}
       <div 
         data-artie-panel
         className={cn(
-          "fixed z-[51] flex flex-col bg-background shadow-strong pointer-events-auto safe-bottom",
-          // Mobile: full width, slides from right
-          "top-0 right-0 left-auto h-[100dvh] h-[100svh] w-[90vw] border-l border-border",
-          // Desktop: right-side panel with margins and rounded corners
-          "md:top-4 md:right-4 md:bottom-4 md:left-auto md:h-auto md:max-h-[calc(100vh-2rem)] md:w-[480px] md:max-w-[560px] md:rounded-lg md:border md:border-border md:shadow-xl",
-          // Animation: slide in from right
-          "animate-slide-in-right"
+          "fixed z-[76] flex flex-col bg-background shadow-xl pointer-events-auto safe-bottom",
+          // Mobile: full width bottom sheet, slides up from bottom
+          isMobile ? [
+            "inset-x-0 bottom-0 top-auto h-[96dvh] h-[96svh]",
+            "rounded-t-2xl border-t border-l border-r border-border",
+            "animate-slide-in-bottom"
+          ] : [
+            // Desktop: right-side panel with margins and rounded corners, slides from right
+            "top-4 right-4 bottom-4 left-auto h-auto max-h-[calc(100vh-2rem)]",
+            "w-[480px] max-w-[560px] rounded-2xl border border-border",
+            "animate-slide-in-right"
+          ]
         )}
         style={{
-          // Ensure it starts off-screen right and animates in smoothly
-          willChange: 'transform',
-          // Ensure flex container allows scrolling
+          // Ensure smooth animation with unified timing
+          willChange: 'transform, opacity',
+          transition: 'transform 260ms cubic-bezier(0.4, 0, 0.2, 1), opacity 260ms cubic-bezier(0.4, 0, 0.2, 1)',
           minHeight: 0,
         }}
       >
         {/* Header - Fixed height with proper padding */}
-        <div className="h-14 md:h-16 flex-shrink-0 flex items-center justify-between px-4 md:px-6 border-b border-border bg-background">
+        <div className="h-14 md:h-16 flex-shrink-0 flex items-center justify-between px-6 md:px-8 border-b border-border bg-background">
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="h-9 w-9 md:h-10 md:w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-subtle">
@@ -1570,10 +1582,10 @@ export const ArtieChat = () => {
         </div>
 
         {/* Quick Actions - Collapsible */}
-        <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-border bg-background">
-          <p className="text-xs md:text-xs font-medium text-muted-foreground mb-3 md:mb-3">Quick Actions</p>
+        <div className="flex-shrink-0 px-6 md:px-8 py-4 md:py-6 border-b border-border bg-background">
+          <p className="text-xs md:text-sm font-medium text-muted-foreground mb-4">Quick Actions</p>
           {/* Desktop: 2-row grid, Mobile: horizontal scroll */}
-          <div className="hidden md:grid md:grid-cols-2 md:gap-2">
+          <div className="hidden md:grid md:grid-cols-2 md:gap-3">
             {quickActions.map((action) => (
               <Button
                 key={action.label}
@@ -1588,7 +1600,7 @@ export const ArtieChat = () => {
               </Button>
             ))}
           </div>
-          <div className="flex md:hidden gap-2 overflow-x-auto scrollbar-hide snap-x snap-mandatory">
+          <div className="flex md:hidden gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory">
             {quickActions.map((action) => (
               <Button
                 key={action.label}
@@ -1610,8 +1622,8 @@ export const ArtieChat = () => {
           ref={chatBodyRef}
           className={cn(
             "flex-1 overflow-y-auto overscroll-contain min-h-0",
-            "px-4 md:px-6 py-4 md:py-5",
-            "space-y-3 md:space-y-4",
+            "px-6 md:px-8 py-6 md:py-8",
+            "space-y-4",
             // Mobile: padding bottom for fixed input
             isMobile && "pb-[calc(80px+env(safe-area-inset-bottom))]",
             // Desktop: padding bottom for sticky input
@@ -1638,7 +1650,7 @@ export const ArtieChat = () => {
                     <Sparkles className="h-3 w-3 md:h-3.5 md:w-3.5 text-primary" />
                   </div>
                 )}
-                <div className="space-y-2 w-full">
+                <div className="space-y-3 w-full">
                    {/* Attachment Preview */}
                   {message.attachment && (
                     <div className="rounded-xl overflow-hidden border border-border bg-muted">
@@ -1655,16 +1667,18 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                // Minimize Artie on desktop to avoid covering Studio
-                                if (!isMobile) {
-                                  setIsOpen(false);
-                                  setIsMinimized(true);
-                                }
-                                openStudioWithPrompt({
-                                  basePrompt: "Refine this image",
-                                  imageUrl: message.attachment?.url || "",
+                                const imageUrl = message.attachment?.url || "";
+                                // Minimize Artie cleanly first, then open Studio
+                                setIsOpen(false);
+                                setIsMinimized(true);
+                                // Use requestAnimationFrame to ensure Artie minimizes before Studio opens
+                                requestAnimationFrame(() => {
+                                  openStudioWithPrompt({
+                                    basePrompt: "Refine this image",
+                                    imageUrl,
+                                  });
+                                  toast.success("Opening in Studio");
                                 });
-                                toast.success("Opening in Studio");
                               }}
                               className="gap-1.5"
                             >
@@ -1675,16 +1689,16 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                // Set state immediately in the same event loop for instant opening
                                 const imageUrl = message.attachment?.url || "";
-                                setEditingImageUrl(imageUrl);
-                                setEditorInstruction("");
-                                setEditorOpen(true);
-                                // Minimize Artie on desktop to avoid covering Edit modal
-                                if (!isMobile) {
-                                  setIsOpen(false);
-                                  setIsMinimized(false);
-                                }
+                                // Minimize Artie cleanly first, then open Edit Image
+                                setIsOpen(false);
+                                setIsMinimized(false);
+                                // Use requestAnimationFrame to ensure Artie minimizes before Edit opens
+                                requestAnimationFrame(() => {
+                                  setEditingImageUrl(imageUrl);
+                                  setEditorInstruction("");
+                                  setEditorOpen(true);
+                                });
                               }}
                               className="gap-1.5"
                             >
@@ -1763,15 +1777,15 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                // Set state immediately in the same event loop for instant opening
-                                setEditingImageUrl(url);
-                                setEditorInstruction("");
-                                setEditorOpen(true);
-                                // Minimize Artie on desktop to avoid covering Edit modal
-                                if (!isMobile) {
-                                  setIsOpen(false);
-                                  setIsMinimized(false);
-                                }
+                                // Minimize Artie cleanly first
+                                setIsOpen(false);
+                                setIsMinimized(false);
+                                // Use requestAnimationFrame to ensure Artie minimizes before Edit opens
+                                requestAnimationFrame(() => {
+                                  setEditingImageUrl(url);
+                                  setEditorInstruction("");
+                                  setEditorOpen(true);
+                                });
                               }}
                               className="gap-1.5"
                             >
@@ -1815,7 +1829,7 @@ export const ArtieChat = () => {
 
                   {/* Action Chips */}
                   {message.actionChips && message.actionChips.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 md:gap-2">
+                    <div className="flex flex-wrap gap-3">
                       {message.actionChips.map((chip, idx) => (
                         <Button
                           key={idx}
@@ -1858,7 +1872,7 @@ export const ArtieChat = () => {
         <div 
           className={cn(
             "flex-shrink-0 border-t border-border bg-background",
-            "px-4 md:px-6 py-3 md:py-4",
+            "px-6 md:px-8 py-4 md:py-6",
             "shadow-[0_-1px_8px_rgba(0,0,0,0.08)]",
             isMobile 
               ? "fixed bottom-0 left-0 right-0 z-[76] pb-[calc(0.75rem+env(safe-area-inset-bottom))] safe-bottom bg-background" 

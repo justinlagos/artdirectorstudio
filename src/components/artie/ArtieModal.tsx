@@ -24,7 +24,7 @@ const maxWidthClasses = {
   lg: "max-w-lg",
   xl: "max-w-xl",
   "2xl": "max-w-2xl",
-  full: "max-w-[1040px]",
+  full: "max-w-[1200px]", // Edit Image uses full width
 };
 
 export const ArtieModal = ({
@@ -53,7 +53,7 @@ export const ArtieModal = ({
             "fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-            "duration-200"
+            "duration-[260ms]"
           )}
         />
 
@@ -71,22 +71,24 @@ export const ArtieModal = ({
                   "data-[state=open]:animate-in data-[state=closed]:animate-out",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                   "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-                  "duration-200",
+                  "duration-[260ms]",
                 ]
               : // Desktop: centered modal with fade+scale animation
                 [
                   "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
-                  "rounded-2xl border border-border bg-background shadow-lg",
+                  "rounded-2xl border border-border bg-background shadow-xl",
                   "w-[90vw] max-h-[90vh]",
                   maxWidthClasses[maxWidth],
-                  // Ensure minimum width for full size modals
+                  // Ensure minimum width for full size modals (Edit Image)
                   maxWidth === "full" && "min-w-[min(960px,90vw)]",
+                  // Default max width for standard modals (Generate in Studio, etc.)
+                  maxWidth !== "full" && !["sm", "md", "lg", "xl", "2xl"].includes(maxWidth) && "max-w-[820px]",
                   "data-[state=open]:animate-in data-[state=closed]:animate-out",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                   "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
                   "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
                   "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-                  "duration-200",
+                  "duration-[260ms]",
                 ],
             className
           )}
@@ -107,7 +109,7 @@ export const ArtieModal = ({
             <header
               className={cn(
                 "flex-shrink-0 border-b border-border bg-background",
-                isMobile ? "px-6 py-5" : "px-8 py-6"
+                "px-6 py-6 pb-4"
               )}
             >
               <div className="flex items-start justify-between gap-4">
@@ -151,10 +153,8 @@ export const ArtieModal = ({
               className={cn(
                 "flex-1 overflow-y-auto overscroll-contain min-h-0",
                 "[&::-webkit-scrollbar]:w-2",
-                // Content area padding: px-6 py-5 mobile, px-8 py-6 desktop
-                isMobile
-                  ? "px-6 py-5"
-                  : "px-8 py-6",
+                // Consistent padding: px-6 py-6
+                "px-6 py-6",
                 contentClassName
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
@@ -167,9 +167,7 @@ export const ArtieModal = ({
               <footer
                 className={cn(
                   "flex-shrink-0 border-t border-border bg-background",
-                  isMobile
-                    ? "px-6 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
-                    : "px-8 py-6"
+                  "px-6 py-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
                 )}
               >
                 {footer}

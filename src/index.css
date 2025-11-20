@@ -47,9 +47,10 @@
   }
   
   /* Ensure Artie floating icon is always visible */
+  /* z-index: 70 (above bottom nav z-60, below modals z-90+) */
   [data-artie-floating-icon] {
     position: fixed !important;
-    z-index: 9999 !important;
+    z-index: 70 !important;
     visibility: visible !important;
     opacity: 1 !important;
     display: block !important;
