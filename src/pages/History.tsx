@@ -67,6 +67,17 @@ const History = () => {
       }
       
       console.log(`[History] Fetched ${data?.length || 0} assets`);
+      // Log asset types and actions for debugging
+      if (data && data.length > 0) {
+        const assetTypes = data.reduce((acc: Record<string, number>, asset) => {
+          const key = `${asset.type || 'unknown'}-${asset.action || 'unknown'}`;
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+        console.log('[History] Asset breakdown:', assetTypes);
+        const withImages = data.filter(a => a.image_url).length;
+        console.log(`[History] Assets with image_url: ${withImages} out of ${data.length}`);
+      }
       return data || [];
     },
     enabled: !!user?.id,
@@ -242,22 +253,42 @@ const History = () => {
       asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       analysisData?.image_overview?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    // Batch filter: check if this is a batch item
-    const isBatch = params?.batchItem === true || params?.batch === true;
+    // Type matching: show all if filter is "all", otherwise match specific type
+    const matchesType = filterType === "all" || asset.type === filterType;
     
-    // Type matching: show all if filter is "all", or match specific type, or match batch
-    // IMPORTANT: Ensure all image types are shown, including 'generate' action
-    const matchesType = 
-      filterType === "all" || 
-      asset.type === filterType;
-      // Batch feature temporarily disabled
-      // || (filterType === "batch" && isBatch);
+    // Include asset if it matches both search and type filters
+    const shouldInclude = matchesSearch && matchesType;
     
-    // Ensure generated images (type='image' with action='generate') are always shown
-    const isGeneratedImage = asset.type === 'image' && (asset.action === 'generate' || asset.image_url);
+    // Log filtered out assets for debugging (only in dev mode)
+    if (import.meta.env.DEV && !shouldInclude && asset.image_url) {
+      console.log('[History] Filtered out asset:', {
+        id: asset.id,
+        type: asset.type,
+        action: asset.action,
+        hasImageUrl: !!asset.image_url,
+        matchesSearch,
+        matchesType,
+        filterType,
+        searchQuery
+      });
+    }
     
-    return (matchesSearch && matchesType) || (filterType === "all" && isGeneratedImage && matchesSearch);
+    return shouldInclude;
   });
+
+  // Log filtered results for debugging
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[History] Filter results:', {
+        totalAssets: assets.length,
+        filteredAssets: filteredAssets.length,
+        filterType,
+        searchQuery,
+        assetsWithImages: assets.filter(a => a.image_url).length,
+        filteredWithImages: filteredAssets.filter(a => a.image_url).length
+      });
+    }
+  }, [assets, filteredAssets, filterType, searchQuery]);
 
   const getTypeBadge = (type: string) => {
     const config = {
@@ -420,7 +451,7 @@ const History = () => {
               </Button>
             </CardContent>
           </Card>
-        ) : filteredAssets.length === 0 ? (
+        ) : filteredAssets.length === 0 && assets.length > 0 ? (
           <Card className="glass-strong">
             <CardContent className="py-16 text-center">
               <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-muted/30 flex items-center justify-center">
@@ -523,7 +554,7 @@ const History = () => {
                   </div>
 
                   {/* Image with lazy loading - Clickable to open workspace */}
-                  {asset.image_url && (
+                  {asset.image_url ? (
                     <div 
                       className="rounded-xl overflow-hidden border border-border/50 bg-muted flex items-center justify-center min-h-[200px] cursor-pointer hover:border-primary/50 transition-colors"
                       onClick={() => {
@@ -534,10 +565,29 @@ const History = () => {
                     >
                       <img 
                         src={getOptimizedImageUrl(asset.image_url, { width: 800, quality: 85, format: 'webp' })}
-                        alt="Generated content" 
+                        alt={asset.prompt || "Generated content"} 
                         className="w-full h-full object-contain max-h-[400px]"
                         loading="lazy"
+                        onError={(e) => {
+                          console.error('[History] Image load error:', {
+                            assetId: asset.id,
+                            imageUrl: asset.image_url,
+                            error: e
+                          });
+                          // Fallback to original URL if optimized fails
+                          const target = e.target as HTMLImageElement;
+                          if (target.src !== asset.image_url) {
+                            target.src = asset.image_url;
+                          }
+                        }}
                       />
+                    </div>
+                  ) : (
+                    <div className="rounded-xl overflow-hidden border border-border/50 bg-muted flex items-center justify-center min-h-[200px]">
+                      <div className="text-center text-muted-foreground">
+                        <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No image available</p>
+                      </div>
                     </div>
                   )}
 

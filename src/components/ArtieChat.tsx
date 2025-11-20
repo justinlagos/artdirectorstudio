@@ -120,6 +120,7 @@ export const ArtieChat = () => {
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isMountedRef = useRef(true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingImageUrl, setEditingImageUrl] = useState<string>("");
   const [editorInstruction, setEditorInstruction] = useState<string>("");
@@ -130,6 +131,14 @@ export const ArtieChat = () => {
   const [currentWorkflowAction, setCurrentWorkflowAction] = useState<'analyzing' | 'generating' | 'editing' | 'blending' | 'upscaling' | 'browsing' | undefined>();
   const [userPreferences, setUserPreferences] = useState<any>(null);
 
+  // Set mounted flag and cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Load user preferences on mount
   useEffect(() => {
     const loadUserPreferences = async () => {
@@ -138,7 +147,9 @@ export const ArtieChat = () => {
         if (user) {
           const { getUserPreferences } = await import('@/lib/intelligence/userBehavior');
           const preferences = await getUserPreferences(user.id);
-          setUserPreferences(preferences);
+          if (isMountedRef.current) {
+            setUserPreferences(preferences);
+          }
         }
       } catch (error) {
         console.error('[ArtieChat] Error loading user preferences:', error);
@@ -389,22 +400,36 @@ export const ArtieChat = () => {
 
   // Track processed images to prevent duplicate processing
   const processedImagesRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
 
-  // Initialize processed images ref with images already in contextMemory
+  // Initialize processed images ref with images already in contextMemory on first mount
   useEffect(() => {
-    contextMemory.images.forEach((img) => {
-      processedImagesRef.current.add(`${img.messageId}|${img.url}`);
-    });
-  }, []); // Only run once on mount
+    if (!initializedRef.current) {
+      contextMemory.images.forEach((img) => {
+        processedImagesRef.current.add(`${img.messageId}|${img.url}`);
+      });
+      initializedRef.current = true;
+    }
+  }, [contextMemory.images]);
 
+  // Process messages and update contextMemory - optimized to prevent infinite loops
   useEffect(() => {
+    if (!isMountedRef.current) return;
+
+    // Early return if no messages
+    if (messages.length === 0) return;
+
     const additions: ContextImage[] = [];
     const imagesToProcess: Array<{ url: string; messageId: string; name?: string; source: ContextImage['source']; text?: string }> = [];
+
+    // Build set of existing keys from current contextMemory to prevent duplicates
+    const existingKeys = new Set<string>();
 
     messages.forEach((message) => {
       if (message.attachment?.type === 'image') {
         const key = `${message.id}|${message.attachment.url}`;
-        if (!processedImagesRef.current.has(key)) {
+        if (!processedImagesRef.current.has(key) && !existingKeys.has(key)) {
+          existingKeys.add(key);
           processedImagesRef.current.add(key);
           const imageData: ContextImage = {
             url: message.attachment.url,
@@ -427,7 +452,8 @@ export const ArtieChat = () => {
       const embeddedUrls = extractSupabaseImageUrls(message.text);
       embeddedUrls.forEach((url, index) => {
         const key = `${message.id}|${url}`;
-        if (!processedImagesRef.current.has(key)) {
+        if (!processedImagesRef.current.has(key) && !existingKeys.has(key)) {
+          existingKeys.add(key);
           processedImagesRef.current.add(key);
           const imageData: ContextImage = {
             url,
@@ -448,12 +474,15 @@ export const ArtieChat = () => {
       });
     });
 
-    // Only update contextMemory if there are new additions
-    if (additions.length > 0) {
+    // Early return if no new additions to prevent unnecessary state updates
+    if (additions.length === 0) return;
+
+    // Only update contextMemory if component is still mounted and there are new additions
+    if (isMountedRef.current) {
       setContextMemory((prev) => {
         // Double-check against current state to prevent duplicates
-        const existingKeys = new Set(prev.images.map((img) => `${img.messageId}|${img.url}`));
-        const newAdditions = additions.filter((img) => !existingKeys.has(`${img.messageId}|${img.url}`));
+        const prevKeys = new Set(prev.images.map((img) => `${img.messageId}|${img.url}`));
+        const newAdditions = additions.filter((img) => !prevKeys.has(`${img.messageId}|${img.url}`));
         
         if (newAdditions.length === 0) {
           return prev;
@@ -545,6 +574,7 @@ export const ArtieChat = () => {
     // Clear existing timer
     if (inactivityTimer.current) {
       clearTimeout(inactivityTimer.current);
+      inactivityTimer.current = null;
     }
 
     // Set contextual prompt based on current route
@@ -561,11 +591,20 @@ export const ArtieChat = () => {
       // Show prompt after 15-20 seconds of inactivity
       const delay = 15000 + Math.random() * 5000;
       inactivityTimer.current = setTimeout(() => {
-        // Double-check chat is still closed before showing prompt
-        setContextualPrompt(prompt);
-        setShowPrompt(true);
-        // Auto-hide after 10 seconds
-        setTimeout(() => setShowPrompt(false), 10000);
+        // Double-check chat is still closed and component is mounted before showing prompt
+        if (!isMountedRef.current || isOpen || isMinimized) {
+          return;
+        }
+        if (isMountedRef.current) {
+          setContextualPrompt(prompt);
+          setShowPrompt(true);
+          // Auto-hide after 10 seconds
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              setShowPrompt(false);
+            }
+          }, 10000);
+        }
       }, delay);
     }
 
@@ -575,7 +614,7 @@ export const ArtieChat = () => {
         inactivityTimer.current = null;
       }
     };
-  }, [location.pathname]); // Only re-run when location changes
+  }, [location.pathname, isOpen, isMinimized]); // Include isOpen and isMinimized in dependencies
 
   const handleQuickAction = (action: QuickAction) => {
     setInputValue(action.prompt);
