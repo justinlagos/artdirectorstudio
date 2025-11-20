@@ -1,4 +1,6 @@
 import { useRef, useEffect, useState } from "react";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface PreviewCanvasProps {
@@ -359,19 +361,45 @@ export const PreviewCanvas = ({
         pointerEvents: "auto",
       } as React.CSSProperties}
     >
+      {/* Enhanced loading state */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs text-muted-foreground">Loading image...</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative">
+              <div className="h-12 w-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+              <div className="absolute inset-0 h-12 w-12 border-4 border-transparent border-t-primary/50 rounded-full animate-spin" 
+                   style={{ animationDuration: '1.5s', animationDirection: 'reverse' }} />
+            </div>
+            <p className="text-sm text-muted-foreground font-medium">Loading image...</p>
           </div>
         </div>
       )}
+      
+      {/* Enhanced error state */}
       {loadError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-          <div className="text-center p-4">
-            <p className="text-sm text-destructive font-medium">Error loading image</p>
-            <p className="text-xs text-muted-foreground mt-1">{loadError}</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-destructive/5 backdrop-blur-sm">
+          <div className="text-center p-6 max-w-xs">
+            <div className="inline-flex p-3 bg-destructive/10 rounded-full mb-3">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+            </div>
+            <p className="text-sm text-destructive font-semibold mb-2">Failed to load image</p>
+            <p className="text-xs text-muted-foreground mb-4">{loadError}</p>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => {
+                setLoadError(null);
+                setIsLoading(true);
+                // Trigger image reload
+                if (imageRef.current) {
+                  imageRef.current.src = imageUrl;
+                }
+              }}
+              className="gap-2"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+            </Button>
           </div>
         </div>
       )}
