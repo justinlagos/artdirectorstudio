@@ -530,7 +530,7 @@ export const ImageGenerationDialog = () => {
 
   const bodyContent = (
     <div className={cn(
-      "flex flex-col min-h-0",
+      "flex flex-col min-h-0 p-6 md:p-8",
       !isMobile ? "grid grid-cols-[42%_58%] gap-8" : "space-y-6"
     )}>
       {/* Left Column: Reference Image Card (Desktop) or Top (Mobile) */}
@@ -657,6 +657,11 @@ export const ImageGenerationDialog = () => {
           {/* Scrollable tabs content */}
           <div className="flex-1 overflow-y-auto min-h-0 mt-4">
             <TabsContent value="templates" className="mt-0">
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Choose a template to guide your generation. Templates provide structured art direction for consistent results.
+                </p>
+              </div>
               <PromptTemplates
                   referenceImageUrl={referenceImage || undefined}
                   currentPrompt={prompt || basePrompt}
@@ -1030,7 +1035,7 @@ export const ImageGenerationDialog = () => {
             Generate in Studio
           </div>
         }
-        description="Craft new variations instantly with your prompt and optional reference image."
+        description="Choose a template to guide your generation, or create from scratch with a custom prompt."
         contentClassName="flex flex-col min-h-0"
         footer={footerContent}
         maxWidth="full"
