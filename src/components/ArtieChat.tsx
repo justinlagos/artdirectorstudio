@@ -123,6 +123,56 @@ export const ArtieChat = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingImageUrl, setEditingImageUrl] = useState<string>("");
   const [editorInstruction, setEditorInstruction] = useState<string>("");
+  
+  // Workflow context tracking for proactive assistance
+  const sessionStartTime = useRef<Date>(new Date());
+  const recentActions = useRef<string[]>([]);
+  const [currentWorkflowAction, setCurrentWorkflowAction] = useState<'analyzing' | 'generating' | 'editing' | 'blending' | 'upscaling' | 'browsing' | undefined>();
+  const [userPreferences, setUserPreferences] = useState<any>(null);
+
+  // Load user preferences on mount
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { getUserPreferences } = await import('@/lib/intelligence/userBehavior');
+          const preferences = await getUserPreferences(user.id);
+          setUserPreferences(preferences);
+        }
+      } catch (error) {
+        console.error('[ArtieChat] Error loading user preferences:', error);
+      }
+    };
+    loadUserPreferences();
+  }, []);
+
+  // Track workflow actions
+  const trackWorkflowAction = useCallback((action: 'analyzing' | 'generating' | 'editing' | 'blending' | 'upscaling' | 'browsing') => {
+    setCurrentWorkflowAction(action);
+    recentActions.current = [...recentActions.current.slice(-9), action]; // Keep last 10 actions
+  }, []);
+
+  // Learn from user action
+  const learnFromAction = useCallback(async (
+    action: 'upscale' | 'blend' | 'edit' | 'save' | 'reject',
+    imageUrl?: string,
+    metadata?: Record<string, unknown>
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { learnFromUserAction } = await import('@/lib/intelligence/userBehavior');
+        await learnFromUserAction(user.id, action, imageUrl, metadata);
+        // Refresh preferences after learning
+        const { getUserPreferences } = await import('@/lib/intelligence/userBehavior');
+        const updatedPreferences = await getUserPreferences(user.id);
+        setUserPreferences(updatedPreferences);
+      }
+    } catch (error) {
+      console.error('[ArtieChat] Error learning from action:', error);
+    }
+  }, []);
 
   // Debug: Monitor editor state changes
   useEffect(() => {
@@ -222,12 +272,17 @@ export const ArtieChat = () => {
       setIsOpen(false);
       setIsMinimized(true);
       // Use requestAnimationFrame to ensure Artie minimizes before Studio opens
-      requestAnimationFrame(() => {
-        openStudioWithPrompt({
-          basePrompt: "Refine this image",
-          imageUrl: latestContextImage.url,
-        });
-        toast.success("Opening latest image in Studio");
+      requestAnimationFrame(async () => {
+        try {
+          await openStudioWithPrompt({
+            basePrompt: "Refine this image",
+            imageUrl: latestContextImage.url,
+          });
+          toast.success("Opening latest image in Studio");
+        } catch (error) {
+          console.error('[ARTIE] Failed to open Studio:', error);
+          toast.error("Unable to open image in Studio");
+        }
       });
     } catch (error) {
       console.error('[ARTIE] Failed to open Studio:', error);
@@ -590,34 +645,33 @@ export const ArtieChat = () => {
           setIsMinimized(true);
         }
         
-        // Generate expert prompt with analysis
+        // Open Studio with Creative Director analysis (handled inside openStudioWithPrompt)
         (async () => {
           try {
-            const expertAnalysis = await generateExpertStudioPrompt(targetImage.url);
-            
-            openStudioWithPrompt({
-              basePrompt: expertAnalysis.prompt,
+            await openStudioWithPrompt({
+              basePrompt: "Refine this image",
               imageUrl: targetImage.url,
               meta: {
                 source: 'artie',
-                suggestedEdits: expertAnalysis.suggestedEdits,
-                analysis: expertAnalysis.analysis,
               },
             });
             
             toast.success("Opening in Studio", {
-              description: "Expert analysis loaded with suggested edits",
+              description: "Creative Director analysis complete",
             });
           } catch (error) {
-            console.error('[Artie] Error generating expert prompt:', error);
-            // Fallback to basic prompt
-            openStudioWithPrompt({
-              basePrompt: "Refine this image",
-              imageUrl: targetImage.url,
-            });
-            toast.success("Opening in Studio", {
-              description: "Your image has been loaded into the Studio editor",
-            });
+            console.error('[Artie] Error opening Studio:', error);
+            // Fallback: try without image analysis
+            try {
+              await openStudioWithPrompt({
+                basePrompt: "Refine this image",
+                imageUrl: targetImage.url,
+              });
+              toast.success("Opening in Studio");
+            } catch (fallbackError) {
+              console.error('[Artie] Fallback error:', fallbackError);
+              toast.error("Unable to open Studio");
+            }
           }
         })();
       } else {
@@ -922,6 +976,47 @@ export const ArtieChat = () => {
           }
         }
         
+        // Add user preferences context for proactive assistance
+        if (userPreferences) {
+          const prefParts: string[] = [];
+          if (userPreferences.preferredStyles?.length > 0) {
+            prefParts.push(`User prefers ${userPreferences.preferredStyles.slice(0, 2).join(' and ')} styles`);
+          }
+          if (userPreferences.preferredColors?.length > 0) {
+            prefParts.push(`User prefers ${userPreferences.preferredColors.slice(0, 2).join(' and ')} colors`);
+          }
+          if (userPreferences.qualityPreferences) {
+            if (userPreferences.qualityPreferences.upscaleFrequency > 0.3) {
+              prefParts.push('User frequently upscales images');
+            }
+            if (userPreferences.qualityPreferences.editFrequency > 0.3) {
+              prefParts.push('User frequently edits images');
+            }
+            if (userPreferences.qualityPreferences.blendFrequency > 0.3) {
+              prefParts.push('User frequently blends images');
+            }
+          }
+          if (prefParts.length > 0) {
+            contextParts.push(`User preferences: ${prefParts.join('; ')}`);
+          }
+        }
+
+        // Add workflow context
+        if (currentWorkflowAction) {
+          contextParts.push(`Current workflow: ${currentWorkflowAction}`);
+        }
+        if (recentActions.current.length > 0) {
+          const recentPattern = recentActions.current.slice(-3).join(' → ');
+          contextParts.push(`Recent workflow pattern: ${recentPattern}`);
+        }
+        const sessionDuration = Math.round((Date.now() - sessionStartTime.current.getTime()) / 1000 / 60); // minutes
+        if (sessionDuration > 0) {
+          contextParts.push(`Session duration: ${sessionDuration} minutes`);
+        }
+        if (contextMemory.images.length > 0) {
+          contextParts.push(`Images in session: ${contextMemory.images.length}`);
+        }
+        
         if (contextParts.length > 0) {
           contextualInput = `Context: ${contextParts.join(' | ')}\n\nUser message: ${contextualInput}`;
         }
@@ -1123,6 +1218,7 @@ export const ArtieChat = () => {
               const args = JSON.parse(toolCall.function.arguments);
               
               if (toolCall.function.name === 'open_studio') {
+                trackWorkflowAction('generating');
                 accumulatedText += `\n\n✨ Opening Studio with your refined prompt...`;
                 setMessages(prev => 
                   prev.map(m => 
@@ -1141,6 +1237,7 @@ export const ArtieChat = () => {
                 setShowGenerationDialog(true);
                 
               } else if (toolCall.function.name === 'open_upscale') {
+                trackWorkflowAction('upscaling');
                 accumulatedText += `\n\n🔍 Opening Upscale tool...`;
                 setMessages(prev => 
                   prev.map(m => 
@@ -1156,6 +1253,7 @@ export const ArtieChat = () => {
                 });
                 
               } else if (toolCall.function.name === 'open_blend') {
+                trackWorkflowAction('blending');
                 accumulatedText += `\n\n🎨 Opening Blend tool...`;
                 setMessages(prev => 
                   prev.map(m => 
@@ -1235,6 +1333,14 @@ export const ArtieChat = () => {
                       },
                       skipToast: true, // Don't show duplicate toast
                     });
+
+                    // Learn from this action
+                    await learnFromAction('save', genData.image, {
+                      prompt: args.prompt,
+                      quality: args.quality || 'auto',
+                      size: args.size || '1024x1024',
+                    });
+                    trackWorkflowAction('generating');
 
                     accumulatedText = accumulatedText.replace(/✨ Generating image\.\.\.|⏳ Retrying \(attempt \d\/3\)\.\.\./g, '').trim();
                     accumulatedText += `\n\n✅ Image generated!`;
@@ -1316,6 +1422,9 @@ export const ArtieChat = () => {
                   continue;
                 }
 
+                // Track workflow action
+                trackWorkflowAction('editing');
+                
                 // Minimize Artie cleanly first
                 setIsOpen(false);
                 setIsMinimized(false);
@@ -1401,8 +1510,8 @@ export const ArtieChat = () => {
     <div 
       data-artie-floating-icon
       className={cn(
-        "fixed opacity-100 visible pointer-events-auto z-[70]",
-        // Mobile: above bottom nav (z-[60]), but below modals (z-[90]+)
+        "fixed opacity-100 visible pointer-events-auto z-[60]",
+        // Mobile: above bottom nav (z-[50]), but below modals (z-[40]+)
         isMobile ? "bottom-20 right-4" : "bottom-6 right-6"
       )}
     >
@@ -1485,7 +1594,7 @@ export const ArtieChat = () => {
       
       {/* Backdrop - Click to close - DO NOT lock scroll */}
       <button 
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[75] cursor-default"
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[70] cursor-default"
         onClick={handleClose}
         aria-label="Close chat"
         type="button"
@@ -1500,7 +1609,7 @@ export const ArtieChat = () => {
       <div 
         data-artie-panel
         className={cn(
-          "fixed z-[76] flex flex-col bg-background shadow-xl pointer-events-auto safe-bottom",
+          "fixed z-[71] flex flex-col bg-background shadow-xl pointer-events-auto safe-bottom",
           // Mobile: full width bottom sheet, slides up from bottom
           isMobile ? [
             "inset-x-0 bottom-0 top-auto h-[96dvh] h-[96svh]",
@@ -1672,12 +1781,17 @@ export const ArtieChat = () => {
                                 setIsOpen(false);
                                 setIsMinimized(true);
                                 // Use requestAnimationFrame to ensure Artie minimizes before Studio opens
-                                requestAnimationFrame(() => {
-                                  openStudioWithPrompt({
-                                    basePrompt: "Refine this image",
-                                    imageUrl,
-                                  });
-                                  toast.success("Opening in Studio");
+                                requestAnimationFrame(async () => {
+                                  try {
+                                    await openStudioWithPrompt({
+                                      basePrompt: "Refine this image",
+                                      imageUrl,
+                                    });
+                                    toast.success("Opening in Studio");
+                                  } catch (error) {
+                                    console.error('[Artie] Error opening Studio:', error);
+                                    toast.error("Unable to open Studio");
+                                  }
                                 });
                               }}
                               className="gap-1.5"
@@ -1762,11 +1876,18 @@ export const ArtieChat = () => {
                                   setIsOpen(false);
                                   setIsMinimized(true);
                                 }
-                                openStudioWithPrompt({
-                                  basePrompt: "Refine this reference",
-                                  imageUrl: url,
-                                });
-                                toast.success("Opening in Studio");
+                                (async () => {
+                                  try {
+                                    await openStudioWithPrompt({
+                                      basePrompt: "Refine this reference",
+                                      imageUrl: url,
+                                    });
+                                    toast.success("Opening in Studio");
+                                  } catch (error) {
+                                    console.error('[Artie] Error opening Studio:', error);
+                                    toast.error("Unable to open Studio");
+                                  }
+                                })();
                               }}
                               className="gap-1.5"
                             >
@@ -1875,7 +1996,7 @@ export const ArtieChat = () => {
             "px-6 md:px-8 py-4 md:py-6",
             "shadow-[0_-1px_8px_rgba(0,0,0,0.08)]",
             isMobile 
-              ? "fixed bottom-0 left-0 right-0 z-[76] pb-[calc(0.75rem+env(safe-area-inset-bottom))] safe-bottom bg-background" 
+              ? "fixed bottom-0 left-0 right-0 z-[71] pb-[calc(0.75rem+env(safe-area-inset-bottom))] safe-bottom bg-background" 
               : "sticky bottom-0 z-10 bg-background"
           )}
         >
@@ -2055,6 +2176,12 @@ export const ArtieChat = () => {
                       skipToast: true, // Don't show duplicate toast
                     });
 
+                    // Learn from this action
+                    await learnFromAction('save', imageUrl, {
+                      prompt: generationPrompt,
+                      ...generationOptions,
+                    });
+
                     setMessages(prev => prev.map(m => 
                       m.id === genMessageId
                         ? { ...m, text: `Generated successfully! 🎨\n\n![Generated Image](${imageUrl})`, attachment: { type: 'image' as const, url: imageUrl, name: 'Generated' } }
@@ -2116,8 +2243,14 @@ export const ArtieChat = () => {
             imageUrl: newImageUrl,
             action: 'edit',
             sourceUrls: [editingImageUrl],
-            params: { source: 'artie_edit' },
+            params: { source: 'artie_edit', instruction: editorInstruction },
             skipToast: true, // Workspace already shows toast
+          });
+
+          // Learn from this edit action
+          await learnFromAction('edit', newImageUrl, {
+            sourceUrl: editingImageUrl,
+            instruction: editorInstruction,
           });
 
           // Add the edited image to context memory

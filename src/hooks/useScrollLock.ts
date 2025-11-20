@@ -18,6 +18,8 @@ class ScrollLockManager {
     position: string;
     top: string;
     width: string;
+    height: string;
+    overscrollBehavior: string;
     scrollY: number;
   } | null = null;
 
@@ -62,6 +64,8 @@ class ScrollLockManager {
         position: document.body.style.position || '',
         top: document.body.style.top || '',
         width: document.body.style.width || '',
+        height: document.body.style.height || '',
+        overscrollBehavior: document.body.style.overscrollBehavior || '',
         scrollY: window.scrollY,
       };
 
@@ -69,6 +73,13 @@ class ScrollLockManager {
       document.body.style.position = 'fixed';
       document.body.style.top = `-${window.scrollY}px`;
       document.body.style.width = '100%';
+      // Fix for iOS Safari - prevent bounce scroll
+      document.body.style.height = '100%';
+      document.body.style.overscrollBehavior = 'none';
+      // Fix for Android Chrome
+      if (window.innerHeight) {
+        document.body.style.height = `${window.innerHeight}px`;
+      }
 
       if (import.meta.env.DEV) {
         console.log('[ScrollLock] Locked by:', Array.from(this.locks));
@@ -79,6 +90,8 @@ class ScrollLockManager {
       document.body.style.position = this.savedStyles.position;
       document.body.style.top = this.savedStyles.top;
       document.body.style.width = this.savedStyles.width;
+      document.body.style.height = '';
+      document.body.style.overscrollBehavior = '';
 
       // Restore scroll position
       window.scrollTo(0, this.savedStyles.scrollY);
@@ -101,6 +114,8 @@ class ScrollLockManager {
       document.body.style.position = this.savedStyles.position;
       document.body.style.top = this.savedStyles.top;
       document.body.style.width = this.savedStyles.width;
+      document.body.style.height = this.savedStyles.height;
+      document.body.style.overscrollBehavior = this.savedStyles.overscrollBehavior;
       window.scrollTo(0, this.savedStyles.scrollY);
       this.savedStyles = null;
     }

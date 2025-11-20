@@ -57,22 +57,21 @@ export const ArtieMessage = memo(({
                   onOpenStudio={async () => {
                     if (message.attachment?.url) {
                       try {
-                        const expertAnalysis = await generateExpertStudioPrompt(message.attachment.url);
-                        openStudioWithPrompt({
-                          basePrompt: expertAnalysis.prompt,
+                        // Use Creative Director prompt generation (handled inside openStudioWithPrompt)
+                        await openStudioWithPrompt({
+                          basePrompt: "Refine this image",
                           imageUrl: message.attachment.url,
                           meta: {
                             source: 'artie',
-                            suggestedEdits: expertAnalysis.suggestedEdits,
-                            analysis: expertAnalysis.analysis,
                           },
                         });
                         toast.success("Opening in Studio", {
-                          description: "Expert analysis loaded",
+                          description: "Creative Director analysis complete",
                         });
                       } catch (error) {
-                        console.error('[ArtieMessage] Error generating expert prompt:', error);
-                        openStudioWithPrompt({
+                        console.error('[ArtieMessage] Error opening Studio:', error);
+                        // Fallback: open with basic prompt
+                        await openStudioWithPrompt({
                           basePrompt: "Refine this image",
                           imageUrl: message.attachment.url,
                         });
@@ -130,25 +129,28 @@ export const ArtieMessage = memo(({
                   onOpenStudio={async () => {
                     try {
                       const expertAnalysis = await generateExpertStudioPrompt(url);
-                      openStudioWithPrompt({
-                        basePrompt: expertAnalysis.prompt,
+                      await openStudioWithPrompt({
+                        basePrompt: "Refine this reference",
                         imageUrl: url,
                         meta: {
                           source: 'artie',
-                          suggestedEdits: expertAnalysis.suggestedEdits,
-                          analysis: expertAnalysis.analysis,
                         },
                       });
                       toast.success("Opening in Studio", {
-                        description: "Expert analysis loaded",
+                        description: "Creative Director analysis complete",
                       });
                     } catch (error) {
-                      console.error('[ArtieMessage] Error generating expert prompt:', error);
-                      openStudioWithPrompt({
-                        basePrompt: "Refine this reference",
-                        imageUrl: url,
-                      });
-                      toast.success("Opening in Studio");
+                      console.error('[ArtieMessage] Error opening Studio:', error);
+                      try {
+                        await openStudioWithPrompt({
+                          basePrompt: "Refine this reference",
+                          imageUrl: url,
+                        });
+                        toast.success("Opening in Studio");
+                      } catch (fallbackError) {
+                        console.error('[ArtieMessage] Fallback error:', fallbackError);
+                        toast.error("Unable to open Studio");
+                      }
                     }
                   }}
                   onUpscale={() => onChipAction("UPSCALE_IMAGE", message.id)}

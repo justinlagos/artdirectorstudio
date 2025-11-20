@@ -12,137 +12,95 @@ export interface OpenStudioOptions {
   meta?: Record<string, unknown>;
 }
 
-export function openStudioWithPrompt({
+export async function openStudioWithPrompt({
   basePrompt,
   imageUrl,
   meta,
-}: OpenStudioOptions): void {
+}: OpenStudioOptions): Promise<void> {
   const studioState = useStudioStore.getState();
   const modalState = useModalStore.getState();
 
-  // Set initial prompt - will be enhanced with analysis if image is provided
-  studioState.setPrompt(basePrompt || "");
-  studioState.setImage(imageUrl || "");
-  if (meta) {
-    studioState.setMeta(meta);
-  } else {
-    studioState.setMeta(undefined);
-  }
-
-  modalState.openGenerateModal();
-
-  // If an image is provided, use Intelligence Framework to enhance the prompt
+  // If an image is provided, generate Creative Director analysis FIRST before opening modal
+  // This prevents context drift by ensuring prompt is ready immediately
+  let initialPrompt = basePrompt || "";
+  
   if (imageUrl) {
-    (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (user) {
+          // Get image understanding (cached or fresh) - do this BEFORE opening modal
+          let understanding = await getCachedUnderstanding(imageUrl);
+          if (!understanding) {
+            // Show loading state while analyzing
+            toast.loading("Analyzing image for Creative Director insights...", { id: 'studio-analysis' });
+            understanding = await analyzeImageDeep(imageUrl);
+            toast.dismiss('studio-analysis');
+          }
 
-        // Get image understanding (cached or fresh)
-        let understanding = await getCachedUnderstanding(imageUrl);
-        if (!understanding) {
-          // Analyze image deeply
-          understanding = await analyzeImageDeep(imageUrl);
-        }
+          // Get user preferences for personalization
+          const userPreferences = await getUserPreferences(user.id);
 
-        // Get user preferences for personalization
-        const userPreferences = await getUserPreferences(user.id);
-
-        // Determine intent and variation type
-        const isVariation = basePrompt && (
-          basePrompt.toLowerCase().includes('variation') ||
-          basePrompt.toLowerCase().includes('variation of') ||
-          basePrompt === "Refine this image"
-        );
-        
-        const intent = basePrompt && basePrompt !== "Refine this image" 
-          ? 'enhancement' 
-          : 'variation';
-
-        // Use style consistency for variations
-        if (isVariation && understanding) {
-          const { generateContextAwareVariation } = await import('@/lib/intelligence/styleConsistency');
-          
-          // Determine variation intensity from meta or default to moderate
-          const variationIntent = (meta?.variationIntent as 'subtle' | 'moderate' | 'major') || 'moderate';
-          
-          const variation = await generateContextAwareVariation(
-            basePrompt || "Create a variation",
+          // Generate Creative Director-level prompt IMMEDIATELY
+          const { generateCreativeDirectorPrompt } = await import('@/lib/intelligence/promptIntelligence');
+          const creativePrompt = await generateCreativeDirectorPrompt({
+            userPrompt: basePrompt || "Refine this image",
             imageUrl,
-            variationIntent,
+            imageUnderstanding: understanding,
             userPreferences,
-            understanding
-          );
+            meta,
+          });
+
+          initialPrompt = creativePrompt.prompt;
           
-          // Update Studio with style-locked prompt and continuation strength
-          studioState.setPrompt(variation.prompt);
+          // Set enhanced metadata
           if (meta) {
             studioState.setMeta({
               ...meta,
-              continuationStrength: variation.continuationStrength,
-              styleLock: variation.styleLock,
+              ...creativePrompt.metadata,
+              source: meta.source || 'studio',
             });
           } else {
             studioState.setMeta({
-              continuationStrength: variation.continuationStrength,
-              styleLock: variation.styleLock,
+              ...creativePrompt.metadata,
+              source: 'studio',
             });
           }
-          
-          toast.success("Style-consistent variation ready", {
-            description: `Maintaining: ${variation.styleLock.slice(0, 2).join(', ')}`
-          });
-        } else {
-          // Use standard context-locked prompt for enhancements
-          const synthesized = synthesizeContextLockedPrompt({
-            userPrompt: basePrompt || "Refine this image",
-            imageUnderstanding: understanding,
-            userPreferences,
-            intent,
-            metadata: meta,
-          });
 
-          // Update Studio with intelligent prompt
-          studioState.setPrompt(synthesized.prompt);
-          
-          toast.success("Intelligent prompt generated", {
-            description: synthesized.reasoning || "Context-locked prompt created"
+          toast.success("Creative Director analysis complete", {
+            description: creativePrompt.reasoning || "Context-aware prompt ready"
           });
-        }
-      } catch (error) {
-        console.error('[Studio] Intelligence Framework error:', error);
-        // Fallback to basic analysis
-        try {
-          const { data: existingAsset } = await supabase
-            .from('generated_assets')
-            .select('analysis_data')
-            .eq('image_url', imageUrl)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          if (existingAsset?.analysis_data) {
-            const analysis = existingAsset.analysis_data as Record<string, any>;
-            const imageOverview = analysis.image_overview || analysis.summary || '';
-            
-            if (imageOverview) {
-              const contextPrompt = basePrompt && basePrompt !== "Refine this image"
-                ? `${basePrompt}. ${imageOverview}`
-                : imageOverview;
-              
-              studioState.setPrompt(contextPrompt);
-            }
-          }
-        } catch (fallbackError) {
-          console.error('[Studio] Fallback analysis error:', fallbackError);
-          // Silently fail - user can still use the base prompt
         }
       }
-    })();
+    } catch (error) {
+      console.error('[Studio] Intelligence Framework error:', error);
+      // Fallback: use expert prompt generator
+      try {
+        const { generateExpertStudioPrompt } = await import('@/lib/artie/expertPromptGenerator');
+        const expertAnalysis = await generateExpertStudioPrompt(imageUrl, basePrompt);
+        initialPrompt = expertAnalysis.prompt;
+        
+        if (meta) {
+          studioState.setMeta({
+            ...meta,
+            suggestedEdits: expertAnalysis.suggestedEdits,
+            analysis: expertAnalysis.analysis,
+          });
+        }
+      } catch (fallbackError) {
+        console.error('[Studio] Fallback analysis error:', fallbackError);
+        // Use base prompt as-is - better than nothing
+      }
+    }
   }
+
+  // NOW set the prompt and open modal - prompt is already enhanced
+  studioState.setPrompt(initialPrompt);
+  studioState.setImage(imageUrl || "");
+  
+  // Open modal with pre-filled intelligent prompt
+  modalState.openGenerateModal();
 
   requestAnimationFrame(() => {
     const modalBody = document.querySelector<HTMLElement>(".studio-modal-body");

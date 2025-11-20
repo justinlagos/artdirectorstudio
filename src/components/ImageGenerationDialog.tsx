@@ -658,28 +658,10 @@ export const ImageGenerationDialog = () => {
           <div className="flex-1 overflow-y-auto min-h-0 mt-4">
             <TabsContent value="templates" className="mt-0">
               <PromptTemplates
-                  onSelect={(templatePrompt) => {
-                    // If we have an existing prompt/image, use template as a variation modifier
-                    // Otherwise, use template as the base prompt
-                    let enhancedPrompt = "";
-                    
-                    if (prompt.trim() || referenceImage) {
-                      // Template acts as a variation modifier
-                      // Extract the style/technique from template and apply it to existing context
-                      const templateStyle = templatePrompt.includes(',') 
-                        ? templatePrompt.split(',').slice(0, 2).join(',') // Get first 2 style elements
-                        : templatePrompt;
-                      
-                      enhancedPrompt = prompt.trim()
-                        ? `${prompt.trim()}, ${templateStyle}`
-                        : referenceImage
-                          ? `Variation: ${templateStyle}`
-                          : templatePrompt;
-                    } else {
-                      // No existing context, use template as base
-                      enhancedPrompt = templatePrompt;
-                    }
-                    
+                  referenceImageUrl={referenceImage || undefined}
+                  currentPrompt={prompt || basePrompt}
+                  onSelect={(enhancedPrompt) => {
+                    // Template has already been enhanced with context awareness by PromptTemplates
                     if (enhancedPrompt.length > MAX_PROMPT_LENGTH) {
                       toast.error(`Combined prompt would exceed ${MAX_PROMPT_LENGTH} characters`);
                       return;
@@ -688,11 +670,6 @@ export const ImageGenerationDialog = () => {
                     setPrompt(enhancedPrompt);
                     setBasePrompt(enhancedPrompt);
                     setStorePrompt(enhancedPrompt);
-                    toast.success(
-                      prompt.trim() || referenceImage 
-                        ? "Template applied as variation" 
-                        : "Template applied to prompt"
-                    );
                   }}
                 />
             </TabsContent>

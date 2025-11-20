@@ -34,7 +34,7 @@ export const ToolDrawer = ({
         <DrawerOverlay className="backdrop-blur-sm" />
         <DrawerPrimitive.Content
           className={cn(
-            "fixed z-50 flex max-h-[96dvh] flex-col border border-border bg-background shadow-xl",
+            "fixed z-[40] flex max-h-[96dvh] flex-col border border-border bg-background shadow-xl",
             // Mobile: bottom sheet with rounded-t-2xl
             "inset-x-0 bottom-0 rounded-t-2xl",
             "sm:mx-auto sm:w-full sm:max-w-[820px]",

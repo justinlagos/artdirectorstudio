@@ -25,9 +25,9 @@ import { useStudioStore } from "@/store/studioStore";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageSkeleton } from "@/components/skeletons/PageSkeleton";
 // Premium Landing Page Components
-import { HeroSection } from "@/components/landing/HeroSection";
-import { EmotionalValueSection } from "@/components/landing/EmotionalValueSection";
-import { CoreFeaturesSection } from "@/components/landing/CoreFeaturesSection";
+import { PremiumHero } from "@/components/landing/PremiumHero";
+import { PremiumFeatures } from "@/components/landing/PremiumFeatures";
+import { PremiumValue } from "@/components/landing/PremiumValue";
 import { ShowcaseSection } from "@/components/landing/ShowcaseSection";
 import { ProofSection } from "@/components/landing/ProofSection";
 import { PricingSection } from "@/components/landing/PricingSection";
@@ -625,25 +625,24 @@ const Index = () => {
         {!user && (
           <>
             <ErrorBoundary fallback={<div className="py-20 text-center">Hero section unavailable</div>}>
-              <HeroSection user={user} />
+              <PremiumHero user={user} />
+            </ErrorBoundary>
+            
+            <ErrorBoundary fallback={null}>
+              <PremiumValue />
+            </ErrorBoundary>
+            
+            <ErrorBoundary fallback={null}>
+              <PremiumFeatures />
             </ErrorBoundary>
             <ErrorBoundary fallback={null}>
-              <EmotionalValueSection />
+              <PremiumValue />
             </ErrorBoundary>
             <ErrorBoundary fallback={null}>
-              <CoreFeaturesSection />
+              <PremiumFeatures />
             </ErrorBoundary>
             <ErrorBoundary fallback={<div className="py-20 text-center">Showcase unavailable</div>}>
               <ShowcaseSection />
-            </ErrorBoundary>
-            <ErrorBoundary fallback={null}>
-              <ProofSection />
-            </ErrorBoundary>
-            <ErrorBoundary fallback={null}>
-              <PricingSection />
-            </ErrorBoundary>
-            <ErrorBoundary fallback={null}>
-              <FinalCTASection />
             </ErrorBoundary>
           </>
         )}

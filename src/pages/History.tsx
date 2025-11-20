@@ -42,7 +42,7 @@ const History = () => {
     }
   }, [user, authLoading, navigate]);
 
-  // Use react-query with caching for assets
+  // Use react-query with caching for assets - always returns latest items
   const { data: assets = [], isLoading: loading, refetch } = useQuery({
     queryKey: ['generated_assets', user?.id],
     queryFn: async () => {
@@ -53,10 +53,16 @@ const History = () => {
         .from('generated_assets')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) // Always return latest first
+        .limit(1000); // Ensure we get all recent items
 
       if (error) {
         console.error('[History] Fetch error:', error);
+        // Silently handle RLS errors
+        if (error.code === '42501' || error.code === 'PGRST301') {
+          console.warn('[History] RLS error, returning empty array');
+          return [];
+        }
         throw error;
       }
       
@@ -64,9 +70,11 @@ const History = () => {
       return data || [];
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutes - matches prefetch
+    staleTime: 0, // Always fetch fresh data
     gcTime: 30 * 60 * 1000, // 30 minutes
-    retry: 1,
+    retry: 2,
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchOnMount: true, // Always refetch on mount
   });
 
   // Subscribe to realtime changes

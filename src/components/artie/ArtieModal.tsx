@@ -50,7 +50,7 @@ export const ArtieModal = ({
         {/* Overlay - Semi-transparent dark overlay, click closes modal */}
         <DialogPrimitive.Overlay
           className={cn(
-            "fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm",
+            "fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "duration-[260ms]"
@@ -60,7 +60,7 @@ export const ArtieModal = ({
         {/* Content */}
         <DialogPrimitive.Content
           className={cn(
-            "fixed z-[91]",
+            "fixed z-[81]",
             // Mobile: bottom sheet with safe-area padding
             isMobile
               ? [
@@ -75,7 +75,7 @@ export const ArtieModal = ({
                 ]
               : // Desktop: centered modal with fade+scale animation
                 [
-                  "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+                  "left-1/2 top-1/2",
                   "rounded-2xl border border-border bg-background shadow-xl",
                   "w-[90vw] max-h-[90vh]",
                   maxWidthClasses[maxWidth],
@@ -92,6 +92,10 @@ export const ArtieModal = ({
                 ],
             className
           )}
+          style={!isMobile ? {
+            transform: 'translate(-50%, -50%)',
+            WebkitTransform: 'translate(-50%, -50%)',
+          } : undefined}
           onOpenAutoFocus={(e) => {
             // Prevent auto focus on mobile to avoid keyboard opening
             if (isMobile) {

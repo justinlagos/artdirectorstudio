@@ -39,7 +39,7 @@ export const ArtieChatInput = memo(({
   }, [inputValue]);
 
   return (
-    <div className="flex-shrink-0 relative z-[70] px-4 md:px-6 py-2 md:py-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)] safe-bottom" style={{ position: 'sticky', bottom: 0 }}>
+    <div className="flex-shrink-0 relative z-[71] px-4 md:px-6 py-2 md:py-2.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-2.5 border-t border-border bg-surface-1 shadow-[0_-1px_8px_rgba(0,0,0,0.08)] safe-bottom" style={{ position: 'sticky', bottom: 0 }}>
       {/* File Upload Preview */}
       {uploadedFiles.length > 0 && (
         <div className="mb-2 md:mb-3 flex flex-wrap gap-1.5 md:gap-2">

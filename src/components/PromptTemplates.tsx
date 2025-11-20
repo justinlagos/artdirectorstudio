@@ -95,9 +95,16 @@ const TEMPLATES: Template[] = [
 interface PromptTemplatesProps {
   onSelect: (prompt: string) => void;
   className?: string;
+  referenceImageUrl?: string;
+  currentPrompt?: string;
 }
 
-export const PromptTemplates = ({ onSelect, className }: PromptTemplatesProps) => {
+export const PromptTemplates = ({ 
+  onSelect, 
+  className, 
+  referenceImageUrl,
+  currentPrompt 
+}: PromptTemplatesProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -112,8 +119,52 @@ export const PromptTemplates = ({ onSelect, className }: PromptTemplatesProps) =
     return matchesCategory && matchesSearch;
   });
 
-  const handleSelect = (prompt: string) => {
-    onSelect(prompt);
+  const handleSelect = async (templatePrompt: string) => {
+    // If we have a reference image, modify the base context intelligently
+    if (referenceImageUrl) {
+      try {
+        // Import intelligence functions
+        const { getCachedUnderstanding, analyzeImageDeep } = await import('@/lib/intelligence/imageUnderstanding');
+        const { generateCreativeDirectorPrompt } = await import('@/lib/intelligence/promptIntelligence');
+        
+        // Get image understanding
+        let understanding = await getCachedUnderstanding(referenceImageUrl);
+        if (!understanding) {
+          understanding = await analyzeImageDeep(referenceImageUrl);
+        }
+        
+        if (understanding) {
+          // Generate context-aware variation using template as modifier
+          const creativePrompt = await generateCreativeDirectorPrompt({
+            userPrompt: templatePrompt,
+            imageUrl: referenceImageUrl,
+            imageUnderstanding: understanding,
+          });
+          
+          // Apply template as a variation modifier while maintaining context
+          const enhancedPrompt = `${creativePrompt.prompt}. Apply template style: ${templatePrompt}`;
+          onSelect(enhancedPrompt);
+          toast.success("Template applied with context awareness", {
+            description: "Maintaining image context while applying template"
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('[PromptTemplates] Error applying template with context:', error);
+        // Fallback to basic template application
+      }
+    }
+    
+    // If we have a current prompt, modify it with template
+    if (currentPrompt && currentPrompt.trim()) {
+      const enhancedPrompt = `${currentPrompt}. Apply: ${templatePrompt}`;
+      onSelect(enhancedPrompt);
+      toast.success("Template applied as variation modifier");
+      return;
+    }
+    
+    // Otherwise, use template as base prompt
+    onSelect(templatePrompt);
     toast.success("Template applied to prompt");
   };
 

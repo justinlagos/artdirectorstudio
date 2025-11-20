@@ -2,12 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-/* iOS-specific viewport height fix */
-@supports (height: 100dvh) {
-  .min-h-screen {
-    min-height: 100dvh;
+  /* Cross-browser viewport height fix */
+  @supports (height: 100dvh) {
+    .min-h-screen {
+      min-height: 100dvh;
+    }
   }
-}
+
+  /* iOS Safari specific viewport fix */
+  @supports (-webkit-touch-callout: none) {
+    .min-h-screen {
+      min-height: -webkit-fill-available;
+    }
+  }
+
+  /* Fallback for older browsers */
+  @supports not (height: 100dvh) {
+    .min-h-screen {
+      min-height: 100vh;
+    }
+  }
 
 /* Optimize mobile scrolling */
 @layer base {
@@ -47,10 +61,10 @@
   }
   
   /* Ensure Artie floating icon is always visible */
-  /* z-index: 70 (above bottom nav z-60, below modals z-90+) */
+  /* z-index: 60 (above bottom nav z-50, below modals z-40+) */
   [data-artie-floating-icon] {
     position: fixed !important;
-    z-index: 70 !important;
+    z-index: 60 !important;
     visibility: visible !important;
     opacity: 1 !important;
     display: block !important;
@@ -398,6 +412,42 @@ All colors MUST be HSL.
     }
   }
 
+  /* Premium landing page animations - 60fps optimized */
+  @keyframes glow-pulse {
+    0%, 100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  .animate-glow-pulse {
+    animation: glow-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Performance optimizations for animations */
+  .will-change-transform {
+    will-change: transform;
+  }
+
+  .will-change-opacity {
+    will-change: opacity;
+  }
+
+  /* GPU acceleration for smooth animations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+
+  /* Smooth parallax container */
+  .parallax-container {
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
   @keyframes fade-slide-out {
     from {
       opacity: 1;
@@ -486,24 +536,80 @@ All colors MUST be HSL.
     will-change: opacity;
   }
 
-  /* Modal scroll optimization */
+  /* Modal scroll optimization - Cross-browser compatible */
   [role="dialog"], 
   [data-vaul-drawer] {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    /* Fix for Safari - ensure proper scrolling */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
   }
 
-  /* Prevent body scroll when modal is open */
+  /* Fix for iOS Safari modal scrolling */
+  @supports (-webkit-touch-callout: none) {
+    [role="dialog"], 
+    [data-vaul-drawer] {
+      -webkit-overflow-scrolling: touch;
+      /* Prevent iOS bounce scroll in modals */
+      overscroll-behavior-y: contain;
+      /* Force hardware acceleration */
+      will-change: scroll-position;
+    }
+  }
+
+  /* Prevent body scroll when modal is open - Cross-browser compatible */
   body.modal-open {
     overflow: hidden !important;
     position: fixed;
     width: 100%;
+    height: 100%;
+    /* Fix for iOS Safari - prevent bounce scroll */
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: auto;
   }
 
-  /* Fix iOS Safari bottom padding issue */
+  /* Fix for iOS Safari - prevent body scroll when modal is open */
+  @supports (-webkit-touch-callout: none) {
+    body.modal-open {
+      position: fixed;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      /* Prevent iOS Safari address bar from hiding/showing */
+      touch-action: none;
+    }
+  }
+
+  /* Fix iOS Safari bottom padding issue - Cross-browser viewport handling */
   @supports (height: 100dvh) {
     .mobile-modal-content {
       max-height: 95dvh;
+    }
+  }
+
+  /* iOS Safari specific fixes */
+  @supports (-webkit-touch-callout: none) {
+    /* Use safe viewport units for iOS */
+    .mobile-modal-content {
+      max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    }
+
+    /* Fix for iOS Safari address bar */
+    html {
+      height: -webkit-fill-available;
+    }
+
+    body {
+      min-height: -webkit-fill-available;
+    }
+  }
+
+  /* Android Chrome specific fixes */
+  @media screen and (max-width: 768px) {
+    /* Prevent Android Chrome address bar from causing layout shifts */
+    .mobile-modal-content {
+      max-height: calc(100vh - env(safe-area-inset-bottom));
     }
   }
 
@@ -524,7 +630,7 @@ All colors MUST be HSL.
     display: none;
   }
 
-  /* iOS Safe Area Support for Bottom Navigation */
+  /* iOS Safe Area Support for Bottom Navigation - Cross-browser compatible */
   .pb-safe {
     padding-bottom: max(env(safe-area-inset-bottom), 1rem);
   }
@@ -536,28 +642,125 @@ All colors MUST be HSL.
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* Fallback for browsers that don't support env() */
+  @supports not (padding: env(safe-area-inset-bottom)) {
+    .pb-safe,
+    .safe-bottom {
+      padding-bottom: 1rem;
+    }
+    
+    .mb-safe {
+      margin-bottom: 0;
+    }
+  }
+
+  /* Enhanced safe area support for iOS devices */
+  @supports (-webkit-touch-callout: none) {
+    .pb-safe,
+    .safe-bottom {
+      padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+    }
+  }
   
-  /* Proper z-index layering */
+  /* Standardized z-index hierarchy for cross-browser compatibility
+   * 
+   * Layer order (lowest to highest):
+   * 1-9:   Base content
+   * 10-19: Fixed UI elements (headers, sidebars)
+   * 20-29: Dropdowns, popovers, tooltips
+   * 30-39: Modal backdrops/overlays
+   * 40-49: Modal content
+   * 50-59: Navigation elements
+   * 60-69: Floating UI elements (Artie icon)
+   * 70-79: Artie panel (special case - above floating icon)
+   * 80-89: High-priority modals (ArtieModal)
+   * 90-99: Toasts, notifications
+   * 100+:  Critical overlays
+   */
+  
   .z-page-content {
     z-index: 1;
   }
   
   .z-fixed-ui {
-    z-index: 30;
+    z-index: 10;
+  }
+  
+  .z-dropdown {
+    z-index: 20;
+  }
+
+  .z-tooltip {
+    z-index: 20;
+  }
+
+  .z-popover {
+    z-index: 20;
   }
   
   .z-modal-backdrop {
+    z-index: 30;
+  }
+  
+  .z-modal-content {
     z-index: 40;
   }
 
-  /* Fix ToolDrawer positioning glitch on desktop */
-  /* Ensure desktop modals are positioned correctly to prevent bottom-left flash */
+  .z-dialog {
+    z-index: 40;
+  }
+
+  .z-navigation {
+    z-index: 50;
+  }
+
+  .z-artie-floating {
+    z-index: 60;
+  }
+
+  .z-artie-panel-backdrop {
+    z-index: 70;
+  }
+
+  .z-artie-panel {
+    z-index: 71;
+  }
+
+  .z-artie-modal-backdrop {
+    z-index: 80;
+  }
+
+  .z-artie-modal-content {
+    z-index: 81;
+  }
+  
+  .z-toast {
+    z-index: 90;
+  }
+
+  /* Fix ToolDrawer positioning glitch on desktop - Cross-browser centering */
   @media (min-width: 768px) {
     [data-vaul-drawer] {
       /* Override bottom positioning on desktop - let Tailwind classes handle top/left */
       bottom: auto !important;
-      /* Ensure transform is applied for centering */
+      /* Ensure transform is applied for centering - Cross-browser compatible */
       transform: translate(-50%, -50%);
+      -webkit-transform: translate(-50%, -50%);
+      /* Fix for Safari - ensure proper centering */
+      left: 50% !important;
+      top: 50% !important;
+      /* Prevent layout shifts */
+      will-change: transform;
+    }
+  }
+
+  /* Fix for Safari backdrop-filter support */
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    [data-vaul-drawer] + [class*="Overlay"],
+    [role="dialog"] + [class*="Overlay"] {
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
   }
 
@@ -574,35 +777,6 @@ All colors MUST be HSL.
       left: auto !important;
     }
   }
-  
-  .z-modal-content {
-    z-index: 50;
-  }
-  
-  .z-toast {
-    z-index: 100;
-  }
-
-  /* Z-index hierarchy utilities */
-  .z-tooltip {
-    z-index: 50;
-  }
-
-  .z-dropdown {
-    z-index: 50;
-  }
-
-  .z-dialog {
-    z-index: 55;
-  }
-
-  .z-navigation {
-    z-index: 60;
-  }
-
-  .z-artie-panel {
-    z-index: 45;
-  }
 
   /* Add bottom padding to body on mobile when bottom nav is present */
   @media (max-width: 767px) {
@@ -616,13 +790,15 @@ All colors MUST be HSL.
       bottom: 0 !important;
       left: 0 !important;
       right: 0 !important;
-      z-index: 60 !important;
+      z-index: 50 !important;
       transform: translateZ(0); /* Force hardware acceleration */
       -webkit-transform: translateZ(0);
+      /* Fix for Safari - ensure proper stacking context */
+      isolation: isolate;
     }
   }
 
-  /* Mobile keyboard handling for Artie chat */
+  /* Mobile keyboard handling for Artie chat - Cross-browser compatible */
   @media (max-width: 767px) {
     /* Ensure input stays visible when keyboard opens */
     .artie-chat-container {
@@ -632,6 +808,8 @@ All colors MUST be HSL.
       max-height: 100vh;
       max-height: 100dvh;
       max-height: 100svh;
+      /* Fix for iOS Safari */
+      min-height: -webkit-fill-available;
     }
     
     /* Prevent body scroll when keyboard is open */
@@ -639,6 +817,17 @@ All colors MUST be HSL.
       position: fixed;
       width: 100%;
       overflow: hidden;
+      /* Fix for iOS Safari */
+      height: 100vh;
+      height: -webkit-fill-available;
+    }
+
+    /* Android Chrome specific keyboard fixes */
+    @supports not (-webkit-touch-callout: none) {
+      body.keyboard-open {
+        height: 100vh;
+        height: 100dvh;
+      }
     }
   }
 
