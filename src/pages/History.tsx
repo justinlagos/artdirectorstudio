@@ -457,7 +457,23 @@ const History = () => {
                         />
                       )}
                       <div className="flex-1 space-y-2">
-                        {getTypeBadge(asset.type)}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {getTypeBadge(asset.type)}
+                          {/* NEW badge for items created < 10 seconds ago */}
+                          {(() => {
+                            const createdAt = new Date(asset.created_at).getTime();
+                            const now = Date.now();
+                            const ageInSeconds = (now - createdAt) / 1000;
+                            return ageInSeconds < 10;
+                          })() && (
+                            <Badge 
+                              variant="default" 
+                              className="bg-primary/20 text-primary border-primary/50 animate-pulse"
+                            >
+                              New
+                            </Badge>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="h-3.5 w-3.5" />
                           <span>
