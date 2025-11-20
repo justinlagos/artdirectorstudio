@@ -155,7 +155,7 @@ export const UploadSection = ({
                 Drop a visual or layout here
               </p>
               <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-                Artie will analyze it, pull out what matters, and suggest next-step visuals.
+                Artie will analyse it, pull out what matters, and suggest next-step visuals.
                 <br />
                 <span className="text-xs opacity-70">(PNG or JPG, max 15MB)</span>
               </p>

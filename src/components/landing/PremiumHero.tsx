@@ -110,16 +110,16 @@ export const PremiumHero = ({ user }: PremiumHeroProps) => {
 
             {/* Main headline */}
             <h1 className="text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tight leading-[1.05] text-foreground max-w-5xl mx-auto">
-              Your creative partner
+              Your creative partner,
               <br />
-              <span className="text-muted-foreground font-normal">meets your workspace</span>
+              <span className="text-muted-foreground font-normal">inside your workspace</span>
             </h1>
 
             {/* Subheadline */}
             <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-normal">
               Artie guides your vision. Studio brings it to life.
               <br className="hidden md:block" />
-              <span className="block mt-2 md:mt-0 md:inline">One platform, infinite possibilities.</span>
+              <span className="block mt-2 md:mt-0 md:inline">Cut ideation time in half.</span>
             </p>
           </motion.div>
 
@@ -139,7 +139,7 @@ export const PremiumHero = ({ user }: PremiumHeroProps) => {
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 
                 <span className="relative z-10 flex items-center">
-                  Start creating
+                  Start with Artie
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
                 </span>
               </Button>
@@ -149,11 +149,11 @@ export const PremiumHero = ({ user }: PremiumHeroProps) => {
                 size="lg"
                 className="text-base md:text-lg px-8 md:px-10 py-6 md:py-7 h-auto font-medium rounded-xl border-2 hover:bg-accent transition-all duration-300 hover:shadow-subtle"
                 onClick={() => {
-                  const showcase = document.getElementById("showcase-section");
-                  showcase?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  const studioSection = document.getElementById("studio-section");
+                  studioSection?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
               >
-                See it in action
+                Open Studio
               </Button>
             </motion.div>
           )}

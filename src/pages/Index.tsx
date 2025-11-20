@@ -28,7 +28,6 @@ import { PageSkeleton } from "@/components/skeletons/PageSkeleton";
 import { PremiumHero } from "@/components/landing/PremiumHero";
 import { PremiumFeatures } from "@/components/landing/PremiumFeatures";
 import { PremiumValue } from "@/components/landing/PremiumValue";
-import { ShowcaseSection } from "@/components/landing/ShowcaseSection";
 import { ProofSection } from "@/components/landing/ProofSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { LandingInspirePreview } from "@/components/landing/LandingInspirePreview";
@@ -638,10 +637,6 @@ const Index = () => {
             
             <ErrorBoundary fallback={null}>
               <LandingInspirePreview />
-            </ErrorBoundary>
-            
-            <ErrorBoundary fallback={<div className="py-20 text-center">Showcase unavailable</div>}>
-              <ShowcaseSection />
             </ErrorBoundary>
           </>
         )}
