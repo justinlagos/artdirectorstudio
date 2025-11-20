@@ -494,7 +494,7 @@ export const ArtieChat = () => {
     
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, isMinimized, showGenerationDialog]);
+  }, []); // Remove state dependencies to prevent re-subscription
 
   // NOTE: Artie panel does NOT lock body scroll - only its internal content scrolls
   // This allows the page to scroll normally when Artie is open, and modals can
@@ -513,7 +513,15 @@ export const ArtieChat = () => {
 
   // Contextual prompts based on page and inactivity
   useEffect(() => {
-    if (isOpen || isMinimized) return;
+    // Only set up timer if chat is closed
+    if (isOpen || isMinimized) {
+      // Clear any existing timer
+      if (inactivityTimer.current) {
+        clearTimeout(inactivityTimer.current);
+        inactivityTimer.current = null;
+      }
+      return;
+    }
 
     // Clear existing timer
     if (inactivityTimer.current) {
@@ -534,6 +542,7 @@ export const ArtieChat = () => {
       // Show prompt after 15-20 seconds of inactivity
       const delay = 15000 + Math.random() * 5000;
       inactivityTimer.current = setTimeout(() => {
+        // Double-check chat is still closed before showing prompt
         setContextualPrompt(prompt);
         setShowPrompt(true);
         // Auto-hide after 10 seconds
@@ -544,9 +553,10 @@ export const ArtieChat = () => {
     return () => {
       if (inactivityTimer.current) {
         clearTimeout(inactivityTimer.current);
+        inactivityTimer.current = null;
       }
     };
-  }, [location.pathname, isOpen, isMinimized]);
+  }, [location.pathname]); // Only re-run when location changes
 
   const handleQuickAction = (action: QuickAction) => {
     setInputValue(action.prompt);
@@ -559,6 +569,7 @@ export const ArtieChat = () => {
   };
 
   const handleOpen = useCallback(() => {
+    if (import.meta.env.DEV) console.log('[ArtieChat] handleOpen called');
     setIsMinimized(false);
     setIsOpen(true);
     // Focus input after opening (small delay for animation)
@@ -568,11 +579,13 @@ export const ArtieChat = () => {
   }, []);
 
   const handleMinimize = useCallback(() => {
+    if (import.meta.env.DEV) console.log('[ArtieChat] handleMinimize called');
     setIsMinimized(true);
     setIsOpen(false);
   }, []);
 
   const handleRestore = useCallback(() => {
+    if (import.meta.env.DEV) console.log('[ArtieChat] handleRestore called');
     setIsMinimized(false);
     setIsOpen(true);
     // Focus input after restoring
@@ -582,6 +595,7 @@ export const ArtieChat = () => {
   }, []);
 
   const handleClose = useCallback(() => {
+    if (import.meta.env.DEV) console.log('[ArtieChat] handleClose called');
     setIsOpen(false);
     setIsMinimized(false);
   }, []);
@@ -1541,8 +1555,8 @@ export const ArtieChat = () => {
     }
   };
 
-  // Persistent floating icon (always visible)
-  const FloatingIcon = () => (
+  // Persistent floating icon (always visible) - Memoized to prevent recreation
+  const FloatingIcon = useCallback(() => (
     <div 
       data-artie-floating-icon
       className={cn(
@@ -1613,7 +1627,7 @@ export const ArtieChat = () => {
         </TooltipContent>
       </Tooltip>
     </div>
-  );
+  ), [showPrompt, contextualPrompt, isMinimized, hasSeenTooltip, isOpen, isMobile, handleOpen, handleRestore]);
 
   // Always render floating button - it should be visible at all times
   // When chat is closed, show only the button (mobile and desktop)
