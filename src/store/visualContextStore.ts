@@ -37,21 +37,64 @@ interface VisualContextStore extends VisualContext {
   getFullContext: () => VisualContext;
 }
 
-const listeners = new Set<() => void>();
-let state: VisualContext;
-
-const notify = () => {
-  listeners.forEach((listener) => listener());
-};
-
 const initialState: VisualContext = {
   operationHistory: [],
   lastModified: Date.now(),
 };
 
-const setState = (partial: PartialContext) => {
+const listeners = new Set<() => void>();
+let state: VisualContext = { ...initialState };
+let snapshot: VisualContextStore;
+
+const notify = () => {
+  listeners.forEach((listener) => listener());
+};
+
+function setContext(partial: PartialContext) {
+  setState(partial);
+}
+
+function updatePrompt(prompt: string) {
+  setState({ basePrompt: prompt });
+}
+
+function updateImage(imageUrl: string, imageId?: string) {
+  setState({
+    activeImageUrl: imageUrl,
+    activeImageId: imageId,
+  });
+}
+
+function addOperation(operation: Omit<OperationHistoryEntry, 'timestamp'>) {
+  setState((prev) => ({
+    operationHistory: [
+      ...prev.operationHistory,
+      { ...operation, timestamp: Date.now() },
+    ].slice(-10), // Keep last 10 operations
+  }));
+}
+
+function reset() {
+  setState({ ...initialState });
+}
+
+function getFullContext() {
+  return { ...state };
+}
+
+const buildSnapshot = (): VisualContextStore => ({
+  ...state,
+  setContext,
+  updatePrompt,
+  updateImage,
+  addOperation,
+  reset,
+  getFullContext,
+});
+
+function setState(partial: PartialContext) {
   const partialState =
-    typeof partial === "function" ? partial(state) : partial;
+    typeof partial === "function" ? partial({ ...state }) : partial;
 
   state = {
     ...state,
@@ -59,36 +102,11 @@ const setState = (partial: PartialContext) => {
     lastModified: Date.now(),
   };
 
+  snapshot = buildSnapshot();
   notify();
-};
+}
 
-state = { ...initialState };
-
-const setContext = (partial: PartialContext) => setState(partial);
-
-const updatePrompt = (prompt: string) => {
-  setState({ basePrompt: prompt });
-};
-
-const updateImage = (imageUrl: string, imageId?: string) => {
-  setState({
-    activeImageUrl: imageUrl,
-    activeImageId: imageId,
-  });
-};
-
-const addOperation = (operation: Omit<OperationHistoryEntry, 'timestamp'>) => {
-  setState((prev) => ({
-    operationHistory: [
-      ...prev.operationHistory,
-      { ...operation, timestamp: Date.now() },
-    ].slice(-10), // Keep last 10 operations
-  }));
-};
-
-const reset = () => setState({ ...initialState });
-
-const getFullContext = () => ({ ...state });
+snapshot = buildSnapshot();
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
@@ -109,36 +127,12 @@ type UseVisualContextStore = {
 const useVisualContextStoreBase = <T,>(selector: VisualContextSelector<T>): T =>
   useSyncExternalStore(
     subscribe,
-    () => selector({
-      ...state,
-      setContext,
-      updatePrompt,
-      updateImage,
-      addOperation,
-      reset,
-      getFullContext,
-    }),
-    () => selector({
-      ...state,
-      setContext,
-      updatePrompt,
-      updateImage,
-      addOperation,
-      reset,
-      getFullContext,
-    })
+    () => selector(snapshot),
+    () => selector(snapshot)
   );
 
 export const useVisualContextStore = useVisualContextStoreBase as UseVisualContextStore;
 
-useVisualContextStore.getState = () => ({
-  ...state,
-  setContext,
-  updatePrompt,
-  updateImage,
-  addOperation,
-  reset,
-  getFullContext,
-});
+useVisualContextStore.getState = () => snapshot;
 useVisualContextStore.setState = setState;
 useVisualContextStore.subscribe = subscribe;

@@ -11,6 +11,7 @@ import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRetryWithBackoff } from "@/hooks/useRetryWithBackoff";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { ImageEditor } from "./ImageEditor";
 import { extractTextFromBriefFile } from "@/lib/documentParser";
 import { openStudioWithPrompt } from "@/lib/studio";
@@ -124,6 +125,8 @@ export const ArtieChat = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingImageUrl, setEditingImageUrl] = useState<string>("");
   const [editorInstruction, setEditorInstruction] = useState<string>("");
+  
+  useScrollLock(isOpen, 'artie-panel', isMobile);
   
   // Workflow context tracking for proactive assistance
   const sessionStartTime = useRef<Date>(new Date());
@@ -1618,9 +1621,8 @@ export const ArtieChat = () => {
     <div 
       data-artie-floating-icon
       className={cn(
-        "fixed opacity-100 visible pointer-events-auto z-[60]",
-        // Mobile: above bottom nav (z-[50]), but below modals (z-[40]+)
-        isMobile ? "bottom-20 right-4" : "bottom-6 right-6"
+        "artie-float opacity-100 visible pointer-events-auto z-[70]",
+        isMobile ? "bottom-20 right-4" : "bottom-4 right-4"
       )}
     >
       {/* Contextual prompt bubble */}
