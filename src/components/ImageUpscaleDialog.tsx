@@ -615,7 +615,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           Upscale Image
         </>
       }
-      description="Upscale your image to higher resolution. Free while subscriptions are being finalized!"
+      description="Increase resolution and enhance details while preserving quality"
       contentClassName="pb-6"
       footer={footerContent}
     >
