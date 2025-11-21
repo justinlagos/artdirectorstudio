@@ -572,12 +572,12 @@ export const EditImageModal = ({
           </div>
         </div>
       ) : (
-        // Desktop: Two-column layout
+        // Desktop: Two-column layout - More space for right sidebar
         <div className={cn(
           "grid gap-6 h-full min-h-0 flex-1 overflow-hidden",
-          "grid-cols-[1fr_320px] max-w-full"
+          "grid-cols-[1.2fr_380px] max-w-full"
         )}>
-          {/* Left Column: Image Preview - Centered, constrained height */}
+          {/* Left Column: Image Preview - Reduced size, centered, constrained height */}
           <div className="flex items-center justify-center min-h-0 overflow-hidden">
             <PreviewCanvas
               imageUrl={previewUrl}
@@ -589,8 +589,8 @@ export const EditImageModal = ({
             />
           </div>
 
-          {/* Right Column: Tools Panel - Fixed width, Scrollable */}
-          <div className="flex flex-col min-h-0 overflow-hidden border-l border-border pl-6 w-[320px] flex-shrink-0">
+          {/* Right Column: Tools Panel - Fixed width, Scrollable, More breathing room */}
+          <div className="flex flex-col min-h-0 overflow-hidden border-l border-border pl-6 w-[380px] flex-shrink-0">
             {/* Instruction Input - Fixed at top */}
             <div className="space-y-2 flex-shrink-0 mb-4">
               <Label htmlFor="custom-instruction" className="text-sm font-medium">Editing Instruction</Label>

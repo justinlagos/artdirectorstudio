@@ -657,22 +657,23 @@ export const ImageGenerationDialog = () => {
             </Alert>
           )}
 
-          {/* Inline Settings - Quality, Aspect Ratio, Background */}
-          <div className="space-y-4 pt-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
+          {/* Inline Settings - Quality, Aspect Ratio, Background - Aligned with prompt input (same padding) */}
+          <div className="space-y-3 rounded-2xl border border-accent/20 bg-accent/5 p-6">
+            <div className="flex flex-col sm:flex-row gap-4 w-full">
+              <div className="flex-1 space-y-2">
                 <Label htmlFor="quality">Quality</Label>
                 <Select
                   value={options.quality}
                   onValueChange={(value: GenerationOptions["quality"]) => {
-                    setOptions((prev) => ({ ...prev, quality: value }));
-                    saveOptions({ ...options, quality: value });
+                    const updatedOptions = { ...options, quality: value };
+                    setOptions(updatedOptions);
+                    saveOptions(updatedOptions);
                   }}
                 >
-                  <SelectTrigger id="quality">
+                  <SelectTrigger id="quality" className="w-full">
                     <SelectValue placeholder="Auto" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[100]">
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="high">High</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
@@ -681,19 +682,20 @@ export const ImageGenerationDialog = () => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="flex-1 space-y-2">
                 <Label htmlFor="aspect-ratio">Aspect Ratio</Label>
                 <Select
                   value={options.aspectRatio}
                   onValueChange={(value: GenerationOptions["aspectRatio"]) => {
-                    setOptions((prev) => ({ ...prev, aspectRatio: value }));
-                    saveOptions({ ...options, aspectRatio: value });
+                    const updatedOptions = { ...options, aspectRatio: value };
+                    setOptions(updatedOptions);
+                    saveOptions(updatedOptions);
                   }}
                 >
-                  <SelectTrigger id="aspect-ratio">
+                  <SelectTrigger id="aspect-ratio" className="w-full">
                     <SelectValue placeholder="Select aspect ratio" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[100]">
                     <SelectItem value="1:1">
                       <div className="flex items-center gap-2">
                         <Square className="h-4 w-4" />
@@ -746,19 +748,20 @@ export const ImageGenerationDialog = () => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="flex-1 space-y-2">
                 <Label htmlFor="background">Background</Label>
                 <Select
                   value={options.background}
                   onValueChange={(value: GenerationOptions["background"]) => {
-                    setOptions((prev) => ({ ...prev, background: value }));
-                    saveOptions({ ...options, background: value });
+                    const updatedOptions = { ...options, background: value };
+                    setOptions(updatedOptions);
+                    saveOptions(updatedOptions);
                   }}
                 >
-                  <SelectTrigger id="background">
+                  <SelectTrigger id="background" className="w-full">
                     <SelectValue placeholder="Auto" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[100]">
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="transparent">Transparent</SelectItem>
                     <SelectItem value="opaque">Opaque</SelectItem>
