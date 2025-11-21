@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -25,6 +25,7 @@ export const UploadSection = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const modKey = getModifierKey();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAuthCheck = useCallback(() => {
     if (!user) {
@@ -98,6 +99,8 @@ export const UploadSection = ({
       return;
     }
     
+    console.log('File input triggered', e.target.files);
+    
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -119,12 +122,14 @@ export const UploadSection = ({
       <div
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
+        onClick={() => fileInputRef.current?.click()}
         className="group relative border-2 border-dashed border-border/60 rounded-2xl p-16 text-center hover:border-foreground/30 hover:bg-accent/20 transition-all duration-300 cursor-pointer overflow-hidden"
       >
         {/* Gradient background on hover */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
         
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/png,image/jpeg,image/jpg"
           onChange={handleFileInput}
