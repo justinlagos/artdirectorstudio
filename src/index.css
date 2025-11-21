@@ -764,6 +764,17 @@ All colors MUST be HSL.
     transform-origin: bottom center;
   }
 
+  @media (max-width: 767px) {
+    [data-vaul-drawer] {
+      left: 50% !important;
+      right: auto !important;
+      width: min(100%, 640px);
+      max-width: min(100%, 640px);
+      translate: -50% 0 !important;
+      transform-origin: bottom center !important;
+    }
+  }
+
   /* Fix ToolDrawer positioning glitch on desktop - Cross-browser centering */
   @media (min-width: 768px) {
     [data-vaul-drawer] {

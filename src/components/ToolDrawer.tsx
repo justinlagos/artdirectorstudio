@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, CSSProperties } from "react";
 import { Drawer as DrawerRoot, DrawerPortal, DrawerOverlay, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,11 @@ export const ToolDrawer = ({
   headerClassName,
   stickyFooterOnMobile = false,
 }: ToolDrawerProps) => {
+  const mobilePositionStyle: CSSProperties = {
+    left: "50%",
+    right: "auto",
+  };
+
   return (
     <DrawerRoot open={open} onOpenChange={onOpenChange} direction="bottom">
       <DrawerPortal>
@@ -48,6 +53,7 @@ export const ToolDrawer = ({
             "md:animate-toolDrawer",
             className,
           )}
+          style={mobilePositionStyle}
           onPointerDownOutside={(e) => {
             // Prevent closing when clicking on interactive elements inside
             const target = e.target as HTMLElement;
