@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { ArtieModal } from "@/components/artie/ArtieModal";
+import { ToolDrawer } from "@/components/ToolDrawer";
+import { ImageZoomDialog } from "@/components/ImageZoomDialog";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Sparkles, MousePointer2, Palette, Wand2, AlertCircle } from "lucide-react";
+import { Sparkles, MousePointer2, Palette, Wand2, AlertCircle, ZoomIn } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -61,6 +63,7 @@ export const EditImageModal = ({
   const [selectedColor, setSelectedColor] = useState("#3B82F6");
   const [activeTab, setActiveTab] = useState<"adjustments" | "select" | "color" | "advanced">("adjustments");
   const [instructionError, setInstructionError] = useState<string | null>(null);
+  const [showZoom, setShowZoom] = useState(false);
 
   useEffect(() => {
     setPreviewUrl(imageUrl);
@@ -407,28 +410,28 @@ export const EditImageModal = ({
   );
 
   return (
-    <ArtieModal
-      open={open}
-      onOpenChange={onOpenChange}
-      title={
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Edit Image
-        </div>
-      }
-      description={isMobile ? "Adjust colors, lighting, and composition with AI-powered transformations" : "Adjust colors, lighting, and composition. Select regions for targeted edits, or apply AI-powered transformations across your entire image."}
-      footer={footerContent}
-      contentClassName={cn(
-        "flex flex-col min-h-0",
-        !isMobile && "overflow-hidden h-full"
-      )}
-      maxWidth="full"
-    >
+    <>
+      <ToolDrawer
+        open={open}
+        onOpenChange={onOpenChange}
+        title={
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Edit Image
+          </div>
+        }
+        description={isMobile ? "Adjust colors, lighting, and composition with AI-powered transformations" : "Adjust colors, lighting, and composition. Select regions for targeted edits, or apply AI-powered transformations across your entire image."}
+        footer={footerContent}
+        contentClassName={cn(
+          "flex flex-col min-h-0",
+          !isMobile && "overflow-hidden h-full"
+        )}
+      >
       {isMobile ? (
         // Mobile: Image at top, tools in bottom sheet
         <div className="flex flex-col min-h-0">
           {/* Image Preview - ~60% viewport height */}
-          <div className="flex-shrink-0 w-full mb-4" style={{ height: "60vh", maxHeight: "400px", minHeight: "300px" }}>
+          <div className="flex-shrink-0 w-full mb-4 relative group" style={{ height: "60vh", maxHeight: "400px", minHeight: "300px" }}>
             <PreviewCanvas
               imageUrl={previewUrl}
               filterStyle={generateFilterStyle(adjustments)}
@@ -437,6 +440,20 @@ export const EditImageModal = ({
               isSelectionMode={activeTab === "select"}
               className="rounded-xl w-full h-full"
             />
+            {/* Zoom button overlay */}
+            {!isProcessing && (
+              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowZoom(true)}
+                  className="bg-background/95 backdrop-blur-sm"
+                >
+                  <ZoomIn className="w-4 h-4 mr-2" />
+                  Zoom
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Tools Panel - Scrollable bottom sheet */}
@@ -578,7 +595,7 @@ export const EditImageModal = ({
           "grid-cols-[1.2fr_380px] max-w-full"
         )}>
           {/* Left Column: Image Preview - Reduced size, centered, constrained height */}
-          <div className="flex items-center justify-center min-h-0 overflow-hidden">
+          <div className="flex items-center justify-center min-h-0 overflow-hidden relative group">
             <PreviewCanvas
               imageUrl={previewUrl}
               filterStyle={generateFilterStyle(adjustments)}
@@ -587,6 +604,20 @@ export const EditImageModal = ({
               isSelectionMode={activeTab === "select"}
               className="rounded-xl w-full h-full max-h-full object-contain"
             />
+            {/* Zoom button overlay */}
+            {!isProcessing && (
+              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowZoom(true)}
+                  className="bg-background/95 backdrop-blur-sm"
+                >
+                  <ZoomIn className="w-4 h-4 mr-2" />
+                  Zoom
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Right Column: Tools Panel - Fixed width, Scrollable, More breathing room */}
@@ -718,7 +749,16 @@ export const EditImageModal = ({
           </div>
         </div>
       )}
-    </ArtieModal>
+      </ToolDrawer>
+      {previewUrl && (
+        <ImageZoomDialog
+          open={showZoom}
+          onOpenChange={setShowZoom}
+          imageUrl={previewUrl}
+          title="Edit Preview - Full Resolution"
+        />
+      )}
+    </>
   );
 };
 

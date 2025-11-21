@@ -330,17 +330,49 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
   // Removed saveToMyProjects - now using unified ensureAssetSaved directly
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!upscaledImage) return;
     
-    const link = document.createElement('a');
-    link.href = upscaledImage;
-    link.download = `upscaled-image-${targetSize}-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.success("Image downloaded!");
+    try {
+      // Handle both data URLs and regular URLs
+      let blob: Blob;
+      if (upscaledImage.startsWith('data:')) {
+        // Data URL - convert directly
+        const response = await fetch(upscaledImage);
+        blob = await response.blob();
+      } else {
+        // Regular URL - fetch with CORS handling
+        const response = await fetch(upscaledImage, {
+          mode: 'cors',
+          cache: 'no-cache'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch image');
+        }
+        
+        blob = await response.blob();
+      }
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `upscaled-image-${targetSize}-${Date.now()}.png`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+      }, 100);
+      
+      toast.success("Image downloaded!");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download image");
+    }
   };
 
   const handleUseInStudio = () => {

@@ -15,6 +15,7 @@ import {
   Clock,
   Image as ImageIcon,
   X,
+  ZoomIn,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
@@ -22,7 +23,7 @@ import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { ArtieModal } from "./artie/ArtieModal";
+import { ToolDrawer } from "./ToolDrawer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useModalStore } from "@/store/modalStore";
 import { useStudioStore } from "@/store/studioStore";
@@ -37,6 +38,7 @@ import { ImageContainer } from "./ImageContainer";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { ensureAssetSaved } from "@/lib/saveAsset";
+import { ImageZoomDialog } from "./ImageZoomDialog";
 
 export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
@@ -115,6 +117,8 @@ export const ImageGenerationDialog = () => {
   const [meta, setMeta] = useState<any>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const generationStartTime = useRef<number>(0);
+  const [showZoom, setShowZoom] = useState(false);
+  const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isGenerateModalOpen) {
@@ -371,29 +375,38 @@ export const ImageGenerationDialog = () => {
     if (!generatedImage) return;
 
     try {
-      // Fetch as blob to ensure proper download
-      const response = await fetch(generatedImage, {
-        mode: 'cors',
-        cache: 'no-cache'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch image');
+      // Handle both data URLs and regular URLs
+      let blob: Blob;
+      if (generatedImage.startsWith('data:')) {
+        // Data URL - convert directly
+        const response = await fetch(generatedImage);
+        blob = await response.blob();
+      } else {
+        // Regular URL - fetch with CORS handling
+        const response = await fetch(generatedImage, {
+          mode: 'cors',
+          cache: 'no-cache'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch image');
+        }
+        
+        blob = await response.blob();
       }
       
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
+      const link = document.createElement("a");
       link.href = url;
-    link.download = `generated-image-${Date.now()}.png`;
+      link.download = `generated-image-${Date.now()}.png`;
       link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
+      document.body.appendChild(link);
+      link.click();
       
       // Cleanup
       setTimeout(() => {
         window.URL.revokeObjectURL(url);
-    document.body.removeChild(link);
+        document.body.removeChild(link);
       }, 100);
 
       toast.success("Image downloaded");
@@ -523,8 +536,10 @@ export const ImageGenerationDialog = () => {
         <div 
           className="rounded-2xl border border-border bg-card p-6 flex items-center justify-center overflow-hidden"
           style={{
-            minHeight: previewSize ? `${previewSize.height}px` : '400px',
-            maxHeight: previewSize ? `${previewSize.height}px` : '600px',
+            aspectRatio: previewSize ? `${previewSize.width} / ${previewSize.height}` : '1 / 1',
+            maxWidth: previewSize ? `${previewSize.width}px` : '400px',
+            maxHeight: previewSize ? `${previewSize.height}px` : '400px',
+            width: '100%',
           }}
         >
           {/* Generated Image (shown when available) */}
@@ -542,7 +557,14 @@ export const ImageGenerationDialog = () => {
                 </div>
               </div>
               
-              <div ref={imageContainerRef} className="w-full overflow-hidden">
+              <div 
+                ref={imageContainerRef} 
+                className="w-full overflow-hidden relative group cursor-pointer"
+                onClick={() => {
+                  setZoomImageUrl(generatedImage);
+                  setShowZoom(true);
+                }}
+              >
                 <ImageContainer
                   src={generatedImage}
                   alt="Generated result"
@@ -552,13 +574,20 @@ export const ImageGenerationDialog = () => {
                     previewSize && `max-w-[${previewSize.width}px]`
                   )}
                 />
+                {/* Zoom overlay */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-lg pointer-events-none">
+                  <div className="bg-background/95 backdrop-blur-sm px-3 py-2 rounded-lg flex items-center gap-2 text-sm">
+                    <ZoomIn className="w-4 h-4" />
+                    <span>Click to zoom</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {/* Reference Image */}
           {referenceImage && !generatedImage && (
-            <div className="relative w-full h-full">
+            <div className="relative w-full h-full group">
               {/* Remove button in top-right */}
               <div className="absolute top-3 right-3 z-10">
                 <Button
@@ -577,7 +606,13 @@ export const ImageGenerationDialog = () => {
               </div>
               
               {/* Preview - maintains aspect ratio */}
-              <div className="w-full h-full flex items-center justify-center">
+              <div 
+                className="w-full h-full flex items-center justify-center cursor-pointer"
+                onClick={() => {
+                  setZoomImageUrl(referenceImage);
+                  setShowZoom(true);
+                }}
+              >
                 <ImageContainer
                   src={referenceImage}
                   alt="Reference inspiration"
@@ -588,6 +623,14 @@ export const ImageGenerationDialog = () => {
                     previewSize && `max-w-[${previewSize.width}px] max-h-[${previewSize.height}px]`
                   )}
                 />
+              </div>
+              
+              {/* Zoom overlay */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-xl">
+                <div className="bg-background/95 backdrop-blur-sm px-3 py-2 rounded-lg flex items-center gap-2 text-sm">
+                  <ZoomIn className="w-4 h-4" />
+                  <span>Click to zoom</span>
+                </div>
               </div>
               
               {/* Meta info (optional) */}
@@ -893,7 +936,7 @@ export const ImageGenerationDialog = () => {
 
   return (
     <ErrorBoundary onReset={handleClose}>
-      <ArtieModal
+      <ToolDrawer
         open={isGenerateModalOpen}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
@@ -907,12 +950,20 @@ export const ImageGenerationDialog = () => {
           </div>
         }
         description="Create images from your prompt with full control over quality, aspect ratio, and background."
-        contentClassName="flex flex-col min-h-0"
+        contentClassName="studio-modal-body flex flex-col min-h-0"
         footer={footerContent}
-        maxWidth="full"
+        stickyFooterOnMobile
       >
         {bodyContent}
-      </ArtieModal>
+      </ToolDrawer>
+      {zoomImageUrl && (
+        <ImageZoomDialog
+          open={showZoom}
+          onOpenChange={setShowZoom}
+          imageUrl={zoomImageUrl}
+          title={generatedImage ? "Generated Image - Full Resolution" : "Reference Image - Full Resolution"}
+        />
+      )}
     </ErrorBoundary>
   );
 };
