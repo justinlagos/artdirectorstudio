@@ -443,6 +443,72 @@ export function useArtieCore() {
     setEditorOpen(true);
   }, []);
 
+  // Handle tool intent JSON parsing from <tool> tags in responses
+  const handleToolIntent = useCallback(async (toolAction: any) => {
+    if (!toolAction || !toolAction.action) return;
+    
+    try {
+      const action = toolAction;
+      console.log('[useArtieCore] Parsed tool intent:', action);
+
+      switch (action.action) {
+        case "OPEN_STUDIO":
+          await openStudioWithPrompt({
+            basePrompt: action.prompt || "Create image",
+            imageUrl: action.imageUrl || null,
+            meta: {
+              source: 'artie',
+              mode: action.mode || 'GENERATE',
+            }
+          });
+          break;
+
+        case "EDIT_IMAGE":
+          if (action.imageUrl && action.instruction) {
+            handleEditImageFromMessage(action.imageUrl, action.instruction);
+          } else {
+            const lastImage = contextMemory.images[contextMemory.images.length - 1];
+            if (lastImage && action.instruction) {
+              handleEditImageFromMessage(lastImage.url, action.instruction);
+            }
+          }
+          break;
+
+        case "BLEND_IMAGES":
+          openTool('blend', {
+            image1Url: action.image1Url || contextMemory.images[contextMemory.images.length - 2]?.url,
+            image2Url: action.image2Url || contextMemory.images[contextMemory.images.length - 1]?.url,
+            mode: action.mode || 'merge',
+            ratio: action.ratio || 50,
+          });
+          break;
+
+        case "UPSCALE_IMAGE":
+          const upscaleImageUrl = action.imageUrl || contextMemory.images[contextMemory.images.length - 1]?.url;
+          if (upscaleImageUrl) {
+            openTool('upscale', {
+              imageUrl: upscaleImageUrl,
+              scaleFactor: action.scaleFactor || '2',
+            });
+          }
+          break;
+
+        case "OPEN_INSPIRE":
+          // Navigate to Inspire page
+          if (typeof window !== 'undefined') {
+            const query = action.query ? `?q=${encodeURIComponent(action.query)}` : '';
+            window.location.href = `/inspire${query}`;
+          }
+          break;
+
+        default:
+          console.warn('[useArtieCore] Unknown tool intent:', action);
+      }
+    } catch (err) {
+      console.error('[useArtieCore] Failed to parse tool intent:', err);
+    }
+  }, [openTool, handleEditImageFromMessage, contextMemory]);
+
   const handleChipAction = useCallback((action: string, messageId?: string) => {
     if (action === "OPEN_STUDIO") {
       const targetImage = messageId 
@@ -768,6 +834,19 @@ export function useArtieCore() {
           throw new Error('Configuration error: VITE_SUPABASE_URL is not set');
         }
 
+        // Build dynamic Artie context package
+        const dynamicContext = {
+          page: typeof window !== 'undefined' ? window.location.pathname : '/',
+          timestamp: Date.now(),
+          recentImages: combinedImages.slice(-4).map(img => ({ url: img.url, name: img.name })),
+          uploadedFiles: uploadedFiles.map(f => f.name),
+          activeProject: sessionStorage.getItem("active-project") || null,
+          userPreferences: JSON.parse(localStorage.getItem("user-preferences") || "{}"),
+          lastToolAction: sessionStorage.getItem("last-tool-action") || null,
+        };
+
+        console.log('[useArtieCore] Sending dynamic context:', dynamicContext);
+
         const response = await fetch(CHAT_URL, {
           method: 'POST',
           headers: {
@@ -814,7 +893,8 @@ export function useArtieCore() {
               images: combinedImages,
               documents: combinedDocuments,
               briefSummary: trackedDocuments[trackedDocuments.length - 1]?.summary || contextMemory.briefSummary,
-            }
+            },
+            environmentContext: dynamicContext
           }),
         });
 
@@ -921,6 +1001,34 @@ export function useArtieCore() {
               } catch (e) {
                 // Ignore parse errors
               }
+            }
+          }
+
+          // Check for tool intent in accumulated text (<tool> tags)
+          const toolTagRegex = /<tool>([\s\S]*?)<\/tool>/g;
+          let toolMatch;
+          while ((toolMatch = toolTagRegex.exec(accumulatedText)) !== null) {
+            try {
+              const toolJson = JSON.parse(toolMatch[1].trim());
+              console.log('[useArtieCore] Found tool intent in response:', toolJson);
+              
+              // Remove the tool tag from the displayed text
+              accumulatedText = accumulatedText.replace(toolMatch[0], '').trim();
+              
+              // Update message without tool tag
+              setMessages(prev => 
+                prev.map(m => 
+                  m.id === assistantMessageId 
+                    ? { ...m, text: accumulatedText }
+                    : m
+                )
+              );
+
+              // Handle the tool action
+              console.log('[useArtieCore] AI raw response tool intent:', toolJson);
+              await handleToolIntent(toolJson);
+            } catch (parseErr) {
+              console.error('[useArtieCore] Failed to parse tool tag JSON:', parseErr);
             }
           }
 
