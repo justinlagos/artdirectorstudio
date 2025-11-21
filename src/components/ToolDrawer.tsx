@@ -37,13 +37,13 @@ export const ToolDrawer = ({
             "fixed z-modal-content flex max-h-[90dvh] flex-col border border-border bg-background shadow-xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "duration-200 ease-in-out",
-            // Mobile: bottom sheet with rounded-t-2xl and slide animation
-            "inset-x-0 bottom-0 rounded-t-2xl",
+            // Mobile: bottom sheet centered horizontally with slide animation from bottom-center
+            "left-0 right-0 mx-auto bottom-0 rounded-t-2xl",
+            "w-full max-w-full",
             "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
-            // Desktop: centered modal with fade/zoom only
-            // The centered positioning (top-1/2 + translate) overrides slide animation
-            "md:inset-x-auto md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:max-w-[820px] md:w-[90vw] md:max-h-[90vh]",
+            // Desktop: centered modal with fade/zoom only, no slide
+            "md:left-1/2 md:right-auto md:mx-0 md:bottom-auto md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:max-w-[820px] md:w-[90vw] md:max-h-[90vh]",
             "md:data-[state=open]:fade-in-0 md:data-[state=closed]:fade-out-0",
             "md:data-[state=open]:zoom-in-95 md:data-[state=closed]:zoom-out-95",
             className,

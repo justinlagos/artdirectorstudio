@@ -61,10 +61,11 @@ export const ArtieModal = ({
         <DialogPrimitive.Content
           className={cn(
             "fixed z-artie-modal-content",
-            // Mobile: bottom sheet with safe-area padding
+            // Mobile: bottom sheet centered horizontally with slide animation from bottom-center
             isMobile
               ? [
-                  "inset-x-0 bottom-0 top-auto",
+                  "left-0 right-0 mx-auto bottom-0 top-auto",
+                  "w-full max-w-full",
                   "rounded-t-2xl border-t border-l border-r border-border",
                   "bg-background shadow-xl max-h-[96dvh]",
                   "pb-[env(safe-area-inset-bottom)]",
@@ -76,6 +77,7 @@ export const ArtieModal = ({
               : // Desktop: centered modal with fade+scale animation ONLY
                 [
                   "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+                  "right-auto bottom-auto",
                   "rounded-2xl border border-border bg-background shadow-xl",
                   "w-[90vw] max-h-[90vh]",
                   maxWidthClasses[maxWidth],
@@ -90,6 +92,16 @@ export const ArtieModal = ({
                 ],
             className
           )}
+          style={{
+            // Ensure proper centering on desktop - override any Radix positioning
+            ...(isMobile ? {} : {
+              left: '50%',
+              top: '50%',
+              right: 'auto',
+              bottom: 'auto',
+              transform: 'translate(-50%, -50%)',
+            }),
+          }}
           onOpenAutoFocus={(e) => {
             // Prevent auto focus on mobile to avoid keyboard opening
             if (isMobile) {
