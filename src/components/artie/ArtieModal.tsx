@@ -64,12 +64,13 @@ export const ArtieModal = ({
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "duration-200 ease-in-out",
             // Mobile: bottom sheet centered horizontally with slide animation from bottom-center
+            // Matches ToolDrawer styling exactly for consistency
             isMobile
               ? [
-                  "left-1/2 bottom-0 -translate-x-1/2 top-auto",
+                  "left-1/2 bottom-0 -translate-x-1/2 top-auto right-auto",
                   "w-full max-w-full",
                   "rounded-t-2xl",
-                  "max-h-[96dvh]",
+                  "max-h-[90dvh]",
                   "pb-[env(safe-area-inset-bottom)]",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                   "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
@@ -91,8 +92,12 @@ export const ArtieModal = ({
             className
           )}
           style={{
-            // Ensure proper centering on desktop - override any Radix positioning
-            ...(isMobile ? {} : {
+            // Ensure proper centering - matches ToolDrawer behavior
+            ...(isMobile ? {
+              left: '50%',
+              right: 'auto',
+              transform: 'translateX(-50%)',
+            } : {
               left: '50%',
               top: '50%',
               right: 'auto',
@@ -107,7 +112,7 @@ export const ArtieModal = ({
             }
           }}
         >
-          {/* Mobile handle */}
+          {/* Mobile handle - matches ToolDrawer */}
           {isMobile && (
             <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-muted shrink-0" />
           )}

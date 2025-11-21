@@ -46,6 +46,11 @@ export default function ArtiePage() {
     learnFromAction,
   } = useArtieCore();
 
+  // Scroll to top on mount (mobile fix) - must be before early returns
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Redirect to auth if not logged in
   useEffect(() => {
     if (!authLoading && !user) {
@@ -55,7 +60,10 @@ export default function ArtiePage() {
     }
   }, [user, authLoading, navigate]);
 
-  // Scroll to bottom when messages change
+  // Track if this is the initial mount
+  const isInitialMount = useRef(true);
+  
+  // Scroll to bottom when messages change, but NOT on initial mount
   const scrollToBottom = useCallback(() => {
     if (chatBodyRef.current) {
       chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
@@ -64,7 +72,16 @@ export default function ArtiePage() {
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
+    // Only auto-scroll if:
+    // 1. Not initial mount (user has interacted)
+    // 2. Or there are new messages (user sent or received)
+    if (!isInitialMount.current || messages.length > 1) {
+      scrollToBottom();
+    }
+    // Mark initial mount as complete after first render
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+    }
   }, [messages, scrollToBottom]);
 
   // Auto-resize textarea
@@ -96,36 +113,37 @@ export default function ArtiePage() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen bg-background flex flex-col overflow-x-hidden">
         <Header />
         
-        <main className="flex-1 container mx-auto px-4 py-8 md:py-12 max-w-4xl">
-          {/* Header Section */}
-          <div className="text-center mb-8 md:mb-12 space-y-4">
+        <main className="flex-1 flex flex-col min-h-0 w-full md:container md:mx-auto md:px-4 md:py-8 md:py-12 md:max-w-4xl">
+          {/* Header Section - Compact on mobile */}
+          <div className="text-center px-4 pt-6 pb-4 md:mb-8 md:mb-12 md:space-y-4 space-y-2 md:px-0">
             <div className="flex items-center justify-center gap-3">
               <div className="relative">
-                <div className="h-12 w-12 md:h-16 md:w-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
-                  <Sparkles className="h-6 w-6 md:h-8 md:w-8 text-primary-foreground" />
+                <div className="h-10 w-10 md:h-16 md:w-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+                  <Sparkles className="h-5 w-5 md:h-8 md:w-8 text-primary-foreground" />
                 </div>
               </div>
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-display font-bold tracking-tight">
+              <h1 className="text-2xl md:text-4xl lg:text-5xl font-display font-bold tracking-tight">
                 Artie
               </h1>
             </div>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-sm md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Creative Intelligent System
             </p>
-            <p className="text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
+            <p className="text-xs md:text-base text-muted-foreground max-w-xl mx-auto hidden md:block">
               Ask anything about campaigns, visuals, copy, strategy, or upload a brief and let Artie handle the heavy lifting.
             </p>
           </div>
 
-          {/* Chat Section */}
-          <div className="flex flex-col h-[calc(100vh-400px)] md:h-[calc(100vh-350px)] min-h-[500px] bg-card border border-border rounded-2xl shadow-lg overflow-hidden">
+          {/* Chat Section - Full height on mobile, thumb-friendly */}
+          <div className="flex flex-col flex-1 min-h-0 md:h-[calc(100vh-350px)] md:min-h-[500px] bg-card border-t md:border md:border-border md:rounded-2xl shadow-lg overflow-hidden w-full">
             {/* Messages Area */}
             <div 
               ref={chatBodyRef}
-              className="flex-1 overflow-y-auto p-6 space-y-6"
+              className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6 min-h-0"
+              style={{ WebkitOverflowScrolling: 'touch' }}
             >
               {messages.map((message) => {
                 const inlineImageUrls = extractSupabaseImageUrls(message.text);
@@ -280,25 +298,25 @@ export default function ArtiePage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area */}
-            <div className="border-t border-border p-4 bg-background">
+            {/* Input Area - Thumb-friendly on mobile */}
+            <div className="border-t border-border p-3 md:p-4 bg-background pb-[calc(0.75rem+env(safe-area-inset-bottom))] safe-bottom">
               {/* Uploaded Files Preview */}
               {uploadedFiles.length > 0 && (
-                <div className="mb-3 flex flex-wrap gap-2">
+                <div className="mb-2 md:mb-3 flex flex-wrap gap-2">
                   {uploadedFiles.map((file, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-2 bg-muted px-3 py-2 rounded-lg text-sm"
+                      className="flex items-center gap-2 bg-muted px-2.5 md:px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm"
                     >
                       {file.type.startsWith('image/') ? (
-                        <FileCheck className="h-4 w-4 text-primary" />
+                        <FileCheck className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
                       ) : (
-                        <FileCheck className="h-4 w-4 text-muted-foreground" />
+                        <FileCheck className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
                       )}
-                      <span className="text-sm max-w-[150px] truncate">{file.name}</span>
+                      <span className="text-xs md:text-sm max-w-[120px] md:max-w-[150px] truncate">{file.name}</span>
                       <button
                         onClick={() => handleRemoveFile(index)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        className="text-muted-foreground hover:text-destructive transition-colors min-w-[24px] min-h-[24px] flex items-center justify-center"
                       >
                         ×
                       </button>
@@ -312,7 +330,7 @@ export default function ArtiePage() {
                   e.preventDefault();
                   handleSend();
                 }} 
-                className="flex gap-2"
+                className="flex gap-2 md:gap-2"
               >
                 <input
                   ref={fileInputRef}
@@ -328,9 +346,9 @@ export default function ArtiePage() {
                   size="icon"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading || isUploading || !isOnline}
-                  className="flex-shrink-0"
+                  className="flex-shrink-0 h-11 w-11 md:h-10 md:w-10 touch-manipulation"
                 >
-                  <Paperclip className="h-4 w-4" />
+                  <Paperclip className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
                 <Textarea
                   ref={textareaRef}
@@ -342,24 +360,24 @@ export default function ArtiePage() {
                       ? "You're offline..." 
                       : isUploading 
                       ? "Processing files..." 
-                      : "Ask Artie anything about your campaign, visual, or brief..."
+                      : "Ask Artie anything..."
                   }
-                  className="min-h-[60px] max-h-[200px] resize-none"
+                  className="min-h-[44px] md:min-h-[60px] max-h-[120px] md:max-h-[200px] resize-none text-base md:text-sm py-2.5 md:py-3 px-3 md:px-4"
                   disabled={isLoading || isUploading || !isOnline}
                 />
                 <Button
                   type="submit"
                   disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading || isUploading || !isOnline}
-                  className="flex-shrink-0"
+                  className="flex-shrink-0 h-11 w-11 md:h-10 md:w-10 touch-manipulation"
                 >
                   {isLoading || isUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" />
                   ) : (
-                    <Send className="h-4 w-4" />
+                    <Send className="h-5 w-5 md:h-4 md:w-4" />
                   )}
                 </Button>
               </form>
-              <p className="text-xs text-muted-foreground mt-2 text-center">
+              <p className="text-xs text-muted-foreground mt-2 text-center hidden md:block">
                 Tip: paste prompts, upload a brief, or ask Artie which tool to use next.
               </p>
             </div>
