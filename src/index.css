@@ -61,13 +61,21 @@
   }
   
   /* Ensure Artie floating icon is always visible */
-  /* z-index: 60 (above bottom nav z-50, below modals z-40+) */
+  /* z-index: 70 (above bottom nav z-50, below Artie panel z-71) */
   [data-artie-floating-icon] {
     position: fixed !important;
-    z-index: 60 !important;
+    z-index: 70 !important;
     visibility: visible !important;
     opacity: 1 !important;
     display: block !important;
+  }
+
+  .artie-float {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 70;
+    pointer-events: auto;
   }
 }
 
@@ -739,17 +747,33 @@ All colors MUST be HSL.
     z-index: 90;
   }
 
+  /* ToolDrawer animation - from bottom-middle to center (desktop only) */
+  @keyframes toolDrawerIn {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 80px));
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  .animate-toolDrawer {
+    animation: toolDrawerIn 0.22s ease-out;
+    transform-origin: bottom center;
+  }
+
   /* Fix ToolDrawer positioning glitch on desktop - Cross-browser centering */
   @media (min-width: 768px) {
     [data-vaul-drawer] {
       /* Override bottom positioning on desktop - let Tailwind classes handle top/left */
       bottom: auto !important;
-      /* Ensure transform is applied for centering - Cross-browser compatible */
-      transform: translate(-50%, -50%);
-      -webkit-transform: translate(-50%, -50%);
       /* Fix for Safari - ensure proper centering */
       left: 50% !important;
       top: 50% !important;
+      right: auto !important;
+      /* Let animation handle transform, don't force it here */
       /* Prevent layout shifts */
       will-change: transform;
     }

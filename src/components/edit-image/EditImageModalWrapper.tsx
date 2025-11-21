@@ -19,10 +19,9 @@ export const EditImageModalWrapper = ({
   initialInstruction = "",
   onImageEdited,
 }: EditImageModalWrapperProps) => {
-  const visualContext = useVisualContextStore(state => ({
-    basePrompt: state.basePrompt,
-    analysisData: state.analysisData,
-  }));
+  const basePrompt = useVisualContextStore((state) => state.basePrompt);
+  const analysisData = useVisualContextStore((state) => state.analysisData);
+  const hasVisualContext = !!(basePrompt || analysisData);
 
   // Debug: Log modal state changes
   useEffect(() => {
@@ -31,10 +30,10 @@ export const EditImageModalWrapper = ({
         open,
         hasImageUrl: !!imageUrl,
         imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : 'empty',
-        hasVisualContext: !!(visualContext.basePrompt || visualContext.analysisData)
+        hasVisualContext,
       });
     }
-  }, [open, imageUrl, visualContext]);
+  }, [open, imageUrl, hasVisualContext]);
 
   // Don't render if no image URL
   if (!imageUrl && !open) {
@@ -61,7 +60,7 @@ export const EditImageModalWrapper = ({
           open={open}
           onOpenChange={onOpenChange}
           imageUrl={imageUrl}
-          initialInstruction={initialInstruction || visualContext.basePrompt || ""}
+          initialInstruction={initialInstruction || basePrompt || ""}
           onImageEdited={onImageEdited}
           sourceType="edit"
         />

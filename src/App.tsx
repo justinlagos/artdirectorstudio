@@ -9,6 +9,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToolsModalProvider } from "@/contexts/ToolsModalContext";
 import { LoadingState } from "@/components/LoadingState";
+import { SafeArtieChat } from "@/components/SafeArtieChat";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
 import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
@@ -60,15 +61,6 @@ const SignedOut = lazy(() => import("./pages/SignedOut"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PresetGallery = lazy(() => import("./pages/PresetGallery"));
 
-// Lazy load heavy components with error handling
-const ArtieChat = lazy(() => 
-  import("./components/ArtieChat")
-    .then(m => ({ default: m.ArtieChat }))
-    .catch(err => {
-      console.error("Failed to load ArtieChat:", err);
-      return { default: () => null };
-    })
-);
 const TrialWelcomeToast = lazy(() => 
   import("./components/TrialWelcomeToast")
     .then(m => ({ default: m.TrialWelcomeToast }))
@@ -225,10 +217,10 @@ const AppContent = () => {
             <OnlineStatusIndicator />
             <ErrorBoundary>
               <Suspense fallback={null}>
-                <ArtieChat />
                 <TrialWelcomeToast />
               </Suspense>
             </ErrorBoundary>
+            <SafeArtieChat />
               </ToolsModalProvider>
             </AuthProvider>
           </BrowserRouter>
