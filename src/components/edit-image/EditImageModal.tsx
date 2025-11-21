@@ -574,8 +574,8 @@ export const EditImageModal = ({
       ) : (
         // Desktop: Two-column layout
         <div className={cn(
-          "grid gap-6 h-full min-h-0 flex-1",
-          "grid-cols-[1fr_400px]"
+          "grid gap-6 h-full min-h-0 flex-1 overflow-hidden",
+          "grid-cols-[1fr_320px] max-w-full"
         )}>
           {/* Left Column: Image Preview - Centered, constrained height */}
           <div className="flex items-center justify-center min-h-0 overflow-hidden">
@@ -585,12 +585,12 @@ export const EditImageModal = ({
               selectedRegion={selectedRegion}
               onRegionSelect={activeTab === "select" ? setSelectedRegion : undefined}
               isSelectionMode={activeTab === "select"}
-              className="rounded-xl w-full h-full max-h-full"
+              className="rounded-xl w-full h-full max-h-full object-contain"
             />
           </div>
 
-          {/* Right Column: Tools Panel - Scrollable */}
-          <div className="flex flex-col min-h-0 overflow-hidden border-l border-border pl-6">
+          {/* Right Column: Tools Panel - Fixed width, Scrollable */}
+          <div className="flex flex-col min-h-0 overflow-hidden border-l border-border pl-6 w-[320px] flex-shrink-0">
             {/* Instruction Input - Fixed at top */}
             <div className="space-y-2 flex-shrink-0 mb-4">
               <Label htmlFor="custom-instruction" className="text-sm font-medium">Editing Instruction</Label>
@@ -614,25 +614,25 @@ export const EditImageModal = ({
 
             {/* Tools Tabs - Scrollable */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full flex-1 flex flex-col min-h-0">
-              <TabsList className="grid w-full grid-cols-4 h-10 flex-shrink-0">
-                <TabsTrigger value="adjustments" className="text-sm">
+              <TabsList className="grid w-full grid-cols-4 h-10 flex-shrink-0 mb-4">
+                <TabsTrigger value="adjustments" className="text-xs px-2">
                   Adjust
                 </TabsTrigger>
-                <TabsTrigger value="select" className="text-sm">
-                  <MousePointer2 className="h-3.5 w-3.5 mr-1.5" />
+                <TabsTrigger value="select" className="text-xs px-2">
+                  <MousePointer2 className="h-3 w-3 mr-1" />
                   Select
                 </TabsTrigger>
-                <TabsTrigger value="color" className="text-sm">
-                  <Palette className="h-3.5 w-3.5 mr-1.5" />
+                <TabsTrigger value="color" className="text-xs px-2">
+                  <Palette className="h-3 w-3 mr-1" />
                   Color
                 </TabsTrigger>
-                <TabsTrigger value="advanced" className="text-sm">
-                  <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                <TabsTrigger value="advanced" className="text-xs px-2">
+                  <Wand2 className="h-3 w-3 mr-1" />
                   Advanced
                 </TabsTrigger>
               </TabsList>
 
-              <div className="flex-1 overflow-y-auto mt-4 min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0">
                 <TabsContent value="adjustments" className="mt-0">
                   <AdjustmentsPanel
                     adjustments={adjustments}

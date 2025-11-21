@@ -9,9 +9,9 @@ import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToolsModalProvider } from "@/contexts/ToolsModalContext";
 import { LoadingState } from "@/components/LoadingState";
-import { SafeArtieChat } from "@/components/SafeArtieChat";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
+import { ArtieTab } from "@/components/ArtieTab";
 import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 // Sentry is loaded asynchronously in main.tsx, so we don't import it here
@@ -217,12 +217,12 @@ const AppContent = () => {
             </ErrorBoundary>
             <BottomNav />
             <OnlineStatusIndicator />
+            <ArtieTab />
             <ErrorBoundary>
               <Suspense fallback={null}>
                 <TrialWelcomeToast />
               </Suspense>
             </ErrorBoundary>
-            {/* <SafeArtieChat /> */}
               </ToolsModalProvider>
             </AuthProvider>
           </BrowserRouter>

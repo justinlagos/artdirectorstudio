@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// Import system prompt from shared file (ensure this matches src/lib/artieSystemPrompt.ts)
 import { artieSystemPrompt } from "./systemPrompt.ts";
 
 const corsHeaders = {
