@@ -50,7 +50,7 @@ export const ArtieModal = ({
         {/* Overlay - Semi-transparent dark overlay, click closes modal */}
         <DialogPrimitive.Overlay
           className={cn(
-            "fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm",
+            "fixed inset-0 z-artie-modal-backdrop bg-black/60 backdrop-blur-sm",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "duration-[260ms]"
@@ -60,7 +60,7 @@ export const ArtieModal = ({
         {/* Content */}
         <DialogPrimitive.Content
           className={cn(
-            "fixed z-[81]",
+            "fixed z-artie-modal-content",
             // Mobile: bottom sheet with safe-area padding
             isMobile
               ? [
