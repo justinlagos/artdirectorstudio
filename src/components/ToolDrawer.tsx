@@ -29,27 +29,25 @@ export const ToolDrawer = ({
   stickyFooterOnMobile = false,
 }: ToolDrawerProps) => {
   return (
-    <DrawerRoot open={open} onOpenChange={onOpenChange}>
+    <DrawerRoot open={open} onOpenChange={onOpenChange} direction="bottom">
       <DrawerPortal>
         <DrawerOverlay className="backdrop-blur-sm" />
         <DrawerPrimitive.Content
           className={cn(
-            "fixed z-[40] flex max-h-[96dvh] flex-col border border-border bg-background shadow-xl",
-            // Mobile: bottom sheet with rounded-t-2xl
-            "inset-x-0 bottom-0 rounded-t-2xl",
-            "sm:mx-auto sm:w-full sm:max-w-[820px]",
-            // Desktop: centered modal with rounded-2xl, proper centering
-            "md:inset-x-auto md:inset-y-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:bottom-auto md:rounded-2xl md:max-w-[820px] md:w-[90vw] md:max-h-[90vh]",
-            // Animation: fade + slide (no position jumping)
+            "fixed z-modal-content flex max-h-[90dvh] flex-col border border-border bg-background shadow-xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-            "md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95",
-            "duration-300",
+            "duration-200 ease-in-out",
+            // Mobile: bottom sheet with rounded-t-2xl and slide animation
+            "inset-x-0 bottom-0 rounded-t-2xl",
+            "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
+            "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+            // Desktop: centered modal with fade/zoom only
+            // The centered positioning (top-1/2 + translate) overrides slide animation
+            "md:inset-x-auto md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:max-w-[820px] md:w-[90vw] md:max-h-[90vh]",
+            "md:data-[state=open]:fade-in-0 md:data-[state=closed]:fade-out-0",
+            "md:data-[state=open]:zoom-in-95 md:data-[state=closed]:zoom-out-95",
             className,
           )}
-          style={{
-            willChange: 'transform',
-          }}
           onPointerDownOutside={(e) => {
             // Prevent closing when clicking on interactive elements inside
             const target = e.target as HTMLElement;
@@ -91,9 +89,8 @@ export const ToolDrawer = ({
                 "[&::-webkit-scrollbar]:w-2",
                 // Consistent padding: px-6 py-6
                 "px-6 py-6",
-                stickyFooterOnMobile
-                  ? "pb-6 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
-                  : "supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+                // Safe-area padding only on mobile when footer is sticky
+                stickyFooterOnMobile && "supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:pb-4",
                 contentClassName,
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
@@ -108,8 +105,11 @@ export const ToolDrawer = ({
           {footer && (
             <footer
               className={cn(
-                "z-20 shrink-0 border-t border-border bg-background px-6 py-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
-                stickyFooterOnMobile ? "md:sticky md:bottom-0" : "sticky bottom-0",
+                "mt-auto shrink-0 border-t border-border bg-background px-6 py-4",
+                // Sticky only on mobile when requested
+                stickyFooterOnMobile ? "sticky bottom-0" : "",
+                // Safe-area padding only on mobile
+                stickyFooterOnMobile && "supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:pb-4",
               )}
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
