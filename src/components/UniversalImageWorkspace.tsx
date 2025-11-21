@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 import { PreviewCanvas } from "./edit-image/PreviewCanvas";
 import { AdjustmentsPanel, Adjustments } from "./edit-image/AdjustmentsPanel";
 import { SelectionTool } from "./edit-image/SelectionTool";
@@ -58,6 +59,7 @@ export const UniversalImageWorkspace = ({
   const navigate = useNavigate();
   const { openTool } = useToolsModal();
   const intelligence = useIntelligence();
+  const queryClient = useQueryClient();
   const [adjustments, setAdjustments] = useState<Adjustments>(defaultAdjustments);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(imageUrl);
@@ -231,32 +233,63 @@ export const UniversalImageWorkspace = ({
         
         // Ensure the edited image is saved to database
         // Edge function should save it, but verify and save if needed
-        const { ensureAssetSaved } = await import('@/lib/saveAsset');
-        await ensureAssetSaved({
-          imageUrl: result.image,
-          action: 'edit',
-          prompt: trimmedInstruction,
-          sourceUrls: [imageUrl],
-          params: {
-            instruction: trimmedInstruction,
-            adjustments: adjustments,
-            source: 'universal_workspace',
-          },
-          skipToast: true, // Edge function already shows toast
-        });
+        try {
+          const { ensureAssetSaved } = await import('@/lib/saveAsset');
+          const assetId = await ensureAssetSaved({
+            imageUrl: result.image,
+            action: 'edit',
+            prompt: trimmedInstruction,
+            sourceUrls: [imageUrl],
+            params: {
+              instruction: trimmedInstruction,
+              adjustments: adjustments,
+              source: 'universal_workspace',
+            },
+            skipToast: true, // Edge function already shows toast
+          });
+          
+          if (assetId) {
+            console.log('[UniversalImageWorkspace] Asset saved successfully:', assetId);
+          } else {
+            console.warn('[UniversalImageWorkspace] Asset save returned null - may already exist or save failed silently');
+          }
+        } catch (saveError) {
+          // Explicit error handling for save operation
+          console.error('[UniversalImageWorkspace] Error saving edited image:', {
+            error: saveError instanceof Error ? saveError.message : 'Unknown error',
+            stack: saveError instanceof Error ? saveError.stack : undefined,
+            imageUrl: result.image.substring(0, 100)
+          });
+          
+          // Show error toast since save failed
+          toast.error("Edits applied but save failed", {
+            description: "Your edits were applied, but the image may not appear in My Projects. Please try saving manually.",
+            duration: 5000
+          });
+        }
         
         toast.success("Edits applied successfully!", {
           description: "Saved to My Projects"
         });
         
         // Track user behavior
-        await intelligence.trackAction('edit', result.image, {
-          instruction: trimmedInstruction,
-          adjustments: adjustments,
-        });
+        try {
+          await intelligence.trackAction('edit', result.image, {
+            instruction: trimmedInstruction,
+            adjustments: adjustments,
+          });
+        } catch (trackError) {
+          // Non-critical - just log
+          console.warn('[UniversalImageWorkspace] Error tracking action:', trackError);
+        }
         
         // Reload versions history
-        await loadVersionsHistory();
+        try {
+          await loadVersionsHistory();
+        } catch (historyError) {
+          // Non-critical - just log
+          console.warn('[UniversalImageWorkspace] Error reloading versions history:', historyError);
+        }
         
         onImageEdited?.(result.image);
       } else {
@@ -364,11 +397,72 @@ export const UniversalImageWorkspace = ({
   };
 
   const handleSave = async () => {
-    // Track user behavior
-    await intelligence.trackAction('save', previewUrl);
-    // Image is already saved when edited, but we can save current state
-    toast.success("Image saved to My Projects");
-    navigate('/history');
+    try {
+      console.log('[UniversalImageWorkspace] Manual save triggered', {
+        hasPreviewUrl: !!previewUrl,
+        hasCustomInstruction: !!customInstruction,
+        sourceUrl: imageUrl.substring(0, 100)
+      });
+      
+      // Track user behavior (non-critical)
+      try {
+        await intelligence.trackAction('save', previewUrl);
+      } catch (trackError) {
+        console.warn('[UniversalImageWorkspace] Error tracking save action:', trackError);
+      }
+      
+      // Explicitly save the current preview state
+      const { ensureAssetSaved } = await import('@/lib/saveAsset');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Please sign in to save your work');
+      }
+      
+      const assetId = await ensureAssetSaved({
+        imageUrl: previewUrl,
+        action: 'edit',
+        prompt: customInstruction || 'Saved from workspace',
+        sourceUrls: [imageUrl],
+        params: {
+          adjustments: adjustments,
+          source: 'universal_workspace',
+          manual_save: true
+        },
+        queryClient: queryClient,
+        userId: user.id,
+        skipToast: false
+      });
+      
+      if (assetId) {
+        console.log('[UniversalImageWorkspace] Manual save successful:', assetId);
+        toast.success("Image saved to My Projects", {
+          description: "Your image has been saved successfully"
+        });
+        
+        // Navigate to history after a short delay to allow save to complete
+        setTimeout(() => {
+          navigate('/history');
+        }, 500);
+      } else {
+        console.warn('[UniversalImageWorkspace] Manual save returned null - asset may already exist or save failed');
+        toast.warning("Save may have failed", {
+          description: "Please check My Projects to verify. The image may already be saved.",
+          duration: 5000
+        });
+      }
+    } catch (saveError) {
+      console.error('[UniversalImageWorkspace] Error in handleSave:', {
+        error: saveError instanceof Error ? saveError.message : 'Unknown error',
+        stack: saveError instanceof Error ? saveError.stack : undefined,
+        previewUrl: previewUrl?.substring(0, 100)
+      });
+      
+      toast.error("Failed to save image", {
+        description: saveError instanceof Error ? saveError.message : "Please try again or check your connection",
+        duration: 5000
+      });
+    }
   };
 
   // Defensive logging

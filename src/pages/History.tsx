@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { analytics } from "@/lib/analytics";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -27,6 +27,7 @@ type GeneratedAsset = Database['public']['Tables']['generated_assets']['Row'];
 const History = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [shareAssetId, setShareAssetId] = useState<string | null>(null);
@@ -243,35 +244,25 @@ const History = () => {
     return null;
   }
 
-  // Filter assets based on search and type
+  // Simplified filtering logic to ensure all user assets are shown
+  // Only filter by search query and type filter - don't exclude assets with missing data
   const filteredAssets = assets.filter((asset) => {
-    const analysisData = asset.analysis_data as Record<string, any> | null;
-    const params = asset.params as Record<string, any> | null;
-    
     // Search matching: if search query is empty, match all; otherwise check prompt or analysis
-    const matchesSearch = searchQuery === "" || 
-      asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      analysisData?.image_overview?.toLowerCase().includes(searchQuery.toLowerCase());
+    let matchesSearch = true;
+    if (searchQuery && searchQuery.trim() !== "") {
+      const searchLower = searchQuery.toLowerCase().trim();
+      const promptMatch = asset.prompt?.toLowerCase().includes(searchLower) ?? false;
+      const analysisData = asset.analysis_data as Record<string, any> | null;
+      const analysisMatch = analysisData?.image_overview?.toLowerCase().includes(searchLower) ?? false;
+      matchesSearch = promptMatch || analysisMatch;
+    }
     
     // Type matching: show all if filter is "all", otherwise match specific type
-    const matchesType = filterType === "all" || asset.type === filterType;
+    // If type is missing/null, treat it as matching all filters
+    const matchesType = filterType === "all" || asset.type === filterType || !asset.type;
     
     // Include asset if it matches both search and type filters
     const shouldInclude = matchesSearch && matchesType;
-    
-    // Log filtered out assets for debugging (only in dev mode)
-    if (import.meta.env.DEV && !shouldInclude && asset.image_url) {
-      console.log('[History] Filtered out asset:', {
-        id: asset.id,
-        type: asset.type,
-        action: asset.action,
-        hasImageUrl: !!asset.image_url,
-        matchesSearch,
-        matchesType,
-        filterType,
-        searchQuery
-      });
-    }
     
     return shouldInclude;
   });
@@ -367,14 +358,29 @@ const History = () => {
             className="h-11 w-11"
             onClick={async () => {
               try {
-                await refetch();
-                toast.success("Projects refreshed");
+                console.log('[History] Manual refresh triggered');
+                // Explicitly invalidate the query to force a fresh fetch
+                if (user?.id) {
+                  queryClient.invalidateQueries({
+                    queryKey: ['generated_assets', user.id],
+                    exact: true
+                  });
+                  console.log('[History] Query invalidated for user:', user.id);
+                }
+                // Also refetch immediately
+                const result = await refetch();
+                console.log('[History] Refresh complete, fetched assets:', result.data?.length || 0);
+                toast.success("Projects refreshed", {
+                  description: `Loaded ${result.data?.length || 0} project(s)`
+                });
               } catch (error) {
-                console.error("Error refreshing assets:", error);
-                toast.error("Failed to refresh projects");
+                console.error('[History] Error refreshing assets:', error);
+                toast.error("Failed to refresh projects", {
+                  description: "Please try again or check your connection"
+                });
               }
             }}
-            title="Refresh"
+            title="Refresh projects"
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -436,19 +442,37 @@ const History = () => {
           <Card className="glass-strong">
             <CardContent className="py-16 text-center">
               <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-muted/30 flex items-center justify-center">
-                <FileText className="w-10 h-10 text-muted-foreground" />
+                <ImageIcon className="w-10 h-10 text-muted-foreground" />
               </div>
               <h2 className="text-2xl font-semibold mb-3">No projects yet</h2>
               <p className="text-lg text-muted-foreground mb-6">
-                Upload an image to get started with your first analysis!
+                Start creating! Generate an image, edit a photo, or blend images to see your projects here.
               </p>
-              <Button 
-                onClick={() => navigate("/")}
-                size="lg"
-                className="min-w-[180px]"
-              >
-                Analyze Image
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button 
+                  onClick={() => navigate("/")}
+                  size="lg"
+                  className="min-w-[180px]"
+                >
+                  Go to Studio
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    if (user?.id) {
+                      queryClient.invalidateQueries({
+                        queryKey: ['generated_assets', user.id],
+                      });
+                      await refetch();
+                    }
+                  }}
+                  variant="outline"
+                  size="lg"
+                  className="min-w-[180px] gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : filteredAssets.length === 0 && assets.length > 0 ? (
@@ -459,18 +483,31 @@ const History = () => {
               </div>
               <h2 className="text-2xl font-semibold mb-3">No results found</h2>
               <p className="text-lg text-muted-foreground mb-6">
-                Try adjusting your search or filter criteria
+                {searchQuery 
+                  ? `No projects match "${searchQuery}". Try different search terms or clear the search.`
+                  : `No projects match the selected filter. Try changing the filter type or clear filters.`
+                }
               </p>
-              <Button 
-                onClick={() => {
-                  setSearchQuery("");
-                  setFilterType("all");
-                }}
-                variant="outline"
-                size="lg"
-              >
-                Clear Filters
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button 
+                  onClick={() => {
+                    setSearchQuery("");
+                    setFilterType("all");
+                  }}
+                  variant="outline"
+                  size="lg"
+                  className="min-w-[180px]"
+                >
+                  Clear Filters
+                </Button>
+                <Button 
+                  onClick={() => navigate("/")}
+                  size="lg"
+                  className="min-w-[180px]"
+                >
+                  Create New Project
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (

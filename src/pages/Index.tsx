@@ -486,42 +486,44 @@ const Index = () => {
       if (!data.assetId) {
         console.warn("[Index] Image generated but not saved to My Projects. Attempting fallback save...");
         
-        // Fallback: Try to save from client side
+        // Fallback: Use the improved saveAsset utility instead of raw Supabase calls
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            const { data: savedAsset, error: saveError } = await supabase
-              .from('generated_assets')
-              .insert({
-                user_id: user.id,
-                type: 'image',
-                action: 'generate',
-                prompt: prompt,
-                image_url: data.image,
-                params: {
-                  quality: options.quality,
-                  size: options.size,
-                  background: options.background,
-                  fallback_save: true
-                }
-              })
-              .select()
-              .single();
+            // Use the unified saveAsset utility for consistency and better error handling
+            const { saveAsset } = await import('@/lib/saveAsset');
+            
+            const assetId = await saveAsset({
+              imageUrl: data.image,
+              action: 'generate',
+              prompt: prompt,
+              params: {
+                quality: options.quality,
+                size: options.size,
+                background: options.background,
+                fallback_save: true
+              },
+              // Note: queryClient not available in this context, but saveAsset will still work
+              skipToast: false, // Show toast even for fallback saves
+            });
 
-            if (saveError) {
-              console.error("[Index] Fallback save failed:", saveError);
-              toast.warning("Image generated but may not appear in My Projects. Please refresh if needed.");
-            } else {
-              console.log("[Index] Fallback save successful:", savedAsset?.id);
+            if (assetId) {
+              console.log("[Index] Fallback save successful:", assetId);
               // Update the assetId in the response
-              if (savedAsset?.id) {
-                data.assetId = savedAsset.id;
-              }
+              data.assetId = assetId;
+            } else {
+              console.warn("[Index] Fallback save returned null - save may have failed");
+              // Still continue - image is available even if not saved
             }
+          } else {
+            console.warn("[Index] Fallback save skipped - no user found");
           }
         } catch (fallbackError) {
-          console.error("[Index] Fallback save exception:", fallbackError);
-          toast.warning("Image generated but may not appear in My Projects. Please refresh if needed.");
+          console.error("[Index] Fallback save exception:", {
+            error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error',
+            stack: fallbackError instanceof Error ? fallbackError.stack : undefined
+          });
+          // Still continue - image is available even if save failed
         }
       } else {
         console.log("[Index] Image saved to My Projects:", data.assetId);

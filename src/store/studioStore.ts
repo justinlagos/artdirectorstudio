@@ -91,38 +91,41 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
   if (!data.assetId) {
     console.warn("[Studio] Image generated but not saved to My Projects. Attempting fallback save...");
     
-    // Fallback: Try to save from client side
+    // Fallback: Use the improved saveAsset utility instead of raw Supabase calls
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: savedAsset, error: saveError } = await supabase
-          .from('generated_assets')
-          .insert({
-            user_id: user.id,
-            type: 'image',
-            action: 'generate',
-            prompt: trimmedPrompt,
-            image_url: data.image,
-            params: {
-              quality: options.quality,
-              size: options.size,
-              background: options.background,
-              fallback_save: true
-            }
-          })
-          .select()
-          .single();
+        // Use the unified saveAsset utility for consistency and better error handling
+        const { saveAsset } = await import('@/lib/saveAsset');
+        
+        const assetId = await saveAsset({
+          imageUrl: data.image,
+          action: 'generate',
+          prompt: trimmedPrompt,
+          params: {
+            quality: options.quality,
+            size: options.size,
+            background: options.background,
+            fallback_save: true
+          },
+          skipToast: false, // Show toast even for fallback saves
+        });
 
-        if (saveError) {
-          console.error("[Studio] Fallback save failed:", saveError);
-          // Still return the image - user can see it even if not saved
+        if (assetId) {
+          console.log("[Studio] Fallback save successful:", assetId);
         } else {
-          console.log("[Studio] Fallback save successful:", savedAsset?.id);
+          console.error("[Studio] Fallback save returned null - save may have failed");
+          // Still return the image - user can see it even if not saved
         }
+      } else {
+        console.warn("[Studio] Fallback save skipped - no user found");
       }
     } catch (fallbackError) {
-      console.error("[Studio] Fallback save exception:", fallbackError);
-      // Continue - image is still available
+      console.error("[Studio] Fallback save exception:", {
+        error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error',
+        stack: fallbackError instanceof Error ? fallbackError.stack : undefined
+      });
+      // Continue - image is still available even if save failed
     }
   } else {
     console.log("[Studio] Image saved to My Projects:", data.assetId);
