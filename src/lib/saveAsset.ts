@@ -7,6 +7,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { QueryClient } from "@tanstack/react-query";
 
 export interface SaveAssetOptions {
   imageUrl: string | Blob; // Can be URL string, base64 data URL, or Blob
@@ -17,6 +18,8 @@ export interface SaveAssetOptions {
   analysisData?: Record<string, unknown>;
   durationMs?: number;
   skipToast?: boolean;
+  queryClient?: QueryClient; // Optional QueryClient for query invalidation
+  userId?: string; // Optional userId for query invalidation
 }
 
 /**
@@ -185,6 +188,16 @@ export async function saveAsset(options: SaveAssetOptions): Promise<string | nul
           description: "Your image has been added to your project history",
         });
       }
+      
+      // Invalidate queries to refresh History page immediately
+      if (options.queryClient && (options.userId || user.id)) {
+        const userId = options.userId || user.id;
+        options.queryClient.invalidateQueries({
+          queryKey: ['generated_assets', userId],
+        });
+        console.log('[SaveAsset] Invalidated queries for user:', userId);
+      }
+      
       return assetData.id;
     }
 
