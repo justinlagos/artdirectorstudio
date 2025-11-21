@@ -1,77 +1,50 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Paperclip, Send, Loader2, FileCheck, Sparkles, Image as ImageIcon } from "lucide-react";
-import { toast } from "sonner";
+import { Paperclip, Send, Loader2, FileCheck, Sparkles, Image as ImageIcon, Wand2, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
-import { useToolsModal } from "@/contexts/ToolsModalContext";
-import { useCredits } from "@/hooks/useCredits";
-import { extractTextFromBriefFile } from "@/lib/documentParser";
-import { openStudioWithPrompt } from "@/lib/studio";
-import type { Message, ContextMemory, ChatAttachment } from "@/components/artie/types";
+import { useArtieCore } from "@/hooks/useArtieCore";
+import { ImageEditor } from "@/components/ImageEditor";
+import { toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-
-// Import the chat hook/logic from ArtieChat - we'll create a simplified version
-// For now, we'll reuse core message handling from ArtieChat component
+const SUPABASE_IMAGE_REGEX = /(https:\/\/[^\s]+\.supabase\.co\/storage\/v1\/object\/[^\s]+\.(?:jpg|jpeg|png|gif|webp))/gi;
 
 export default function ArtiePage() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { openTool } = useToolsModal();
-  const { balance, refetch: refetchCredits } = useCredits();
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = sessionStorage.getItem('artie-page-conversation');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as Array<Omit<Message, 'timestamp'> & { timestamp: string }>;
-        return parsed.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
-      } catch {
-        // Fallback to welcome message
-      }
-    }
-    return [{
-      id: '1',
-      text: "Hi! I'm Artie — Your Creative Intelligent System.\n\nI can help you brainstorm concepts, refine visual briefs, analyze images, generate visuals, and guide you through any creative challenge. You can also upload creative briefs (PDF/Word) for me to analyze.\n\nWhat creative project are we working on today?",
-      sender: 'artie',
-      timestamp: new Date()
-    }];
-  });
-  const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [contextMemory, setContextMemory] = useState<ContextMemory>(() => {
-    const saved = sessionStorage.getItem('artie-context-memory');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return {
-          images: Array.isArray(parsed.images) ? parsed.images : [],
-          documents: Array.isArray(parsed.documents) ? parsed.documents : [],
-          briefSummary: typeof parsed.briefSummary === 'string' ? parsed.briefSummary : undefined
-        } as ContextMemory;
-      } catch {
-        // ignore parsing errors
-      }
-    }
-    return { images: [], documents: [] };
-  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const isMountedRef = useRef(true);
+  const chatBodyRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
+  const {
+    messages,
+    inputValue,
+    setInputValue,
+    isLoading,
+    isUploading,
+    isOnline,
+    uploadedFiles,
+    contextMemory,
+    editorOpen,
+    editingImageUrl,
+    editorInstruction,
+    handleSend,
+    handleKeyDown,
+    handleFileInputChange,
+    handleRemoveFile,
+    handleChipAction,
+    handleOpenStudioFromImage,
+    handleEditImageFromMessage,
+    setEditorOpen,
+    setEditingImageUrl,
+    setEditorInstruction,
+    learnFromAction,
+  } = useArtieCore();
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -82,20 +55,11 @@ export default function ArtiePage() {
     }
   }, [user, authLoading, navigate]);
 
-  // Save messages to sessionStorage
-  useEffect(() => {
-    if (messages.length > 0) {
-      sessionStorage.setItem('artie-page-conversation', JSON.stringify(messages));
-    }
-  }, [messages]);
-
-  // Save context memory to sessionStorage
-  useEffect(() => {
-    sessionStorage.setItem('artie-context-memory', JSON.stringify(contextMemory));
-  }, [contextMemory]);
-
   // Scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
@@ -103,392 +67,20 @@ export default function ArtiePage() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const validFiles = files.filter(file => {
-      const isValidType =
-        file.type.startsWith('image/') ||
-        file.type === 'application/pdf' ||
-        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        file.type === 'application/msword';
-      
-      const isValidSize = file.size <= 20 * 1024 * 1024; // 20MB
-
-      if (!isValidType) {
-        toast.error("Invalid file type", {
-          description: `${file.name} is not supported. Please upload images, PDFs, or Word documents.`,
-        });
-      }
-      if (!isValidSize) {
-        toast.error("File too large", {
-          description: `${file.name} exceeds 20MB limit.`,
-        });
-      }
-
-      return isValidType && isValidSize;
-    });
-
-    if (validFiles.length > 0) {
-      setUploadedFiles(prev => [...prev, ...validFiles]);
-      toast.success("Files added", {
-        description: `${validFiles.length} file(s) ready to upload`,
-      });
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '40px';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = Math.min(scrollHeight, 200) + 'px';
     }
+  }, [inputValue]);
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleSend = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    
-    if (!inputValue.trim() && uploadedFiles.length === 0) return;
-    if (isLoading) return;
-
-    const userMessageText = inputValue.trim();
-    const filesToProcess = [...uploadedFiles];
-    
-    // Clear input and files immediately
-    setInputValue("");
-    setUploadedFiles([]);
-    setIsLoading(true);
-
-    // Add user message
-    const userMessageId = Date.now().toString();
-    const userMessage: Message = {
-      id: userMessageId,
-      text: userMessageText || filesToProcess.map(f => f.name).join(', '),
-      sender: 'user',
-      timestamp: new Date(),
-      ...(filesToProcess.length > 0 && filesToProcess[0].type.startsWith('image/') ? {
-        attachment: {
-          type: 'image',
-          url: URL.createObjectURL(filesToProcess[0]),
-          name: filesToProcess[0].name
-        } as ChatAttachment
-      } : {})
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-
-    // Create loading message
-    const assistantMessageId = (Date.now() + 1).toString();
-    const loadingMessage: Message = {
-      id: assistantMessageId,
-      text: "",
-      sender: 'artie',
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, loadingMessage]);
-
-    try {
-      // Process files first
-      const attachments: ChatAttachment[] = [];
-      let briefSummary: string | undefined;
-
-      for (const file of filesToProcess) {
-        if (file.type.startsWith('image/')) {
-          // Upload image to storage
-          setIsUploading(true);
-          try {
-            const { data: { user: authUser } } = await supabase.auth.getUser();
-            if (!authUser) throw new Error('Not authenticated');
-
-            const fileExt = file.name.split('.').pop() || 'png';
-            const fileName = `${authUser.id}/artie/${Date.now()}-${file.name}`;
-            
-            const { error: uploadError } = await supabase.storage
-              .from('generated-images')
-              .upload(fileName, file, {
-                contentType: file.type,
-                upsert: false
-              });
-
-            if (uploadError) throw uploadError;
-
-            const { data: { publicUrl } } = supabase.storage
-              .from('generated-images')
-              .getPublicUrl(fileName);
-
-            attachments.push({
-              type: 'image',
-              url: publicUrl,
-              name: file.name
-            });
-
-            setContextMemory(prev => ({
-              ...prev,
-              images: [...prev.images, {
-                url: publicUrl,
-                messageId: userMessageId,
-                name: file.name,
-                source: 'user',
-                timestamp: new Date().toISOString()
-              }]
-            }));
-          } catch (imgError) {
-            console.error('[ArtiePage] Image upload error:', imgError);
-            toast.error("Failed to upload image", {
-              description: "Please try again.",
-            });
-          } finally {
-            setIsUploading(false);
-          }
-        } else if (file.type === 'application/pdf' || 
-                   file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                   file.type === 'application/msword') {
-          // Process document/brief
-          setIsUploading(true);
-          try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error('Not authenticated');
-
-            const extractedText = await extractTextFromBriefFile(file);
-            
-            // Send to process-brief edge function for analysis
-            try {
-              const { data: briefAnalysis, error: briefError } = await supabase.functions.invoke('process-brief', {
-                body: {
-                  text: extractedText,
-                  filename: file.name
-                },
-                headers: {
-                  Authorization: `Bearer ${session.access_token}`,
-                },
-              });
-
-              if (!briefError && briefAnalysis) {
-                briefSummary = briefAnalysis.summary || `Brief: ${file.name}`;
-                
-                // Store full analysis in context
-                setContextMemory(prev => ({
-                  ...prev,
-                  documents: [...prev.documents, {
-                    name: file.name,
-                    summary: briefAnalysis.summary,
-                    keyInsights: briefAnalysis.key_insights || [],
-                    targetAudience: briefAnalysis.target_audience,
-                    deliverables: briefAnalysis.deliverables,
-                    tonalKeywords: briefAnalysis.tonal_keywords || [],
-                    timestamp: new Date().toISOString()
-                  }],
-                  briefSummary
-                }));
-
-                attachments.push({
-                  type: 'document',
-                  url: URL.createObjectURL(file),
-                  name: file.name,
-                  analysis: briefAnalysis,
-                  excerpt: extractedText.slice(0, 2000)
-                } as ChatAttachment);
-
-                toast.success("Brief analyzed", {
-                  description: `I've analyzed ${file.name} and extracted key insights.`,
-                });
-              } else {
-                // Fallback to simple summary if analysis fails
-                briefSummary = `Brief: ${file.name} (${extractedText.slice(0, 200)}...)`;
-                attachments.push({
-                  type: 'document',
-                  url: URL.createObjectURL(file),
-                  name: file.name
-                });
-              }
-            } catch (analysisError) {
-              console.error('[ArtiePage] Brief analysis error:', analysisError);
-              // Fallback: use extracted text
-              briefSummary = `Brief: ${file.name} (${extractedText.slice(0, 200)}...)`;
-              attachments.push({
-                type: 'document',
-                url: URL.createObjectURL(file),
-                name: file.name
-              });
-              toast.info("Brief uploaded", {
-                description: "Processing brief analysis...",
-              });
-            }
-          } catch (docError) {
-            console.error('[ArtiePage] Document processing error:', docError);
-            toast.error("Failed to process document", {
-              description: "Please try again.",
-            });
-          } finally {
-            setIsUploading(false);
-          }
-        }
-      }
-
-      // Prepare messages for Artie API with context
-      const messagesForAPI = messages
-        .filter(m => m.text) // Only include messages with text
-        .map(m => ({
-          role: m.sender === 'user' ? 'user' : 'assistant',
-          content: m.text || ''
-        }));
-
-      // Build contextual user message
-      let contextualUserMessage = userMessageText || briefSummary || 'Uploaded files';
-      
-      // Add context about uploaded files
-      if (attachments.length > 0) {
-        const contextParts: string[] = [];
-        attachments.forEach(att => {
-          if (att.type === 'image') {
-            contextParts.push(`[Uploaded image: ${att.name}]`);
-          } else if (att.type === 'document') {
-            if (att.analysis?.summary) {
-              contextParts.push(`[Brief (${att.name}): ${att.analysis.summary}]`);
-            } else {
-              contextParts.push(`[Uploaded document: ${att.name}]`);
-            }
-          }
-        });
-        if (contextParts.length > 0) {
-          contextualUserMessage = `${contextualUserMessage}\n\n${contextParts.join('\n')}`;
-        }
-      }
-
-      // Add user's current message
-      messagesForAPI.push({
-        role: 'user',
-        content: contextualUserMessage
-      });
-
-      // Call Artie chat API
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
-      const { data, error } = await supabase.functions.invoke('artie-chat', {
-        body: {
-          messages: messagesForAPI,
-          attachments: attachments.length > 0 ? attachments : undefined,
-          contextMemory
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-
-      // Process streaming response (simplified - Artie API returns full response)
-      let accumulatedText = '';
-      if (data?.choices?.[0]?.message?.content) {
-        accumulatedText = data.choices[0].message.content;
-      }
-
-      // Handle tool calls if present
-      const toolCalls = data?.choices?.[0]?.message?.tool_calls || [];
-      for (const toolCall of toolCalls) {
-        let args: any = {};
-        try {
-          args = toolCall.function.arguments ? 
-            (typeof toolCall.function.arguments === 'string' ? 
-              JSON.parse(toolCall.function.arguments) : 
-              toolCall.function.arguments) : {};
-        } catch (e) {
-          console.error('[ArtiePage] Failed to parse tool call arguments:', e);
-          continue;
-        }
-
-        if (toolCall.function.name === 'open_studio') {
-          accumulatedText += '\n\n✨ Opening Studio with your refined prompt...';
-          const recentImage = contextMemory.images[contextMemory.images.length - 1];
-          await openStudioWithPrompt({
-            basePrompt: args.prompt || userMessageText,
-            imageUrl: recentImage?.url || args.referenceImage,
-            meta: {
-              source: 'artie',
-              conversationContext: messages.slice(-5).map(m => m.text).join('\n'),
-              quality: args.quality || 'auto',
-              size: args.size || '1024x1024'
-            }
-          });
-        } else if (toolCall.function.name === 'open_upscale') {
-          accumulatedText += '\n\n🔍 Opening Upscale tool...';
-          const imageUrl = args.imageUrl || contextMemory.images[contextMemory.images.length - 1]?.url;
-          if (imageUrl) {
-            openTool('upscale', { 
-              imageUrl,
-              scaleFactor: args.scaleFactor || '2'
-            });
-          } else {
-            accumulatedText += '\n\n⚠️ Please upload an image first.';
-          }
-        } else if (toolCall.function.name === 'open_blend') {
-          accumulatedText += '\n\n🎨 Opening Blend tool...';
-          const recentImages = contextMemory.images.slice(-2);
-          if (recentImages.length >= 2) {
-            openTool('blend', {
-              image1Url: recentImages[0]?.url,
-              image2Url: recentImages[1]?.url,
-              mode: args.mode || 'merge',
-              ratio: args.ratio || 50
-            });
-          } else {
-            accumulatedText += '\n\n⚠️ Please upload at least 2 images to blend.';
-          }
-        } else if (toolCall.function.name === 'generate_image') {
-          // Generate image inline - handled by edge function
-          accumulatedText += '\n\n✨ Generating image...';
-          // The edge function should handle generation and saving
-          // This is typically done via open_studio instead, but support it here too
-        } else if (toolCall.function.name === 'edit_image') {
-          // Edit image - should open edit modal
-          accumulatedText += '\n\n🖼️ Opening Edit Image tool...';
-          const imageUrl = args.imageUrl || contextMemory.images[contextMemory.images.length - 1]?.url;
-          const instruction = args.instruction;
-          
-          if (!imageUrl) {
-            accumulatedText += '\n\n⚠️ Please upload an image first.';
-          } else if (!instruction) {
-            accumulatedText += '\n\n⚠️ Please provide an editing instruction.';
-          } else {
-            // Note: Edit image tool opening would require ImageEditor component
-            // For now, just acknowledge the request
-            accumulatedText += `\n\nI'll help you edit the image with: "${instruction}".`;
-            toast.info("Edit Image feature coming soon in ArtiePage", {
-              description: "Use the floating Artie chat or Studio for now.",
-            });
-          }
-        }
-      }
-
-      // Update assistant message with response
-      setMessages(prev => 
-        prev.map(m => 
-          m.id === assistantMessageId
-            ? { ...m, text: accumulatedText || 'I received your message. How can I help?' }
-            : m
-        )
-      );
-
-      await refetchCredits();
-    } catch (error) {
-      console.error('[ArtiePage] Chat error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      setMessages(prev => 
-        prev.map(m => 
-          m.id === assistantMessageId
-            ? { ...m, text: `❌ ${errorMessage}`, error: true }
-            : m
-        )
-      );
-      
-      toast.error("Error", {
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const extractSupabaseImageUrls = useCallback((text: string) => {
+    if (!text) return [];
+    const matches = text.match(SUPABASE_IMAGE_REGEX) || [];
+    return Array.from(new Set(matches));
+  }, []);
 
   if (authLoading) {
     return (
@@ -531,58 +123,157 @@ export default function ArtiePage() {
           {/* Chat Section */}
           <div className="flex flex-col h-[calc(100vh-400px)] md:h-[calc(100vh-350px)] min-h-[500px] bg-card border border-border rounded-2xl shadow-lg overflow-hidden">
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex gap-4",
-                    message.sender === 'user' ? 'justify-end' : 'justify-start'
-                  )}
-                >
-                  {message.sender === 'artie' && (
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                  )}
+            <div 
+              ref={chatBodyRef}
+              className="flex-1 overflow-y-auto p-6 space-y-6"
+            >
+              {messages.map((message) => {
+                const inlineImageUrls = extractSupabaseImageUrls(message.text);
+                return (
                   <div
+                    key={message.id}
                     className={cn(
-                      "max-w-[80%] rounded-2xl px-4 py-3",
-                      message.sender === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground',
-                      message.error && 'bg-destructive/10 text-destructive border border-destructive/20'
+                      "flex gap-4 animate-fade-in",
+                      message.sender === 'user' ? 'justify-end' : 'justify-start'
                     )}
                   >
-                    {message.text && (
-                      <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">
-                        {message.text}
-                      </p>
+                    {message.sender === 'artie' && (
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
+                        <Sparkles className="h-4 w-4 text-primary-foreground" />
+                      </div>
                     )}
-                    {message.attachment?.type === 'image' && (
-                      <div className="mt-2 rounded-lg overflow-hidden">
-                        <img
-                          src={message.attachment.url}
-                          alt={message.attachment.name}
-                          className="max-w-full max-h-64 object-contain"
-                        />
+                    <div className="space-y-3 w-full max-w-[80%]">
+                      {/* Attachment Preview */}
+                      {message.attachment && (
+                        <div className="rounded-xl overflow-hidden border border-border bg-muted">
+                          {message.attachment.type === 'image' ? (
+                            <div className="relative group">
+                              <img 
+                                src={message.attachment.url} 
+                                alt={message.attachment.name}
+                                className="w-full h-auto max-h-[300px] object-contain"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleOpenStudioFromImage(message.attachment!.url)}
+                                  className="gap-1.5"
+                                >
+                                  <Wand2 className="h-3.5 w-3.5" />
+                                  Open in Studio
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleEditImageFromMessage(message.attachment!.url)}
+                                  className="gap-1.5"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                  Edit
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-muted px-3 py-2">
+                              <FileCheck className="h-4 w-4 text-muted-foreground inline mr-2" />
+                              <span className="text-xs text-muted-foreground">{message.attachment.name}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {inlineImageUrls.length > 0 && (
+                        <div className="grid grid-cols-1 gap-2">
+                          {inlineImageUrls.map((url, idx) => (
+                            <div key={`${message.id}-inline-${idx}`} className="relative rounded-xl overflow-hidden border border-border bg-muted group">
+                              <img
+                                src={url}
+                                alt="Referenced image"
+                                className="w-full h-auto max-h-[260px] object-contain"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleOpenStudioFromImage(url)}
+                                  className="gap-1.5"
+                                >
+                                  <Wand2 className="h-3.5 w-3.5" />
+                                  Open in Studio
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleEditImageFromMessage(url)}
+                                  className="gap-1.5"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                  Edit
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Message Text */}
+                      <div
+                        className={cn(
+                          "rounded-2xl px-4 py-3",
+                          message.sender === 'user'
+                            ? 'bg-primary text-primary-foreground dark:bg-white dark:text-gray-900'
+                            : message.error
+                            ? 'bg-destructive/10 text-destructive border border-destructive/20'
+                            : 'bg-muted text-foreground'
+                        )}
+                      >
+                        <p className={cn(
+                          "whitespace-pre-wrap text-sm md:text-base leading-relaxed",
+                          message.sender === 'user' && "text-primary-foreground dark:text-gray-900"
+                        )}>
+                          {message.text || (message.attachment ? "Sent an attachment" : "")}
+                        </p>
+                      </div>
+
+                      {/* Action Chips */}
+                      {message.actionChips && message.actionChips.length > 0 && (
+                        <div className="flex flex-wrap gap-3">
+                          {message.actionChips.map((chip, idx) => (
+                            <Button
+                              key={idx}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleChipAction(chip.action, message.id)}
+                              className="text-xs h-7 hover:bg-accent hover:border-primary/20"
+                            >
+                              {chip.label}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {message.sender === 'user' && (
+                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
                       </div>
                     )}
                   </div>
-                  {message.sender === 'user' && (
-                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
               {isLoading && (
                 <div className="flex gap-4 justify-start">
                   <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="h-4 w-4 text-primary-foreground" />
+                    <Sparkles className="h-4 w-4 text-primary-foreground animate-pulse" />
                   </div>
-                  <div className="bg-muted rounded-2xl px-4 py-3">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                  <div className="bg-muted rounded-2xl px-4 py-3 flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -599,13 +290,15 @@ export default function ArtiePage() {
                       key={index}
                       className="flex items-center gap-2 bg-muted px-3 py-2 rounded-lg text-sm"
                     >
-                      <FileCheck className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{file.name}</span>
+                      {file.type.startsWith('image/') ? (
+                        <FileCheck className="h-4 w-4 text-primary" />
+                      ) : (
+                        <FileCheck className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="text-sm max-w-[150px] truncate">{file.name}</span>
                       <button
-                        onClick={() => {
-                          setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-                        }}
-                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => handleRemoveFile(index)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
                       >
                         ×
                       </button>
@@ -614,13 +307,19 @@ export default function ArtiePage() {
                 </div>
               )}
 
-              <form onSubmit={handleSend} className="flex gap-2">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSend();
+                }} 
+                className="flex gap-2"
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
                   multiple
                   accept="image/*,application/pdf,.doc,.docx"
-                  onChange={handleFileSelect}
+                  onChange={handleFileInputChange}
                   className="hidden"
                 />
                 <Button
@@ -628,7 +327,7 @@ export default function ArtiePage() {
                   variant="outline"
                   size="icon"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading || isUploading}
+                  disabled={isLoading || isUploading || !isOnline}
                   className="flex-shrink-0"
                 >
                   <Paperclip className="h-4 w-4" />
@@ -637,19 +336,20 @@ export default function ArtiePage() {
                   ref={textareaRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Ask Artie anything about your campaign, visual, or brief..."
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    !isOnline 
+                      ? "You're offline..." 
+                      : isUploading 
+                      ? "Processing files..." 
+                      : "Ask Artie anything about your campaign, visual, or brief..."
+                  }
                   className="min-h-[60px] max-h-[200px] resize-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  disabled={isLoading || isUploading}
+                  disabled={isLoading || isUploading || !isOnline}
                 />
                 <Button
                   type="submit"
-                  disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading || isUploading}
+                  disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading || isUploading || !isOnline}
                   className="flex-shrink-0"
                 >
                   {isLoading || isUploading ? (
@@ -667,6 +367,38 @@ export default function ArtiePage() {
         </main>
 
         <Footer />
+
+        {/* Image Editor Modal */}
+        <ImageEditor
+          open={editorOpen}
+          onOpenChange={(open) => {
+            setEditorOpen(open);
+            if (!open) {
+              setEditorInstruction("");
+              setEditingImageUrl("");
+            }
+          }}
+          imageUrl={editingImageUrl}
+          initialInstruction={editorInstruction}
+          onImageEdited={async (newImageUrl) => {
+            const { ensureAssetSaved } = await import('@/lib/saveAsset');
+            await ensureAssetSaved({
+              imageUrl: newImageUrl,
+              action: 'edit',
+              sourceUrls: [editingImageUrl],
+              params: { source: 'artie_edit', instruction: editorInstruction },
+              skipToast: true,
+            });
+
+            await learnFromAction('edit', newImageUrl, {
+              sourceUrl: editingImageUrl,
+              instruction: editorInstruction,
+            });
+
+            toast.success("Your edited image is ready and saved to My Projects!");
+            setEditorOpen(false);
+          }}
+        />
       </div>
     </ErrorBoundary>
   );

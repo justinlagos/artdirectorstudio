@@ -222,7 +222,7 @@ const AppContent = () => {
                 <TrialWelcomeToast />
               </Suspense>
             </ErrorBoundary>
-            <SafeArtieChat />
+            {/* <SafeArtieChat /> */}
               </ToolsModalProvider>
             </AuthProvider>
           </BrowserRouter>

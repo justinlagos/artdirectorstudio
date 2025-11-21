@@ -54,6 +54,10 @@ export const Header = () => {
             <Button variant="ghost" size="sm" asChild>
               <Link to="/inspire">Inspire</Link>
             </Button>
+            
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/artie">Artie</Link>
+            </Button>
           </nav>
         </div>
 
@@ -151,6 +155,18 @@ export const Header = () => {
                       <Sparkles className="mr-3 h-4 w-4" />
                       Inspire
                     </Link>
+                  </Button>
+                  
+                  <Button
+                    variant="ghost"
+                    className="justify-start min-h-[48px] w-full"
+                    onClick={() => {
+                      navigate("/artie");
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    <Sparkles className="mr-3 h-4 w-4" />
+                    Artie
                   </Button>
                   
                   {!user && (

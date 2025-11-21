@@ -58,6 +58,13 @@ export const BottomNav = () => {
       isActive: (pathname) => pathname === "/inspire" || pathname === "/gallery"
     },
     {
+      id: "artie",
+      label: "Artie",
+      icon: MessageSquare,
+      action: () => navigate("/artie"),
+      isActive: (pathname) => pathname === "/artie"
+    },
+    {
       id: "projects",
       label: "My Projects",
       icon: FolderOpen,
@@ -79,7 +86,7 @@ export const BottomNav = () => {
           right: 0,
         }}
       >
-        <div className="grid grid-cols-5 h-16 safe-bottom">
+        <div className="grid grid-cols-6 h-16 safe-bottom">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.isActive(location.pathname);
