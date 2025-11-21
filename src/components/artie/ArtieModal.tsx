@@ -60,35 +60,33 @@ export const ArtieModal = ({
         {/* Content */}
         <DialogPrimitive.Content
           className={cn(
-            "fixed z-artie-modal-content",
+            "fixed z-artie-modal-content flex flex-col border border-border bg-background shadow-xl overflow-hidden",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "duration-200 ease-in-out",
             // Mobile: bottom sheet centered horizontally with slide animation from bottom-center
             isMobile
               ? [
-                  "left-0 right-0 mx-auto bottom-0 top-auto",
+                  "left-1/2 bottom-0 -translate-x-1/2 top-auto",
                   "w-full max-w-full",
-                  "rounded-t-2xl border-t border-l border-r border-border",
-                  "bg-background shadow-xl max-h-[96dvh]",
+                  "rounded-t-2xl",
+                  "max-h-[96dvh]",
                   "pb-[env(safe-area-inset-bottom)]",
-                  "data-[state=open]:animate-in data-[state=closed]:animate-out",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                   "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-                  "duration-300",
                 ]
-              : // Desktop: centered modal with fade+scale animation ONLY
+              : // Desktop: centered modal with animation from bottom-middle to center
                 [
                   "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
                   "right-auto bottom-auto",
-                  "rounded-2xl border border-border bg-background shadow-xl",
+                  "rounded-2xl",
                   "w-[90vw] max-h-[90vh]",
                   maxWidthClasses[maxWidth],
                   // Ensure minimum width for full size modals (Edit Image)
                   maxWidth === "full" && "min-w-[min(960px,90vw)]",
                   // Default max width for standard modals (Generate in Studio, etc.)
                   maxWidth !== "full" && !["sm", "md", "lg", "xl", "2xl"].includes(maxWidth) && "max-w-[820px]",
-                  "data-[state=open]:animate-in data-[state=closed]:animate-out",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-                  "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-                  "duration-300",
+                  "animate-toolDrawer",
                 ],
             className
           )}

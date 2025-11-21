@@ -747,17 +747,33 @@ All colors MUST be HSL.
     z-index: 90;
   }
 
+  /* ToolDrawer animation - from bottom-middle to center (desktop only) */
+  @keyframes toolDrawerIn {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 80px));
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  .animate-toolDrawer {
+    animation: toolDrawerIn 0.22s ease-out;
+    transform-origin: bottom center;
+  }
+
   /* Fix ToolDrawer positioning glitch on desktop - Cross-browser centering */
   @media (min-width: 768px) {
     [data-vaul-drawer] {
       /* Override bottom positioning on desktop - let Tailwind classes handle top/left */
       bottom: auto !important;
-      /* Ensure transform is applied for centering - Cross-browser compatible */
-      transform: translate(-50%, -50%);
-      -webkit-transform: translate(-50%, -50%);
       /* Fix for Safari - ensure proper centering */
       left: 50% !important;
       top: 50% !important;
+      right: auto !important;
+      /* Let animation handle transform, don't force it here */
       /* Prevent layout shifts */
       will-change: transform;
     }
