@@ -646,6 +646,14 @@ const Index = () => {
         <div id="studio-section" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6 md:pb-16 space-y-6 md:space-y-8">
           <OnboardingPopup />
           
+          {/* Studio Onboarding Copy */}
+          <div className="space-y-3 animate-fade-in">
+            <h2 className="text-2xl md:text-3xl font-display font-bold tracking-tight">Studio</h2>
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
+              Upload a visual, layout, or campaign asset. Artie will analyse it, highlight what matters, and help you generate next-step visuals, variations, and refinements.
+            </p>
+          </div>
+          
           <UploadSection
             onFileSelect={handleFileSelect}
             previewUrl={previewUrl}

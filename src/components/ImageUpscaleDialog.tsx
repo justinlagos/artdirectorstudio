@@ -15,6 +15,8 @@ import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { ToolDrawer } from "./ToolDrawer";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { analytics } from "@/lib/analytics";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -28,6 +30,8 @@ interface SourceImage {
 
 export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogProps) => {
   const toolState = useToolState();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
@@ -265,6 +269,8 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           },
           durationMs: duration,
           skipToast: true, // Upscale already shows success toast
+          queryClient,
+          userId: user?.id,
         }).then(async (assetId) => {
           if (assetId) {
             setUpscaledAssetId(assetId);

@@ -22,9 +22,6 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { GenerationPresets, GenerationPreset } from "./GenerationPresets";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { ArtieModal } from "./artie/ArtieModal";
@@ -37,10 +34,11 @@ import {
   calculateContinuationStrength, 
   getContinuationDescription 
 } from "@/lib/promptSimilarity";
-import { useRecentPrompts } from "@/hooks/useRecentPrompts";
 import { useSmartDefaults } from "@/hooks/useSmartDefaults";
 import { ImageContainer } from "./ImageContainer";
-import { PromptTemplates } from "./PromptTemplates";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { ensureAssetSaved } from "@/lib/saveAsset";
 
 export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
@@ -59,6 +57,8 @@ const truncatePrompt = (value: string) =>
 export const ImageGenerationDialog = () => {
   const isMobile = useIsMobile();
   const isGenerateModalOpen = useModalStore((state) => state.isGenerateModalOpen);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const storePrompt = useStudioStore((state) => state.prompt);
   const storeImage = useStudioStore((state) => state.imageUrl);
@@ -66,21 +66,18 @@ export const ImageGenerationDialog = () => {
   const setStoreImage = useStudioStore((state) => state.setImage);
   const generator = useStudioStore((state) => state.generator);
 
-  const { recentPrompts, addPrompt } = useRecentPrompts();
   const { lastOptions, saveOptions } = useSmartDefaults();
 
   const truncatedInitialPrompt = useMemo(() => truncatePrompt(storePrompt ?? ""), [storePrompt]);
 
   const [prompt, setPrompt] = useState(truncatedInitialPrompt);
   const [basePrompt, setBasePrompt] = useState(truncatedInitialPrompt);
-  const [selectedPreset, setSelectedPreset] = useState<GenerationPreset | null>(null);
   const [options, setOptions] = useState<GenerationOptions>(lastOptions);
   const [referenceImage, setReferenceImage] = useState<string | null>(storeImage ?? null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [presetsExpanded, setPresetsExpanded] = useState(false);
   const [generationStage, setGenerationStage] = useState<string>("");
   const [generationTime, setGenerationTime] = useState<number>(0);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -101,14 +98,12 @@ export const ImageGenerationDialog = () => {
 
     setPrompt(truncatedInitialPrompt);
     setBasePrompt(truncatedInitialPrompt);
-    setSelectedPreset(null);
     setGeneratedImage(null);
     setProgress(0);
     setGenerationStage("");
     setGenerationTime(0);
     setLastError(null);
     setShowAdvanced(false);
-    setPresetsExpanded(false);
     setReferenceImage(storeImage ?? null);
     setPreviousGeneratedPrompt("");
     setContinuationStrength(1.0);
@@ -200,6 +195,28 @@ export const ImageGenerationDialog = () => {
 
       if (imageUrl) {
         setGeneratedImage(imageUrl);
+        
+        // Ensure image is saved to My Projects (edge function should save, but verify/fallback)
+        // Use ensureAssetSaved as fallback in case edge function didn't save
+        ensureAssetSaved({
+          imageUrl: imageUrl,
+          action: 'generate',
+          prompt: prompt || basePrompt,
+          params: {
+            quality: options.quality,
+            size: options.size,
+            background: options.background,
+            continuationStrength: finalContinuationStrength,
+            hadReference: !!referenceImage,
+          },
+          durationMs: totalTime * 1000,
+          queryClient,
+          userId: user?.id,
+          skipToast: true, // Don't show duplicate toast
+        }).catch((err) => {
+          // Silently handle - might already be saved by edge function
+          console.log('[Generate] Save check completed:', err?.message || 'OK');
+        });
         
         // Enhanced success feedback
         toast.success(
@@ -424,95 +441,11 @@ export const ImageGenerationDialog = () => {
     handleGenerate();
   };
 
-  const incrementPresetUsage = async (presetId: string) => {
-    try {
-      const { data } = await supabase
-        .from("custom_generation_presets")
-        .select("usage_count")
-        .eq("id", presetId)
-        .single();
-
-      if (data) {
-        await supabase
-          .from("custom_generation_presets")
-          .update({ usage_count: (data.usage_count || 0) + 1 })
-          .eq("id", presetId);
-      }
-    } catch (error) {
-      console.error("Error incrementing usage:", error);
-    }
-  };
-
-  const handlePresetSelect = (preset: GenerationPreset) => {
-    setSelectedPreset(preset);
-    setOptions(preset.options);
-
-    if (preset.id.includes("-")) {
-      incrementPresetUsage(preset.id);
-    }
-
-    const enhancedPrompt = basePrompt + preset.promptModifier;
-
-    if (enhancedPrompt.length <= MAX_PROMPT_LENGTH) {
-      setPrompt(enhancedPrompt);
-      setStorePrompt(enhancedPrompt);
-      toast.success(`"${preset.name}" preset applied!`);
-    } else {
-      setPrompt(basePrompt);
-      setStorePrompt(basePrompt);
-      toast.info(`"${preset.name}" settings applied. Prompt modifier skipped due to length.`);
-    }
-
-    if (isMobile) {
-      setPresetsExpanded(false);
-    }
-  };
-
-  const handleClearPreset = () => {
-    setSelectedPreset(null);
-    setPrompt(basePrompt);
-    setStorePrompt(basePrompt);
-    setOptions({
-      quality: "auto",
-      size: "1024x1024",
-      background: "auto",
-    });
-    toast.info("Preset cleared, returned to custom settings");
-  };
-
-  const handlePromptChange = (newValue: string) => {
-    if (newValue.length <= MAX_PROMPT_LENGTH) {
-      setPrompt(newValue);
-      setStorePrompt(newValue);
-      if (selectedPreset) {
-        setBasePrompt(newValue);
-        setSelectedPreset(null);
-        toast.info("Custom edits detected, preset cleared");
-      } else {
-        setBasePrompt(newValue);
-      }
-    } else {
-      toast.error(`Maximum ${MAX_PROMPT_LENGTH} characters allowed`);
-    }
-  };
-
   const handleBasePromptChange = (newValue: string) => {
     if (newValue.length <= MAX_PROMPT_LENGTH) {
       setBasePrompt(newValue);
-      if (selectedPreset) {
-        const enhanced = newValue + selectedPreset.promptModifier;
-        if (enhanced.length <= MAX_PROMPT_LENGTH) {
-          setPrompt(enhanced);
-          setStorePrompt(enhanced);
-        } else {
-          setPrompt(newValue);
-          setStorePrompt(newValue);
-          toast.info("Preset modifier removed due to length");
-        }
-      } else {
-        setPrompt(newValue);
-        setStorePrompt(newValue);
-      }
+      setPrompt(newValue);
+      setStorePrompt(newValue);
     }
   };
 
@@ -521,11 +454,9 @@ export const ImageGenerationDialog = () => {
     setPrompt("");
     setBasePrompt("");
     setReferenceImage(null);
-    setSelectedPreset(null);
     setGeneratedImage(null);
     setProgress(0);
     setShowAdvanced(false);
-    setPresetsExpanded(false);
   };
 
   const bodyContent = (
@@ -645,41 +576,10 @@ export const ImageGenerationDialog = () => {
         )}
       </div>
 
-      {/* Right Column: Tabs and Controls (Desktop) or Below (Mobile) */}
+      {/* Right Column: Your Base Prompt (Desktop) or Below (Mobile) */}
       <div className="flex flex-col min-h-0">
-        <Tabs defaultValue="templates" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-3 shrink-0">
-            <TabsTrigger value="templates">Templates</TabsTrigger>
-            <TabsTrigger value="presets">Presets</TabsTrigger>
-            <TabsTrigger value="custom">Custom Prompt</TabsTrigger>
-          </TabsList>
-
-          {/* Scrollable tabs content */}
-          <div className="flex-1 overflow-y-auto min-h-0 mt-4">
-            <TabsContent value="templates" className="mt-0">
-              <div className="mb-4">
-                <p className="text-sm text-muted-foreground">
-                  Choose a template to guide the AI's creative direction, or switch to Custom for full control.
-                </p>
-              </div>
-              <PromptTemplates
-                  referenceImageUrl={referenceImage || undefined}
-                  currentPrompt={prompt || basePrompt}
-                  onSelect={(enhancedPrompt) => {
-                    // Template has already been enhanced with context awareness by PromptTemplates
-                    if (enhancedPrompt.length > MAX_PROMPT_LENGTH) {
-                      toast.error(`Combined prompt would exceed ${MAX_PROMPT_LENGTH} characters`);
-                      return;
-                    }
-                    
-                    setPrompt(enhancedPrompt);
-                    setBasePrompt(enhancedPrompt);
-                    setStorePrompt(enhancedPrompt);
-                  }}
-                />
-            </TabsContent>
-
-            <TabsContent value="presets" className="mt-0 space-y-4">
+        <div className="flex-1 overflow-y-auto min-h-0 space-y-4">
+          {/* Your Base Prompt Section */}
           <div className="space-y-3 rounded-2xl border border-accent/20 bg-accent/5 p-6">
             <div className="flex items-center gap-3">
               <Label className="text-base font-semibold">Your Base Prompt</Label>
@@ -693,124 +593,21 @@ export const ImageGenerationDialog = () => {
               placeholder="Describe the image you want to generate..."
               disabled={isGenerating}
             />
-            {selectedPreset && (
-              <p className="text-xs text-muted-foreground">✨ Preset enhancements will be automatically added</p>
-            )}
           </div>
 
-          <Separator />
-
-          {selectedPreset && (
-            <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-4 w-4 flex-shrink-0">{selectedPreset.icon}</div>
-                <div>
-                  <div className="text-sm font-medium">{selectedPreset.name}</div>
-                  <div className="text-xs text-muted-foreground">Active preset</div>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearPreset}
-                disabled={isGenerating}
-                className="h-8"
-              >
-                <RotateCcw className="mr-1.5 h-3 w-3" />
-                Clear
-              </Button>
-            </div>
+          {/* Character limit warning */}
+          {basePrompt.length > MAX_PROMPT_LENGTH * 0.9 && (
+            <Alert variant={basePrompt.length > MAX_PROMPT_LENGTH ? "destructive" : "default"}>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {basePrompt.length > MAX_PROMPT_LENGTH
+                  ? `Prompt exceeds maximum length by ${basePrompt.length - MAX_PROMPT_LENGTH} characters. Please shorten it.`
+                  : `Approaching character limit: ${basePrompt.length}/${MAX_PROMPT_LENGTH}`}
+              </AlertDescription>
+            </Alert>
           )}
 
-          <Collapsible open={presetsExpanded} onOpenChange={setPresetsExpanded}>
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" className="mb-3 min-h-[44px] w-full justify-between" disabled={isGenerating}>
-                <span className="font-medium">
-                  {presetsExpanded ? "Hide Quick Presets" : "Browse Quick Presets"}
-                </span>
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${presetsExpanded ? "rotate-180" : ""}`}
-                />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <GenerationPresets
-                onSelectPreset={handlePresetSelect}
-                disabled={isGenerating}
-                selectedPresetId={selectedPreset?.id}
-                onManageCustomPresets={() => {
-                  const presetData = {
-                    options,
-                    prompt_modifier: selectedPreset?.promptModifier || "",
-                    base_prompt: basePrompt,
-                  };
-                  window.location.href = `/settings?tab=presets&data=${encodeURIComponent(
-                    JSON.stringify(presetData)
-                  )}`;
-                }}
-              />
-            </CollapsibleContent>
-          </Collapsible>
-            </TabsContent>
-
-            <TabsContent value="custom" className="mt-0 space-y-4">
-              {/* Large textarea for custom prompt */}
-              <div className="space-y-3">
-                <EnhancedPromptEditor
-                  value={prompt}
-                  onChange={handlePromptChange}
-                  label="Image Prompt"
-                  placeholder="Describe the image you want to generate..."
-                  disabled={isGenerating}
-                />
-                
-                {/* Subtle helper copy */}
-                <p className="text-xs text-muted-foreground">
-                  Be specific about style, composition, colors, mood, and any important details.
-                </p>
-              </div>
-
-              {/* Recent prompts (optional, collapsible) */}
-              {recentPrompts.length > 0 && (
-                <Collapsible>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full justify-between text-xs">
-                      <span className="flex items-center gap-2">
-                        <Clock className="h-3 w-3" />
-                        Recent Prompts ({recentPrompts.length})
-                      </span>
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-3 pt-3">
-                    <Select onValueChange={(value) => setPrompt(value)} disabled={isGenerating}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Load a recent prompt..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {recentPrompts.map((recentPrompt, idx) => (
-                          <SelectItem key={idx} value={recentPrompt}>
-                            {recentPrompt.slice(0, 60)}...
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-
-              {/* Character limit warning */}
-              {prompt.length > MAX_PROMPT_LENGTH * 0.9 && (
-                <Alert variant={prompt.length > MAX_PROMPT_LENGTH ? "destructive" : "default"}>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    {prompt.length > MAX_PROMPT_LENGTH
-                      ? `Prompt exceeds maximum length by ${prompt.length - MAX_PROMPT_LENGTH} characters. Please shorten it.`
-                      : `Approaching character limit: ${prompt.length}/${MAX_PROMPT_LENGTH}`}
-                  </AlertDescription>
-                </Alert>
-              )}
-
+          {/* Advanced Options */}
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="min-h-[44px] w-full justify-between">
@@ -897,44 +694,42 @@ export const ImageGenerationDialog = () => {
               </div>
             </CollapsibleContent>
           </Collapsible>
-            </TabsContent>
-          </div>
+        </div>
 
-          {/* Status messages - outside scrollable area */}
-          {isGenerating && (
-            <div className="mt-4 space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4 shrink-0">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-foreground">{generationStage}</p>
-                <span className="text-xs text-muted-foreground">{progress}%</span>
-              </div>
-              <Progress value={progress} className="w-full" />
-              <p className="text-xs text-muted-foreground text-center">
-                This usually takes 8-15 seconds
-              </p>
+        {/* Status messages - outside scrollable area */}
+        {isGenerating && (
+          <div className="mt-4 space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4 shrink-0">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-foreground">{generationStage}</p>
+              <span className="text-xs text-muted-foreground">{progress}%</span>
             </div>
-          )}
+            <Progress value={progress} className="w-full" />
+            <p className="text-xs text-muted-foreground text-center">
+              This usually takes 8-15 seconds
+            </p>
+          </div>
+        )}
 
-          {lastError && !isGenerating && (
-            <Alert variant="destructive" className="mt-4 border-destructive/50 shrink-0">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                  <p className="font-semibold">Generation failed</p>
-                  <p className="text-sm mt-1">{lastError}</p>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={handleRetry}
-                  className="shrink-0"
-                >
-                  <RotateCcw className="mr-1.5 h-3 w-3" />
-                  Retry
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-        </Tabs>
+        {lastError && !isGenerating && (
+          <Alert variant="destructive" className="mt-4 border-destructive/50 shrink-0">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <p className="font-semibold">Generation failed</p>
+                <p className="text-sm mt-1">{lastError}</p>
+              </div>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={handleRetry}
+                className="shrink-0"
+              >
+                <RotateCcw className="mr-1.5 h-3 w-3" />
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
     </div>
   );

@@ -60,6 +60,7 @@ const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const SignedOut = lazy(() => import("./pages/SignedOut"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PresetGallery = lazy(() => import("./pages/PresetGallery"));
+const ArtiePage = lazy(() => import("./pages/ArtiePage"));
 
 const TrialWelcomeToast = lazy(() => 
   import("./components/TrialWelcomeToast")
@@ -201,10 +202,11 @@ const AppContent = () => {
                 <Route path="/plans" element={<Subscriptions />} />
                 <Route path="/subscription-history" element={<SubscriptionHistory />} />
                 <Route path="/billing-history" element={<BillingHistory />} />
-                <Route path="/signed-out" element={<SignedOut />} />
-                <Route path="/presets" element={<PresetGallery />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
+                  <Route path="/signed-out" element={<SignedOut />} />
+                  <Route path="/presets" element={<PresetGallery />} />
+                  <Route path="/artie" element={<ArtiePage />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
             <ErrorBoundary>

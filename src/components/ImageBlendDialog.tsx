@@ -14,6 +14,8 @@ import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { ToolDrawer } from "./ToolDrawer";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { analytics } from "@/lib/analytics";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BLEND_STYLE_PRESETS = [
   { id: "modern", label: "Modern", hint: "Modern minimal aesthetic" },
@@ -35,6 +37,8 @@ interface ImageFile {
 
 export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) => {
   const toolState = useToolState();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("");
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
@@ -390,6 +394,8 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           },
           durationMs: duration,
           skipToast: true, // Blend already shows success toast
+          queryClient,
+          userId: user?.id,
         }).then(async (assetId) => {
           if (assetId) {
             setBlendedAssetId(assetId);
