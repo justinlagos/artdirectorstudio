@@ -42,7 +42,8 @@ import { ImageZoomDialog } from "./ImageZoomDialog";
 
 export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
-  aspectRatio: "1:1" | "4:5" | "3:2" | "2:3" | "16:9" | "9:16" | "4:3" | "3:4";
+  aspectRatio?: "1:1" | "4:5" | "3:2" | "2:3" | "16:9" | "9:16" | "4:3" | "3:4";
+  size?: string; // Legacy field for backward compatibility
   background: "transparent" | "opaque" | "auto";
   referenceImageUrl?: string;
   continuationStrength?: number;
