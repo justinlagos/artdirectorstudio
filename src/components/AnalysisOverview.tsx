@@ -1,7 +1,7 @@
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { AlertCircle, CheckCircle2, Lightbulb, TrendingUp, Sparkles, Wand2, Edit3, MessageSquare, Zap, Palette, Eye, Target } from "lucide-react";
+import { AlertCircle, Blend, CheckCircle2, Copy, Edit3, Eye, Lightbulb, MessageSquare, Palette, Sparkles, Target, TrendingUp, UploadCloud, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUnifiedModalStore } from "@/store/unifiedModalStore";
 import { useUnifiedVisualContext } from "@/store/unifiedVisualContext";
@@ -76,6 +76,25 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
     });
   };
 
+  const handleGenerateVariations = () => {
+    if (imageUrl) {
+      setActiveImage(imageUrl, imageId);
+    }
+    if (fullPrompt) {
+      setPrompt(fullPrompt);
+    }
+    addOperation({
+      tool: 'generate',
+      prompt: fullPrompt,
+      imageUrl: imageUrl,
+      params: { mode: 'variation' },
+    });
+    openModal('generate', {
+      prompt: fullPrompt,
+      referenceImage: imageUrl,
+    });
+  };
+
   const handleEditDesign = () => {
     if (!imageUrl) return;
     
@@ -91,6 +110,27 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
     openModal('edit', {
       imageUrl: imageUrl,
       instruction: 'Refine this design based on the analysis',
+    });
+  };
+
+  const handleUpscale = () => {
+    if (!imageUrl) return;
+    setActiveImage(imageUrl, imageId);
+    addOperation({ tool: 'upscale', imageUrl });
+    openModal('upscale', { imageUrl });
+  };
+
+  const handleBlend = () => {
+    if (!imageUrl) return;
+    setActiveImage(imageUrl, imageId);
+    addOperation({ tool: 'blend', imageUrl });
+    openModal('blend', { images: [imageUrl] });
+  };
+
+  const handlePostToCommunity = () => {
+    openModal('artie', {
+      initialMessage: 'Draft a short community post for this visual and include tags.',
+      contextImages: imageUrl ? [imageUrl] : undefined,
     });
   };
   
@@ -154,73 +194,80 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
 
   const keyInsights = extractKeyInsights();
 
-  const moodData = analysis.mood || analysis.mood_emotion || '';
-  const styleData = analysis.art_style || analysis.design_style || '';
-  const mediumData = analysis.medium || analysis.artistic_medium || '';
-
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Hero Section - Compact and Premium */}
-      <motion.div 
+    <div className="space-y-6 lg:space-y-8 animate-fade-in">
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 via-background to-accent/5 p-6 md:p-8 border border-border/50"
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 via-background to-accent/5 p-6 md:p-7 border border-border/50"
       >
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10" />
-        <div className="space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2 flex-1">
-              <Badge variant="secondary" className="mb-2">
-                <Eye className="w-3 h-3 mr-1" />
-                Analysis Complete
-              </Badge>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight leading-tight">
-                Visual Analysis
-              </h1>
-              <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-2xl">
-                {analysis.image_overview || "Comprehensive analysis of visual elements, composition, and creative opportunities."}
-              </p>
-            </div>
+        <div className="absolute top-0 right-0 w-52 h-52 bg-primary/5 rounded-full blur-3xl -z-10" />
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="flex items-center gap-1">
+              <Eye className="w-3 h-3" />
+              Visual Summary
+            </Badge>
+            <span className="text-xs text-muted-foreground">Artie captured</span>
           </div>
-          
-          {/* Premium Action Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4">
+          <p className="text-base md:text-lg text-foreground/90 leading-relaxed max-w-3xl">
+            {analysis.image_overview || 'Artie is reviewing composition, palette, and focal balance to summarize the shot.'}
+          </p>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="rounded-2xl border border-border/70 bg-background/80 shadow-sm"
+      >
+        <div className="flex flex-col gap-4 p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-base font-semibold">Primary Actions</h2>
+              <p className="text-sm text-muted-foreground">Quick follow-ups designed for thumb reach.</p>
+            </div>
+            <Badge variant="outline" className="text-xs">Live studio</Badge>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Button
               onClick={handleOpenArtie}
-              variant="default"
               size="lg"
-              className="group hover-scale transition-all duration-200 shadow-sm hover:shadow-md"
+              className="w-full justify-between sm:justify-center gap-3 bg-primary text-primary-foreground"
             >
-              <MessageSquare className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform" />
-              <span className="font-medium">Discuss with Artie</span>
+              <span className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Discuss with Artie
+              </span>
+              <span className="text-xs opacity-75">Live</span>
             </Button>
             <Button
-              onClick={handleRegenerateStyle}
+              onClick={handleGenerateVariations}
               variant="secondary"
               size="lg"
               disabled={!fullPrompt}
-              className="group hover-scale transition-all duration-200"
+              className="w-full justify-between sm:justify-center gap-3"
             >
-              <Wand2 className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform" />
-              <span className="font-medium">Regenerate</span>
+              <Wand2 className="w-4 h-4" />
+              Generate Variations
             </Button>
             <Button
               onClick={handleEditDesign}
               variant="outline"
               size="lg"
               disabled={!imageUrl}
-              className="group hover-scale transition-all duration-200"
+              className="w-full justify-between sm:justify-center gap-3"
             >
-              <Edit3 className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-              <span className="font-medium">Edit Design</span>
+              <Edit3 className="w-4 h-4" />
+              Edit Image
             </Button>
           </div>
         </div>
       </motion.div>
 
-      {/* Insights Grid - Compact Premium Design */}
       {keyInsights.filter(i => i.category === 'strength').length > 0 && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -228,209 +275,141 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
         >
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-            <h2 className="text-lg font-semibold">Strengths</h2>
+            <h2 className="text-lg font-semibold">What’s Working</h2>
             <Badge variant="secondary" className="ml-auto">
-              {keyInsights.filter(i => i.category === 'strength').length}
+              {Math.min(keyInsights.filter(i => i.category === 'strength').length, 5)} strengths
             </Badge>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            {keyInsights.filter(i => i.category === 'strength').map((insight, idx) => {
-              const Icon = insight.icon;
-              return (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 + idx * 0.05 }}
-                >
-                  <Card className="group p-4 border border-emerald-500/20 bg-gradient-to-br from-emerald-50/50 via-background to-background dark:from-emerald-950/10 hover:shadow-md hover:border-emerald-500/40 transition-all duration-200 hover-scale">
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            {keyInsights
+              .filter(i => i.category === 'strength')
+              .slice(0, 5)
+              .map((insight, idx) => {
+                const Icon = insight.icon;
+                return (
+                  <Card key={idx} className="p-4 border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/10">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10">
+                        <Icon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1">
-                          {insight.title}
-                        </h3>
-                        <p className="text-sm text-foreground/80 leading-snug line-clamp-2">
-                          {insight.content}
-                        </p>
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold leading-tight">{insight.title}</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{insight.content}</p>
                       </div>
                     </div>
                   </Card>
-                </motion.div>
-              );
-            })}
+                );
+              })}
           </div>
         </motion.div>
       )}
 
-      {/* Improvements - Compact Design */}
-      {keyInsights.some(i => i.category === 'improvement') && (
-        <motion.div 
+      {(keyInsights.some(i => i.category === 'improvement') || keyInsights.some(i => i.category === 'opportunity')) && (
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.15 }}
           className="space-y-3"
         >
           <div className="flex items-center gap-2">
             <Target className="h-5 w-5 text-amber-500" />
-            <h2 className="text-lg font-semibold">Areas to Improve</h2>
+            <h2 className="text-lg font-semibold">What to Improve</h2>
             <Badge variant="outline" className="ml-auto border-amber-500/30 text-amber-600 dark:text-amber-400">
-              {keyInsights.filter(i => i.category === 'improvement').length}
+              Creative Director notes
             </Badge>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            {keyInsights.filter(i => i.category === 'improvement').map((insight, idx) => {
-              const Icon = insight.icon;
-              return (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 + idx * 0.05 }}
-                >
-                  <Card className="group p-4 border border-amber-500/20 bg-gradient-to-br from-amber-50/50 via-background to-background dark:from-amber-950/10 hover:shadow-md hover:border-amber-500/40 transition-all duration-200 hover-scale">
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Icon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            {[...keyInsights.filter(i => i.category === 'improvement'), ...keyInsights.filter(i => i.category === 'opportunity')]
+              .slice(0, 5)
+              .map((insight, idx) => {
+                const Icon = insight.icon;
+                return (
+                  <Card key={idx} className="p-4 border border-amber-500/25 bg-amber-50/40 dark:bg-amber-950/10">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
+                        <Icon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-xs uppercase tracking-wider text-amber-700 dark:text-amber-300 mb-1">
-                          {insight.title}
-                        </h3>
-                        <p className="text-sm text-foreground/80 leading-snug line-clamp-2">
-                          {insight.content}
-                        </p>
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold leading-tight">{insight.title}</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{insight.content}</p>
                       </div>
                     </div>
                   </Card>
-                </motion.div>
-              );
-            })}
+                );
+              })}
           </div>
         </motion.div>
       )}
 
-      {/* Creative Opportunities - Premium Compact Cards */}
-      {keyInsights.some(i => i.category === 'opportunity') && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="space-y-3"
-        >
-          <div className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5 text-blue-500" />
-            <h2 className="text-lg font-semibold">Creative Opportunities</h2>
-            <Badge variant="outline" className="ml-auto border-blue-500/30 text-blue-600 dark:text-blue-400">
-              {keyInsights.filter(i => i.category === 'opportunity').length}
-            </Badge>
-          </div>
-          <div className="grid gap-3">
-            {keyInsights.filter(i => i.category === 'opportunity').map((insight, idx) => {
-              const Icon = insight.icon;
-              return (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 + idx * 0.05 }}
-                >
-                  <Card className="group p-4 border border-blue-500/20 bg-gradient-to-br from-blue-50/50 via-background to-background dark:from-blue-950/10 hover:shadow-md hover:border-blue-500/40 transition-all duration-200 hover-scale">
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-xs uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1">
-                          {insight.title}
-                        </h3>
-                        <p className="text-sm text-foreground/80 leading-snug line-clamp-2">
-                          {insight.content}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                </motion.div>
-              );
-            })}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Premium Stat Cards - Compact & Refined */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="space-y-3"
+        transition={{ delay: 0.2 }}
+        className="rounded-2xl border border-border/70 bg-background/70 shadow-sm"
       >
-        <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-violet-500" />
-          <h2 className="text-lg font-semibold">Key Attributes</h2>
+        <div className="flex flex-col gap-4 p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h2 className="text-base font-semibold">Creative Blueprint</h2>
+          </div>
+          <div className="rounded-xl border border-dashed border-border/60 bg-muted/30 p-4 text-sm text-foreground/90 leading-relaxed">
+            {fullPrompt || 'No generation prompt found.'}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fullPrompt && navigator.clipboard.writeText(fullPrompt)}
+              disabled={!fullPrompt}
+              className="gap-2"
+            >
+              <Copy className="w-4 h-4" />
+              Copy prompt
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRegenerateStyle}
+              disabled={!fullPrompt}
+              className="gap-2"
+            >
+              <Wand2 className="w-4 h-4" />
+              Reuse in Studio
+            </Button>
+          </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 400 }}
-          >
-            <Card className="p-4 bg-gradient-to-br from-violet-50/50 via-background to-background dark:from-violet-950/10 border-violet-500/20 hover:border-violet-500/40 transition-all hover:shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-md bg-violet-500/10 flex items-center justify-center">
-                  <Sparkles className="w-3 h-3 text-violet-600 dark:text-violet-400" />
-                </div>
-                <p className="text-xs font-medium text-violet-700 dark:text-violet-300 uppercase tracking-wider">Mood</p>
-              </div>
-              <p className="text-sm font-semibold truncate">{moodData || 'Balanced'}</p>
-            </Card>
-          </motion.div>
-          
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 400 }}
-          >
-            <Card className="p-4 bg-gradient-to-br from-pink-50/50 via-background to-background dark:from-pink-950/10 border-pink-500/20 hover:border-pink-500/40 transition-all hover:shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-md bg-pink-500/10 flex items-center justify-center">
-                  <Palette className="w-3 h-3 text-pink-600 dark:text-pink-400" />
-                </div>
-                <p className="text-xs font-medium text-pink-700 dark:text-pink-300 uppercase tracking-wider">Style</p>
-              </div>
-              <p className="text-sm font-semibold truncate">{styleData || 'Modern'}</p>
-            </Card>
-          </motion.div>
-          
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 400 }}
-          >
-            <Card className="p-4 bg-gradient-to-br from-orange-50/50 via-background to-background dark:from-orange-950/10 border-orange-500/20 hover:border-orange-500/40 transition-all hover:shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-md bg-orange-500/10 flex items-center justify-center">
-                  <Eye className="w-3 h-3 text-orange-600 dark:text-orange-400" />
-                </div>
-                <p className="text-xs font-medium text-orange-700 dark:text-orange-300 uppercase tracking-wider">Lighting</p>
-              </div>
-              <p className="text-sm font-semibold truncate">{analysis.lighting?.split('.')[0] || 'Natural'}</p>
-            </Card>
-          </motion.div>
-          
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 400 }}
-          >
-            <Card className="p-4 bg-gradient-to-br from-cyan-50/50 via-background to-background dark:from-cyan-950/10 border-cyan-500/20 hover:border-cyan-500/40 transition-all hover:shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-md bg-cyan-500/10 flex items-center justify-center">
-                  <Wand2 className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
-                </div>
-                <p className="text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">Medium</p>
-              </div>
-              <p className="text-sm font-semibold truncate">{mediumData || 'Digital'}</p>
-            </Card>
-          </motion.div>
-        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="grid gap-3 sm:grid-cols-3"
+      >
+        <Card className="p-5 space-y-3 h-full border-border/70 bg-background/80">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Blend className="w-4 h-4 text-primary" />
+            Blend
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">Mix this visual with another reference to explore new directions.</p>
+          <Button variant="secondary" size="sm" onClick={handleBlend} disabled={!imageUrl} className="justify-start">Start blend</Button>
+        </Card>
+        <Card className="p-5 space-y-3 h-full border-border/70 bg-background/80">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            Upscale
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">Sharpen edges and increase fidelity before exporting.</p>
+          <Button variant="secondary" size="sm" onClick={handleUpscale} disabled={!imageUrl} className="justify-start">Open upscale</Button>
+        </Card>
+        <Card className="p-5 space-y-3 h-full border-border/70 bg-background/80">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <UploadCloud className="w-4 h-4 text-primary" />
+            Post to Community
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">Share this take, gather quick feedback, and iterate live.</p>
+          <Button variant="outline" size="sm" onClick={handlePostToCommunity} className="justify-start">Draft post</Button>
+        </Card>
       </motion.div>
     </div>
   );
