@@ -51,11 +51,11 @@ export const Footer = () => {
               >
                 Studio
               </a>
-              <button 
-                onClick={() => handleNavigation('/inspire')} 
+              <button
+                onClick={() => handleNavigation('/community')}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[40px] flex items-center text-left w-full font-medium"
               >
-                Inspire
+                Community
               </button>
             </nav>
           </div>

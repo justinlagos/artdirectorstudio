@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, Layers, Maximize2, Sparkles, FolderOpen, MessageSquare } from "lucide-react";
+import { Home, Layers, Maximize2, Sparkles, MessageSquare } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
@@ -51,11 +51,11 @@ export const BottomNav = () => {
       isActive: () => false
     },
     {
-      id: "inspire",
-      label: "Inspire",
+      id: "community",
+      label: "Community",
       icon: Sparkles,
-      action: () => navigate("/inspire"),
-      isActive: (pathname) => pathname === "/inspire" || pathname === "/gallery"
+      action: () => navigate("/community"),
+      isActive: (pathname) => pathname === "/community"
     },
     {
       id: "artie",
@@ -64,13 +64,6 @@ export const BottomNav = () => {
       action: () => navigate("/artie"),
       isActive: (pathname) => pathname === "/artie"
     },
-    {
-      id: "projects",
-      label: "My Projects",
-      icon: FolderOpen,
-      action: () => navigate("/history"),
-      isActive: (pathname) => pathname === "/history"
-    }
   ];
 
   return (

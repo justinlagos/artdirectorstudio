@@ -354,7 +354,7 @@ const Insights = () => {
                     <Button 
                       variant="outline" 
                       className="h-auto py-4 flex flex-col items-start gap-2"
-                      onClick={() => navigate('/inspire')}
+                      onClick={() => navigate('/community')}
                     >
                       <Sparkles className="w-5 h-5" />
                       <div className="text-left">
@@ -404,7 +404,7 @@ const Insights = () => {
                       <Button 
                         variant="outline"
                         size="lg"
-                        onClick={() => navigate('/inspire')}
+                        onClick={() => navigate('/community')}
                         className="flex-1"
                       >
                         Learn More

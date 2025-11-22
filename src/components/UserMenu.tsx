@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, User, History, Shield, Settings, BarChart3, Crown, Coins } from "lucide-react";
+import { LogOut, User, Shield, Settings, BarChart3, Crown, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export const UserMenu = () => {
@@ -65,10 +65,6 @@ export const UserMenu = () => {
         <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer">
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate("/history")} className="cursor-pointer">
-          <History className="mr-2 h-4 w-4" />
-          <span>My Projects</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate("/insights")} className="cursor-pointer">
           <BarChart3 className="mr-2 h-4 w-4" />

@@ -336,10 +336,10 @@ const Dashboard = () => {
                     <Sparkles className="w-4 h-4 mr-2" />
                     {subscription.tier === 'free' ? 'View Plans' : 'Upgrade to Pro'}
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
                     size="lg"
-                    onClick={() => navigate('/inspire')}
+                    onClick={() => navigate('/community')}
                     className="flex-1"
                   >
                     Learn More
