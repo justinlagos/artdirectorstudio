@@ -52,7 +52,7 @@ export const Header = () => {
             )}
 
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/inspire">Inspire</Link>
+              <Link to="/community">Community</Link>
             </Button>
             
             <Button variant="ghost" size="sm" asChild>
@@ -151,9 +151,9 @@ export const Header = () => {
                     className="justify-start min-h-[48px]"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <Link to="/inspire">
+                    <Link to="/community">
                       <Sparkles className="mr-3 h-4 w-4" />
-                      Inspire
+                      Community
                     </Link>
                   </Button>
                   
