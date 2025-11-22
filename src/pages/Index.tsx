@@ -84,6 +84,7 @@ const Index = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
+  const [editedPrompt, setEditedPrompt] = useState<string | null>(null);
   
   // Debug logging
   useEffect(() => {
@@ -249,6 +250,7 @@ const Index = () => {
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     setResult(null);
+    setEditedPrompt(null);
   };
 
   const handleAnalyze = async (retryCount = 0) => {
@@ -587,6 +589,10 @@ const Index = () => {
     setResult(updatedResult);
   };
 
+  const handlePromptUpdate = (updatedPrompt: string) => {
+    setEditedPrompt(updatedPrompt);
+  };
+
   // Add timeout fallback for loading state to prevent infinite loading
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   
@@ -674,10 +680,13 @@ const Index = () => {
                 imageUrl={previewUrl || undefined}
                 analysisContent={
                   <div className="space-y-6">
-                    <PromptDisplay prompt={result.full_regeneration_prompt} />
+                    <PromptDisplay 
+                      prompt={editedPrompt || result.full_regeneration_prompt}
+                      onPromptUpdate={handlePromptUpdate}
+                    />
                     <AnalysisOverview
                       analysis={result.analysis}
-                      fullPrompt={result.full_regeneration_prompt}
+                      fullPrompt={editedPrompt || result.full_regeneration_prompt}
                       imageUrl={previewUrl || undefined}
                     />
                   </div>
