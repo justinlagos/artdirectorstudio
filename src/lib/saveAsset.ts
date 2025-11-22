@@ -93,7 +93,6 @@ async function ensureImageInStorage(
   if (uploadError) {
     console.warn('[SaveAsset] Primary upload failed, trying alternative path:', {
       error: uploadError.message,
-      code: uploadError.statusCode,
       fileName
     });
     
@@ -112,13 +111,11 @@ async function ensureImageInStorage(
       // Both uploads failed - this is a critical error
       console.error('[SaveAsset] Storage upload failed completely:', {
         primaryError: uploadError.message,
-        primaryCode: uploadError.statusCode,
         altError: altError.message,
-        altCode: altError.statusCode,
         fileName,
         altFileName
       });
-      throw new Error(`Storage upload failed: ${altError.message} (code: ${altError.statusCode})`);
+      throw new Error(`Storage upload failed: ${altError.message}`);
     }
 
     // Verify alternative upload succeeded
