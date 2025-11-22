@@ -42,6 +42,8 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const History = lazy(() => import("./pages/History"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Inspire = lazy(() => import("./pages/Inspire"));
+// Community temporarily disabled until database migration completes
+// const Community = lazy(() => import("./pages/Community"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Insights = lazy(() => import("./pages/Insights"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -181,9 +183,10 @@ const AppContent = () => {
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/" element={<Index />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/history" element={<History />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/inspire" element={<Inspire />} />
+                {/* Community temporarily uses Inspire until migration completes */}
+                <Route path="/community" element={<Inspire />} />
                 <Route path="/gallery" element={<Inspire />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/insights" element={<Insights />} />
