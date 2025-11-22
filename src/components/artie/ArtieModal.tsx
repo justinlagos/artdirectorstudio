@@ -63,14 +63,14 @@ export const ArtieModal = ({
             "fixed z-artie-modal-content flex flex-col border border-border bg-background shadow-xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "duration-200 ease-in-out",
-            // Mobile: bottom sheet centered horizontally with slide animation from bottom-center
-            // Matches ToolDrawer styling exactly for consistency
+            // Mobile: centered bottom sheet with consistent sizing
+            // No slide-from-right, always centered with bottom sheet animation
             isMobile
               ? [
                   "left-1/2 bottom-0 -translate-x-1/2 top-auto right-auto",
-                  "w-full max-w-full",
+                  "w-full max-w-full mx-auto",
                   "rounded-t-2xl",
-                  "max-h-[90dvh]",
+                  "max-h-[90vh]",
                   "pb-[env(safe-area-inset-bottom)]",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                   "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
