@@ -2,7 +2,7 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { CheckCircle2, Edit3, Lightbulb, MessageSquare, Sparkles, Target, Wand2, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
+import { CheckCircle2, Edit3, Sparkles, Target, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
 import { useUnifiedVisualContext } from "@/store/unifiedVisualContext";
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
@@ -225,7 +225,7 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
 
     if (analysis.subject_description) {
       insights.push({
-        icon: Lightbulb,
+        icon: Sparkles,
         title: 'Creative Direction',
         content: analysis.subject_description,
         category: 'opportunity',
@@ -245,36 +245,24 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <Card className="p-5 sm:p-6 border border-border/50 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-            <div className="space-y-1 text-left">
-              <p className="text-[11px] uppercase tracking-[0.35em] text-muted-foreground/80">Collaboration</p>
-              <h2 className="text-xl font-semibold text-foreground">Keep iterating with your analysis</h2>
-              <p className="text-sm text-muted-foreground max-w-2xl">
-                Send the latest reference image and prompt context into the tools you need next.
-              </p>
+        <Card className="p-5 sm:p-6 border border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-background">
+          <div className="flex flex-col gap-4">
+            <div className="space-y-1 text-center sm:text-left">
+              <p className="text-[11px] uppercase tracking-[0.35em] text-muted-foreground/80">Primary Actions</p>
+              <h2 className="text-lg font-semibold text-foreground">Ready to Create?</h2>
             </div>
-            <div className="grid w-full gap-2 sm:w-auto sm:min-w-[360px] sm:grid-cols-3">
-              <Button
-                onClick={handleOpenArtie}
-                className="w-full justify-center gap-2 h-11"
-                variant="default"
-              >
-                <MessageSquare className="h-4 w-4" />
-                <span className="truncate">Discuss with Artie</span>
-              </Button>
+            <div className="grid w-full gap-3 sm:grid-cols-2">
               <Button
                 onClick={handleGenerateVariations}
-                className="w-full justify-center gap-2 h-11"
-                variant="outline"
+                className="w-full justify-center gap-2 h-12 text-base font-semibold"
                 disabled={!fullPrompt}
               >
-                <Wand2 className="h-4 w-4" />
-                <span className="truncate">Generate Variations</span>
+                <Sparkles className="h-5 w-5" />
+                <span className="truncate">Generate in Studio</span>
               </Button>
               <Button
                 onClick={handleEditImage}
-                className="w-full justify-center gap-2 h-11"
+                className="w-full justify-center gap-2 h-12 text-base font-semibold"
                 variant="outline"
                 disabled={!imageUrl}
               >
