@@ -20,7 +20,7 @@ const SignedOut = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           <Button 
-            onClick={() => navigate("/inspire")} 
+            onClick={() => navigate("/community")}
             className="w-full gap-2"
             size="lg"
             variant="outline"

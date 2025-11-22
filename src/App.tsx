@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { usePageViewTracking } from "@/hooks/usePageViewTracking";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -39,11 +39,8 @@ const ImageGenerationDialog = lazy(() =>
 
 // Lazy load non-critical routes
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const History = lazy(() => import("./pages/History"));
 const Admin = lazy(() => import("./pages/Admin"));
-const Inspire = lazy(() => import("./pages/Inspire"));
-// Community temporarily disabled until database migration completes
-// const Community = lazy(() => import("./pages/Community"));
+const Community = lazy(() => import("./pages/Inspire"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Insights = lazy(() => import("./pages/Insights"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -184,10 +181,9 @@ const AppContent = () => {
                   <Route path="/" element={<Index />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/admin" element={<Admin />} />
-                <Route path="/inspire" element={<Inspire />} />
-                {/* Community temporarily uses Inspire until migration completes */}
-                <Route path="/community" element={<Inspire />} />
-                <Route path="/gallery" element={<Inspire />} />
+                <Route path="/inspire" element={<Navigate to="/community" replace />} />
+                <Route path="/community" element={<Community />} />
+                <Route path="/gallery" element={<Navigate to="/community" replace />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/insights" element={<Insights />} />
                 <Route path="/settings" element={<Settings />} />

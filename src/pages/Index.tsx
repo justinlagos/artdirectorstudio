@@ -15,7 +15,7 @@ import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import { KeyboardShortcutsGuide } from "@/components/KeyboardShortcutsGuide";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Keyboard } from "lucide-react";
+import { Keyboard, Lightbulb } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useKeyboardShortcuts, KeyboardShortcut, getModifierKey } from "@/hooks/useKeyboardShortcuts";
@@ -679,13 +679,13 @@ const Index = () => {
                 imageUrl={previewUrl || undefined}
                 analysisContent={
                   <>
-                    <AnalysisOverview 
+                    <AnalysisOverview
                       analysis={result.analysis}
                       fullPrompt={result.full_regeneration_prompt}
                       imageUrl={previewUrl || undefined}
                     />
-                    <ResultsSection 
-                      result={result} 
+                    <ResultsSection
+                      result={result}
                       onRegenerate={handleRegenerate}
                       isRegenerating={isAnalyzing}
                       onGenerateImage={handleGenerateImage}
@@ -694,6 +694,39 @@ const Index = () => {
                       onResultUpdate={handleResultUpdate}
                       imagePreviewUrl={previewUrl || undefined}
                     />
+                    <div className="mt-6 md:mt-8 rounded-2xl border border-border/60 bg-muted/30 backdrop-blur-sm p-4 md:p-6 shadow-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                          <Lightbulb className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground/80 font-semibold">Creative Director Insights</p>
+                          <p className="text-base text-foreground/90">Artie reviews layout, typography, and rhythm before you iterate.</p>
+                        </div>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+                          <p className="font-medium text-foreground">What Artie highlights</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Layout balance and spacing grid</li>
+                            <li>Font hierarchy and readability</li>
+                            <li>Composition weight and focal points</li>
+                            <li>Color balance and contrast</li>
+                            <li>Visual rhythm across sections</li>
+                          </ul>
+                        </div>
+                        <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+                          <p className="font-medium text-foreground">Guide the critique</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>What platform is this intended for?</li>
+                            <li>Do you prefer a minimal or expressive tone?</li>
+                            <li>Should typography be tighter for clarity?</li>
+                            <li>Any brand colors to emphasize or soften?</li>
+                            <li>Are we optimizing for mobile-first scrolling?</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
                   </>
                 }
               />
