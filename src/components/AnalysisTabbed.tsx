@@ -4,7 +4,7 @@ import { AnalysisOverview } from "@/components/AnalysisOverview";
 import { Analysis, UserEdits } from "@/pages/Index";
 import { ChipSelector } from "@/components/ChipSelector";
 import { Button } from "@/components/ui/button";
-import { Copy, Edit2 } from "lucide-react";
+import { Copy, Edit2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { 
   Accordion, 
@@ -13,6 +13,7 @@ import {
   AccordionTrigger 
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
 
 interface AnalysisTabbedProps {
   analysis: Analysis;
@@ -126,23 +127,23 @@ export const AnalysisTabbed = ({
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/50">
+      <TabsList className="grid w-full grid-cols-3 h-12 p-1.5 bg-muted/30 backdrop-blur-sm rounded-xl border border-border/50">
         <TabsTrigger 
           value="overview" 
-          className="data-[state=active]:bg-background data-[state=active]:shadow-sm py-2.5"
+          className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all duration-200 font-medium"
         >
           <span className="hidden sm:inline">Overview</span>
           <span className="sm:hidden">Quick</span>
         </TabsTrigger>
         <TabsTrigger 
           value="details" 
-          className="data-[state=active]:bg-background data-[state=active]:shadow-sm py-2.5"
+          className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all duration-200 font-medium"
         >
           Details
         </TabsTrigger>
         <TabsTrigger 
           value="technical" 
-          className="data-[state=active]:bg-background data-[state=active]:shadow-sm py-2.5"
+          className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg transition-all duration-200 font-medium"
         >
           <span className="hidden sm:inline">Technical</span>
           <span className="sm:hidden">Tech</span>
@@ -150,23 +151,34 @@ export const AnalysisTabbed = ({
       </TabsList>
 
       {/* Overview Tab */}
-      <TabsContent value="overview" className="mt-6 animate-fade-in">
-        <AnalysisOverview analysis={analysis} />
+      <TabsContent value="overview" className="mt-6">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <AnalysisOverview analysis={analysis} />
+        </motion.div>
       </TabsContent>
 
       {/* Details Tab */}
-      <TabsContent value="details" className="mt-6 animate-fade-in">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between mb-2">
+      <TabsContent value="details" className="mt-6">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-4"
+        >
+          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl border border-border/50">
             <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              <h3 className="text-sm font-semibold">
                 Creative Details
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Essential visual and aesthetic attributes
               </p>
             </div>
-            <Badge variant="outline">{detailsSections.length} Sections</Badge>
+            <Badge variant="secondary" className="shadow-sm">{detailsSections.length}</Badge>
           </div>
 
           <Accordion type="multiple" className="space-y-2">
@@ -174,27 +186,27 @@ export const AnalysisTabbed = ({
               <AccordionItem 
                 key={section.key} 
                 value={section.key}
-                className="border border-border/50 rounded-lg px-4 bg-card"
+                className="border border-border/40 rounded-xl px-5 bg-card/50 backdrop-blur-sm hover:border-border/60 transition-colors"
               >
-                <AccordionTrigger className="hover:no-underline py-4 hover:bg-transparent">
+                <AccordionTrigger className="hover:no-underline py-4">
                   <div className="flex items-center gap-3 text-left">
-                    <Badge variant="secondary" className="text-xs">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
                       {index + 1}
-                    </Badge>
+                    </div>
                     <span className="font-semibold text-sm">{section.title}</span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="pb-4">
-                  <div className="space-y-4 pt-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                <AccordionContent className="pb-5">
+                  <div className="space-y-4 pt-3">
+                    <div className="flex items-start justify-between gap-3 p-4 bg-muted/30 rounded-lg">
+                      <p className="text-sm text-foreground/90 leading-relaxed flex-1">
                         {section.content}
                       </p>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleCopySection(section.content, section.title)}
-                        className="shrink-0 h-8 w-8 p-0"
+                        className="shrink-0 h-8 w-8 p-0 hover:bg-primary/10 transition-colors"
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </Button>
@@ -202,10 +214,10 @@ export const AnalysisTabbed = ({
 
                     {/* Editable Fields */}
                     {section.editFields && section.editFields.length > 0 && (
-                      <div className="space-y-3 pt-3 border-t border-border/50">
-                        <div className="flex items-center gap-2">
-                          <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <div className="space-y-3 pt-3 border-t border-border/30">
+                        <div className="flex items-center gap-2 px-1">
+                          <Edit2 className="w-3.5 h-3.5 text-primary" />
+                          <p className="text-xs font-semibold text-primary uppercase tracking-wider">
                             Customize
                           </p>
                         </div>
@@ -226,22 +238,27 @@ export const AnalysisTabbed = ({
               </AccordionItem>
             ))}
           </Accordion>
-        </div>
+        </motion.div>
       </TabsContent>
 
       {/* Technical Tab */}
-      <TabsContent value="technical" className="mt-6 animate-fade-in">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between mb-2">
+      <TabsContent value="technical" className="mt-6">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-4"
+        >
+          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-accent/5 to-primary/5 rounded-xl border border-border/50">
             <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              <h3 className="text-sm font-semibold">
                 Technical Specifications
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Professional technical analysis and specifications
               </p>
             </div>
-            <Badge variant="outline">{technicalSections.length} Sections</Badge>
+            <Badge variant="secondary" className="shadow-sm">{technicalSections.length}</Badge>
           </div>
 
           <Accordion type="multiple" className="space-y-2">
@@ -249,27 +266,27 @@ export const AnalysisTabbed = ({
               <AccordionItem 
                 key={section.key} 
                 value={section.key}
-                className="border border-border/50 rounded-lg px-4 bg-card"
+                className="border border-border/40 rounded-xl px-5 bg-card/50 backdrop-blur-sm hover:border-border/60 transition-colors"
               >
-                <AccordionTrigger className="hover:no-underline py-4 hover:bg-transparent">
+                <AccordionTrigger className="hover:no-underline py-4">
                   <div className="flex items-center gap-3 text-left">
-                    <Badge variant="secondary" className="text-xs">
+                    <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center text-xs font-bold text-accent-foreground">
                       {index + 1}
-                    </Badge>
+                    </div>
                     <span className="font-semibold text-sm">{section.title}</span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="pb-4">
-                  <div className="space-y-4 pt-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                <AccordionContent className="pb-5">
+                  <div className="space-y-4 pt-3">
+                    <div className="flex items-start justify-between gap-3 p-4 bg-muted/30 rounded-lg">
+                      <p className="text-sm text-foreground/90 leading-relaxed flex-1">
                         {section.content}
                       </p>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleCopySection(section.content, section.title)}
-                        className="shrink-0 h-8 w-8 p-0"
+                        className="shrink-0 h-8 w-8 p-0 hover:bg-accent/10 transition-colors"
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </Button>
@@ -277,10 +294,10 @@ export const AnalysisTabbed = ({
 
                     {/* Editable Fields */}
                     {section.editFields && section.editFields.length > 0 && (
-                      <div className="space-y-3 pt-3 border-t border-border/50">
-                        <div className="flex items-center gap-2">
-                          <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <div className="space-y-3 pt-3 border-t border-border/30">
+                        <div className="flex items-center gap-2 px-1">
+                          <Edit2 className="w-3.5 h-3.5 text-accent" />
+                          <p className="text-xs font-semibold text-accent uppercase tracking-wider">
                             Customize
                           </p>
                         </div>
@@ -301,7 +318,7 @@ export const AnalysisTabbed = ({
               </AccordionItem>
             ))}
           </Accordion>
-        </div>
+        </motion.div>
       </TabsContent>
     </Tabs>
   );
