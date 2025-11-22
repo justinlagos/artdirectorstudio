@@ -1,8 +1,10 @@
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { AlertCircle, CheckCircle2, Lightbulb, TrendingUp, Sparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, Lightbulb, TrendingUp, Sparkles, Wand2, Edit3, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUnifiedModalStore } from "@/store/unifiedModalStore";
+import { useUnifiedVisualContext } from "@/store/unifiedVisualContext";
 
 interface AnalysisOverviewProps {
   analysis: {
@@ -19,6 +21,9 @@ interface AnalysisOverviewProps {
     medium?: string;
     artistic_medium?: string;
   };
+  fullPrompt?: string;
+  imageUrl?: string;
+  imageId?: string;
 }
 
 interface KeyInsight {
@@ -29,7 +34,66 @@ interface KeyInsight {
   color: string;
 }
 
-export const AnalysisOverview = ({ analysis }: AnalysisOverviewProps): JSX.Element => {
+export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: AnalysisOverviewProps): JSX.Element => {
+  const { openModal } = useUnifiedModalStore(state => ({
+    openModal: state.openModal,
+  }));
+  const { setActiveImage, setPrompt, addOperation } = useUnifiedVisualContext.getState();
+
+  const handleOpenArtie = () => {
+    if (imageUrl) {
+      setActiveImage(imageUrl, imageId);
+    }
+    if (fullPrompt) {
+      setPrompt(fullPrompt);
+    }
+    addOperation({
+      tool: 'artie',
+      prompt: fullPrompt,
+      imageUrl: imageUrl,
+    });
+    openModal('artie', {
+      initialMessage: `Give me feedback on this design`,
+      contextImages: imageUrl ? [imageUrl] : undefined,
+    });
+  };
+
+  const handleRegenerateStyle = () => {
+    if (imageUrl) {
+      setActiveImage(imageUrl, imageId);
+    }
+    if (fullPrompt) {
+      setPrompt(fullPrompt);
+    }
+    addOperation({
+      tool: 'generate',
+      prompt: fullPrompt,
+      imageUrl: imageUrl,
+    });
+    openModal('generate', {
+      prompt: fullPrompt,
+      referenceImage: imageUrl,
+    });
+  };
+
+  const handleEditDesign = () => {
+    if (!imageUrl) return;
+    
+    setActiveImage(imageUrl, imageId);
+    if (fullPrompt) {
+      setPrompt(fullPrompt);
+    }
+    addOperation({
+      tool: 'edit',
+      imageUrl: imageUrl,
+      prompt: fullPrompt,
+    });
+    openModal('edit', {
+      imageUrl: imageUrl,
+      instruction: 'Refine this design based on the analysis',
+    });
+  };
+  
   // Extract structured insights with creative director tonality
   const extractKeyInsights = (): KeyInsight[] => {
     const insights: KeyInsight[] = [];
@@ -97,11 +161,44 @@ export const AnalysisOverview = ({ analysis }: AnalysisOverviewProps): JSX.Eleme
   return (
     <div className="space-y-8 animate-fade-in">
       {/* H1: High-level summary */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Analysis Summary</h1>
         <p className="text-base md:text-lg leading-relaxed text-foreground/90">
           {analysis.image_overview || "A comprehensive analysis of your image's visual elements, composition, and creative opportunities."}
         </p>
+        
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Button
+            onClick={handleOpenArtie}
+            variant="default"
+            size="lg"
+            className="flex-1 sm:flex-none"
+          >
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Ask Artie for Feedback
+          </Button>
+          <Button
+            onClick={handleRegenerateStyle}
+            variant="secondary"
+            size="lg"
+            className="flex-1 sm:flex-none"
+            disabled={!fullPrompt}
+          >
+            <Wand2 className="w-4 h-4 mr-2" />
+            Regenerate Style
+          </Button>
+          <Button
+            onClick={handleEditDesign}
+            variant="outline"
+            size="lg"
+            className="flex-1 sm:flex-none"
+            disabled={!imageUrl}
+          >
+            <Edit3 className="w-4 h-4 mr-2" />
+            Edit This Design
+          </Button>
+        </div>
       </div>
 
       {/* H2: Key Insights Grid */}
@@ -228,20 +325,8 @@ export const AnalysisOverview = ({ analysis }: AnalysisOverviewProps): JSX.Eleme
         </div>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Use the Details and Technical tabs to explore deeper insights, or take action with the buttons below.
+            Use the details above to understand your design, then take action with the buttons at the top.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm">
-              <Sparkles className="h-4 w-4 mr-2" />
-              Generate Similar
-            </Button>
-            <Button variant="outline" size="sm">
-              Edit This Design
-            </Button>
-            <Button variant="outline" size="sm">
-              Ask Artie for Feedback
-            </Button>
-          </div>
         </div>
       </div>
     </div>

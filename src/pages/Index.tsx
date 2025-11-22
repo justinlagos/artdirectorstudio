@@ -24,6 +24,8 @@ import { openStudioWithPrompt } from "@/lib/studio";
 import { useStudioStore } from "@/store/studioStore";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageSkeleton } from "@/components/skeletons/PageSkeleton";
+import { AnalysisLayout } from "@/components/AnalysisLayout";
+import { AnalysisOverview } from "@/components/AnalysisOverview";
 // Premium Landing Page Components
 import { PremiumHero } from "@/components/landing/PremiumHero";
 import { PremiumFeatures } from "@/components/landing/PremiumFeatures";
@@ -673,15 +675,27 @@ const Index = () => {
           
           {result && analysisComplete && (
             <div className="w-full animate-fade-in" style={{ animationDelay: '200ms' }}>
-              <ResultsSection 
-                result={result} 
-                onRegenerate={handleRegenerate}
-                isRegenerating={isAnalyzing}
-                onGenerateImage={handleGenerateImage}
-                generatedImages={generatedImages}
-                onDeleteImage={handleDeleteImage}
-                onResultUpdate={handleResultUpdate}
-                imagePreviewUrl={previewUrl || undefined}
+              <AnalysisLayout
+                imageUrl={previewUrl || undefined}
+                analysisContent={
+                  <>
+                    <AnalysisOverview 
+                      analysis={result.analysis}
+                      fullPrompt={result.full_regeneration_prompt}
+                      imageUrl={previewUrl || undefined}
+                    />
+                    <ResultsSection 
+                      result={result} 
+                      onRegenerate={handleRegenerate}
+                      isRegenerating={isAnalyzing}
+                      onGenerateImage={handleGenerateImage}
+                      generatedImages={generatedImages}
+                      onDeleteImage={handleDeleteImage}
+                      onResultUpdate={handleResultUpdate}
+                      imagePreviewUrl={previewUrl || undefined}
+                    />
+                  </>
+                }
               />
             </div>
           )}
