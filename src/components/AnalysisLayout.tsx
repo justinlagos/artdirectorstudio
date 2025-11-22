@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { ArrowsMaximize, Maximize2, RefreshCw, ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, RefreshCw, ZoomIn, ZoomOut, Maximize } from "lucide-react";
 
 interface AnalysisLayoutProps {
   imageUrl?: string;
@@ -151,7 +151,7 @@ export const AnalysisLayout = ({
                 Replace image
               </button>
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-background/90 backdrop-blur ring-1 ring-border shadow-sm text-[11px] font-semibold">
-                <ArrowsMaximize className="w-3.5 h-3.5" />
+                <Maximize className="w-3.5 h-3.5" />
                 <span>Aspect live preview</span>
               </div>
             </div>

@@ -637,9 +637,6 @@ const Index = () => {
             <ErrorBoundary fallback={null}>
               <PremiumFeatures />
             </ErrorBoundary>
-            
-            <ErrorBoundary fallback={null}>
-            </ErrorBoundary>
           </>
         )}
 
