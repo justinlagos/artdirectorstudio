@@ -2,13 +2,17 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { CheckCircle2, Copy, Edit3, Lightbulb, MessageSquare, Sparkles, Target, Wand2, Check, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
-import { useUnifiedModalStore } from "@/store/unifiedModalStore";
+import { CheckCircle2, Edit3, Lightbulb, MessageSquare, Sparkles, Target, Wand2, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
 import { useUnifiedVisualContext } from "@/store/unifiedVisualContext";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useModalStore } from "@/store/modalStore";
+import { useStudioStore } from "@/store/studioStore";
+import { useVisualContextStore } from "@/store/visualContextStore";
+import { ImageEditor } from "@/components/ImageEditor";
+import { addImageToMemory as addImageToArtieMemory } from "@/lib/artie/imageMemory";
 
 interface AnalysisOverviewProps {
   analysis: {
@@ -39,26 +43,85 @@ interface KeyInsight {
 }
 
 export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: AnalysisOverviewProps): JSX.Element => {
-  const [copied, setCopied] = useState(false);
   const [strengthsOpen, setStrengthsOpen] = useState(false);
   const [improvementsOpen, setImprovementsOpen] = useState(false);
   const [blueprintOpen, setBlueprintOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const navigate = useNavigate();
-  
-  const openModal = useUnifiedModalStore(state => state.openModal);
-  const { setActiveImage, setPrompt, addOperation, addImageToMemory } = useUnifiedVisualContext.getState();
 
-  const handleCopyPrompt = () => {
-    if (fullPrompt) {
-      navigator.clipboard.writeText(fullPrompt);
-      setCopied(true);
-      toast.success("Prompt copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
+  const { setActiveImage, setPrompt, addOperation, addImageToMemory } = useUnifiedVisualContext.getState();
+  const openGenerateModal = useModalStore((state) => state.openGenerateModal);
+  const setStudioPrompt = useStudioStore((state) => state.setPrompt);
+  const setStudioImage = useStudioStore((state) => state.setImage);
+  const updateVisualPrompt = useVisualContextStore((state) => state.updatePrompt);
+  const updateVisualImage = useVisualContextStore((state) => state.updateImage);
+
+  const welcomeMessage = useMemo(() => "Hi! I'm Artie — Your Creative Collaborator.\n\nI can help you brainstorm ideas, refine visual concepts, analyze images, or guide you through any creative challenge. You can also upload images or creative briefs for me to review, and I can create variations of your images.\n\nWhat are we working on today?", []);
+
+  const seedArtieConversation = (messageId: string) => {
+    if (typeof window === 'undefined' || !imageUrl) return;
+
+    try {
+      const existing = sessionStorage.getItem('artie-conversation');
+      const parsed = existing ? JSON.parse(existing) : [];
+      const messages = Array.isArray(parsed) ? parsed : [];
+
+      if (messages.length === 0) {
+        messages.push({
+          id: '1',
+          text: welcomeMessage,
+          sender: 'artie',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const alreadyAttached = messages.some((m: any) => m.attachment?.url === imageUrl);
+      if (!alreadyAttached) {
+        messages.push({
+          id: messageId,
+          text: fullPrompt ? 'Bringing the latest analysis image and prompt context into our chat.' : "Let's continue working from this image.",
+          sender: 'user',
+          timestamp: new Date().toISOString(),
+          attachment: {
+            type: 'image',
+            url: imageUrl,
+            name: 'Current analysis image',
+          },
+        });
+      }
+
+      sessionStorage.setItem('artie-conversation', JSON.stringify(messages));
+
+      const contextRaw = sessionStorage.getItem('artie-context-memory');
+      const contextParsed = contextRaw ? JSON.parse(contextRaw) : {};
+      const context = {
+        images: Array.isArray(contextParsed.images) ? contextParsed.images : [],
+        documents: Array.isArray(contextParsed.documents) ? contextParsed.documents : [],
+        briefSummary: typeof contextParsed.briefSummary === 'string' ? contextParsed.briefSummary : undefined,
+      };
+
+      const hasContextImage = context.images?.some((img: any) => img.url === imageUrl);
+      if (!hasContextImage) {
+        context.images = [
+          ...context.images,
+          {
+            url: imageUrl,
+            messageId,
+            name: 'Analysis reference',
+            source: 'user',
+            timestamp: new Date().toISOString(),
+          },
+        ];
+        sessionStorage.setItem('artie-context-memory', JSON.stringify(context));
+      }
+    } catch (error) {
+      console.error('[AnalysisOverview] Failed to seed Artie conversation context', error);
     }
   };
 
   const handleOpenArtie = () => {
-    if (imageUrl && imageId) {
+    if (imageUrl) {
+      const messageId = crypto.randomUUID?.() || `img-${Date.now()}`;
       setActiveImage(imageUrl, imageId);
       setPrompt(fullPrompt || '');
       addOperation({ tool: 'studio', prompt: fullPrompt, imageUrl });
@@ -73,25 +136,50 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
           lighting: analysis.lighting,
         },
       });
+      seedArtieConversation(messageId);
+      addImageToArtieMemory({
+        url: imageUrl,
+        type: 'uploaded',
+        source: 'user',
+        name: 'Analysis image',
+        messageId,
+      });
     }
+
     navigate('/artie');
   };
 
   const handleGenerateVariations = () => {
-    if (imageUrl && imageId) {
-      setActiveImage(imageUrl, imageId);
-      setPrompt(fullPrompt || '');
-      addOperation({ tool: 'generate', prompt: fullPrompt, imageUrl, params: { mode: 'variation' } });
+    if (!fullPrompt) {
+      toast.error('No generation prompt available yet.');
+      return;
     }
-    openModal('generate', { prompt: fullPrompt, referenceImage: imageUrl });
+
+    if (imageUrl) {
+      setActiveImage(imageUrl, imageId);
+      setPrompt(fullPrompt);
+      setStudioImage(imageUrl);
+      updateVisualImage(imageUrl, imageId);
+    }
+
+    setStudioPrompt(fullPrompt);
+    updateVisualPrompt(fullPrompt);
+    addOperation({ tool: 'generate', prompt: fullPrompt, imageUrl, params: { mode: 'variation' } });
+    openGenerateModal();
   };
 
   const handleEditImage = () => {
-    if (!imageUrl) return;
+    if (!imageUrl) {
+      toast.error('Upload or analyze an image before editing.');
+      return;
+    }
+
     setActiveImage(imageUrl, imageId);
     setPrompt(fullPrompt || '');
+    updateVisualImage(imageUrl, imageId);
+    updateVisualPrompt(fullPrompt || analysis.image_overview || '');
     addOperation({ tool: 'edit', imageUrl, prompt: fullPrompt });
-    openModal('edit', { imageUrl, instruction: 'Refine this design based on the analysis' });
+    setEditOpen(true);
   };
 
   // Extract structured insights
@@ -151,100 +239,52 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
   const keyInsights = extractKeyInsights();
 
   return (
-    <div className="space-y-4 w-full max-w-4xl mx-auto">
-      {/* Full Generation Prompt - PRIMARY */}
+    <div className="space-y-6 w-full max-w-5xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <Card className="p-5 bg-gradient-to-br from-primary/5 via-background to-background border-primary/20">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <h2 className="text-base font-semibold">Full Generation Prompt</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCopyPrompt}
-              className="shrink-0 h-8 w-8 p-0"
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </Button>
+        <Card className="p-5 sm:p-6 border border-border/50 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="space-y-1 text-left">
+              <p className="text-[11px] uppercase tracking-[0.35em] text-muted-foreground/80">Collaboration</p>
+              <h2 className="text-xl font-semibold text-foreground">Keep iterating with your analysis</h2>
+              <p className="text-sm text-muted-foreground max-w-2xl">
+                Send the latest reference image and prompt context into the tools you need next.
+              </p>
+            </div>
+            <div className="grid w-full gap-2 sm:w-auto sm:min-w-[360px] sm:grid-cols-3">
+              <Button
+                onClick={handleOpenArtie}
+                className="w-full justify-center gap-2 h-11"
+                variant="default"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span className="truncate">Discuss with Artie</span>
+              </Button>
+              <Button
+                onClick={handleGenerateVariations}
+                className="w-full justify-center gap-2 h-11"
+                variant="outline"
+                disabled={!fullPrompt}
+              >
+                <Wand2 className="h-4 w-4" />
+                <span className="truncate">Generate Variations</span>
+              </Button>
+              <Button
+                onClick={handleEditImage}
+                className="w-full justify-center gap-2 h-11"
+                variant="outline"
+                disabled={!imageUrl}
+              >
+                <Edit3 className="h-4 w-4" />
+                <span className="truncate">Edit Image</span>
+              </Button>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {fullPrompt || 'No generation prompt available'}
-          </p>
         </Card>
       </motion.div>
-
-      {/* Primary Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.05 }}
-        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
-      >
-        <Button
-          onClick={handleOpenArtie}
-          className="w-full justify-center gap-2 h-11"
-          variant="default"
-        >
-          <MessageSquare className="h-4 w-4" />
-          <span className="truncate">Discuss with Artie</span>
-        </Button>
-        <Button
-          onClick={handleGenerateVariations}
-          className="w-full justify-center gap-2 h-11"
-          variant="outline"
-          disabled={!fullPrompt}
-        >
-          <Wand2 className="h-4 w-4" />
-          <span className="truncate">Generate Variations</span>
-        </Button>
-        <Button
-          onClick={handleEditImage}
-          className="w-full justify-center gap-2 h-11"
-          variant="outline"
-          disabled={!imageUrl}
-        >
-          <Edit3 className="h-4 w-4" />
-          <span className="truncate">Edit Image</span>
-        </Button>
-      </motion.div>
-
-      {/* Key Attributes - Compact */}
-      {(analysis.mood || analysis.art_style || analysis.design_style || analysis.lighting || analysis.medium || analysis.artistic_medium) && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="grid grid-cols-2 sm:grid-cols-4 gap-2"
-        >
-          {analysis.mood && (
-            <Card className="p-3 bg-card/50">
-              <div className="text-xs text-muted-foreground mb-0.5">Mood</div>
-              <div className="text-sm font-medium truncate">{analysis.mood}</div>
-            </Card>
-          )}
-          {(analysis.art_style || analysis.design_style) && (
-            <Card className="p-3 bg-card/50">
-              <div className="text-xs text-muted-foreground mb-0.5">Style</div>
-              <div className="text-sm font-medium truncate">{analysis.art_style || analysis.design_style}</div>
-            </Card>
-          )}
-          {analysis.lighting && (
-            <Card className="p-3 bg-card/50">
-              <div className="text-xs text-muted-foreground mb-0.5">Lighting</div>
-              <div className="text-sm font-medium truncate">{analysis.lighting}</div>
-            </Card>
-          )}
-          {(analysis.medium || analysis.artistic_medium) && (
-            <Card className="p-3 bg-card/50">
-              <div className="text-xs text-muted-foreground mb-0.5">Medium</div>
-              <div className="text-sm font-medium truncate">{analysis.medium || analysis.artistic_medium}</div>
-            </Card>
-          )}
-        </motion.div>
-      )}
 
       {/* What's Working - Collapsible */}
       {keyInsights.filter(i => i.category === 'strength').length > 0 && (
@@ -331,23 +371,56 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
                 {blueprintOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="px-4 pb-4 space-y-3">
-                  {analysis.image_overview && (
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">Overview</div>
-                      <div className="text-sm">{analysis.image_overview}</div>
-                    </div>
-                  )}
-                  {analysis.composition && (
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">Composition</div>
-                      <div className="text-sm">{analysis.composition}</div>
-                    </div>
-                  )}
-                  {analysis.color_palette && (
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">Color Palette</div>
-                      <div className="text-sm">{analysis.color_palette}</div>
+                <div className="px-4 pb-5 space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {analysis.image_overview && (
+                      <Card className="p-3 bg-card/50 h-full">
+                        <div className="text-xs text-muted-foreground mb-1">Overview</div>
+                        <p className="text-sm leading-relaxed text-foreground/90">{analysis.image_overview}</p>
+                      </Card>
+                    )}
+                    {analysis.composition && (
+                      <Card className="p-3 bg-card/50 h-full">
+                        <div className="text-xs text-muted-foreground mb-1">Composition</div>
+                        <p className="text-sm leading-relaxed text-foreground/90">{analysis.composition}</p>
+                      </Card>
+                    )}
+                    {analysis.color_palette && (
+                      <Card className="p-3 bg-card/50 h-full">
+                        <div className="text-xs text-muted-foreground mb-1">Color Palette</div>
+                        <p className="text-sm leading-relaxed text-foreground/90">{analysis.color_palette}</p>
+                      </Card>
+                    )}
+                  </div>
+
+                  {(analysis.art_style || analysis.design_style || analysis.lighting || analysis.artistic_medium) && (
+                    <div className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[11px] uppercase tracking-[0.25em]">Overview</Badge>
+                          <span className="text-sm font-semibold text-foreground">Style, Lighting & Medium</span>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {(analysis.art_style || analysis.design_style) && (
+                          <Card className="p-3 bg-background/70 h-full">
+                            <div className="text-xs text-muted-foreground mb-1">Style</div>
+                            <p className="text-sm font-medium text-foreground/90 leading-relaxed">{analysis.art_style || analysis.design_style}</p>
+                          </Card>
+                        )}
+                        {analysis.lighting && (
+                          <Card className="p-3 bg-background/70 h-full">
+                            <div className="text-xs text-muted-foreground mb-1">Lighting</div>
+                            <p className="text-sm font-medium text-foreground/90 leading-relaxed">{analysis.lighting}</p>
+                          </Card>
+                        )}
+                        {(analysis.medium || analysis.artistic_medium) && (
+                          <Card className="p-3 bg-background/70 h-full">
+                            <div className="text-xs text-muted-foreground mb-1">Medium</div>
+                            <p className="text-sm font-medium text-foreground/90 leading-relaxed">{analysis.medium || analysis.artistic_medium}</p>
+                          </Card>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -356,6 +429,13 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
           </Collapsible>
         </motion.div>
       )}
+
+      <ImageEditor
+        open={editOpen && !!imageUrl}
+        onOpenChange={setEditOpen}
+        imageUrl={imageUrl || ""}
+        initialInstruction={fullPrompt || analysis.image_overview || ""}
+      />
     </div>
   );
 };

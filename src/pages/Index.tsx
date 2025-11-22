@@ -674,11 +674,6 @@ const Index = () => {
                 imageUrl={previewUrl || undefined}
                 analysisContent={
                   <>
-                    <AnalysisOverview
-                      analysis={result.analysis}
-                      fullPrompt={result.full_regeneration_prompt}
-                      imageUrl={previewUrl || undefined}
-                    />
                     <ResultsSection
                       result={result}
                       onRegenerate={handleRegenerate}
@@ -688,6 +683,11 @@ const Index = () => {
                       onDeleteImage={handleDeleteImage}
                       onResultUpdate={handleResultUpdate}
                       imagePreviewUrl={previewUrl || undefined}
+                    />
+                    <AnalysisOverview
+                      analysis={result.analysis}
+                      fullPrompt={result.full_regeneration_prompt}
+                      imageUrl={previewUrl || undefined}
                     />
                     <div className="mt-6 md:mt-8 rounded-2xl border border-border/60 bg-muted/30 backdrop-blur-sm p-4 md:p-6 shadow-sm">
                       <div className="flex items-center gap-3 mb-3">
