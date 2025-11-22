@@ -10,14 +10,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { useQueryClient } from "@tanstack/react-query";
 import { PreviewCanvas } from "./edit-image/PreviewCanvas";
 import { AdjustmentsPanel, Adjustments } from "./edit-image/AdjustmentsPanel";
 import { SelectionTool } from "./edit-image/SelectionTool";
 import { ColorPickerPanel } from "./edit-image/ColorPickerPanel";
 import { AdvancedEditPanel } from "./edit-image/AdvancedEditPanel";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
-import { useNavigate } from "react-router-dom";
 import { getCachedUnderstanding, analyzeImageDeep } from "@/lib/intelligence/imageUnderstanding";
 import { getQuickFixes, getFixAdjustments } from "@/lib/intelligence/visualTroubleshooting";
 import { useIntelligence } from "@/hooks/useIntelligence";
@@ -56,10 +54,8 @@ export const UniversalImageWorkspace = ({
   sourceType = 'studio',
 }: UniversalImageWorkspaceProps) => {
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
   const { openTool } = useToolsModal();
   const intelligence = useIntelligence();
-  const queryClient = useQueryClient();
   const [adjustments, setAdjustments] = useState<Adjustments>(defaultAdjustments);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(imageUrl);
@@ -122,40 +118,14 @@ export const UniversalImageWorkspace = ({
   };
 
   const loadVersionsHistory = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Load related images from the same source
-      const { data: assets } = await supabase
-        .from('generated_assets')
-        .select('id, image_url, action, prompt, created_at, source_urls')
-        .eq('user_id', user.id)
-        .or(`image_url.eq.${imageUrl},source_urls.cs.["${imageUrl}"]`)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (assets) {
-        const versions: ImageVersion[] = [
-          {
-            id: 'original',
-            url: imageUrl,
-            type: 'original',
-            timestamp: new Date(),
-          },
-          ...assets.map(asset => ({
-            id: asset.id,
-            url: asset.image_url || '',
-            type: (asset.action || 'edit') as ImageVersion['type'],
-            timestamp: new Date(asset.created_at),
-            prompt: asset.prompt || undefined,
-          })).filter(v => v.url)
-        ];
-        setVersionsHistory(versions);
+    setVersionsHistory([
+      {
+        id: 'original',
+        url: imageUrl,
+        type: 'original',
+        timestamp: new Date(),
       }
-    } catch (error) {
-      console.error('Error loading versions history:', error);
-    }
+    ]);
   };
 
   // Use centralized instruction generation
@@ -403,54 +373,15 @@ export const UniversalImageWorkspace = ({
         hasCustomInstruction: !!customInstruction,
         sourceUrl: imageUrl.substring(0, 100)
       });
-      
+
       // Track user behavior (non-critical)
       try {
         await intelligence.trackAction('save', previewUrl);
       } catch (trackError) {
         console.warn('[UniversalImageWorkspace] Error tracking save action:', trackError);
       }
-      
-      // Explicitly save the current preview state
-      const { ensureAssetSaved } = await import('@/lib/saveAsset');
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('Please sign in to save your work');
-      }
-      
-      const assetId = await ensureAssetSaved({
-        imageUrl: previewUrl,
-        action: 'edit',
-        prompt: customInstruction || 'Saved from workspace',
-        sourceUrls: [imageUrl],
-        params: {
-          adjustments: adjustments,
-          source: 'universal_workspace',
-          manual_save: true
-        },
-        queryClient: queryClient,
-        userId: user.id,
-        skipToast: false
-      });
-      
-      if (assetId) {
-        console.log('[UniversalImageWorkspace] Manual save successful:', assetId);
-        toast.success("Image saved to My Projects", {
-          description: "Your image has been saved successfully"
-        });
-        
-        // Navigate to history after a short delay to allow save to complete
-        setTimeout(() => {
-          navigate('/history');
-        }, 500);
-      } else {
-        console.warn('[UniversalImageWorkspace] Manual save returned null - asset may already exist or save failed');
-        toast.warning("Save may have failed", {
-          description: "Please check My Projects to verify. The image may already be saved.",
-          duration: 5000
-        });
-      }
+
+      toast.info("Project saving has been retired. Continue editing or download your image to keep a copy.");
     } catch (saveError) {
       console.error('[UniversalImageWorkspace] Error in handleSave:', {
         error: saveError instanceof Error ? saveError.message : 'Unknown error',

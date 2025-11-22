@@ -584,10 +584,8 @@ export const ArtieChat = () => {
     let prompt = "";
     if (location.pathname.includes('/dashboard') || location.pathname === '/') {
       prompt = "Want me to help refine this?";
-    } else if (location.pathname.includes('/inspire')) {
-      prompt = "See something you like? I can help remix it.";
-    } else if (location.pathname.includes('/history')) {
-      prompt = "Would you like me to analyze your past work?";
+    } else if (location.pathname.includes('/community')) {
+      prompt = "Exploring the community? I can help you recreate a style.";
     }
 
     if (prompt) {

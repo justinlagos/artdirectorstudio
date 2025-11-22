@@ -1,4 +1,4 @@
-import { Wand2, Blend, Maximize2, MessageSquare, History } from "lucide-react";
+import { Wand2, Blend, Maximize2, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
@@ -47,19 +47,8 @@ export const ToolsShowcase = () => {
       icon: MessageSquare,
       title: "Artie AI",
       description: "Get instant help and suggestions from AI assistant",
-      action: () => {
-        const artieButton = document.querySelector('[aria-label="Chat with Artie"]') as HTMLButtonElement;
-        if (artieButton) artieButton.click();
-      },
+      action: () => navigate("/artie"),
       gradient: "from-primary/15 to-primary/5"
-    },
-    {
-      id: "history",
-      icon: History,
-      title: "History",
-      description: "View and manage your previous generations",
-      action: () => navigate("/history"),
-      gradient: "from-foreground/10 to-foreground/5"
     }
   ];
 

@@ -275,15 +275,15 @@ const Dashboard = () => {
                     <p className="text-xs text-muted-foreground">Create AI artwork</p>
                   </div>
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="h-auto py-4 flex flex-col items-start gap-2"
-                  onClick={() => navigate('/history')}
+                  onClick={() => navigate('/community')}
                 >
                   <TrendingUp className="w-5 h-5" />
                   <div className="text-left">
-                    <p className="font-semibold">View History</p>
-                    <p className="text-xs text-muted-foreground">Past generations</p>
+                    <p className="font-semibold">Visit Community</p>
+                    <p className="text-xs text-muted-foreground">Share and learn</p>
                   </div>
                 </Button>
                 <Button 

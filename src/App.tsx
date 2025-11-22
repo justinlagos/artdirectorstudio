@@ -11,8 +11,6 @@ import { ToolsModalProvider } from "@/contexts/ToolsModalContext";
 import { LoadingState } from "@/components/LoadingState";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 import { BottomNav } from "@/components/BottomNav";
-import { ArtieTab } from "@/components/ArtieTab";
-import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 // Sentry is loaded asynchronously in main.tsx, so we don't import it here
 // This prevents blocking the app initialization
@@ -40,7 +38,7 @@ const ImageGenerationDialog = lazy(() =>
 // Lazy load non-critical routes
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Admin = lazy(() => import("./pages/Admin"));
-const Community = lazy(() => import("./pages/Inspire"));
+const Community = lazy(() => import("./pages/Community"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Insights = lazy(() => import("./pages/Insights"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -173,7 +171,6 @@ const AppContent = () => {
           >
             <PageViewTracker />
             <AuthProvider>
-              <GlobalKeyboardShortcuts />
               <ToolsModalProvider>
               <Suspense fallback={<LoadingState />}>
                 <Routes>
@@ -181,7 +178,6 @@ const AppContent = () => {
                   <Route path="/" element={<Index />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/admin" element={<Admin />} />
-                <Route path="/inspire" element={<Navigate to="/community" replace />} />
                 <Route path="/community" element={<Community />} />
                 <Route path="/gallery" element={<Navigate to="/community" replace />} />
                 <Route path="/analytics" element={<Analytics />} />
@@ -216,7 +212,6 @@ const AppContent = () => {
             </ErrorBoundary>
             <BottomNav />
             <OnlineStatusIndicator />
-            <ArtieTab />
             <ErrorBoundary>
               <Suspense fallback={null}>
                 <TrialWelcomeToast />

@@ -4,10 +4,19 @@ import { Footer } from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Search, BookOpen, Sparkles, Blend, Maximize2, CreditCard } from "lucide-react";
+import { Search, BookOpen, Sparkles, Blend, Maximize2, CreditCard, Keyboard } from "lucide-react";
 
 const Help = () => {
   const [searchQuery, setSearchQuery] = useState("");
+
+  const shortcuts = [
+    { keys: "Ctrl/Cmd + U", description: "Upload a new image for analysis" },
+    { keys: "Ctrl/Cmd + Enter", description: "Analyze the current image" },
+    { keys: "Ctrl/Cmd + G", description: "Open Studio with the current prompt" },
+    { keys: "Ctrl/Cmd + K", description: "Copy the generated prompt" },
+    { keys: "Ctrl/Cmd + R", description: "Run analysis again with the same file" },
+    { keys: "Ctrl/Cmd + ?", description: "Show the in-app keyboard shortcuts overlay" }
+  ];
 
   const faqs = [
     {
@@ -94,6 +103,31 @@ const Help = () => {
               className="pl-11 h-12 glass-strong text-base"
             />
           </div>
+
+          <Card className="glass max-w-3xl mx-auto">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Keyboard className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <h2 className="text-xl font-semibold">Keyboard shortcuts</h2>
+                  <p className="text-sm text-muted-foreground">Quick ways to navigate Studio features</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {shortcuts.map(shortcut => (
+                  <div key={shortcut.keys} className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
+                    <span className="font-mono text-sm px-2 py-1 rounded-md bg-background border border-border/60 shadow-sm">
+                      {shortcut.keys}
+                    </span>
+                    <p className="text-sm text-left text-muted-foreground">{shortcut.description}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* FAQ Categories */}
           <div className="space-y-8">

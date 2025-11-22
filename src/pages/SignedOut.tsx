@@ -26,7 +26,7 @@ const SignedOut = () => {
             variant="outline"
           >
             <Sparkles className="w-4 h-4" />
-            Browse Inspire Gallery
+            Visit Community
           </Button>
           <Button 
             onClick={() => navigate("/help")} 
