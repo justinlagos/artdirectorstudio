@@ -17,6 +17,12 @@ export default {
       },
     },
     extend: {
+      zIndex: {
+        'modal-backdrop': '80',
+        'modal-content': '90',
+        'sheet': '90',
+        'drawer': '90',
+      },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
         display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],

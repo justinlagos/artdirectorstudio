@@ -34,18 +34,19 @@ export const ToolDrawer = ({
   };
 
   return (
-    <DrawerRoot open={open} onOpenChange={onOpenChange} direction="bottom">
+    <DrawerRoot open={open} onOpenChange={onOpenChange} direction="bottom" modal={true} dismissible={true}>
       <DrawerPortal>
-        <DrawerOverlay className="backdrop-blur-sm" />
+        <DrawerOverlay className="backdrop-blur-sm z-[80]" />
         <DrawerPrimitive.Content
           className={cn(
-            "fixed z-modal-content flex flex-col border border-border bg-background shadow-xl overflow-hidden",
+            "fixed z-[90] flex flex-col border border-border bg-background shadow-xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "duration-200 ease-in-out",
+            "duration-300 ease-out",
             "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
             "w-[92vw] max-w-[920px] max-h-[90vh] rounded-2xl",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
-            "data-[state=open]:zoom-in-90 data-[state=closed]:zoom-out-90",
+            "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
+            "data-[state=open]:slide-in-from-bottom-4 data-[state=closed]:slide-out-to-bottom-4",
             className,
           )}
           style={mobilePositionStyle}
