@@ -7,7 +7,7 @@ import { analytics } from "@/lib/analytics";
 import { Header } from "@/components/Header";
 import { UploadSection } from "@/components/UploadSection";
 import { ProgressiveAnalysisFeedback } from "@/components/ProgressiveAnalysisFeedback";
-import { ResultsSection } from "@/components/ResultsSectionEnhanced";
+import { PromptDisplay } from "@/components/PromptDisplay";
 import { OnboardingPopup } from "@/components/OnboardingPopup";
 import { Footer } from "@/components/Footer";
 import { CreditCostIndicator } from "@/components/CreditCostIndicator";
@@ -673,56 +673,14 @@ const Index = () => {
               <AnalysisLayout
                 imageUrl={previewUrl || undefined}
                 analysisContent={
-                  <>
-                    <ResultsSection
-                      result={result}
-                      onRegenerate={handleRegenerate}
-                      isRegenerating={isAnalyzing}
-                      onGenerateImage={handleGenerateImage}
-                      generatedImages={generatedImages}
-                      onDeleteImage={handleDeleteImage}
-                      onResultUpdate={handleResultUpdate}
-                      imagePreviewUrl={previewUrl || undefined}
-                    />
+                  <div className="space-y-6">
+                    <PromptDisplay prompt={result.full_regeneration_prompt} />
                     <AnalysisOverview
                       analysis={result.analysis}
                       fullPrompt={result.full_regeneration_prompt}
                       imageUrl={previewUrl || undefined}
                     />
-                    <div className="mt-6 md:mt-8 rounded-2xl border border-border/60 bg-muted/30 backdrop-blur-sm p-4 md:p-6 shadow-sm">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                          <Lightbulb className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground/80 font-semibold">Creative Director Insights</p>
-                          <p className="text-base text-foreground/90">Artie reviews layout, typography, and rhythm before you iterate.</p>
-                        </div>
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
-                          <p className="font-medium text-foreground">What Artie highlights</p>
-                          <ul className="list-disc pl-5 space-y-1">
-                            <li>Layout balance and spacing grid</li>
-                            <li>Font hierarchy and readability</li>
-                            <li>Composition weight and focal points</li>
-                            <li>Color balance and contrast</li>
-                            <li>Visual rhythm across sections</li>
-                          </ul>
-                        </div>
-                        <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
-                          <p className="font-medium text-foreground">Guide the critique</p>
-                          <ul className="list-disc pl-5 space-y-1">
-                            <li>What platform is this intended for?</li>
-                            <li>Do you prefer a minimal or expressive tone?</li>
-                            <li>Should typography be tighter for clarity?</li>
-                            <li>Any brand colors to emphasize or soften?</li>
-                            <li>Are we optimizing for mobile-first scrolling?</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 }
               />
             </div>
