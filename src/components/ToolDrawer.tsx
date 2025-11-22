@@ -42,15 +42,10 @@ export const ToolDrawer = ({
             "fixed z-modal-content flex flex-col border border-border bg-background shadow-xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "duration-200 ease-in-out",
-            // Mobile: bottom sheet centered horizontally with slide animation from bottom-center
-            "left-1/2 bottom-0 -translate-x-1/2 rounded-t-2xl",
-            "w-full max-w-full max-h-[90dvh]",
-            "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",
+            "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+            "w-[92vw] max-w-[920px] max-h-[90vh] rounded-2xl",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
-            // Desktop: centered modal with animation from bottom-middle to center
-            "md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:max-w-[820px] md:w-[90vw] md:max-h-[90vh] md:bottom-auto",
-            "md:data-[state=open]:fade-in-0 md:data-[state=closed]:fade-out-0",
-            "md:animate-toolDrawer",
+            "data-[state=open]:zoom-in-90 data-[state=closed]:zoom-out-90",
             className,
           )}
           style={mobilePositionStyle}

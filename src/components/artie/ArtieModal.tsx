@@ -63,31 +63,26 @@ export const ArtieModal = ({
             "fixed z-artie-modal-content flex flex-col border border-border bg-background shadow-xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "duration-200 ease-in-out",
-            // Mobile: centered bottom sheet with consistent sizing
-            // No slide-from-right, always centered with bottom sheet animation
             isMobile
               ? [
-                  "left-1/2 bottom-0 -translate-x-1/2 top-auto right-auto",
-                  "w-full max-w-full mx-auto",
-                  "rounded-t-2xl",
-                  "max-h-[90vh]",
+                  "left-1/2 top-4 -translate-x-1/2",
+                  "w-[94vw] max-w-[1024px] mx-auto",
+                  "rounded-2xl",
+                  "max-h-[92vh]",
                   "pb-[env(safe-area-inset-bottom)]",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-                  "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+                  "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
                 ]
-              : // Desktop: centered modal with animation from bottom-middle to center
-                [
-                  "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+              : [
+                  "left-1/2 top-8 -translate-x-1/2",
                   "right-auto bottom-auto",
                   "rounded-2xl",
                   "w-[90vw] max-h-[90vh]",
                   maxWidthClasses[maxWidth],
-                  // Ensure minimum width for full size modals (Edit Image)
                   maxWidth === "full" && "min-w-[min(960px,90vw)]",
-                  // Default max width for standard modals (Generate in Studio, etc.)
                   maxWidth !== "full" && !["sm", "md", "lg", "xl", "2xl"].includes(maxWidth) && "max-w-[820px]",
                   "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-                  "animate-toolDrawer",
+                  "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
                 ],
             className
           )}
@@ -99,10 +94,10 @@ export const ArtieModal = ({
               transform: 'translateX(-50%)',
             } : {
               left: '50%',
-              top: '50%',
+              top: '2rem',
               right: 'auto',
               bottom: 'auto',
-              transform: 'translate(-50%, -50%)',
+              transform: 'translateX(-50%)',
             }),
           }}
           onOpenAutoFocus={(e) => {
