@@ -359,58 +359,45 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
                 {blueprintOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="px-4 pb-5 space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-3">
+                <div className="px-4 pb-5">
+                  <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                     {analysis.image_overview && (
-                      <Card className="p-3 bg-card/50 h-full">
-                        <div className="text-xs text-muted-foreground mb-1">Overview</div>
-                        <p className="text-sm leading-relaxed text-foreground/90">{analysis.image_overview}</p>
-                      </Card>
+                      <div className="group p-4 rounded-lg bg-gradient-to-br from-background to-muted/30 border border-border/40 hover:border-primary/30 transition-all duration-200">
+                        <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Overview</p>
+                        <p className="text-sm text-foreground/90 leading-relaxed">{analysis.image_overview}</p>
+                      </div>
                     )}
                     {analysis.composition && (
-                      <Card className="p-3 bg-card/50 h-full">
-                        <div className="text-xs text-muted-foreground mb-1">Composition</div>
-                        <p className="text-sm leading-relaxed text-foreground/90">{analysis.composition}</p>
-                      </Card>
+                      <div className="group p-4 rounded-lg bg-gradient-to-br from-background to-muted/30 border border-border/40 hover:border-primary/30 transition-all duration-200">
+                        <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Composition</p>
+                        <p className="text-sm text-foreground/90 leading-relaxed">{analysis.composition}</p>
+                      </div>
                     )}
                     {analysis.color_palette && (
-                      <Card className="p-3 bg-card/50 h-full">
-                        <div className="text-xs text-muted-foreground mb-1">Color Palette</div>
-                        <p className="text-sm leading-relaxed text-foreground/90">{analysis.color_palette}</p>
-                      </Card>
+                      <div className="group p-4 rounded-lg bg-gradient-to-br from-background to-muted/30 border border-border/40 hover:border-primary/30 transition-all duration-200">
+                        <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Color Palette</p>
+                        <p className="text-sm text-foreground/90 leading-relaxed">{analysis.color_palette}</p>
+                      </div>
+                    )}
+                    {(analysis.art_style || analysis.design_style) && (
+                      <div className="group p-4 rounded-lg bg-gradient-to-br from-background to-muted/30 border border-border/40 hover:border-primary/30 transition-all duration-200">
+                        <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Style</p>
+                        <p className="text-sm text-foreground/90 leading-relaxed">{analysis.art_style || analysis.design_style}</p>
+                      </div>
+                    )}
+                    {analysis.lighting && (
+                      <div className="group p-4 rounded-lg bg-gradient-to-br from-background to-muted/30 border border-border/40 hover:border-primary/30 transition-all duration-200">
+                        <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Lighting</p>
+                        <p className="text-sm text-foreground/90 leading-relaxed">{analysis.lighting}</p>
+                      </div>
+                    )}
+                    {(analysis.medium || analysis.artistic_medium) && (
+                      <div className="group p-4 rounded-lg bg-gradient-to-br from-background to-muted/30 border border-border/40 hover:border-primary/30 transition-all duration-200">
+                        <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Medium</p>
+                        <p className="text-sm text-foreground/90 leading-relaxed">{analysis.medium || analysis.artistic_medium}</p>
+                      </div>
                     )}
                   </div>
-
-                  {(analysis.art_style || analysis.design_style || analysis.lighting || analysis.artistic_medium) && (
-                    <div className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[11px] uppercase tracking-[0.25em]">Overview</Badge>
-                          <span className="text-sm font-semibold text-foreground">Style, Lighting & Medium</span>
-                        </div>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        {(analysis.art_style || analysis.design_style) && (
-                          <Card className="p-3 bg-background/70 h-full">
-                            <div className="text-xs text-muted-foreground mb-1">Style</div>
-                            <p className="text-sm font-medium text-foreground/90 leading-relaxed">{analysis.art_style || analysis.design_style}</p>
-                          </Card>
-                        )}
-                        {analysis.lighting && (
-                          <Card className="p-3 bg-background/70 h-full">
-                            <div className="text-xs text-muted-foreground mb-1">Lighting</div>
-                            <p className="text-sm font-medium text-foreground/90 leading-relaxed">{analysis.lighting}</p>
-                          </Card>
-                        )}
-                        {(analysis.medium || analysis.artistic_medium) && (
-                          <Card className="p-3 bg-background/70 h-full">
-                            <div className="text-xs text-muted-foreground mb-1">Medium</div>
-                            <p className="text-sm font-medium text-foreground/90 leading-relaxed">{analysis.medium || analysis.artistic_medium}</p>
-                          </Card>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </CollapsibleContent>
             </Card>

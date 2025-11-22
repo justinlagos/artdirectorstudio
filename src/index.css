@@ -134,6 +134,12 @@ All colors MUST be HSL.
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-spring: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    
+    /* Z-index layers for proper stacking */
+    --z-modal-backdrop: 80;
+    --z-modal-content: 90;
+    --z-sheet: 90;
+    --z-drawer: 90;
   }
 
   .dark {
