@@ -35,9 +35,8 @@ interface KeyInsight {
 }
 
 export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: AnalysisOverviewProps): JSX.Element => {
-  const { openModal } = useUnifiedModalStore(state => ({
-    openModal: state.openModal,
-  }));
+  // FIX: Use direct selector instead of creating new object on every render
+  const openModal = useUnifiedModalStore(state => state.openModal);
   const { setActiveImage, setPrompt, addOperation } = useUnifiedVisualContext.getState();
 
   const handleOpenArtie = () => {

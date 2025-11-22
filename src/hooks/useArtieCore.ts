@@ -168,6 +168,7 @@ export function useArtieCore() {
   }, []);
 
   // Initialize processed images ref with images already in contextMemory on first mount
+  // FIX: Remove dependency to prevent unnecessary re-runs - only needs to run once
   useEffect(() => {
     if (!initializedRef.current) {
       contextMemory.images.forEach((img) => {
@@ -175,7 +176,8 @@ export function useArtieCore() {
       });
       initializedRef.current = true;
     }
-  }, [contextMemory.images]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const registerContextImage = useCallback(
     (image: {
