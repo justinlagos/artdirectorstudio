@@ -72,7 +72,7 @@ export const AnalysisSelect = ({
           <SelectTrigger className="h-9 text-sm bg-surface-1 ring-1 ring-border/30 focus:ring-primary/30 transition-all">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
-          <SelectContent className="max-h-[300px] bg-background/95 backdrop-blur-sm z-[20]">
+          <SelectContent className="max-h-[300px] bg-background/95 backdrop-blur-sm z-dropdown">
             <SelectGroup>
               <SelectLabel className="text-xs font-semibold text-muted-foreground">Recommended</SelectLabel>
               {options.slice(0, 5).map((option) => (

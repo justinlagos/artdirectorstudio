@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Kbd } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { getModifierKey } from "@/hooks/useKeyboardShortcuts";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { Upload, Play, Wand2, X, Copy, Download, RefreshCw, Keyboard } from "lucide-react";
 
 interface ShortcutItem {
@@ -18,6 +19,9 @@ interface KeyboardShortcutsGuideProps {
 
 export const KeyboardShortcutsGuide = ({ open, onOpenChange }: KeyboardShortcutsGuideProps) => {
   const modKey = getModifierKey();
+  
+  // Centralized scroll lock
+  useScrollLock(open, 'keyboard-shortcuts-guide');
 
   const shortcuts: ShortcutItem[] = [
     {

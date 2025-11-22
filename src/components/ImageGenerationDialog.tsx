@@ -717,7 +717,7 @@ export const ImageGenerationDialog = () => {
                   <SelectTrigger id="quality" className="w-full">
                     <SelectValue placeholder="Auto" />
                   </SelectTrigger>
-                  <SelectContent className="z-[100]">
+                  <SelectContent className="z-select">
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="high">High</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
@@ -739,7 +739,7 @@ export const ImageGenerationDialog = () => {
                   <SelectTrigger id="aspect-ratio" className="w-full">
                     <SelectValue placeholder="Select aspect ratio" />
                   </SelectTrigger>
-                  <SelectContent className="z-[100]">
+                  <SelectContent className="z-select">
                     <SelectItem value="1:1">
                       <div className="flex items-center gap-2">
                         <Square className="h-4 w-4" />
@@ -805,7 +805,7 @@ export const ImageGenerationDialog = () => {
                   <SelectTrigger id="background" className="w-full">
                     <SelectValue placeholder="Auto" />
                   </SelectTrigger>
-                  <SelectContent className="z-[100]">
+                  <SelectContent className="z-select">
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="transparent">Transparent</SelectItem>
                     <SelectItem value="opaque">Opaque</SelectItem>

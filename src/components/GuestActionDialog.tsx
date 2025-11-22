@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface GuestActionDialogProps {
   open: boolean;
@@ -23,6 +24,9 @@ export const GuestActionDialog = ({
   title = "Sign in to remix this project",
   description = "Try ArtDirector Studio free. Sign in to open this project in Studio.",
 }: GuestActionDialogProps) => {
+  // Centralized scroll lock
+  useScrollLock(open, 'guest-action-dialog');
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md rounded-3xl">

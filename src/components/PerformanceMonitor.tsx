@@ -33,7 +33,7 @@ export const PerformanceMonitor = () => {
   };
 
   return (
-    <div className="fixed bottom-20 right-4 z-[90]">
+    <div className="fixed bottom-20 right-4 z-performance-monitor">
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button

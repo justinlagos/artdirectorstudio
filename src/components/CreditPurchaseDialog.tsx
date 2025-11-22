@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PricingTable } from "./PricingTable";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface CreditPurchaseDialogProps {
   open: boolean;
@@ -7,6 +8,9 @@ interface CreditPurchaseDialogProps {
 }
 
 export const CreditPurchaseDialog = ({ open, onOpenChange }: CreditPurchaseDialogProps) => {
+  // Centralized scroll lock
+  useScrollLock(open, 'credit-purchase-dialog');
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

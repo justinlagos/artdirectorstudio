@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, Maximize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface ImageZoomDialogProps {
   open: boolean;
@@ -23,6 +24,9 @@ export const ImageZoomDialog = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  
+  // Centralized scroll lock
+  useScrollLock(open, 'image-zoom-dialog');
 
   // Reset when dialog opens/closes
   useEffect(() => {
