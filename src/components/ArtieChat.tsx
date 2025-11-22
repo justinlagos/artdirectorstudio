@@ -1621,7 +1621,7 @@ export const ArtieChat = () => {
     <div 
       data-artie-floating-icon
       className={cn(
-        "artie-float opacity-100 visible pointer-events-auto z-[70]",
+        "artie-float opacity-100 visible pointer-events-auto z-artie-floating",
         isMobile ? "bottom-20 right-4" : "bottom-4 right-4"
       )}
     >
@@ -1704,7 +1704,7 @@ export const ArtieChat = () => {
       
       {/* Backdrop - Click to close - DO NOT lock scroll */}
       <button 
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[70] cursor-default"
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-artie-panel-backdrop cursor-default"
         onClick={handleClose}
         aria-label="Close chat"
         type="button"
@@ -1719,7 +1719,7 @@ export const ArtieChat = () => {
       <div 
         data-artie-panel
         className={cn(
-          "fixed z-[71] flex flex-col bg-background shadow-xl pointer-events-auto safe-bottom",
+          "fixed z-artie-panel flex flex-col bg-background shadow-xl pointer-events-auto safe-bottom",
           // Mobile: full width bottom sheet, slides up from bottom
           isMobile ? [
             "inset-x-0 bottom-0 top-auto h-[96dvh] h-[96svh]",
@@ -2106,7 +2106,7 @@ export const ArtieChat = () => {
             "px-6 md:px-8 py-4 md:py-6",
             "shadow-[0_-1px_8px_rgba(0,0,0,0.08)]",
             isMobile 
-              ? "fixed bottom-0 left-0 right-0 z-[71] pb-[calc(0.75rem+env(safe-area-inset-bottom))] safe-bottom bg-background" 
+              ? "fixed bottom-0 left-0 right-0 z-artie-panel pb-[calc(0.75rem+env(safe-area-inset-bottom))] safe-bottom bg-background" 
               : "sticky bottom-0 z-10 bg-background"
           )}
         >

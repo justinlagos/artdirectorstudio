@@ -699,12 +699,23 @@ All colors MUST be HSL.
     z-index: 20;
   }
 
+  /* Z-Index Hierarchy - Centralized Management */
+  /* See src/lib/zIndexMap.ts for usage documentation */
+  
   .z-tooltip {
     z-index: 20;
   }
 
   .z-popover {
     z-index: 20;
+  }
+  
+  .z-dropdown {
+    z-index: 25;
+  }
+  
+  .z-select {
+    z-index: 25;
   }
   
   .z-modal-backdrop {
@@ -718,8 +729,24 @@ All colors MUST be HSL.
   .z-dialog {
     z-index: 40;
   }
+  
+  .z-sheet {
+    z-index: 40;
+  }
+  
+  .z-drawer {
+    z-index: 40;
+  }
 
   .z-navigation {
+    z-index: 50;
+  }
+  
+  .z-header {
+    z-index: 50;
+  }
+  
+  .z-bottom-nav {
     z-index: 50;
   }
 
@@ -745,6 +772,31 @@ All colors MUST be HSL.
   
   .z-toast {
     z-index: 90;
+  }
+  
+  .z-alert {
+    z-index: 90;
+  }
+  
+  .z-performance-monitor {
+    z-index: 95;
+  }
+  
+  /* Touch-Friendly Utilities */
+  /* Minimum 44px touch targets for WCAG AA compliance */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .touch-target-comfortable {
+    min-height: 56px;
+    min-width: 56px;
+  }
+  
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* ToolDrawer animation - from bottom-middle to center (desktop only) */
