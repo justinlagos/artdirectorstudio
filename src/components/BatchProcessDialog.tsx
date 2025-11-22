@@ -1387,7 +1387,7 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
   };
 
   const handleViewAll = () => {
-    navigate('/history');
+    navigate('/');
     onOpenChange(false);
   };
 

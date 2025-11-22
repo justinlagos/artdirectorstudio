@@ -287,7 +287,7 @@ const Insights = () => {
                       <CardTitle>Recent Creations</CardTitle>
                       <CardDescription>Your latest generated images</CardDescription>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/history')}>
+                    <Button variant="ghost" size="sm" onClick={() => navigate('/') }>
                       View All
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
@@ -340,15 +340,15 @@ const Insights = () => {
                         <p className="text-xs text-muted-foreground">Create AI artwork</p>
                       </div>
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="h-auto py-4 flex flex-col items-start gap-2"
-                      onClick={() => navigate('/history')}
+                      onClick={() => navigate('/')}
                     >
                       <HistoryIcon className="w-5 h-5" />
                       <div className="text-left">
-                        <p className="font-semibold">View Projects</p>
-                        <p className="text-xs text-muted-foreground">Past generations</p>
+                        <p className="font-semibold">Return to Studio</p>
+                        <p className="text-xs text-muted-foreground">Keep creating</p>
                       </div>
                     </Button>
                     <Button 
@@ -358,8 +358,8 @@ const Insights = () => {
                     >
                       <Sparkles className="w-5 h-5" />
                       <div className="text-left">
-                        <p className="font-semibold">Explore Inspire</p>
-                        <p className="text-xs text-muted-foreground">Community art</p>
+                        <p className="font-semibold">Explore Community</p>
+                        <p className="text-xs text-muted-foreground">See what others are making</p>
                       </div>
                     </Button>
                     <Button 

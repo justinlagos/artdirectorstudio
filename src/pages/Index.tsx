@@ -32,7 +32,6 @@ import { PremiumFeatures } from "@/components/landing/PremiumFeatures";
 import { PremiumValue } from "@/components/landing/PremiumValue";
 import { ProofSection } from "@/components/landing/ProofSection";
 import { PricingSection } from "@/components/landing/PricingSection";
-import { LandingInspirePreview } from "@/components/landing/LandingInspirePreview";
 
 export interface Analysis {
   image_overview: string;
@@ -640,7 +639,6 @@ const Index = () => {
             </ErrorBoundary>
             
             <ErrorBoundary fallback={null}>
-              <LandingInspirePreview />
             </ErrorBoundary>
           </>
         )}
