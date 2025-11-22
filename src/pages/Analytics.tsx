@@ -22,8 +22,10 @@ const Analytics = () => {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
-        <main className="flex-1 container mx-auto px-4 py-8">
-          <Skeleton className="h-96 w-full" />
+        <main className="flex-1 flex items-start justify-center px-4 py-8">
+          <div className="w-full max-w-5xl">
+            <Skeleton className="h-96 w-full" />
+          </div>
         </main>
         <Footer />
       </div>
@@ -37,11 +39,11 @@ const Analytics = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <div className="space-y-2">
+      <main className="flex-1 flex items-start justify-center px-4 py-8">
+        <div className="w-full max-w-5xl space-y-8 text-center">
+          <div className="space-y-3">
             <h1 className="text-4xl font-bold">Analytics</h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-lg">
               Track your usage and activity insights
             </p>
           </div>
