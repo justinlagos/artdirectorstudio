@@ -771,33 +771,35 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
   );
 
   return (
-    <ToolDrawer
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (nextOpen) {
-          onOpenChange(true);
-        } else {
-          handleClose();
+    <>
+      <ToolDrawer
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            onOpenChange(true);
+          } else {
+            handleClose();
+          }
+        }}
+        title={
+          <>
+            <Blend className="w-5 h-5" />
+            Blend Images
+          </>
         }
-      }}
-      title={
-        <>
-          <Blend className="w-5 h-5" />
-          Blend Images
-        </>
-      }
-      description="Combine multiple images into a unified visual. Upload 2-4 images, choose a style, and let AI blend them seamlessly."
-      contentClassName="pb-6"
-      footer={footerContent}
-    >
-      {bodyContent}
-    </ToolDrawer>
-    <ShareToCommunityDialog
-      open={shareOpen}
-      onOpenChange={setShareOpen}
-      imageUrl={blendedImage}
-      defaultCaption={blendPrompt || instruction}
-      defaultTitle="Image Blend"
-    />
+        description="Combine multiple images into a unified visual. Upload 2-4 images, choose a style, and let AI blend them seamlessly."
+        contentClassName="pb-6"
+        footer={footerContent}
+      >
+        {bodyContent}
+      </ToolDrawer>
+      <ShareToCommunityDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        imageUrl={blendedImage}
+        defaultCaption={blendPrompt || instruction}
+        defaultTitle="Image Blend"
+      />
+    </>
   );
 };
