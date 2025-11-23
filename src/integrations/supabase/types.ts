@@ -194,6 +194,100 @@ export type Database = {
         }
         Relationships: []
       }
+      community_comments: {
+        Row: {
+          comment_text: string
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          comment_text: string
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          comment_text?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_likes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_posts: {
+        Row: {
+          caption: string | null
+          comments_count: number
+          created_at: string
+          id: string
+          image_url: string
+          likes_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          comments_count?: number
+          created_at?: string
+          id?: string
+          image_url: string
+          likes_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          comments_count?: number
+          created_at?: string
+          id?: string
+          image_url?: string
+          likes_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_transactions: {
         Row: {
           action: Database["public"]["Enums"]["credit_action"] | null

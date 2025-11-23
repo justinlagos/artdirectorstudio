@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
 import { Link } from "react-router-dom";
 
-interface CommunityPreview extends Database["public"]["Tables"]["community_posts"]["Row"] {
-  profiles?: { username: string | null } | null;
+interface CommunityPreview {
+  id: string;
+  image_url: string;
+  likes_count: number;
+  profiles?: { username: string | null; email: string } | null;
 }
 
 export const FeaturedCommunitySection = () => {
@@ -16,7 +19,7 @@ export const FeaturedCommunitySection = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("community_posts")
-        .select("id, image_url, likes_count, profiles(username)")
+        .select("id, image_url, likes_count, profiles!community_posts_user_id_fkey(username, email)")
         .order("likes_count", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(6);
