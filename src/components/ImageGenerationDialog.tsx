@@ -706,6 +706,7 @@ export const ImageGenerationDialog = () => {
             <div className="flex flex-col sm:flex-row gap-4 w-full">
               <div className="flex-1 space-y-2">
                 <Label htmlFor="quality">Quality</Label>
+                <p className="text-xs text-muted-foreground">Controls how much detail Artie prioritises in the render.</p>
                 <Select
                   value={options.quality}
                   onValueChange={(value: GenerationOptions["quality"]) => {
@@ -728,6 +729,7 @@ export const ImageGenerationDialog = () => {
 
               <div className="flex-1 space-y-2">
                 <Label htmlFor="aspect-ratio">Aspect Ratio</Label>
+                <p className="text-xs text-muted-foreground">Sets the canvas shape the model will generate into.</p>
                 <Select
                   value={options.aspectRatio}
                   onValueChange={(value: GenerationOptions["aspectRatio"]) => {
@@ -794,6 +796,7 @@ export const ImageGenerationDialog = () => {
 
               <div className="flex-1 space-y-2">
                 <Label htmlFor="background">Background</Label>
+                <p className="text-xs text-muted-foreground">Choose whether to keep transparency or request a solid background.</p>
                 <Select
                   value={options.background}
                   onValueChange={(value: GenerationOptions["background"]) => {
@@ -812,6 +815,12 @@ export const ImageGenerationDialog = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full bg-background/80 px-3 py-1 border border-border/60">{options.aspectRatio} frame</span>
+              <span className="rounded-full bg-background/80 px-3 py-1 border border-border/60">{options.quality} quality</span>
+              <span className="rounded-full bg-background/80 px-3 py-1 border border-border/60">{options.background} background</span>
+              <span className="text-muted-foreground/80">Applied to the next generation</span>
             </div>
           </div>
         </div>
