@@ -41,18 +41,19 @@ export const PremiumHero = ({ user }: PremiumHeroProps) => {
       opacity: 1,
       transition: {
         staggerChildren: 0.1,
-        delayChildren: 0.2,
+        delayChildren: 0.1,
+        duration: 0.3,
       },
     },
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 10 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: 0.6,
+        duration: 0.4,
       },
     },
   };
@@ -85,7 +86,6 @@ export const PremiumHero = ({ user }: PremiumHeroProps) => {
           initial="hidden"
           animate="visible"
           className="text-center space-y-8 md:space-y-12"
-          style={{ opacity: smoothOpacity }}
         >
           {/* Dual-core messaging: Artie + Studio */}
           <motion.div variants={itemVariants} className="space-y-6 md:space-y-8">

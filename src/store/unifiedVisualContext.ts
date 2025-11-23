@@ -169,6 +169,7 @@ const getLatestImage = () => {
 };
 
 const setContextPayload = (context: VisualContextPayload) => {
+  const newAnalysisData = (context.meta as Record<string, unknown> | undefined)?.analysisData;
   setState((prev) => ({
     currentContext: {
       ...prev.currentContext,
@@ -178,7 +179,9 @@ const setContextPayload = (context: VisualContextPayload) => {
     activeImageUrl: context.imageUrl ?? prev.activeImageUrl,
     activeImageId: context.imageId ?? prev.activeImageId,
     styleTags: context.styleTags ?? prev.styleTags,
-    analysisData: (context.meta as Record<string, unknown> | undefined)?.analysisData ?? prev.analysisData,
+    analysisData: (typeof newAnalysisData === 'object' && newAnalysisData !== null) 
+      ? newAnalysisData as Record<string, unknown>
+      : prev.analysisData,
   }));
 };
 
