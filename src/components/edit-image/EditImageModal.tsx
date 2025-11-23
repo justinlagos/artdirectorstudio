@@ -417,6 +417,7 @@ export const EditImageModal = ({
         }
         description={isMobile ? "Adjust colors, lighting, and composition with AI-powered transformations" : "Adjust colors, lighting, and composition. Select regions for targeted edits, or apply AI-powered transformations across your entire image."}
         footer={footerContent}
+        className="max-w-[1400px] max-h-[90vh] md:max-h-[90vh]"
         contentClassName={cn(
           "flex flex-col min-h-0",
           !isMobile && "overflow-hidden h-full"
@@ -587,17 +588,17 @@ export const EditImageModal = ({
         // Desktop: Two-column layout - More space for right sidebar
         <div className={cn(
           "grid gap-6 h-full min-h-0 flex-1 overflow-hidden",
-          "grid-cols-[1.2fr_380px] max-w-full"
+          "grid-cols-2 max-w-full"
         )}>
           {/* Left Column: Image Preview - Reduced size, centered, constrained height */}
-          <div className="flex items-center justify-center min-h-0 overflow-hidden relative group">
+          <div className="flex items-center justify-center min-h-0 overflow-hidden relative group rounded-xl bg-muted/10">
             <PreviewCanvas
               imageUrl={previewUrl}
               filterStyle={generateFilterStyle(adjustments)}
               selectedRegion={selectedRegion}
               onRegionSelect={activeTab === "select" ? setSelectedRegion : undefined}
               isSelectionMode={activeTab === "select"}
-              className="rounded-xl w-full h-full max-h-full object-contain"
+              className="rounded-xl w-full h-full max-h-[80vh] max-w-full object-contain"
             />
             {/* Zoom button overlay */}
             {!isProcessing && (
@@ -616,7 +617,7 @@ export const EditImageModal = ({
           </div>
 
           {/* Right Column: Tools Panel - Fixed width, Scrollable, More breathing room */}
-          <div className="flex flex-col min-h-0 overflow-hidden border-l border-border pl-6 w-[380px] flex-shrink-0">
+          <div className="flex flex-col min-h-0 max-h-full overflow-hidden border-l border-border p-6">
             {/* Instruction Input - Fixed at top */}
             <div className="space-y-2 flex-shrink-0 mb-4">
               <Label htmlFor="custom-instruction" className="text-sm font-medium">Editing Instruction</Label>
