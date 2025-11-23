@@ -17,6 +17,7 @@ import { openStudioWithPrompt } from "@/lib/studio";
 import { analytics } from "@/lib/analytics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { ShareToCommunityDialog } from "@/components/community/ShareToCommunityDialog";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -40,6 +41,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
   const [showZoom, setShowZoom] = useState(false);
   const [zoomImage, setZoomImage] = useState<'before' | 'after'>('after');
   const [upscaleStartTime, setUpscaleStartTime] = useState<number>(0);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -608,6 +610,13 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
           <Download className="w-4 h-4 mr-2" />
           Download
         </Button>
+        <Button
+          variant="secondary"
+          onClick={() => setShareOpen(true)}
+          className="min-h-[48px] w-full sm:flex-1"
+        >
+          Share to Community
+        </Button>
       </div>
       <Button
         variant="ghost"
@@ -659,5 +668,12 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     >
       {bodyContent}
     </ToolDrawer>
+    <ShareToCommunityDialog
+      open={shareOpen}
+      onOpenChange={setShareOpen}
+      imageUrl={upscaledImage}
+      defaultCaption={sourceImage ? `Upscaled to ${targetSize}` : undefined}
+      defaultTitle="Upscaled Image"
+    />
   );
 };
