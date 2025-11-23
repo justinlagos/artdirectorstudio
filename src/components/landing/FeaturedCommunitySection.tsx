@@ -25,7 +25,7 @@ export const FeaturedCommunitySection = () => {
         .limit(6);
 
       if (error) throw error;
-      return (data as CommunityPreview[]) ?? [];
+      return (data as unknown as CommunityPreview[]) ?? [];
     },
     staleTime: 1000 * 60 * 5,
   });
