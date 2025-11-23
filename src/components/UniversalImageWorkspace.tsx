@@ -24,7 +24,7 @@ import {
   generateFilterStyle,
   DEFAULT_ADJUSTMENTS
 } from "@/lib/imageEditing/instructionGenerator";
-import { useVisualContextStore } from "@/store/visualContextStore";
+import { useUnifiedVisualContext } from "@/store/unifiedVisualContext";
 
 interface UniversalImageWorkspaceProps {
   open: boolean;
@@ -57,9 +57,9 @@ export const UniversalImageWorkspace = ({
   const isMobile = useIsMobile();
   const { openTool } = useToolsModal();
   const intelligence = useIntelligence();
-  const contextSnapshot = useVisualContextStore((state) => state.currentContext);
-  const contextPrompt = useVisualContextStore((state) => state.basePrompt);
-  const contextAnalysis = useVisualContextStore((state) => state.analysisData);
+  const contextSnapshot = useUnifiedVisualContext((state) => state.currentContext);
+  const contextPrompt = useUnifiedVisualContext((state) => state.basePrompt);
+  const contextAnalysis = useUnifiedVisualContext((state) => state.analysisData);
   const [adjustments, setAdjustments] = useState<Adjustments>(defaultAdjustments);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(imageUrl);

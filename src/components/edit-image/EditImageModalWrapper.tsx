@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { ArtieModal } from "@/components/artie/ArtieModal";
 import { UniversalImageWorkspace } from "@/components/UniversalImageWorkspace";
 import { Edit } from "lucide-react";
-import { useVisualContextStore } from "@/store/visualContextStore";
+import { useUnifiedVisualContext } from "@/store/unifiedVisualContext";
 
 interface EditImageModalWrapperProps {
   open: boolean;
@@ -19,9 +19,9 @@ export const EditImageModalWrapper = ({
   initialInstruction = "",
   onImageEdited,
 }: EditImageModalWrapperProps) => {
-  const basePrompt = useVisualContextStore((state) => state.basePrompt);
-  const analysisData = useVisualContextStore((state) => state.analysisData);
-  const setContextPayload = useVisualContextStore((state) => state.setContextPayload);
+  const basePrompt = useUnifiedVisualContext((state) => state.basePrompt);
+  const analysisData = useUnifiedVisualContext((state) => state.analysisData);
+  const setContextPayload = useUnifiedVisualContext((state) => state.setContextPayload);
   const hasVisualContext = !!(basePrompt || analysisData);
 
   const contextualInstruction = useMemo(() => {
