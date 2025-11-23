@@ -192,6 +192,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       return;
     }
 
+    const startTime = Date.now();
     const idempotencyKey = crypto.randomUUID();
 
     toolState.startProcessing();
@@ -409,6 +410,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       }
 
       // Track successful blend
+      const duration = Date.now() - startTime;
       analytics.track("Image Blend", {
         tool: "blend",
         action: "blend",
