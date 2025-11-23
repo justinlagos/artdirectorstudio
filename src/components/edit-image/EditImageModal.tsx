@@ -75,14 +75,6 @@ export const EditImageModal = ({
     setSelectedPreset("None");
   }, [imageUrl, initialInstruction]);
 
-  // Clear region when switching away from Select tab
-  useEffect(() => {
-    if (activeTab !== "select" && selectedRegion) {
-      setSelectedRegion(null);
-      setRegionInstruction("");
-    }
-  }, [activeTab]);
-
   // Handle Escape key to clear selection
   useEffect(() => {
     if (!open) return;
@@ -137,7 +129,8 @@ export const EditImageModal = ({
       }
 
       // Ensure imageUrl is present
-      if (!imageUrl) {
+      const targetImageUrl = previewUrl || imageUrl;
+      if (!targetImageUrl) {
         throw new Error('No image provided');
       }
 
@@ -148,10 +141,12 @@ export const EditImageModal = ({
         quality?: string;
         mask?: string;
         region?: { x: number; y: number; width: number; height: number };
+        adjustments?: Adjustments;
       } = {
-        imageUrl: imageUrl,
+        imageUrl: targetImageUrl,
         instruction: trimmedInstruction,
-        quality: 'high'
+        quality: 'high',
+        adjustments,
       };
 
       // Add optional mask if provided
@@ -159,8 +154,8 @@ export const EditImageModal = ({
         requestBody.mask = mask;
       }
 
-      // Add optional region if provided (only when Select tab is active)
-      if (selectedRegion && activeTab === "select") {
+      // Add optional region if provided
+      if (selectedRegion) {
         requestBody.region = selectedRegion;
         console.log('[EDIT-IMAGE] Including region in request:', selectedRegion);
       }

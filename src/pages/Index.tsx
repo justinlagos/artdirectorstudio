@@ -254,7 +254,12 @@ const Index = () => {
   };
 
   const handleAnalyze = async (retryCount = 0) => {
-    if (!selectedFile) return;
+    if (!selectedFile) {
+      toast.error("Add an image to analyze", {
+        description: "Drop a JPG or PNG first, then run Artie's analysis."
+      });
+      return;
+    }
 
     const startTime = Date.now();
     setIsAnalyzing(true);
@@ -657,6 +662,20 @@ const Index = () => {
             <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
               Upload a visual, layout, or campaign asset. Artie will analyse it, highlight what matters, and help you generate next-step visuals, variations, and refinements.
             </p>
+            <div className="max-w-2xl mx-auto grid gap-2 text-sm text-muted-foreground md:grid-cols-3">
+              <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-sm">
+                <p className="font-medium text-foreground">1. Drop your image</p>
+                <p className="text-xs text-muted-foreground">Supports JPG/PNG up to 15MB.</p>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-sm">
+                <p className="font-medium text-foreground">2. Run Analysis</p>
+                <p className="text-xs text-muted-foreground">Artie reviews composition, color, and opportunities.</p>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-sm">
+                <p className="font-medium text-foreground">3. Act on insights</p>
+                <p className="text-xs text-muted-foreground">Use the prompts and regions to generate or edit.</p>
+              </div>
+            </div>
           </div>
           
           <UploadSection
