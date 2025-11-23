@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useModalStore } from "@/store/modalStore";
 import { useStudioStore } from "@/store/studioStore";
-import { useVisualContextStore } from "@/store/visualContextStore";
 import { ImageEditor } from "@/components/ImageEditor";
 import { addImageToMemory as addImageToArtieMemory } from "@/lib/artie/imageMemory";
 
@@ -49,12 +48,10 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
   const [editOpen, setEditOpen] = useState(false);
   const navigate = useNavigate();
 
-  const { setActiveImage, setPrompt, addOperation, addImageToMemory } = useUnifiedVisualContext.getState();
+  const { setActiveImage, setPrompt, addOperation, addImageToMemory, setContextPayload } = useUnifiedVisualContext.getState();
   const openGenerateModal = useModalStore((state) => state.openGenerateModal);
   const setStudioPrompt = useStudioStore((state) => state.setPrompt);
   const setStudioImage = useStudioStore((state) => state.setImage);
-  const updateVisualPrompt = useVisualContextStore((state) => state.updatePrompt);
-  const updateVisualImage = useVisualContextStore((state) => state.updateImage);
 
   const welcomeMessage = useMemo(() => "Hi! I'm Artie — Your Creative Collaborator.\n\nI can help you brainstorm ideas, refine visual concepts, analyze images, or guide you through any creative challenge. You can also upload images or creative briefs for me to review, and I can create variations of your images.\n\nWhat are we working on today?", []);
 
@@ -159,11 +156,16 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
       setActiveImage(imageUrl, imageId);
       setPrompt(fullPrompt);
       setStudioImage(imageUrl);
-      updateVisualImage(imageUrl, imageId);
+      setContextPayload({
+        imageUrl,
+        imageId,
+        prompt: fullPrompt,
+        toolOrigin: 'generate',
+      });
     }
 
     setStudioPrompt(fullPrompt);
-    updateVisualPrompt(fullPrompt);
+    setPrompt(fullPrompt);
     addOperation({ tool: 'generate', prompt: fullPrompt, imageUrl, params: { mode: 'variation' } });
     openGenerateModal();
   };
@@ -176,8 +178,13 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
 
     setActiveImage(imageUrl, imageId);
     setPrompt(fullPrompt || '');
-    updateVisualImage(imageUrl, imageId);
-    updateVisualPrompt(fullPrompt || analysis.image_overview || '');
+    setContextPayload({
+      imageUrl,
+      imageId,
+      prompt: fullPrompt || analysis.image_overview || '',
+      toolOrigin: 'edit',
+      meta: { analysis },
+    });
     addOperation({ tool: 'edit', imageUrl, prompt: fullPrompt });
     setEditOpen(true);
   };

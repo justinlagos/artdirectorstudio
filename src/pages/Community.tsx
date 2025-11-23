@@ -248,10 +248,24 @@ const Community = () => {
         sessionStorage.setItem("artie-context-memory", JSON.stringify(context));
       }
 
+      unifiedContext.setActiveImage(post.image_url, post.id);
+      unifiedContext.setPrompt(post.caption || "Let's discuss this community post.");
+      unifiedContext.setContextPayload({
+        imageUrl: post.image_url,
+        imageId: post.id,
+        prompt: post.caption || "Let's discuss this community post.",
+        toolOrigin: 'artie',
+      });
       unifiedContext.addImageToMemory({
         url: post.image_url,
         source: "user",
         name: post.caption || "Community post",
+      });
+      unifiedContext.addOperation({
+        tool: 'artie',
+        imageUrl: post.image_url,
+        prompt: post.caption || undefined,
+        params: { source: 'community' },
       });
 
       window.dispatchEvent(new Event("openArtieChat"));

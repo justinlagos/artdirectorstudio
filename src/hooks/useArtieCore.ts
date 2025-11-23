@@ -1078,8 +1078,8 @@ export function useArtieCore() {
                 const recentImage = contextMemory.images[contextMemory.images.length - 1];
                 
                 if (imageUrl) {
-                  const { useVisualContextStore } = await import('@/store/visualContextStore');
-                  const visualContext = useVisualContextStore.getState();
+                  const { useUnifiedVisualContext } = await import('@/store/unifiedVisualContext');
+                  const visualContext = useUnifiedVisualContext.getState();
                   visualContext.setContextPayload({
                     imageUrl,
                     prompt: visualContext.basePrompt || args.prompt,
@@ -1112,8 +1112,8 @@ export function useArtieCore() {
                 
                 const recentImages = contextMemory.images.slice(-2);
                 
-                const { useVisualContextStore } = await import('@/store/visualContextStore');
-                const visualContext = useVisualContextStore.getState();
+                const { useUnifiedVisualContext } = await import('@/store/unifiedVisualContext');
+                const visualContext = useUnifiedVisualContext.getState();
                 if (recentImages.length > 0) {
                   visualContext.setContextPayload({
                     imageUrl: recentImages[0].url,

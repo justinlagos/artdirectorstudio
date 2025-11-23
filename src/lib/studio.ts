@@ -1,6 +1,6 @@
 import { useModalStore } from "@/store/modalStore";
 import { useStudioStore } from "@/store/studioStore";
-import { useVisualContextStore } from "@/store/visualContextStore";
+import { useUnifiedVisualContext } from "@/store/unifiedVisualContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { analyzeImageDeep, getCachedUnderstanding } from "@/lib/intelligence/imageUnderstanding";
@@ -26,7 +26,7 @@ export async function openStudioWithPrompt({
 }: OpenStudioOptions): Promise<void> {
   const studioState = useStudioStore.getState();
   const modalState = useModalStore.getState();
-  const visualContext = useVisualContextStore.getState();
+  const visualContext = useUnifiedVisualContext.getState();
 
   // Update visual context for cross-tool continuity
   visualContext.setContextPayload({

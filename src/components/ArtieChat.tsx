@@ -1331,8 +1331,8 @@ export const ArtieChat = () => {
                 const recentImage = contextMemory.images[contextMemory.images.length - 1];
                 
                 // Update visual context before opening tool
-                const { useVisualContextStore } = await import('@/store/visualContextStore');
-                const visualContext = useVisualContextStore.getState();
+                const { useUnifiedVisualContext } = await import('@/store/unifiedVisualContext');
+                const visualContext = useUnifiedVisualContext.getState();
                 if (imageUrl) {
                   visualContext.setContextPayload({
                     imageUrl,
@@ -1368,8 +1368,8 @@ export const ArtieChat = () => {
                 const recentImages = contextMemory.images.slice(-2);
                 
                 // Update visual context
-                const { useVisualContextStore } = await import('@/store/visualContextStore');
-                const visualContext = useVisualContextStore.getState();
+                const { useUnifiedVisualContext } = await import('@/store/unifiedVisualContext');
+                const visualContext = useUnifiedVisualContext.getState();
                 if (recentImages.length > 0) {
                   visualContext.setContextPayload({
                     imageUrl: recentImages[0].url,

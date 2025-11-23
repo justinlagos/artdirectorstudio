@@ -6,6 +6,16 @@
 
 import { useSyncExternalStore } from "react";
 
+export interface VisualContextPayload {
+  imageUrl?: string;
+  imageId?: string;
+  prompt?: string;
+  toolOrigin?: 'artie' | 'generate' | 'edit' | 'blend' | 'upscale';
+  aspectRatio?: string;
+  styleTags?: string[];
+  meta?: Record<string, unknown>;
+}
+
 export interface OperationHistoryEntry {
   tool: 'generate' | 'edit' | 'upscale' | 'blend' | 'artie';
   timestamp: number;
@@ -38,6 +48,9 @@ export interface UnifiedVisualContext {
   // Analysis and metadata
   analysisData?: Record<string, unknown>;
   styleTags?: string[];
+
+  // Rich context payload
+  currentContext?: VisualContextPayload;
   
   // Operation history (last 10)
   operationHistory: OperationHistoryEntry[];
@@ -56,10 +69,13 @@ type PartialContext =
 interface UnifiedVisualContextStore extends UnifiedVisualContext {
   setContext: (partial: PartialContext) => void;
   setActiveImage: (imageUrl: string, imageId?: string) => void;
+  updateImage: (imageUrl: string, imageId?: string) => void;
   setPrompt: (prompt: string) => void;
+  updatePrompt: (prompt: string) => void;
   setAnalysis: (data: Record<string, unknown>) => void;
   addOperation: (operation: Omit<OperationHistoryEntry, 'timestamp'>) => void;
   addImageToMemory: (image: Omit<ImageMemoryEntry, 'timestamp'>) => void;
+  setContextPayload: (context: VisualContextPayload) => void;
   getLatestImage: () => ImageMemoryEntry | undefined;
   getFullContext: () => UnifiedVisualContext;
   reset: () => void;
@@ -75,6 +91,7 @@ const notify = () => {
 const initialState: UnifiedVisualContext = {
   operationHistory: [],
   imageMemory: [],
+  currentContext: {},
   lastModified: Date.now(),
 };
 
@@ -99,12 +116,25 @@ const setActiveImage = (imageUrl: string, imageId?: string) => {
   setState({
     activeImageUrl: imageUrl,
     activeImageId: imageId,
+    currentContext: {
+      ...state.currentContext,
+      imageUrl,
+      imageId,
+    },
   });
 };
 
 const setPrompt = (prompt: string) => {
-  setState({ basePrompt: prompt });
+  setState({
+    basePrompt: prompt,
+    currentContext: {
+      ...state.currentContext,
+      prompt,
+    },
+  });
 };
+
+const updatePrompt = setPrompt;
 
 const setAnalysis = (data: Record<string, unknown>) => {
   setState({ analysisData: data });
@@ -138,6 +168,22 @@ const getLatestImage = () => {
   return state.imageMemory[state.imageMemory.length - 1];
 };
 
+const setContextPayload = (context: VisualContextPayload) => {
+  setState((prev) => ({
+    currentContext: {
+      ...prev.currentContext,
+      ...context,
+    },
+    basePrompt: context.prompt ?? prev.basePrompt,
+    activeImageUrl: context.imageUrl ?? prev.activeImageUrl,
+    activeImageId: context.imageId ?? prev.activeImageId,
+    styleTags: context.styleTags ?? prev.styleTags,
+    analysisData: (context.meta as Record<string, unknown> | undefined)?.analysisData ?? prev.analysisData,
+  }));
+};
+
+const updateImage = setActiveImage;
+
 const getFullContext = () => ({ ...state });
 
 const reset = () => setState({ ...initialState });
@@ -165,10 +211,13 @@ const useUnifiedVisualContextBase = <T,>(selector: UnifiedVisualContextSelector<
       ...state,
       setContext,
       setActiveImage,
+      updateImage,
       setPrompt,
+      updatePrompt,
       setAnalysis,
       addOperation,
       addImageToMemory,
+      setContextPayload,
       getLatestImage,
       getFullContext,
       reset,
@@ -177,10 +226,13 @@ const useUnifiedVisualContextBase = <T,>(selector: UnifiedVisualContextSelector<
       ...state,
       setContext,
       setActiveImage,
+      updateImage,
       setPrompt,
+      updatePrompt,
       setAnalysis,
       addOperation,
       addImageToMemory,
+      setContextPayload,
       getLatestImage,
       getFullContext,
       reset,
@@ -193,10 +245,13 @@ useUnifiedVisualContext.getState = () => ({
   ...state,
   setContext,
   setActiveImage,
+  updateImage,
   setPrompt,
+  updatePrompt,
   setAnalysis,
   addOperation,
   addImageToMemory,
+  setContextPayload,
   getLatestImage,
   getFullContext,
   reset,
