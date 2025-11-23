@@ -28,7 +28,7 @@ export interface OperationHistoryEntry {
 export interface VisualContextPayload {
   imageUrl?: string;
   prompt?: string;
-  toolOrigin?: 'artie' | 'studio' | 'edit' | 'blend' | 'upscale';
+  toolOrigin?: 'artie' | 'generate' | 'edit' | 'blend' | 'upscale';
   aspectRatio?: string;
   styleTags?: string[];
   meta?: Record<string, unknown>;

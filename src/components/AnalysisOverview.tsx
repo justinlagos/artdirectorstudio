@@ -124,7 +124,7 @@ export const AnalysisOverview = ({ analysis, fullPrompt, imageUrl, imageId }: An
       const messageId = crypto.randomUUID?.() || `img-${Date.now()}`;
       setActiveImage(imageUrl, imageId);
       setPrompt(fullPrompt || '');
-      addOperation({ tool: 'studio', prompt: fullPrompt, imageUrl });
+      addOperation({ tool: 'generate', prompt: fullPrompt, imageUrl });
       addImageToMemory({
         url: imageUrl,
         name: 'Analysis Subject',

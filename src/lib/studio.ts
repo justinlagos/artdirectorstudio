@@ -11,7 +11,7 @@ export interface OpenStudioOptions {
   basePrompt: string;
   imageUrl?: string;
   meta?: Record<string, unknown>;
-  toolOrigin?: 'artie' | 'studio' | 'edit' | 'blend' | 'upscale';
+  toolOrigin?: 'artie' | 'generate' | 'edit' | 'blend' | 'upscale';
   aspectRatio?: string;
   styleTags?: string[];
 }

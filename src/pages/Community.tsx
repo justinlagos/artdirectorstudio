@@ -19,10 +19,10 @@ const PAGE_SIZE = 12;
 
 type SortOption = "trending" | "recent" | "discussed";
 type CommunityPost = Database["public"]["Tables"]["community_posts"]["Row"] & {
-  profiles?: { username: string | null } | null;
+  profiles?: { username: string | null; email: string } | null;
 };
 type CommunityComment = Database["public"]["Tables"]["community_comments"]["Row"] & {
-  profiles?: { username: string | null } | null;
+  profiles?: { username: string | null; email: string } | null;
 };
 
 const sortLabels: Record<SortOption, string> = {
@@ -48,7 +48,7 @@ const Community = () => {
 
     let query = supabase
       .from("community_posts")
-      .select("id, user_id, image_url, caption, created_at, likes_count, comments_count, profiles(username)", { count: "exact" })
+      .select("*, profiles!community_posts_user_id_fkey(username, email)", { count: "exact" })
       .range(from, to);
 
     if (sort === "recent") {

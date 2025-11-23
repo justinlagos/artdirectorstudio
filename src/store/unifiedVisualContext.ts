@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from "react";
 
 export interface OperationHistoryEntry {
-  tool: 'generate' | 'edit' | 'upscale' | 'blend' | 'artie' | 'studio';
+  tool: 'generate' | 'edit' | 'upscale' | 'blend' | 'artie';
   timestamp: number;
   prompt?: string;
   imageUrl?: string;
