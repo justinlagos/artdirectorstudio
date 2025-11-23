@@ -1331,14 +1331,19 @@ export const ArtieChat = () => {
                 const { useVisualContextStore } = await import('@/store/visualContextStore');
                 const visualContext = useVisualContextStore.getState();
                 if (imageUrl) {
-                  visualContext.updateImage(imageUrl);
+                  visualContext.setContextPayload({
+                    imageUrl,
+                    prompt: visualContext.basePrompt || args.prompt,
+                    toolOrigin: 'upscale',
+                    meta: { scaleFactor: args.scaleFactor || '2' },
+                  });
                   visualContext.addOperation({
                     tool: 'upscale',
                     imageUrl,
                     params: { scaleFactor: args.scaleFactor || '2' }
                   });
                 }
-                
+
                 openTool('upscale', {
                   scaleFactor: args.scaleFactor || '2',
                   imageUrl,
@@ -1363,7 +1368,12 @@ export const ArtieChat = () => {
                 const { useVisualContextStore } = await import('@/store/visualContextStore');
                 const visualContext = useVisualContextStore.getState();
                 if (recentImages.length > 0) {
-                  visualContext.updateImage(recentImages[0].url);
+                  visualContext.setContextPayload({
+                    imageUrl: recentImages[0].url,
+                    prompt: visualContext.basePrompt || args.prompt,
+                    toolOrigin: 'blend',
+                    meta: { mode: args.mode || 'merge', ratio: args.ratio || 50 },
+                  });
                   visualContext.addOperation({
                     tool: 'blend',
                     params: { mode: args.mode || 'merge', ratio: args.ratio || 50 }
