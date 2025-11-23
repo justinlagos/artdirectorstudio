@@ -647,33 +647,35 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
   );
 
   return (
-    <ToolDrawer
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (nextOpen) {
-          onOpenChange(true);
-        } else {
-          handleClose();
+    <>
+      <ToolDrawer
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            onOpenChange(true);
+          } else {
+            handleClose();
+          }
+        }}
+        title={
+          <>
+            <Maximize2 className="w-5 h-5" />
+            Upscale Image
+          </>
         }
-      }}
-      title={
-        <>
-          <Maximize2 className="w-5 h-5" />
-          Upscale Image
-        </>
-      }
-      description="Enhance image resolution and detail without losing quality. Perfect for print or high-resolution displays."
-      contentClassName="pb-6"
-      footer={footerContent}
-    >
-      {bodyContent}
-    </ToolDrawer>
-    <ShareToCommunityDialog
-      open={shareOpen}
-      onOpenChange={setShareOpen}
-      imageUrl={upscaledImage}
-      defaultCaption={sourceImage ? `Upscaled to ${targetSize}` : undefined}
-      defaultTitle="Upscaled Image"
-    />
+        description="Enhance image resolution and detail without losing quality. Perfect for print or high-resolution displays."
+        contentClassName="pb-6"
+        footer={footerContent}
+      >
+        {bodyContent}
+      </ToolDrawer>
+      <ShareToCommunityDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        imageUrl={upscaledImage}
+        defaultCaption={sourceImage ? `Upscaled to ${targetSize}` : undefined}
+        defaultTitle="Upscaled Image"
+      />
+    </>
   );
 };
