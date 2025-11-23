@@ -64,7 +64,7 @@ const Community = () => {
 
     const { data, error, count } = await query;
     if (error) throw error;
-    return { data: (data as CommunityPost[]) ?? [], count: count ?? null };
+    return { data: (data as unknown as CommunityPost[]) ?? [], count: count ?? null };
   };
 
   const postsQuery = useInfiniteQuery({
@@ -165,12 +165,12 @@ const Community = () => {
     setLoadingComments((prev) => ({ ...prev, [postId]: true }));
     const { data, error } = await supabase
       .from("community_comments")
-      .select("id, comment_text, created_at, user_id, profiles(username)")
+      .select("id, post_id, comment_text, created_at, user_id, profiles!community_comments_user_id_fkey(username, email)")
       .eq("post_id", postId)
       .order("created_at", { ascending: false })
       .limit(10);
     if (!error) {
-      setCommentsByPost((prev) => ({ ...prev, [postId]: (data as CommunityComment[]) ?? [] }));
+      setCommentsByPost((prev) => ({ ...prev, [postId]: (data as unknown as CommunityComment[]) ?? [] }));
     }
     setLoadingComments((prev) => ({ ...prev, [postId]: false }));
   };
@@ -187,14 +187,14 @@ const Community = () => {
       const { data, error } = await supabase
         .from("community_comments")
         .insert({ post_id: postId, user_id: user.id, comment_text: text })
-        .select("id, comment_text, created_at, user_id, profiles(username)")
+        .select("id, post_id, comment_text, created_at, user_id, profiles!community_comments_user_id_fkey(username, email)")
         .single();
 
       if (error) throw error;
 
       setCommentsByPost((prev) => ({
         ...prev,
-        [postId]: [data as CommunityComment, ...(prev[postId] || [])],
+        [postId]: [data as unknown as CommunityComment, ...(prev[postId] || [])],
       }));
       setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
       updateLocalCounts(postId, 0, 1);
