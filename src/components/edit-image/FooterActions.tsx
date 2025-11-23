@@ -7,6 +7,8 @@ interface FooterActionsProps {
   onApply: () => void;
   isProcessing: boolean;
   canApply: boolean;
+  onShare?: () => void;
+  shareDisabled?: boolean;
 }
 
 export const FooterActions = ({
@@ -15,6 +17,8 @@ export const FooterActions = ({
   onApply,
   isProcessing,
   canApply,
+  onShare,
+  shareDisabled,
 }: FooterActionsProps) => {
   return (
     <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
@@ -42,6 +46,19 @@ export const FooterActions = ({
         <Download className="h-4 w-4 mr-2" />
         Download
       </Button>
+      {onShare && (
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            onShare();
+          }}
+          variant="secondary"
+          className="flex-1 min-h-[44px] touch-manipulation"
+          disabled={isProcessing || shareDisabled}
+        >
+          Share to Community
+        </Button>
+      )}
       <Button
         onClick={(e) => {
           e.stopPropagation();

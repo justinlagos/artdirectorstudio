@@ -32,6 +32,7 @@ import { PremiumFeatures } from "@/components/landing/PremiumFeatures";
 import { PremiumValue } from "@/components/landing/PremiumValue";
 import { ProofSection } from "@/components/landing/ProofSection";
 import { PricingSection } from "@/components/landing/PricingSection";
+import { FeaturedCommunitySection } from "@/components/landing/FeaturedCommunitySection";
 
 export interface Analysis {
   image_overview: string;
@@ -716,6 +717,10 @@ const Index = () => {
         </div>
       )}
 
+
+        <ErrorBoundary>
+          <FeaturedCommunitySection />
+        </ErrorBoundary>
 
         <ErrorBoundary>
           <Footer />

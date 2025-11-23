@@ -16,6 +16,7 @@ import { openStudioWithPrompt } from "@/lib/studio";
 import { analytics } from "@/lib/analytics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { ShareToCommunityDialog } from "@/components/community/ShareToCommunityDialog";
 
 const BLEND_STYLE_PRESETS = [
   { id: "modern", label: "Modern", hint: "Modern minimal aesthetic" },
@@ -48,6 +49,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
   const [showZoom, setShowZoom] = useState(false);
   const [blendStartTime, setBlendStartTime] = useState<number>(0);
   const [blendPrompt, setBlendPrompt] = useState<string>("");
+  const [shareOpen, setShareOpen] = useState(false);
 
   const toggleStyle = (styleId: string) => {
     setSelectedStyles((prev) =>
@@ -733,6 +735,13 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
           <Download className="w-4 h-4 mr-2" />
           Download
         </Button>
+        <Button
+          variant="secondary"
+          onClick={() => setShareOpen(true)}
+          className="min-h-[48px] w-full sm:flex-1"
+        >
+          Share to Community
+        </Button>
       </div>
       <Button
         variant="ghost"
@@ -783,5 +792,12 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     >
       {bodyContent}
     </ToolDrawer>
+    <ShareToCommunityDialog
+      open={shareOpen}
+      onOpenChange={setShareOpen}
+      imageUrl={blendedImage}
+      defaultCaption={blendPrompt || instruction}
+      defaultTitle="Image Blend"
+    />
   );
 };

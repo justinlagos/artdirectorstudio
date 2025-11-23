@@ -38,6 +38,7 @@ import { ImageContainer } from "./ImageContainer";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { ensureAssetSaved } from "@/lib/saveAsset";
+import { ShareToCommunityDialog } from "@/components/community/ShareToCommunityDialog";
 import { ImageZoomDialog } from "./ImageZoomDialog";
 
 export interface GenerationOptions {
@@ -120,6 +121,7 @@ export const ImageGenerationDialog = () => {
   const generationStartTime = useRef<number>(0);
   const [showZoom, setShowZoom] = useState(false);
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     if (!isGenerateModalOpen) {
@@ -880,9 +882,9 @@ export const ImageGenerationDialog = () => {
       )}>
         {generatedImage ? (
           <>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleCopyPrompt} 
               className={cn(
                 "shrink-0",
@@ -901,9 +903,9 @@ export const ImageGenerationDialog = () => {
               <Wand2 className="mr-2 h-4 w-4" />
               Generate Again
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleDownload} 
+            <Button
+              variant="outline"
+              onClick={handleDownload}
               className={cn(
                 "min-h-[44px]",
                 isMobile ? "w-full" : ""
@@ -911,6 +913,17 @@ export const ImageGenerationDialog = () => {
             >
               <Download className="mr-2 h-4 w-4" />
               Download
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShareOpen(true)}
+              className={cn(
+                "min-h-[44px]",
+                isMobile ? "w-full" : ""
+              )}
+              disabled={!generatedImage}
+            >
+              Share to Community
             </Button>
           </>
         ) : (
@@ -966,6 +979,13 @@ export const ImageGenerationDialog = () => {
       >
         {bodyContent}
       </ToolDrawer>
+      <ShareToCommunityDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        imageUrl={generatedImage || referenceImage || undefined}
+        defaultCaption={basePrompt}
+        defaultTitle="Generated in Studio"
+      />
       {zoomImageUrl && (
         <ImageZoomDialog
           open={showZoom}

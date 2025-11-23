@@ -17,6 +17,7 @@ import { SelectionTool } from "./SelectionTool";
 import { ColorPickerPanel } from "./ColorPickerPanel";
 import { AdvancedEditPanel } from "./AdvancedEditPanel";
 import { FooterActions } from "./FooterActions";
+import { ShareToCommunityDialog } from "@/components/community/ShareToCommunityDialog";
 import { 
   generateInstructionFromAdjustments, 
   generateFilterStyle, 
@@ -64,6 +65,7 @@ export const EditImageModal = ({
   const [activeTab, setActiveTab] = useState<"adjustments" | "select" | "color" | "advanced">("adjustments");
   const [instructionError, setInstructionError] = useState<string | null>(null);
   const [showZoom, setShowZoom] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     setPreviewUrl(imageUrl);
@@ -401,6 +403,8 @@ export const EditImageModal = ({
       onApply={handleApply}
       isProcessing={isProcessing}
       canApply={canApply()}
+      onShare={() => setShareOpen(true)}
+      shareDisabled={!previewUrl}
     />
   );
 
@@ -746,6 +750,13 @@ export const EditImageModal = ({
         </div>
       )}
       </ToolDrawer>
+      <ShareToCommunityDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        imageUrl={previewUrl}
+        defaultCaption={customInstruction || initialInstruction}
+        defaultTitle="Edited in Studio"
+      />
       {previewUrl && (
         <ImageZoomDialog
           open={showZoom}

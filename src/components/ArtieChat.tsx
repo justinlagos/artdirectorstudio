@@ -13,6 +13,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useRetryWithBackoff } from "@/hooks/useRetryWithBackoff";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { ImageEditor } from "./ImageEditor";
+import { ShareToCommunityDialog } from "@/components/community/ShareToCommunityDialog";
 import { extractTextFromBriefFile } from "@/lib/documentParser";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { ArtieModal } from "./artie/ArtieModal";
@@ -125,6 +126,8 @@ export const ArtieChat = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingImageUrl, setEditingImageUrl] = useState<string>("");
   const [editorInstruction, setEditorInstruction] = useState<string>("");
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareDefaults, setShareDefaults] = useState<{ imageUrl: string; caption?: string }>({ imageUrl: "" });
   
   useScrollLock(isOpen, 'artie-panel', isMobile);
   
@@ -1921,6 +1924,19 @@ export const ArtieChat = () => {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
+                                if (!message.attachment?.url) return;
+                                setShareDefaults({ imageUrl: message.attachment.url, caption: message.text });
+                                setShareDialogOpen(true);
+                              }}
+                              className="gap-1.5"
+                            >
+                              <Sparkles className="h-3.5 w-3.5" />
+                              Share
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
                                 const imageUrl = message.attachment?.url || "";
                                 // Minimize Artie cleanly first, then open Edit Image
                                 setIsOpen(false);
@@ -2400,6 +2416,13 @@ export const ArtieChat = () => {
           toast.success("Your edited image is ready and saved to My Projects!");
           setEditorOpen(false);
         }}
+      />
+      <ShareToCommunityDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        imageUrl={shareDefaults.imageUrl}
+        defaultCaption={shareDefaults.caption}
+        defaultTitle="Shared from Artie"
       />
     </>
   );
