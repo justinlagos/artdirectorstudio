@@ -1,7 +1,9 @@
-import { ReactNode, CSSProperties } from "react";
+import { ReactNode } from "react";
 import { Drawer as DrawerRoot, DrawerPortal, DrawerOverlay, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface ToolDrawerProps {
   open: boolean;
@@ -14,6 +16,7 @@ interface ToolDrawerProps {
   contentClassName?: string;
   headerClassName?: string;
   stickyFooterOnMobile?: boolean;
+  preventBodyScroll?: boolean;
 }
 
 export const ToolDrawer = ({
@@ -27,29 +30,51 @@ export const ToolDrawer = ({
   contentClassName,
   headerClassName,
   stickyFooterOnMobile = false,
+  preventBodyScroll = true,
 }: ToolDrawerProps) => {
-  const mobilePositionStyle: CSSProperties = {
-    left: "50%",
-    right: "auto",
-  };
+  const isMobile = useIsMobile();
+
+  // Lock body scroll while any tool modal is open
+  useScrollLock(open, "tool-drawer", preventBodyScroll);
 
   return (
     <DrawerRoot open={open} onOpenChange={onOpenChange} direction="bottom" modal={true} dismissible={true}>
       <DrawerPortal>
-        <DrawerOverlay className="backdrop-blur-sm z-[80]" />
+        <DrawerOverlay
+          className={cn(
+            "fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+            "duration-200 ease-out"
+          )}
+        />
         <DrawerPrimitive.Content
           className={cn(
-            "fixed z-[90] flex flex-col border border-border bg-background shadow-xl overflow-hidden",
+            "fixed z-[81] flex flex-col border border-border bg-background shadow-2xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "duration-300 ease-out",
-            "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
-            "w-[92vw] max-w-[920px] max-h-[90vh] rounded-2xl",
+            "duration-200 ease-out",
+            "left-1/2 -translate-x-1/2",
+            "w-[94vw] max-w-[1040px]",
+            "rounded-3xl",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
             "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
-            "data-[state=open]:slide-in-from-bottom-4 data-[state=closed]:slide-out-to-bottom-4",
+            "md:top-1/2 md:-translate-y-1/2 md:max-h-[90vh]",
+            "max-h-[92vh] bottom-4 md:bottom-auto",
             className,
           )}
-          style={mobilePositionStyle}
+          style={{
+            left: "50%",
+            right: "auto",
+            ...(isMobile
+              ? {
+                  bottom: "env(safe-area-inset-bottom)",
+                  transform: "translate(-50%, 0)",
+                }
+              : {
+                  top: "50%",
+                  transform: "translate(-50%, -50%)",
+                }),
+          }}
           onPointerDownOutside={(e) => {
             // Prevent closing when clicking on interactive elements inside
             const target = e.target as HTMLElement;
