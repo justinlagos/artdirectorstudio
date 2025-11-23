@@ -14,9 +14,11 @@ import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { ToolDrawer } from "./ToolDrawer";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { analytics } from "@/lib/analytics";
-import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShareToCommunityDialog } from "@/components/community/ShareToCommunityDialog";
+import { EmailDeliveryToggle } from "./EmailDeliveryToggle";
+import { useEmailDeliveryPreference } from "@/hooks/useEmailDeliveryPreference";
+import { sendImageEmail, showEmailSentToast } from "@/lib/emailDelivery";
 
 const BLEND_STYLE_PRESETS = [
   { id: "modern", label: "Modern", hint: "Modern minimal aesthetic" },
@@ -38,18 +40,16 @@ interface ImageFile {
 
 export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) => {
   const toolState = useToolState();
-  const queryClient = useQueryClient();
   const { user } = useAuth();
   const [images, setImages] = useState<ImageFile[]>([]);
   const [instruction, setInstruction] = useState("");
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [blendedImage, setBlendedImage] = useState<string | null>(null);
-  const [blendedAssetId, setBlendedAssetId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [showZoom, setShowZoom] = useState(false);
-  const [blendStartTime, setBlendStartTime] = useState<number>(0);
   const [blendPrompt, setBlendPrompt] = useState<string>("");
   const [shareOpen, setShareOpen] = useState(false);
+  const { emailDeliveryEnabled, setEmailDeliveryEnabled } = useEmailDeliveryPreference();
 
   const toggleStyle = (styleId: string) => {
     setSelectedStyles((prev) =>
@@ -67,6 +67,26 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       .filter((hint) => Boolean(hint)) as string[];
     const combined = hints.length ? `${base}. ${hints.join(". ")}` : base;
     return `${combined}. Create a seamless blend that feels unified and cohesive.`;
+  };
+
+  const deliverEmail = async (imageUrl: string, promptText: string) => {
+    if (!emailDeliveryEnabled || !user?.email) return;
+
+    try {
+      await sendImageEmail({
+        imageUrl,
+        prompt: promptText,
+        action: "blend",
+        viewUrl: window.location.origin,
+        downloadUrl: imageUrl,
+      });
+      showEmailSentToast(user.email);
+    } catch (error) {
+      console.error("[Blend] Email delivery failed", error);
+      toast.error("Email delivery failed", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
   };
 
   const validateImage = async (file: File): Promise<{ valid: boolean; error?: string }> => {
@@ -173,9 +193,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     }
 
     const idempotencyKey = crypto.randomUUID();
-    const startTime = Date.now();
-    setBlendStartTime(startTime);
-    
+
     toolState.startProcessing();
     setProgress(0);
     setBlendedImage(null);
@@ -374,39 +392,7 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       setBlendedImage(validatedImage);
       setBlendPrompt(finalInstruction);
       toolState.handleSuccess();
-      
-      // Edge function already saves, but ensure it's saved using unified function as fallback
-      const duration = Date.now() - startTime;
-      if (data.assetId) {
-        // Already saved by edge function
-        setBlendedAssetId(data.assetId);
-        console.log('✅ [Blend] Asset saved by edge function:', data.assetId);
-      } else {
-        // Fallback: save using unified function
-        const { ensureAssetSaved } = await import('@/lib/saveAsset');
-        ensureAssetSaved({
-          imageUrl: validatedImage, // base64 data URL
-          action: 'blend',
-          prompt: finalInstruction,
-          sourceUrls: base64Images,
-          params: {
-            imageCount: images.length,
-            instruction: finalInstruction,
-            styles: selectedStyles
-          },
-          durationMs: duration,
-          skipToast: true, // Blend already shows success toast
-          queryClient,
-          userId: user?.id,
-        }).then(async (assetId) => {
-          if (assetId) {
-            setBlendedAssetId(assetId);
-          }
-        }).catch((err: unknown) => {
-          // Silently handle - saveAsset already handles errors silently
-          console.error('[Blend] Background save failed:', err);
-        });
-      }
+      await deliverEmail(validatedImage, finalInstruction);
       
       // Track user behavior for intelligence
       try {
@@ -458,8 +444,6 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       setTimeout(() => setProgress(0), 1000);
     }
   };
-
-  // Removed saveToMyProjects - now using unified ensureAssetSaved directly
 
   const handleDownload = async () => {
     if (!blendedImage) return;
@@ -531,7 +515,6 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
     images.forEach(img => URL.revokeObjectURL(img.preview));
     setImages([]);
     setBlendedImage(null);
-    setBlendedAssetId(null);
     setInstruction("");
     setSelectedStyles([]);
     setBlendPrompt("");
@@ -720,54 +703,62 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         </div>
       );
 
-  const footerContent = blendedImage ? (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <Button onClick={handleUseInStudio} className="min-h-[48px] w-full sm:flex-1">
-          <Wand2 className="w-4 h-4 mr-2" />
-          Generate in Studio
-        </Button>
+  const footerContent = (
+    <div className="space-y-3">
+      <EmailDeliveryToggle
+        enabled={emailDeliveryEnabled}
+        onToggle={setEmailDeliveryEnabled}
+        helperText={user?.email ? `Send a copy to ${user.email}` : "Send blend results to your inbox."}
+      />
+      {blendedImage ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button onClick={handleUseInStudio} className="min-h-[48px] w-full sm:flex-1">
+              <Wand2 className="w-4 h-4 mr-2" />
+              Generate in Studio
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDownload}
+              className="min-h-[48px] w-full sm:flex-1"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShareOpen(true)}
+              className="min-h-[48px] w-full sm:flex-1"
+            >
+              Share to Community
+            </Button>
+          </div>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setBlendedImage(null);
+                setImages([]);
+                setInstruction("");
+                setSelectedStyles([]);
+                setBlendPrompt("");
+              }}
+            className="w-full"
+          >
+            Blend New Images
+          </Button>
+        </div>
+      ) : (
         <Button
-          variant="outline"
-          onClick={handleDownload}
-          className="min-h-[48px] w-full sm:flex-1"
+          onClick={handleBlend}
+          disabled={toolState.isProcessing || images.length < 2}
+          className="w-full min-h-[48px]"
+          size="lg"
         >
-          <Download className="w-4 h-4 mr-2" />
-          Download
+          <Blend className="w-4 h-4 mr-2" />
+          {toolState.isProcessing ? "Blending..." : "Blend Images"}
         </Button>
-        <Button
-          variant="secondary"
-          onClick={() => setShareOpen(true)}
-          className="min-h-[48px] w-full sm:flex-1"
-        >
-          Share to Community
-        </Button>
-      </div>
-      <Button
-        variant="ghost"
-        onClick={() => {
-          setBlendedImage(null);
-          setBlendedAssetId(null);
-          setImages([]);
-          setInstruction("");
-          setSelectedStyles([]);
-          setBlendPrompt("");
-        }}
-        className="w-full"
-      >
-        Blend New Images
-      </Button>
+      )}
     </div>
-  ) : (
-    <Button
-      onClick={handleBlend}
-      disabled={toolState.isProcessing || images.length < 2}
-      className="w-full min-h-[48px]"
-      size="lg"
-    >
-      <Blend className="w-4 h-4 mr-2" />
-      {toolState.isProcessing ? "Blending..." : "Blend Images"}
-    </Button>
   );
 
   return (

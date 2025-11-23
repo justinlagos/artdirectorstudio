@@ -15,9 +15,11 @@ import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { ToolDrawer } from "./ToolDrawer";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { analytics } from "@/lib/analytics";
-import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShareToCommunityDialog } from "@/components/community/ShareToCommunityDialog";
+import { EmailDeliveryToggle } from "./EmailDeliveryToggle";
+import { useEmailDeliveryPreference } from "@/hooks/useEmailDeliveryPreference";
+import { sendImageEmail, showEmailSentToast } from "@/lib/emailDelivery";
 
 interface ImageUpscaleDialogProps {
   open: boolean;
@@ -31,17 +33,15 @@ interface SourceImage {
 
 export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogProps) => {
   const toolState = useToolState();
-  const queryClient = useQueryClient();
   const { user } = useAuth();
   const [sourceImage, setSourceImage] = useState<SourceImage | null>(null);
   const [targetSize, setTargetSize] = useState<'1536x1536' | '2048x2048'>('1536x1536');
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
-  const [upscaledAssetId, setUpscaledAssetId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [showZoom, setShowZoom] = useState(false);
   const [zoomImage, setZoomImage] = useState<'before' | 'after'>('after');
-  const [upscaleStartTime, setUpscaleStartTime] = useState<number>(0);
   const [shareOpen, setShareOpen] = useState(false);
+  const { emailDeliveryEnabled, setEmailDeliveryEnabled } = useEmailDeliveryPreference();
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,6 +58,26 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     setUpscaledImage(null);
   };
 
+  const deliverEmail = async (imageUrl: string, promptText: string) => {
+    if (!emailDeliveryEnabled || !user?.email) return;
+
+    try {
+      await sendImageEmail({
+        imageUrl,
+        prompt: promptText,
+        action: "upscale",
+        viewUrl: window.location.origin,
+        downloadUrl: imageUrl,
+      });
+      showEmailSentToast(user.email);
+    } catch (error) {
+      console.error("[Upscale] Email delivery failed", error);
+      toast.error("Email delivery failed", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
+  };
+
   const handleUpscale = async () => {
     if (!sourceImage) {
       toast.error("Please upload an image first");
@@ -66,8 +86,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
 
     const idempotencyKey = crypto.randomUUID();
     const startTime = Date.now();
-    setUpscaleStartTime(startTime);
-    
+
     toolState.startProcessing();
     setProgress(0);
     setUpscaledImage(null);
@@ -250,38 +269,7 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       console.log('✅ [Upscale] Image validated, setting state immediately');
       setUpscaledImage(validatedImage);
       toolState.handleSuccess();
-      
-      // Edge function already saves, but ensure it's saved using unified function as fallback
-      const duration = Date.now() - startTime;
-      if (data.assetId) {
-        // Already saved by edge function
-        setUpscaledAssetId(data.assetId);
-        console.log('✅ [Upscale] Asset saved by edge function:', data.assetId);
-      } else {
-        // Fallback: save using unified function
-        const { ensureAssetSaved } = await import('@/lib/saveAsset');
-        ensureAssetSaved({
-          imageUrl: validatedImage, // base64 data URL
-          action: 'upscale',
-          prompt: `Upscaled to ${targetSize}`,
-          sourceUrls: [base64Image],
-          params: {
-            targetSize: targetSize,
-            originalSize: sourceImage?.file.size
-          },
-          durationMs: duration,
-          skipToast: true, // Upscale already shows success toast
-          queryClient,
-          userId: user?.id,
-        }).then(async (assetId) => {
-          if (assetId) {
-            setUpscaledAssetId(assetId);
-          }
-        }).catch((err) => {
-          // Silently handle - saveAsset already handles errors silently
-          console.error('[Upscale] Background save failed:', err);
-        });
-      }
+      await deliverEmail(validatedImage, `Upscaled to ${targetSize}`);
       
       // Track user behavior for intelligence
       try {
@@ -295,8 +283,9 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       } catch {
         // Silently fail - intelligence is optional
       }
-      
+
       // Track successful upscale
+      const duration = Date.now() - startTime;
       analytics.track("Image Upscale", {
         tool: "upscale",
         action: "upscale",
@@ -329,8 +318,6 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       setTimeout(() => setProgress(0), 1000);
     }
   };
-
-  // Removed saveToMyProjects - now using unified ensureAssetSaved directly
 
   const handleDownload = async () => {
     if (!upscaledImage) return;
@@ -404,7 +391,6 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
     }
     setSourceImage(null);
     setUpscaledImage(null);
-    setUpscaledAssetId(null);
     setTargetSize('1536x1536');
     setProgress(0);
     toolState.reset();
@@ -595,55 +581,64 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         </div>
       );
 
-  const footerContent = upscaledImage ? (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <Button onClick={handleUseInStudio} className="min-h-[48px] w-full sm:flex-1">
-          <Wand2 className="w-4 h-4 mr-2" />
-          Generate in Studio
-        </Button>
+  const footerContent = (
+    <div className="space-y-3">
+      <EmailDeliveryToggle
+        enabled={emailDeliveryEnabled}
+        onToggle={setEmailDeliveryEnabled}
+        helperText={user?.email ? `Send a copy to ${user.email}` : "Email upscaled results."}
+      />
+      {upscaledImage ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button onClick={handleUseInStudio} className="min-h-[48px] w-full sm:flex-1">
+              <Wand2 className="w-4 h-4 mr-2" />
+              Generate in Studio
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDownload}
+              className="min-h-[48px] w-full sm:flex-1"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShareOpen(true)}
+              className="min-h-[48px] w-full sm:flex-1"
+            >
+              Share to Community
+            </Button>
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setUpscaledImage(null);
+              if (sourceImage) {
+                URL.revokeObjectURL(sourceImage.preview);
+              }
+              setSourceImage(null);
+              setTargetSize("1536x1536");
+              setZoomImage('after');
+            }}
+            className="w-full"
+          >
+            Upscale Another Image
+          </Button>
+        </div>
+      ) : (
         <Button
-          variant="outline"
-          onClick={handleDownload}
-          className="min-h-[48px] w-full sm:flex-1"
+          onClick={handleUpscale}
+          disabled={toolState.isProcessing || !sourceImage}
+          className="w-full min-h-[48px]"
+          size="lg"
         >
-          <Download className="w-4 h-4 mr-2" />
-          Download
+          <Maximize2 className="w-4 h-4 mr-2" />
+          {toolState.isProcessing ? "Upscaling..." : "Upscale Image"}
         </Button>
-        <Button
-          variant="secondary"
-          onClick={() => setShareOpen(true)}
-          className="min-h-[48px] w-full sm:flex-1"
-        >
-          Share to Community
-        </Button>
-      </div>
-      <Button
-        variant="ghost"
-        onClick={() => {
-          setUpscaledImage(null);
-          setUpscaledAssetId(null);
-          if (sourceImage) {
-            URL.revokeObjectURL(sourceImage.preview);
-          }
-          setSourceImage(null);
-          setTargetSize("1536x1536");
-        }}
-        className="w-full"
-      >
-        Upscale Another Image
-      </Button>
+      )}
     </div>
-  ) : (
-    <Button
-      onClick={handleUpscale}
-      disabled={toolState.isProcessing || !sourceImage}
-      className="w-full min-h-[48px]"
-      size="lg"
-    >
-      <Maximize2 className="w-4 h-4 mr-2" />
-      {toolState.isProcessing ? "Upscaling..." : "Upscale Image"}
-    </Button>
   );
 
   return (

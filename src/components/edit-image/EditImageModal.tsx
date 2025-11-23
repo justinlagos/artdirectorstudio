@@ -23,6 +23,9 @@ import {
   generateFilterStyle, 
   DEFAULT_ADJUSTMENTS 
 } from "@/lib/imageEditing/instructionGenerator";
+import { EmailDeliveryToggle } from "../EmailDeliveryToggle";
+import { useEmailDeliveryPreference } from "@/hooks/useEmailDeliveryPreference";
+import { sendImageEmail, showEmailSentToast } from "@/lib/emailDelivery";
 
 interface EditImageModalProps {
   open: boolean;
@@ -66,6 +69,7 @@ export const EditImageModal = ({
   const [instructionError, setInstructionError] = useState<string | null>(null);
   const [showZoom, setShowZoom] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const { emailDeliveryEnabled, setEmailDeliveryEnabled } = useEmailDeliveryPreference();
 
   useEffect(() => {
     setPreviewUrl(imageUrl);
@@ -91,6 +95,29 @@ export const EditImageModal = ({
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [open, selectedRegion, activeTab]);
+
+  const deliverEmail = async (imageUrl: string, promptText: string) => {
+    if (!emailDeliveryEnabled) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) return;
+
+    try {
+      await sendImageEmail({
+        imageUrl,
+        prompt: promptText,
+        action: "edit",
+        viewUrl: window.location.origin,
+        downloadUrl: imageUrl,
+      });
+      showEmailSentToast(user.email);
+    } catch (error) {
+      console.error('[Edit] Email delivery failed:', error);
+      toast.error("Email delivery failed", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
+  };
 
   // Use centralized instruction generation
   const generateInstruction = (): string => {
@@ -236,18 +263,14 @@ export const EditImageModal = ({
         });
         return;
       }
-      
+
       if (result.success && result.image) {
         setPreviewUrl(result.image);
+        await deliverEmail(result.image, trimmedInstruction);
         toast.success("Edits applied successfully!", {
-          description: result.assetId ? "Saved to My Projects" : "Image edited"
+          description: "We\'ll send a copy to your inbox if email delivery is enabled.",
         });
-        
-        // If assetId is returned, the image was saved to database
-        if (result.assetId) {
-          console.log('[EDIT-IMAGE] Image saved to My Projects:', result.assetId);
-        }
-        
+
         onImageEdited?.(result.image);
       } else {
         const errorMessage = result.error || 'No image returned from edit';
@@ -397,15 +420,22 @@ export const EditImageModal = ({
   };
 
   const footerContent = (
-    <FooterActions
-      onReset={handleReset}
-      onDownload={handleDownload}
-      onApply={handleApply}
-      isProcessing={isProcessing}
-      canApply={canApply()}
-      onShare={() => setShareOpen(true)}
-      shareDisabled={!previewUrl}
-    />
+    <div className="space-y-3">
+      <EmailDeliveryToggle
+        enabled={emailDeliveryEnabled}
+        onToggle={setEmailDeliveryEnabled}
+        helperText="Send edited results to your inbox."
+      />
+      <FooterActions
+        onReset={handleReset}
+        onDownload={handleDownload}
+        onApply={handleApply}
+        isProcessing={isProcessing}
+        canApply={canApply()}
+        onShare={() => setShareOpen(true)}
+        shareDisabled={!previewUrl}
+      />
+    </div>
   );
 
   return (
