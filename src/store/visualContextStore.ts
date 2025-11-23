@@ -12,6 +12,7 @@ export interface VisualContext {
   basePrompt?: string;
   analysisData?: Record<string, unknown>;
   styleTags?: string[];
+  currentContext?: VisualContextPayload;
   operationHistory: OperationHistoryEntry[];
   lastModified: number;
 }
@@ -24,6 +25,15 @@ export interface OperationHistoryEntry {
   params?: Record<string, unknown>;
 }
 
+export interface VisualContextPayload {
+  imageUrl?: string;
+  prompt?: string;
+  toolOrigin?: 'artie' | 'studio' | 'edit' | 'blend' | 'upscale';
+  aspectRatio?: string;
+  styleTags?: string[];
+  meta?: Record<string, unknown>;
+}
+
 type PartialContext =
   | Partial<VisualContext>
   | ((state: VisualContext) => Partial<VisualContext>);
@@ -32,12 +42,14 @@ interface VisualContextStore extends VisualContext {
   setContext: (partial: PartialContext) => void;
   updatePrompt: (prompt: string) => void;
   updateImage: (imageUrl: string, imageId?: string) => void;
+  setContextPayload: (context: VisualContextPayload) => void;
   addOperation: (operation: Omit<OperationHistoryEntry, 'timestamp'>) => void;
   reset: () => void;
   getFullContext: () => VisualContext;
 }
 
 const initialState: VisualContext = {
+  currentContext: {},
   operationHistory: [],
   lastModified: Date.now(),
 };
@@ -62,6 +74,21 @@ function updateImage(imageUrl: string, imageId?: string) {
   setState({
     activeImageUrl: imageUrl,
     activeImageId: imageId,
+    currentContext: {
+      ...state.currentContext,
+      imageUrl,
+    }
+  });
+}
+
+function setContextPayload(context: VisualContextPayload) {
+  setState({
+    currentContext: {
+      ...state.currentContext,
+      ...context,
+    },
+    basePrompt: context.prompt ?? state.basePrompt,
+    activeImageUrl: context.imageUrl ?? state.activeImageUrl,
   });
 }
 
@@ -87,6 +114,7 @@ const buildSnapshot = (): VisualContextStore => ({
   setContext,
   updatePrompt,
   updateImage,
+  setContextPayload,
   addOperation,
   reset,
   getFullContext,

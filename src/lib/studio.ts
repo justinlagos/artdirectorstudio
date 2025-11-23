@@ -11,28 +11,40 @@ export interface OpenStudioOptions {
   basePrompt: string;
   imageUrl?: string;
   meta?: Record<string, unknown>;
+  toolOrigin?: 'artie' | 'studio' | 'edit' | 'blend' | 'upscale';
+  aspectRatio?: string;
+  styleTags?: string[];
 }
 
 export async function openStudioWithPrompt({
   basePrompt,
   imageUrl,
   meta,
+  toolOrigin = 'artie',
+  aspectRatio,
+  styleTags,
 }: OpenStudioOptions): Promise<void> {
   const studioState = useStudioStore.getState();
   const modalState = useModalStore.getState();
   const visualContext = useVisualContextStore.getState();
 
   // Update visual context for cross-tool continuity
+  visualContext.setContextPayload({
+    imageUrl,
+    prompt: basePrompt,
+    toolOrigin,
+    aspectRatio,
+    styleTags,
+    meta,
+  });
+
   if (imageUrl) {
-    visualContext.updateImage(imageUrl);
     visualContext.addOperation({
-      tool: 'artie',
+      tool: toolOrigin,
       prompt: basePrompt,
       imageUrl,
+      params: { aspectRatio, ...meta },
     });
-  }
-  if (basePrompt) {
-    visualContext.updatePrompt(basePrompt);
   }
 
   // If an image is provided, generate Creative Director analysis FIRST before opening modal
@@ -117,6 +129,14 @@ export async function openStudioWithPrompt({
   }
 
   // NOW set the prompt and open modal - prompt is already enhanced
+  visualContext.setContextPayload({
+    imageUrl,
+    prompt: initialPrompt,
+    toolOrigin,
+    aspectRatio,
+    styleTags: styleTags || (meta?.styleTags as string[] | undefined),
+    meta,
+  });
   studioState.setPrompt(initialPrompt);
   studioState.setImage(imageUrl || "");
   

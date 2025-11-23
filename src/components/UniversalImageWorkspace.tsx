@@ -19,11 +19,12 @@ import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { getCachedUnderstanding, analyzeImageDeep } from "@/lib/intelligence/imageUnderstanding";
 import { getQuickFixes, getFixAdjustments } from "@/lib/intelligence/visualTroubleshooting";
 import { useIntelligence } from "@/hooks/useIntelligence";
-import { 
-  generateInstructionFromAdjustments, 
-  generateFilterStyle, 
-  DEFAULT_ADJUSTMENTS 
+import {
+  generateInstructionFromAdjustments,
+  generateFilterStyle,
+  DEFAULT_ADJUSTMENTS
 } from "@/lib/imageEditing/instructionGenerator";
+import { useVisualContextStore } from "@/store/visualContextStore";
 
 interface UniversalImageWorkspaceProps {
   open: boolean;
@@ -56,6 +57,9 @@ export const UniversalImageWorkspace = ({
   const isMobile = useIsMobile();
   const { openTool } = useToolsModal();
   const intelligence = useIntelligence();
+  const contextSnapshot = useVisualContextStore((state) => state.currentContext);
+  const contextPrompt = useVisualContextStore((state) => state.basePrompt);
+  const contextAnalysis = useVisualContextStore((state) => state.analysisData);
   const [adjustments, setAdjustments] = useState<Adjustments>(defaultAdjustments);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(imageUrl);
@@ -143,13 +147,58 @@ export const UniversalImageWorkspace = ({
     return generateInstructionFromAdjustments(adjustments);
   };
 
+  const buildContextualInstruction = (userInstruction: string): string => {
+    const segments: string[] = [];
+
+    const promptContext = contextSnapshot?.prompt || contextPrompt;
+    if (promptContext) {
+      segments.push(`Base image description: ${promptContext}`);
+    }
+
+    if (contextSnapshot?.toolOrigin) {
+      segments.push(`Origin tool: ${contextSnapshot.toolOrigin}`);
+    }
+
+    if (contextAnalysis && typeof contextAnalysis === 'object') {
+      const analysis = contextAnalysis as Record<string, unknown>;
+      const cues = [
+        analysis.image_overview as string | undefined,
+        analysis.subject_description as string | undefined,
+        analysis.art_style ? `Style: ${analysis.art_style}` : undefined,
+        analysis.mood ? `Mood: ${analysis.mood}` : undefined,
+      ].filter(Boolean);
+
+      if (cues.length) {
+        segments.push(`Key visual cues: ${cues.join(' | ')}`);
+      }
+    }
+
+    const adjustmentIntent = generateInstructionFromAdjustments(adjustments, 5);
+    if (adjustmentIntent) {
+      segments.push(`Active sliders: ${adjustmentIntent}`);
+    }
+
+    if (selectedRegion && activeTab === "select") {
+      const { x, y, width, height } = selectedRegion;
+      segments.push(`Apply to region x:${Math.round(x)}, y:${Math.round(y)}, w:${Math.round(width)}, h:${Math.round(height)}`);
+    }
+
+    if (userInstruction) {
+      segments.push(`User instruction: ${userInstruction}`);
+    }
+
+    return segments.join(' | ');
+  };
+
   const submitEdit = async (instruction: string) => {
     const trimmedInstruction = instruction?.trim() || "";
-    
+
     if (!trimmedInstruction || trimmedInstruction.length < 3) {
       setInstructionError("Describe what you want to change.");
       return;
     }
+
+    const contextualInstruction = buildContextualInstruction(trimmedInstruction);
 
     setInstructionError(null);
     setIsProcessing(true);
@@ -171,7 +220,7 @@ export const UniversalImageWorkspace = ({
         region?: { x: number; y: number; width: number; height: number };
       } = {
         imageUrl: previewUrl,
-        instruction: trimmedInstruction,
+        instruction: contextualInstruction,
         quality: 'high'
       };
 
