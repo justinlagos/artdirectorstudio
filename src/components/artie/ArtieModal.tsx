@@ -50,38 +50,38 @@ export const ArtieModal = ({
         {/* Overlay - Semi-transparent dark overlay, click closes modal */}
         <DialogPrimitive.Overlay
           className={cn(
-            "fixed inset-0 z-artie-modal-backdrop bg-black/60 backdrop-blur-sm",
+            "fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-            "duration-[260ms]"
+            "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+            "duration-200 ease-out"
           )}
         />
 
         {/* Content */}
         <DialogPrimitive.Content
           className={cn(
-            "fixed z-artie-modal-content flex flex-col border border-border bg-background shadow-xl overflow-hidden",
+            "fixed z-[81] flex flex-col border border-border bg-background shadow-2xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "duration-200 ease-in-out",
+            "duration-200 ease-out",
             isMobile
               ? [
-                  "left-1/2 top-4 -translate-x-1/2",
-                  "w-[94vw] max-w-[1024px] mx-auto",
-                  "rounded-2xl",
+                  "left-1/2 -translate-x-1/2",
+                  "w-[94vw] max-w-[1040px] mx-auto",
+                  "rounded-3xl",
                   "max-h-[92vh]",
                   "pb-[env(safe-area-inset-bottom)]",
-                  "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-                  "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+                  "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+                  "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
                 ]
               : [
-                  "left-1/2 top-8 -translate-x-1/2",
+                  "left-1/2 -translate-x-1/2",
                   "right-auto bottom-auto",
-                  "rounded-2xl",
-                  "w-[90vw] max-h-[90vh]",
+                  "rounded-3xl",
+                  "w-[92vw] max-w-[1040px] max-h-[90vh]",
                   maxWidthClasses[maxWidth],
                   maxWidth === "full" && "min-w-[min(960px,90vw)]",
                   maxWidth !== "full" && !["sm", "md", "lg", "xl", "2xl"].includes(maxWidth) && "max-w-[820px]",
-                  "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                  "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
                   "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
                 ],
             className
@@ -91,13 +91,14 @@ export const ArtieModal = ({
             ...(isMobile ? {
               left: '50%',
               right: 'auto',
-              transform: 'translateX(-50%)',
+              bottom: 'env(safe-area-inset-bottom)',
+              transform: 'translate(-50%, 0)',
             } : {
               left: '50%',
-              top: '2rem',
+              top: '50%',
               right: 'auto',
               bottom: 'auto',
-              transform: 'translateX(-50%)',
+              transform: 'translate(-50%, -50%)',
             }),
           }}
           onOpenAutoFocus={(e) => {
@@ -166,6 +167,7 @@ export const ArtieModal = ({
                 contentClassName
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
+              data-studio-modal-body
             >
               {children}
             </div>
