@@ -35,11 +35,12 @@ import {
 } from "@/lib/promptSimilarity";
 import { useSmartDefaults } from "@/hooks/useSmartDefaults";
 import { ImageContainer } from "./ImageContainer";
-import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { ensureAssetSaved } from "@/lib/saveAsset";
 import { ShareToCommunityDialog } from "@/components/community/ShareToCommunityDialog";
 import { ImageZoomDialog } from "./ImageZoomDialog";
+import { EmailDeliveryToggle } from "./EmailDeliveryToggle";
+import { useEmailDeliveryPreference } from "@/hooks/useEmailDeliveryPreference";
+import { sendImageEmail, showEmailSentToast } from "@/lib/emailDelivery";
 
 export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
@@ -71,7 +72,6 @@ const truncatePrompt = (value: string) =>
 export const ImageGenerationDialog = () => {
   const isMobile = useIsMobile();
   const isGenerateModalOpen = useModalStore((state) => state.isGenerateModalOpen);
-  const queryClient = useQueryClient();
   const { user } = useAuth();
 
   const storePrompt = useStudioStore((state) => state.prompt);
@@ -122,6 +122,7 @@ export const ImageGenerationDialog = () => {
   const [showZoom, setShowZoom] = useState(false);
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const { emailDeliveryEnabled, setEmailDeliveryEnabled } = useEmailDeliveryPreference();
 
   useEffect(() => {
     if (!isGenerateModalOpen) {
@@ -234,29 +235,7 @@ export const ImageGenerationDialog = () => {
 
       if (imageUrl) {
         setGeneratedImage(imageUrl);
-        
-        // Ensure image is saved to My Projects (edge function should save, but verify/fallback)
-        // Use ensureAssetSaved as fallback in case edge function didn't save
-        ensureAssetSaved({
-          imageUrl: imageUrl,
-          action: 'generate',
-          prompt: prompt || basePrompt,
-          params: {
-            quality: options.quality,
-            aspectRatio: options.aspectRatio,
-            size: ASPECT_RATIO_TO_SIZE[options.aspectRatio] || "1024x1024",
-            background: options.background,
-            continuationStrength: finalContinuationStrength,
-            hadReference: !!referenceImage,
-          },
-          durationMs: totalTime * 1000,
-          queryClient,
-          userId: user?.id,
-          skipToast: true, // Don't show duplicate toast
-        }).catch((err) => {
-          // Silently handle - might already be saved by edge function
-          console.log('[Generate] Save check completed:', err?.message || 'OK');
-        });
+        await deliverEmail(imageUrl, prompt || basePrompt);
         
         // Enhanced success feedback
         toast.success(
@@ -527,6 +506,26 @@ export const ImageGenerationDialog = () => {
     
     updatePreviewSize(options.aspectRatio);
   }, [options.aspectRatio, isGenerateModalOpen]);
+
+  const deliverEmail = async (imageUrl: string, promptText: string) => {
+    if (!emailDeliveryEnabled || !user?.email) return;
+
+    try {
+      await sendImageEmail({
+        imageUrl,
+        prompt: promptText,
+        action: "generate",
+        viewUrl: window.location.origin,
+        downloadUrl: imageUrl,
+      });
+      showEmailSentToast(user.email);
+    } catch (error) {
+      console.error("[Generate] Email delivery failed", error);
+      toast.error("Email delivery failed", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
 
   const bodyContent = (
     <div className={cn(
@@ -866,93 +865,100 @@ export const ImageGenerationDialog = () => {
   );
 
   const footerContent = (
-    <div className={cn(
-      "flex items-center gap-6",
-      isMobile ? "flex-col" : "justify-between"
-    )}>
-      {/* Left: Credit usage text */}
-      <div className="text-xs text-muted-foreground shrink-0">
-        This generation uses 1 credit
-      </div>
-      
-      {/* Right: Actions */}
+    <div className="space-y-3">
+      <EmailDeliveryToggle
+        enabled={emailDeliveryEnabled}
+        onToggle={setEmailDeliveryEnabled}
+        helperText={user?.email ? `Send a copy to ${user.email}` : "Send a copy to your inbox."}
+      />
       <div className={cn(
-        "flex items-center gap-3",
-        isMobile ? "w-full flex-col" : "ml-auto"
+        "flex items-center gap-6",
+        isMobile ? "flex-col" : "justify-between"
       )}>
-        {generatedImage ? (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyPrompt} 
-              className={cn(
-                "shrink-0",
-                isMobile ? "w-full" : ""
-              )}
-            >
-              <Copy className="mr-2 h-3 w-3" /> Copy Prompt
-            </Button>
-            <Button 
-              onClick={handleRegenerate} 
-              className={cn(
-                "min-h-[44px]",
-                isMobile ? "w-full" : ""
-              )}
-            >
-              <Wand2 className="mr-2 h-4 w-4" />
-              Generate Again
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleDownload}
-              className={cn(
-                "min-h-[44px]",
-                isMobile ? "w-full" : ""
-              )}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setShareOpen(true)}
-              className={cn(
-                "min-h-[44px]",
-                isMobile ? "w-full" : ""
-              )}
-              disabled={!generatedImage}
-            >
-              Share to Community
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleCopyPrompt} 
-              className={cn(
-                "shrink-0",
-                isMobile ? "w-full" : ""
-              )}
-            >
-              <Copy className="mr-2 h-3 w-3" /> Copy Prompt
-            </Button>
-            <Button
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className={cn(
-                "min-h-[44px]",
-                isMobile ? "w-full" : "min-w-[140px]"
-              )}
-              size={isMobile ? "lg" : "default"}
-            >
-              <Wand2 className="mr-2 h-4 w-4" />
-              {isGenerating ? "Generating..." : "Generate"}
-            </Button>
-          </>
-        )}
+        {/* Left: Credit usage text */}
+        <div className="text-xs text-muted-foreground shrink-0">
+          This generation uses 1 credit
+        </div>
+
+        {/* Right: Actions */}
+        <div className={cn(
+          "flex items-center gap-3",
+          isMobile ? "w-full flex-col" : "ml-auto"
+        )}>
+          {generatedImage ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyPrompt}
+                className={cn(
+                  "shrink-0",
+                  isMobile ? "w-full" : ""
+                )}
+              >
+                <Copy className="mr-2 h-3 w-3" /> Copy Prompt
+              </Button>
+              <Button
+                onClick={handleRegenerate}
+                className={cn(
+                  "min-h-[44px]",
+                  isMobile ? "w-full" : ""
+                )}
+              >
+                <Wand2 className="mr-2 h-4 w-4" />
+                Generate Again
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDownload}
+                className={cn(
+                  "min-h-[44px]",
+                  isMobile ? "w-full" : ""
+                )}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShareOpen(true)}
+                className={cn(
+                  "min-h-[44px]",
+                  isMobile ? "w-full" : ""
+                )}
+                disabled={!generatedImage}
+              >
+                Share to Community
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyPrompt}
+                className={cn(
+                  "shrink-0",
+                  isMobile ? "w-full" : ""
+                )}
+              >
+                <Copy className="mr-2 h-3 w-3" /> Copy Prompt
+              </Button>
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className={cn(
+                  "min-h-[44px]",
+                  isMobile ? "w-full" : "min-w-[140px]"
+                )}
+                size={isMobile ? "lg" : "default"}
+              >
+                <Wand2 className="mr-2 h-4 w-4" />
+                {isGenerating ? "Generating..." : "Generate"}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
