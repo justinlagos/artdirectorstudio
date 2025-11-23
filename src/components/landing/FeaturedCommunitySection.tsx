@@ -10,6 +10,7 @@ interface CommunityPreview {
   id: string;
   image_url: string;
   likes_count: number;
+  created_at: string;
   profiles?: { username: string | null; email: string } | null;
 }
 
@@ -19,9 +20,11 @@ export const FeaturedCommunitySection = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("community_posts")
-        .select("id, image_url, likes_count, profiles!community_posts_user_id_fkey(username, email)")
-        .order("likes_count", { ascending: false })
-        .order("created_at", { ascending: false })
+        .select(
+          "id, image_url, likes_count, created_at, profiles!community_posts_user_id_fkey(username, email)"
+        )
+        .order("likes_count", { ascending: false, nullsLast: true })
+        .order("created_at", { ascending: false, nullsLast: true })
         .limit(6);
 
       if (error) throw error;
@@ -30,8 +33,7 @@ export const FeaturedCommunitySection = () => {
     staleTime: 1000 * 60 * 5,
   });
 
-  if (isLoading && !data) return null;
-  if (!data || data.length === 0) return null;
+  if (!isLoading && (!data || data.length === 0)) return null;
 
   return (
     <section className="py-16 border-t border-border/60 bg-muted/20">
@@ -49,21 +51,27 @@ export const FeaturedCommunitySection = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {data.map((post) => (
-            <Card key={post.id} className="overflow-hidden border-border/60">
+          {(isLoading ? Array.from({ length: 6 }) : data).map((post, index) => (
+            <Card key={post?.id ?? index} className="overflow-hidden border-border/60">
               <div className="aspect-[4/3] overflow-hidden bg-muted">
-                <img
-                  src={post.image_url}
-                  alt={post.profiles?.username || "Community post"}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
+                {post ? (
+                  <img
+                    src={post.image_url}
+                    alt={post.profiles?.username || "Community post"}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full animate-pulse" />
+                )}
               </div>
               <div className="p-4 flex items-center justify-between">
-                <div className="font-medium">{post.profiles?.username || "Creator"}</div>
+                <div className="font-medium">
+                  {post ? post.profiles?.username || "Creator" : <span className="block h-4 w-24 bg-muted animate-pulse" />}
+                </div>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <Heart className="h-4 w-4" />
-                  {post.likes_count}
+                  {post ? post.likes_count : <span className="block h-4 w-6 bg-muted animate-pulse" />}
                 </div>
               </div>
             </Card>
