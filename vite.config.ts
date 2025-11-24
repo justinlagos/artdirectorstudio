@@ -66,9 +66,9 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('node_modules/browser-image-compression') || id.includes('node_modules/html2canvas')) {
             return 'image-vendor';
           }
-          // Lucide icons - split by usage
+          // Lucide icons - bundle with React to avoid forwardRef issues
           if (id.includes('node_modules/lucide-react')) {
-            return 'icons-vendor';
+            return 'react-vendor';
           }
           // Intelligence features (lazy loaded)
           if (id.includes('src/lib/intelligence/')) {
@@ -113,6 +113,7 @@ export default defineConfig(({ mode }) => ({
       'react-router-dom',
       '@supabase/supabase-js',
       '@tanstack/react-query',
+      'lucide-react', // Include for proper React dependency resolution
       'lodash', // Explicitly include lodash for proper transformation
     ],
     exclude: [
