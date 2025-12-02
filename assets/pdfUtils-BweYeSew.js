@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/jspdf.es.min-Cz_0wlQE.js","assets/index-DuUJkTx0.js","assets/index-CVGClX_t.css"])))=>i.map(i=>d[i]);
+import{_ as n}from"./index-DuUJkTx0.js";let e=null;async function a(){return e||(e=await n(()=>import("./jspdf.es.min-Cz_0wlQE.js").then(t=>t.j),__vite__mapDeps([0,1,2]))),e}async function o(){const t=await a();return new t.default}export{o as c};
