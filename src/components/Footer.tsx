@@ -45,12 +45,12 @@ export const Footer = () => {
               AI-powered creative platform for image analysis, generation, and enhancement. Transform your creative workflow.
             </p>
             <nav className="flex flex-col space-y-2.5 pt-2">
-              <a 
-                href="/#hero" 
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[40px] flex items-center font-medium"
+              <button 
+                onClick={() => handleNavigation('/')} 
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[40px] flex items-center text-left w-full font-medium"
               >
                 Studio
-              </a>
+              </button>
               <button
                 onClick={() => handleNavigation('/community')}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[40px] flex items-center text-left w-full font-medium"
@@ -109,11 +109,15 @@ export const Footer = () => {
               </button>
               <button
                 onClick={() => {
-                  const artieButton = document.querySelector('[aria-label="Chat with Artie"]') as HTMLButtonElement;
-                  if (artieButton) {
-                    artieButton.click();
+                  if (window.location.pathname === '/artie') {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                   } else {
-                    toast.info("Opening Artie Assistant...");
+                    const artieButton = document.querySelector('[aria-label="Chat with Artie"]') as HTMLButtonElement;
+                    if (artieButton) {
+                      artieButton.click();
+                    } else {
+                      navigate('/artie');
+                    }
                   }
                 }}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[40px] flex items-center text-left w-full font-medium"
@@ -164,29 +168,26 @@ export const Footer = () => {
               </p>
               <div className="flex items-center gap-4">
                 <a 
-                  href="https://twitter.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                  href="#" 
                   className="text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="Twitter"
+                  onClick={(e) => { e.preventDefault(); toast.info("Social profiles coming soon!"); }}
                 >
                   <Twitter className="h-4 w-4" />
                 </a>
                 <a 
-                  href="https://github.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                  href="#" 
                   className="text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="GitHub"
+                  onClick={(e) => { e.preventDefault(); toast.info("Social profiles coming soon!"); }}
                 >
                   <Github className="h-4 w-4" />
                 </a>
                 <a 
-                  href="https://linkedin.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                  href="#" 
                   className="text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="LinkedIn"
+                  onClick={(e) => { e.preventDefault(); toast.info("Social profiles coming soon!"); }}
                 >
                   <Linkedin className="h-4 w-4" />
                 </a>

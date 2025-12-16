@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card } from "@/components/ui/card";
@@ -31,9 +32,13 @@ const sortLabels: Record<SortOption, string> = {
   discussed: "Most Discussed",
 };
 
+import { useModalStore } from "@/store/modalStore";
+
 const Community = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const openGenerateModal = useModalStore((state) => state.openGenerateModal);
   const [sort, setSort] = useState<SortOption>("trending");
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
@@ -269,6 +274,7 @@ const Community = () => {
       });
 
       window.dispatchEvent(new Event("openArtieChat"));
+      navigate('/artie');
       toast.success("Opening Artie with this image");
     } catch (error) {
       console.error("Failed to open Artie", error);
@@ -446,7 +452,7 @@ const Community = () => {
             <Card className="p-8 text-center space-y-3">
               <h3 className="text-xl font-semibold">No posts yet</h3>
               <p className="text-muted-foreground">Be the first to share your work from the Studio.</p>
-              <Button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+              <Button onClick={openGenerateModal}>
                 Start Creating
               </Button>
             </Card>

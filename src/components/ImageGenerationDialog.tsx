@@ -29,9 +29,9 @@ import { useModalStore } from "@/store/modalStore";
 import { useStudioStore } from "@/store/studioStore";
 import { closeStudioModal } from "@/lib/studio";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { 
-  calculateContinuationStrength, 
-  getContinuationDescription 
+import {
+  calculateContinuationStrength,
+  getContinuationDescription
 } from "@/lib/promptSimilarity";
 import { useSmartDefaults } from "@/hooks/useSmartDefaults";
 import { ImageContainer } from "./ImageContainer";
@@ -194,7 +194,7 @@ export const ImageGenerationDialog = () => {
         } else if (prev < 85) {
           setGenerationStage("Adding final touches...");
         }
-        
+
         if (prev >= 90) {
           clearInterval(progressInterval);
           return 90;
@@ -209,10 +209,10 @@ export const ImageGenerationDialog = () => {
       const finalContinuationStrength = metaContinuationStrength !== undefined
         ? metaContinuationStrength
         : (referenceImage ? continuationStrength : undefined);
-      
+
       // Convert aspect ratio to size for API compatibility
       const size = ASPECT_RATIO_TO_SIZE[options.aspectRatio] || "1024x1024";
-      
+
       const optionsWithReference = {
         ...options,
         size: size, // Add size for API compatibility
@@ -220,9 +220,9 @@ export const ImageGenerationDialog = () => {
         continuationStrength: finalContinuationStrength,
         previousPrompt: previousGeneratedPrompt || undefined,
       };
-      
+
       const imageUrl = await generator(prompt, optionsWithReference);
-      
+
       // Store this prompt for future similarity calculations
       setPreviousGeneratedPrompt(prompt);
 
@@ -236,7 +236,7 @@ export const ImageGenerationDialog = () => {
       if (imageUrl) {
         setGeneratedImage(imageUrl);
         await deliverEmail(imageUrl, prompt || basePrompt);
-        
+
         // Enhanced success feedback
         toast.success(
           <div className="flex flex-col gap-1">
@@ -262,14 +262,14 @@ export const ImageGenerationDialog = () => {
       setProgress(0);
       setGenerationStage("");
       console.error("Generation error:", error);
-      
+
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       const requestId = (error as any)?.requestId;
       const errorType = (error as any)?.errorType;
-      
+
       // Store error with request ID for display
       setLastError(requestId ? `${errorMessage} (Request ID: ${requestId})` : errorMessage);
-      
+
       // Enhanced error handling with more context
       if (errorMessage.toLowerCase().includes("rate limit")) {
         toast.error(
@@ -369,14 +369,14 @@ export const ImageGenerationDialog = () => {
           mode: 'cors',
           cache: 'no-cache'
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch image');
         }
-        
+
         blob = await response.blob();
       }
-      
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -384,7 +384,7 @@ export const ImageGenerationDialog = () => {
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
-      
+
       // Cleanup
       setTimeout(() => {
         window.URL.revokeObjectURL(url);
@@ -411,11 +411,11 @@ export const ImageGenerationDialog = () => {
         const { getUserPreferences } = await import('@/lib/intelligence/userBehavior');
         const { getCachedUnderstanding } = await import('@/lib/intelligence/imageUnderstanding');
         const { data: { user } } = await supabase.auth.getUser();
-        
+
         if (user) {
           const userPreferences = await getUserPreferences(user.id);
           const understanding = await getCachedUnderstanding(referenceImage);
-          
+
           if (understanding) {
             // Generate context-aware variation with style consistency
             const variation = await generateContextAwareVariation(
@@ -425,15 +425,15 @@ export const ImageGenerationDialog = () => {
               userPreferences,
               understanding
             );
-            
+
             // Update prompt with style-locked version
             setPrompt(variation.prompt);
             setBasePrompt(variation.prompt);
             setStorePrompt(variation.prompt);
-            
+
             // Update continuation strength from style consistency
             setContinuationStrength(variation.continuationStrength);
-            
+
             // Update meta with style lock info
             if (meta) {
               setMeta({
@@ -447,7 +447,7 @@ export const ImageGenerationDialog = () => {
                 styleLock: variation.styleLock,
               });
             }
-            
+
             toast.success("Style-consistent variation ready", {
               description: `Maintaining: ${variation.styleLock.slice(0, 2).join(', ')}`
             });
@@ -458,7 +458,7 @@ export const ImageGenerationDialog = () => {
         // Continue with normal regenerate
       }
     }
-    
+
     setGeneratedImage(null);
     setLastError(null);
     handleGenerate();
@@ -489,7 +489,7 @@ export const ImageGenerationDialog = () => {
   // Update preview size based on aspect ratio
   useEffect(() => {
     if (!isGenerateModalOpen) return;
-    
+
     const updatePreviewSize = (aspectRatio: GenerationOptions["aspectRatio"]) => {
       const aspectRatioMap: Record<GenerationOptions["aspectRatio"], { width: number; height: number }> = {
         "1:1": { width: 400, height: 400 },
@@ -503,7 +503,7 @@ export const ImageGenerationDialog = () => {
       };
       setPreviewSize(aspectRatioMap[aspectRatio] || { width: 400, height: 400 });
     };
-    
+
     updatePreviewSize(options.aspectRatio);
   }, [options.aspectRatio, isGenerateModalOpen]);
 
@@ -535,8 +535,8 @@ export const ImageGenerationDialog = () => {
       {/* Left Column: Image Preview (Desktop) or Top (Mobile) */}
       <div className="flex flex-col">
         {/* Image Preview Container - Resizes based on aspect ratio */}
-        <div 
-          className="rounded-2xl border border-border bg-card p-6 flex items-center justify-center overflow-hidden"
+        <div
+          className="rounded-2xl border border-border bg-card p-6 flex items-center justify-center overflow-hidden max-w-full"
           style={{
             aspectRatio: previewSize ? `${previewSize.width} / ${previewSize.height}` : '1 / 1',
             maxWidth: previewSize ? `${previewSize.width}px` : '400px',
@@ -558,9 +558,9 @@ export const ImageGenerationDialog = () => {
                   )}
                 </div>
               </div>
-              
-              <div 
-                ref={imageContainerRef} 
+
+              <div
+                ref={imageContainerRef}
                 className="w-full overflow-hidden relative group cursor-pointer"
                 onClick={() => {
                   setZoomImageUrl(generatedImage);
@@ -606,9 +606,9 @@ export const ImageGenerationDialog = () => {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               {/* Preview - maintains aspect ratio */}
-              <div 
+              <div
                 className="w-full h-full flex items-center justify-center cursor-pointer"
                 onClick={() => {
                   setZoomImageUrl(referenceImage);
@@ -626,7 +626,7 @@ export const ImageGenerationDialog = () => {
                   )}
                 />
               </div>
-              
+
               {/* Zoom overlay */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-xl">
                 <div className="bg-background/95 backdrop-blur-sm px-3 py-2 rounded-lg flex items-center gap-2 text-sm">
@@ -634,7 +634,7 @@ export const ImageGenerationDialog = () => {
                   <span>Click to zoom</span>
                 </div>
               </div>
-              
+
               {/* Meta info (optional) */}
               {previousGeneratedPrompt && continuationStrength < 1.0 && (
                 <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-border/30 bg-muted/10 p-3">
@@ -645,13 +645,12 @@ export const ImageGenerationDialog = () => {
                     </span>
                   </div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-300 ${
-                        continuationStrength <= 0.3 ? 'bg-blue-500' :
-                        continuationStrength <= 0.6 ? 'bg-yellow-500' :
-                        continuationStrength <= 0.8 ? 'bg-orange-500' :
-                        'bg-red-500'
-                      }`}
+                    <div
+                      className={`h-full transition-all duration-300 ${continuationStrength <= 0.3 ? 'bg-blue-500' :
+                          continuationStrength <= 0.6 ? 'bg-yellow-500' :
+                            continuationStrength <= 0.8 ? 'bg-orange-500' :
+                              'bg-red-500'
+                        }`}
                       style={{ width: `${(1 - continuationStrength) * 100}%` }}
                     />
                   </div>
@@ -659,7 +658,7 @@ export const ImageGenerationDialog = () => {
               )}
             </div>
           )}
-          
+
           {/* Placeholder when no image */}
           {!referenceImage && !generatedImage && (
             <div className="text-center space-y-3">
@@ -848,8 +847,8 @@ export const ImageGenerationDialog = () => {
                 <p className="font-semibold">Generation failed</p>
                 <p className="text-sm mt-1">{lastError}</p>
               </div>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 variant="outline"
                 onClick={handleRetry}
                 className="shrink-0"
@@ -991,6 +990,17 @@ export const ImageGenerationDialog = () => {
         imageUrl={generatedImage || referenceImage || undefined}
         defaultCaption={basePrompt}
         defaultTitle="Generated in Studio"
+        // NEW: Pass metadata
+        prompt={basePrompt}
+        toolUsed="studio"
+        params={{
+          quality: options.quality,
+          aspectRatio: options.aspectRatio,
+          background: options.background,
+          referenceImageUrl: referenceImage || undefined,
+          continuationStrength: continuationStrength,
+        }}
+        aspectRatio={options.aspectRatio}
       />
       {zoomImageUrl && (
         <ImageZoomDialog
