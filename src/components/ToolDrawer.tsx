@@ -53,8 +53,8 @@ export const ToolDrawer = ({
             "fixed z-[81] flex flex-col border border-border bg-background shadow-2xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "duration-200 ease-out",
-            // Mobile: Standard full-width bottom sheet
-            "inset-x-0 bottom-0 w-full rounded-t-[20px] rounded-b-none",
+            // Mobile: Floating tray with explicit side pinning for perfect centering
+            "left-4 right-4 bottom-4 w-auto rounded-[24px] outline-none",
             // Desktop: Floating centered modal
             "md:left-1/2 md:right-auto md:mx-0 md:-translate-x-1/2",
             "md:w-[94vw] md:max-w-[1040px]",
