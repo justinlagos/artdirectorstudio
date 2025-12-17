@@ -12,14 +12,14 @@ const corsHeaders = {
 serve(async (req) => {
   // Generate unique request ID for tracing
   const requestId = crypto.randomUUID?.() || `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
     console.log(`[${requestId}] Edit image request received`);
-    
+
     // Extract and validate JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -74,11 +74,11 @@ serve(async (req) => {
       }
 
       const accessResult = await accessResponse.json();
-      
+
       if (!accessResult.allowed) {
         console.log(`[${requestId}] Access denied:`, accessResult.reason);
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             error: accessResult.reason || "Access denied",
             upgrade_required: accessResult.upgrade_required || false,
             tier: accessResult.tier
@@ -109,7 +109,7 @@ serve(async (req) => {
     }
 
     const { imageUrl, instruction, quality = 'auto', size = '1024x1024', mask, region } = requestBody;
-    
+
     // Validate inputs
     if (!imageUrl || typeof imageUrl !== 'string') {
       return new Response(
@@ -141,8 +141,8 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[${requestId}] Request validated:`, { 
-      imageUrl: imageUrl.substring(0, 50) + '...', 
+    console.log(`[${requestId}] Request validated:`, {
+      imageUrl: imageUrl.substring(0, 50) + '...',
       instructionLength: trimmedInstruction.length,
       instruction: trimmedInstruction.substring(0, 100),
       hasMask: !!mask,
@@ -178,7 +178,7 @@ serve(async (req) => {
 
     // Call Lovable AI Gateway with image editing
     console.log(`[${requestId}] Calling Lovable AI Gateway for image editing...`);
-    
+
     // Build instruction with region/mask context
     let enhancedInstruction = trimmedInstruction;
     if (region && typeof region === 'object' && region.x !== undefined) {
@@ -193,7 +193,7 @@ serve(async (req) => {
 
     // FIX: Build AI request with structured region parameters if supported
     const aiRequestBody: any = {
-      model: "google/gemini-2.5-flash-image-preview",
+      model: "google/gemini-3-pro-image-preview",
       messages: [
         {
           role: "user",
@@ -260,14 +260,14 @@ serve(async (req) => {
         errorText = 'Unable to read error response';
       }
       console.error(`[${requestId}] Lovable AI error:`, aiResponse.status, errorText.substring(0, 200));
-      
+
       if (aiResponse.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
+
       if (aiResponse.status === 402) {
         return new Response(
           JSON.stringify({ error: "AI service credits exhausted. Please try again later or contact support." }),
@@ -292,7 +292,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[${requestId}] AI response received:`, { 
+    console.log(`[${requestId}] AI response received:`, {
       hasChoices: !!aiData.choices,
       hasMessage: !!aiData.choices?.[0]?.message,
       hasImages: !!aiData.choices?.[0]?.message?.images,
@@ -301,7 +301,7 @@ serve(async (req) => {
 
     // Extract edited image - handle multiple possible response structures
     let editedImageUrl = null;
-    
+
     // Try primary structure: choices[0].message.images[0].image_url.url
     if (aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url) {
       editedImageUrl = aiData.choices[0].message.images[0].image_url.url;
@@ -324,7 +324,7 @@ serve(async (req) => {
     else if (aiData.image) {
       editedImageUrl = aiData.image;
     }
-    
+
     if (!editedImageUrl) {
       console.error(`[${requestId}] No image in AI response. Full response:`, JSON.stringify(aiData).substring(0, 500));
       return new Response(
@@ -338,23 +338,23 @@ serve(async (req) => {
     // FIX: Validate image URL before processing
     const isValidImageUrl = (url: string): boolean => {
       if (!url || typeof url !== 'string') return false;
-      
+
       try {
         // Allow data URIs and HTTPS URLs
         if (url.startsWith('data:image/')) return true;
-        
+
         const parsed = new URL(url);
         if (parsed.protocol !== 'https:') return false;
-        
+
         // Verify Supabase storage URLs or allowed external domains
         const supabaseUrl = Deno.env.get('SUPABASE_URL');
         if (url.startsWith(`${supabaseUrl}/storage/`)) return true;
-        
+
         // Allow Lovable AI gateway and Google storage URLs
         if (url.includes('ai.gateway.lovable.dev') || url.includes('storage.googleapis.com')) {
           return true;
         }
-        
+
         return false;
       } catch {
         return false;
@@ -383,7 +383,7 @@ serve(async (req) => {
         }
 
         const base64Data = base64Match[1];
-        
+
         // Validate base64 data
         if (!base64Data || base64Data.length === 0) {
           throw new Error('Empty base64 data');
@@ -403,11 +403,11 @@ serve(async (req) => {
         }
 
         console.log(`[${requestId}] Decoded image buffer size: ${buffer.length} bytes`);
-        
+
         // Upload to storage
         const fileName = `${userId}/${Date.now()}-edited.png`;
         console.log(`[${requestId}] Uploading to storage: ${fileName}`);
-        
+
         const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
           .from('generated-images')
           .upload(fileName, buffer, {
@@ -426,12 +426,12 @@ serve(async (req) => {
         const { data: urlData } = supabaseAdmin.storage
           .from('generated-images')
           .getPublicUrl(fileName);
-        
+
         if (!urlData?.publicUrl) {
           console.error(`[${requestId}] Failed to get public URL`);
           throw new Error('Failed to get public URL for uploaded image');
         }
-        
+
         finalImageUrl = urlData.publicUrl;
         console.log(`[${requestId}] Image uploaded to storage: ${finalImageUrl.substring(0, 100)}...`);
       } catch (storageError) {
@@ -500,7 +500,7 @@ serve(async (req) => {
     console.log(`[${requestId}] Edit completed successfully`);
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         image: finalImageUrl,
         assetId: assetData?.id || null,
@@ -512,15 +512,15 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : 'No stack trace';
-    
+
     console.error(`[${requestId}] Error in edit-image function:`, {
       message: errorMessage,
       stack: errorStack,
       errorType: error?.constructor?.name || typeof error
     });
-    
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: errorMessage,
         requestId,
         timestamp: new Date().toISOString()

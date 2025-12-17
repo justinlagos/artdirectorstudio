@@ -53,24 +53,27 @@ export const ToolDrawer = ({
             "fixed z-[81] flex flex-col border border-border bg-background shadow-2xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "duration-200 ease-out",
-            "left-1/2 -translate-x-1/2",
-            "w-[94vw] max-w-[1040px]",
-            "rounded-3xl",
+            // Mobile: Standard full-width bottom sheet
+            "inset-x-0 bottom-0 w-full rounded-t-[20px] rounded-b-none",
+            // Desktop: Floating centered modal
+            "md:left-1/2 md:right-auto md:mx-0 md:-translate-x-1/2",
+            "md:w-[94vw] md:max-w-[1040px]",
+            "md:rounded-3xl",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
             "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
             "md:top-1/2 md:-translate-y-1/2 md:max-h-[90vh]",
-            "max-h-[92vh] bottom-4 md:bottom-auto",
+            "max-h-[96dvh] md:bottom-auto",
             className,
           )}
           style={{
-            left: "50%",
-            right: "auto",
             ...(isMobile
               ? {
-                  bottom: "env(safe-area-inset-bottom)",
-                  transform: "translate(-50%, 0)",
+                  // Mobile: Vaul handles positioning
                 }
               : {
+                  // Desktop: Absolute centering
+                  left: "50%",
+                  right: "auto",
                   top: "50%",
                   transform: "translate(-50%, -50%)",
                 }),

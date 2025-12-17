@@ -19,6 +19,15 @@ interface ShareToCommunityDialogProps {
   defaultCaption?: string;
   defaultTitle?: string;
   onShared?: (postId: string) => void;
+
+  // NEW: Metadata props
+  prompt?: string;
+  contextPrompt?: string;
+  toolUsed?: 'studio' | 'edit' | 'blend' | 'upscale' | 'artie';
+  params?: Record<string, any>;
+  aspectRatio?: string;
+  remixSourceId?: string;
+  thumbnailUrl?: string;
 }
 
 export const ShareToCommunityDialog = ({
@@ -28,6 +37,14 @@ export const ShareToCommunityDialog = ({
   defaultCaption,
   defaultTitle,
   onShared,
+  // NEW: Metadata props
+  prompt,
+  contextPrompt,
+  toolUsed,
+  params,
+  aspectRatio,
+  remixSourceId,
+  thumbnailUrl,
 }: ShareToCommunityDialogProps) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -59,6 +76,15 @@ export const ShareToCommunityDialog = ({
           user_id: user.id,
           image_url: imageUrl,
           caption: caption?.trim() || title?.trim() || "Shared via ArtDirector Studio",
+          // NEW: Add metadata
+          prompt: prompt,
+          context_prompt: contextPrompt,
+          tool_used: toolUsed,
+          params: params,
+          aspect_ratio: aspectRatio,
+          remix_source_id: remixSourceId,
+          thumbnail_url: thumbnailUrl,
+          model_version: 'google/gemini-3-pro-image-preview',
         })
         .select("id")
         .single();

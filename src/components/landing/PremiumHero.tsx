@@ -155,6 +155,15 @@ export const PremiumHero = ({ user }: PremiumHeroProps) => {
               >
                 Open Studio
               </Button>
+
+              <Button
+                variant="ghost"
+                size="lg"
+                className="text-base md:text-lg px-8 md:px-10 py-6 md:py-7 h-auto font-medium rounded-xl hover:bg-accent/50 transition-all duration-300"
+                onClick={() => navigate("/community")}
+              >
+                Explore Community
+              </Button>
             </motion.div>
           )}
 

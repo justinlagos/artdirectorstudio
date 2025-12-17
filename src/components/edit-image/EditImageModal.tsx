@@ -786,6 +786,15 @@ export const EditImageModal = ({
         imageUrl={previewUrl}
         defaultCaption={customInstruction || initialInstruction}
         defaultTitle="Edited in Studio"
+        // NEW: Pass metadata
+        prompt={customInstruction || initialInstruction}
+        toolUsed="edit"
+        params={{
+          adjustments: adjustments,
+          preset: selectedPreset,
+          hasRegion: !!selectedRegion,
+          hasColor: activeTab === "color" ? selectedColor : undefined
+        }}
       />
       {previewUrl && (
         <ImageZoomDialog

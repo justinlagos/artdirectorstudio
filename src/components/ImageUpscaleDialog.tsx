@@ -670,6 +670,13 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
         imageUrl={upscaledImage}
         defaultCaption={sourceImage ? `Upscaled to ${targetSize}` : undefined}
         defaultTitle="Upscaled Image"
+        // NEW: Pass metadata
+        prompt={sourceImage ? `Upscale to ${targetSize}` : undefined}
+        toolUsed="upscale"
+        params={{
+          targetSize: targetSize,
+          originalSize: sourceImage?.file.size
+        }}
       />
     </>
   );

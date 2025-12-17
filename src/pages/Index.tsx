@@ -33,6 +33,7 @@ import { PremiumValue } from "@/components/landing/PremiumValue";
 import { ProofSection } from "@/components/landing/ProofSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FeaturedCommunitySection } from "@/components/landing/FeaturedCommunitySection";
+import { ImageComparisonView } from "@/components/ImageComparisonView";
 
 export interface Analysis {
   image_overview: string;
@@ -86,7 +87,7 @@ const Index = () => {
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
   const [editedPrompt, setEditedPrompt] = useState<string | null>(null);
-  
+
   // Debug logging
   useEffect(() => {
     console.log('[Index] Component mounted/updated', { user: !!user, loading });
@@ -266,7 +267,7 @@ const Index = () => {
     setIsAnalyzing(true);
     setShowProgressiveFeedback(true);
     setAnalysisComplete(false);
-    
+
     try {
       // Get session token
       const { data: { session } } = await supabase.auth.getSession();
@@ -279,10 +280,10 @@ const Index = () => {
       // Convert file to base64
       const reader = new FileReader();
       reader.readAsDataURL(selectedFile);
-      
+
       reader.onload = async () => {
         const base64Image = reader.result as string;
-        
+
         const { data, error } = await supabase.functions.invoke("analyze-image", {
           body: { image: base64Image },
           headers: {
@@ -292,35 +293,35 @@ const Index = () => {
 
         if (error) {
           console.error("Analysis error:", error);
-          
+
           // Extract error details
           let errorMessage = "Failed to analyze image. Please try again.";
           let errorData: any = error;
-          
+
           // Try to parse error context if available
           if (error.context) {
             try {
-              errorData = typeof error.context === 'string' 
-                ? JSON.parse(error.context) 
+              errorData = typeof error.context === 'string'
+                ? JSON.parse(error.context)
                 : error.context;
             } catch {
               errorData = error;
             }
           }
-          
+
           // Check for 402 (credits exhausted) or specific error messages
-          if (errorData?.details?.aiStatus === 402 || 
-              errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402 ||
-              error.message?.includes('402') ||
-              error.message?.includes('Credits exhausted') ||
-              error.message?.includes('credits exhausted')) {
+          if (errorData?.details?.aiStatus === 402 ||
+            errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402 ||
+            error.message?.includes('402') ||
+            error.message?.includes('Credits exhausted') ||
+            error.message?.includes('credits exhausted')) {
             errorMessage = "Your credits are used up. Choose a plan to continue.";
           } else if (errorData?.error) {
             errorMessage = errorData.error;
           } else if (error.message) {
             errorMessage = error.message;
           }
-          
+
           analytics.track("Image Analysis", {
             tool: "analyze",
             action: "analyze",
@@ -328,7 +329,7 @@ const Index = () => {
             error_type: errorData?.errorType || error.message?.substring(0, 50) || "unknown",
             status_code: errorData?.details?.aiStatus || errorData?.status,
           });
-          
+
           toast.error(errorMessage);
           setIsAnalyzing(false);
           setShowProgressiveFeedback(false);
@@ -341,7 +342,7 @@ const Index = () => {
           setAnalysisComplete(true);
           setIsAnalyzing(false);
           setShowProgressiveFeedback(false);
-          
+
           // Track successful analysis
           const duration = Date.now() - startTime;
           analytics.track("Image Analysis", {
@@ -351,7 +352,7 @@ const Index = () => {
             duration_ms: duration,
             asset_id: data?.assetId || undefined,
           });
-          
+
           toast.success("Image analyzed successfully!");
         }, 3000);
       };
@@ -379,7 +380,7 @@ const Index = () => {
       toast.error(errorMsg);
       setIsAnalyzing(false);
       setShowProgressiveFeedback(false);
-      
+
       // Retry logic for network errors
       if (retryCount < 2 && errorMsg.toLowerCase().includes('network')) {
         toast.info("Retrying analysis...");
@@ -393,7 +394,7 @@ const Index = () => {
     if (!result) return;
 
     setIsAnalyzing(true);
-    
+
     try {
       // Get session token
       const { data: { session } } = await supabase.auth.getSession();
@@ -404,9 +405,9 @@ const Index = () => {
       }
 
       const { data, error } = await supabase.functions.invoke("regenerate-prompt", {
-        body: { 
+        body: {
           base_analysis: result.analysis,
-          user_edits: userEdits 
+          user_edits: userEdits
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -446,7 +447,7 @@ const Index = () => {
 
       // Call generate-image edge function
       const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: { 
+        body: {
           prompt,
           quality: options.quality,
           size: options.size,
@@ -459,7 +460,7 @@ const Index = () => {
 
       if (error) {
         console.error("Generation error:", error);
-        
+
         // Track generation failure
         analytics.track("Image Generation", {
           tool: "generate",
@@ -468,7 +469,7 @@ const Index = () => {
           has_reference: false,
           error_type: error.message?.substring(0, 50) || "unknown",
         });
-        
+
         if (error.message?.includes("Rate limit")) {
           toast.error("Too many requests. Please wait a moment and try again.");
         } else if (error.message?.includes("credits exhausted")) {
@@ -494,14 +495,14 @@ const Index = () => {
       // Verify the image was saved to database
       if (!data.assetId) {
         console.warn("[Index] Image generated but not saved to My Projects. Attempting fallback save...");
-        
+
         // Fallback: Use the improved saveAsset utility instead of raw Supabase calls
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
             // Use the unified saveAsset utility for consistency and better error handling
             const { saveAsset } = await import('@/lib/saveAsset');
-            
+
             const assetId = await saveAsset({
               imageUrl: data.image,
               action: 'generate',
@@ -545,10 +546,10 @@ const Index = () => {
         prompt: prompt,
         timestamp: new Date()
       };
-      
+
       setGeneratedImages(prev => [newImage, ...prev]);
       toast.success("Image generated successfully!");
-      
+
       // Track successful generation
       const duration = Date.now() - startTime;
       analytics.track("Image Generation", {
@@ -559,13 +560,13 @@ const Index = () => {
         duration_ms: duration,
         asset_id: data.assetId || undefined,
       });
-      
+
       return data.image;
     } catch (error) {
       console.error("Error during image generation:", error);
       const errorMsg = error instanceof Error ? error.message : "An error occurred during image generation.";
       toast.error(errorMsg);
-      
+
       // Retry logic for network errors
       if (retryCount < 2 && errorMsg.toLowerCase().includes('network')) {
         toast.info("Retrying generation...");
@@ -601,25 +602,25 @@ const Index = () => {
 
   // Add timeout fallback for loading state to prevent infinite loading
   const [loadingTimeout, setLoadingTimeout] = useState(false);
-  
+
   useEffect(() => {
     if (loading) {
       const timer = setTimeout(() => {
         console.warn('[Index] Loading timeout - forcing render');
         setLoadingTimeout(true);
       }, 3000); // 3 second timeout
-      
+
       return () => clearTimeout(timer);
     } else {
       setLoadingTimeout(false);
     }
   }, [loading]);
-  
+
   // Show skeleton only if loading and not timed out
   if (loading && !loadingTimeout) {
     return <PageSkeleton />;
   }
-  
+
   // Log render state
   console.log('[Index] Rendering page', { user: !!user, loading, loadingTimeout });
 
@@ -634,88 +635,98 @@ const Index = () => {
         <ErrorBoundary>
           <Header />
         </ErrorBoundary>
-      
+
         {/* Premium Landing Page - Only for non-authenticated users */}
         {!user && (
           <>
             <ErrorBoundary fallback={<div className="py-20 text-center">Hero section unavailable</div>}>
               <PremiumHero user={user} />
             </ErrorBoundary>
-            
+
             <ErrorBoundary fallback={null}>
               <PremiumValue />
             </ErrorBoundary>
-            
+
             <ErrorBoundary fallback={null}>
               <PremiumFeatures />
             </ErrorBoundary>
           </>
         )}
 
-      {/* Studio Section - Only for authenticated users */}
-      {user && (
-        <div id="studio-section" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6 md:pb-16 space-y-6 md:space-y-8">
-          <OnboardingPopup />
-          
-          {/* Studio Onboarding Copy - Centered with breathing room */}
-          <div className="space-y-3 animate-fade-in text-center py-8 md:py-12">
-            <h2 className="text-2xl md:text-4xl font-display font-bold tracking-tight">Studio</h2>
-            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-              Upload a visual, layout, or campaign asset. Artie will analyse it, highlight what matters, and help you generate next-step visuals, variations, and refinements.
-            </p>
-            <div className="max-w-2xl mx-auto grid gap-2 text-sm text-muted-foreground md:grid-cols-3">
-              <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-sm">
-                <p className="font-medium text-foreground">1. Drop your image</p>
-                <p className="text-xs text-muted-foreground">Supports JPG/PNG up to 15MB.</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-sm">
-                <p className="font-medium text-foreground">2. Run Analysis</p>
-                <p className="text-xs text-muted-foreground">Artie reviews composition, color, and opportunities.</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-sm">
-                <p className="font-medium text-foreground">3. Act on insights</p>
-                <p className="text-xs text-muted-foreground">Use the prompts and regions to generate or edit.</p>
+        {/* Studio Section - Only for authenticated users */}
+        {user && (
+          <div id="studio-section" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6 md:pb-16 space-y-6 md:space-y-8">
+            <OnboardingPopup />
+
+            {/* Studio Onboarding Copy - Centered with breathing room */}
+            <div className="space-y-3 animate-fade-in text-center py-8 md:py-12">
+              <h2 className="text-2xl md:text-4xl font-display font-bold tracking-tight">Studio</h2>
+              <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
+                Upload a visual, layout, or campaign asset. Artie will analyse it, highlight what matters, and help you generate next-step visuals, variations, and refinements.
+              </p>
+              <div className="max-w-2xl mx-auto grid gap-2 text-sm text-muted-foreground md:grid-cols-3">
+                <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-sm">
+                  <p className="font-medium text-foreground">1. Drop your image</p>
+                  <p className="text-xs text-muted-foreground">Supports JPG/PNG up to 15MB.</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-sm">
+                  <p className="font-medium text-foreground">2. Run Analysis</p>
+                  <p className="text-xs text-muted-foreground">Artie reviews composition, color, and opportunities.</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 shadow-sm">
+                  <p className="font-medium text-foreground">3. Act on insights</p>
+                  <p className="text-xs text-muted-foreground">Use the prompts and regions to generate or edit.</p>
+                </div>
               </div>
             </div>
+
+            <UploadSection
+              onFileSelect={handleFileSelect}
+              previewUrl={previewUrl}
+              onAnalyze={handleAnalyze}
+              disabled={!selectedFile || isAnalyzing}
+            />
+
+            {selectedFile && !isAnalyzing && !result && (
+              <div className="flex justify-center">
+                <CreditCostIndicator cost={1} action="analysis" />
+              </div>
+            )}
+
+            {showProgressiveFeedback && <ProgressiveAnalysisFeedback />}
+
+            {result && analysisComplete && (
+              <div className="w-full animate-fade-in" style={{ animationDelay: '200ms' }}>
+                <AnalysisLayout
+                  imageUrl={previewUrl || undefined}
+                  analysisContent={
+                    <div className="space-y-6">
+                      <PromptDisplay
+                        prompt={editedPrompt || result.full_regeneration_prompt}
+                        onPromptUpdate={handlePromptUpdate}
+                      />
+
+                      {generatedImages.length > 0 && previewUrl && (
+                        <div className="animate-fade-in">
+                          <ImageComparisonView
+                            originalImage={previewUrl}
+                            generatedImages={generatedImages}
+                          />
+                        </div>
+                      )}
+
+                      <AnalysisOverview
+                        analysis={result.analysis}
+                        fullPrompt={editedPrompt || result.full_regeneration_prompt}
+                        imageUrl={previewUrl || undefined}
+                      />
+                    </div>
+                  }
+                />
+              </div>
+            )}
           </div>
-          
-          <UploadSection
-            onFileSelect={handleFileSelect}
-            previewUrl={previewUrl}
-            onAnalyze={handleAnalyze}
-            disabled={!selectedFile || isAnalyzing}
-          />
-          
-          {selectedFile && !isAnalyzing && !result && (
-            <div className="flex justify-center">
-              <CreditCostIndicator cost={1} action="analysis" />
-            </div>
-          )}
-          
-          {showProgressiveFeedback && <ProgressiveAnalysisFeedback />}
-          
-          {result && analysisComplete && (
-            <div className="w-full animate-fade-in" style={{ animationDelay: '200ms' }}>
-              <AnalysisLayout
-                imageUrl={previewUrl || undefined}
-                analysisContent={
-                  <div className="space-y-6">
-                    <PromptDisplay 
-                      prompt={editedPrompt || result.full_regeneration_prompt}
-                      onPromptUpdate={handlePromptUpdate}
-                    />
-                    <AnalysisOverview
-                      analysis={result.analysis}
-                      fullPrompt={editedPrompt || result.full_regeneration_prompt}
-                      imageUrl={previewUrl || undefined}
-                    />
-                  </div>
-                }
-              />
-            </div>
-          )}
-        </div>
-      )}
+        )}
 
 
         <ErrorBoundary>
@@ -725,31 +736,31 @@ const Index = () => {
         <ErrorBoundary>
           <Footer />
         </ErrorBoundary>
-      
-      {/* Keyboard Shortcuts Guide */}
-      <KeyboardShortcutsGuide 
-        open={showShortcutsGuide} 
-        onOpenChange={setShowShortcutsGuide}
-      />
-      
-      {/* Floating Keyboard Shortcuts Button - Desktop Only */}
-      {user && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setShowShortcutsGuide(true)}
-              className="hidden md:flex fixed bottom-6 right-6 w-12 h-12 rounded-full shadow-lg hover:shadow-xl transition-all z-30 bg-background/95 backdrop-blur border-border/50"
-            >
-              <Keyboard className="w-5 h-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="left">
-            <p>Keyboard Shortcuts ({modKey}+?)</p>
-          </TooltipContent>
-        </Tooltip>
-      )}
+
+        {/* Keyboard Shortcuts Guide */}
+        <KeyboardShortcutsGuide
+          open={showShortcutsGuide}
+          onOpenChange={setShowShortcutsGuide}
+        />
+
+        {/* Floating Keyboard Shortcuts Button - Desktop Only */}
+        {user && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowShortcutsGuide(true)}
+                className="hidden md:flex fixed bottom-6 right-6 w-12 h-12 rounded-full shadow-lg hover:shadow-xl transition-all z-30 bg-background/95 backdrop-blur border-border/50"
+              >
+                <Keyboard className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Keyboard Shortcuts ({modKey}+?)</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
       </div>
     </ErrorBoundary>

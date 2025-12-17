@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// Import system prompt from shared file (ensure this matches src/lib/artieSystemPrompt.ts)
 import { artieSystemPrompt } from "./systemPrompt.ts";
+import { buildContextPrompt, extractContextFromEnvironment } from "./contextPrompt.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,8 +16,8 @@ serve(async (req) => {
     // Validate request has body
     if (!req.body) {
       return new Response(
-        JSON.stringify({ error: 'Request body is required' }), 
-        { 
+        JSON.stringify({ error: 'Request body is required' }),
+        {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
@@ -30,8 +30,8 @@ serve(async (req) => {
     } catch (parseError) {
       console.error('Error parsing request body:', parseError);
       return new Response(
-        JSON.stringify({ error: 'Invalid JSON in request body' }), 
-        { 
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
@@ -39,12 +39,12 @@ serve(async (req) => {
     }
 
     const { messages, attachments, contextMemory, environmentContext } = requestData;
-    
+
     // Validate required fields
     if (!messages || !Array.isArray(messages)) {
       return new Response(
-        JSON.stringify({ error: 'Messages array is required' }), 
-        { 
+        JSON.stringify({ error: 'Messages array is required' }),
+        {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
@@ -52,20 +52,26 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    
+
     if (!LOVABLE_API_KEY) {
       console.error('LOVABLE_API_KEY is not configured');
       return new Response(
-        JSON.stringify({ error: 'Server configuration error: LOVABLE_API_KEY is not configured' }), 
-        { 
+        JSON.stringify({ error: 'Server configuration error: LOVABLE_API_KEY is not configured' }),
+        {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
 
-    // Use the master system prompt from shared file
-    const systemPrompt = artieSystemPrompt;
+    // Build dynamic context prompt from environment context
+    const contextParams = extractContextFromEnvironment(environmentContext);
+    const contextPrompt = buildContextPrompt(contextParams);
+
+    // Combine base system prompt with dynamic context
+    const systemPrompt = contextPrompt
+      ? `${artieSystemPrompt}\n\n${contextPrompt}`
+      : artieSystemPrompt;
 
     // Define platform action tools
     const tools = [
@@ -239,12 +245,12 @@ serve(async (req) => {
         console.error('Error reading error response:', textError);
       }
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: errorMessage,
           status: response.status,
           details: 'The AI service returned an error. Please try again.'
-        }), 
-        { 
+        }),
+        {
           status: response.status >= 400 && response.status < 600 ? response.status : 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
@@ -261,7 +267,7 @@ serve(async (req) => {
     console.error('Error in artie-chat function:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: errorMessage }), 
+      JSON.stringify({ error: errorMessage }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

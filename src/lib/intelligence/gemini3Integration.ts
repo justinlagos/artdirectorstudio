@@ -45,7 +45,7 @@ export async function generateArtDirectionPrompt(
   // Call: https://ai.gateway.lovable.dev/v1/chat/completions
   // Model: google/gemini-3 or google/gemini-2.5-pro
   // System prompt: "You are an expert art director. Enhance this creative brief..."
-  
+
   // Current implementation: Return user prompt as-is
   console.log('[Gemini3] generateArtDirectionPrompt called (placeholder implementation)');
   return params.userPrompt;
@@ -118,7 +118,7 @@ export async function analyzeImageComposition(
   // Call: https://ai.gateway.lovable.dev/v1/chat/completions
   // Model: google/gemini-3 (when available) with multimodal support
   // Messages: [{ role: "user", content: [{ type: "image_url", ... }, { type: "text", ... }] }]
-  
+
   // Current implementation: Return placeholder
   console.log('[Gemini3] analyzeImageComposition called (placeholder implementation)');
   return {
@@ -194,17 +194,17 @@ export async function selectBestModelForTask(
 ): Promise<ModelSelectionResult> {
   // TODO: Phase C - Implement intelligent model selection
   // Logic:
-  // - Simple tasks → google/gemini-2.5-flash-image-preview (Nano banana)
-  // - Complex reasoning → google/gemini-3 (when available)
-  // - Multimodal understanding → google/gemini-3
+  // - Simple tasks → google/gemini-3-pro-image-preview (Nano Banana Pro)
+  // - Complex reasoning → google/gemini-3-pro-image-preview (Nano Banana Pro)
+  // - Multimodal understanding → google/gemini-3-pro-image-preview (Nano Banana Pro)
   // - Cost-sensitive users → cheaper models
   // - Time-sensitive users → faster models
-  
-  // Current implementation: Default to Nano banana
+
+  // Current implementation: Default to Nano Banana Pro
   console.log('[Gemini3] selectBestModelForTask called (placeholder implementation)');
   return {
-    model: 'google/gemini-2.5-flash-image-preview',
-    reasoning: 'Fast generation for image tasks (default)',
+    model: 'google/gemini-3-pro-image-preview',
+    reasoning: 'Nano Banana Pro - Superior quality with 4K support (default)',
     estimatedCost: 'low',
     estimatedTime: 'fast'
   };

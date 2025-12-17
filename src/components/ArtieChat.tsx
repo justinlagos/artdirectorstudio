@@ -2423,6 +2423,13 @@ export const ArtieChat = () => {
         imageUrl={shareDefaults.imageUrl}
         defaultCaption={shareDefaults.caption}
         defaultTitle="Shared from Artie"
+        // NEW: Pass metadata
+        prompt={shareDefaults.caption}
+        toolUsed="artie"
+        params={{
+          source: 'chat_attachment',
+          messageId: messages.find(m => m.attachment?.url === shareDefaults.imageUrl)?.id
+        }}
       />
     </>
   );

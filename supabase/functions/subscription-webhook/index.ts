@@ -36,26 +36,93 @@ serve(async (req) => {
     // Handle successful checkout
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
+
+      // Handle one-time payments (Credit Packs)
+      if (session.mode === 'payment') {
+        const userId = session.metadata?.user_id;
+        const credits = parseInt(session.metadata?.credits || '0');
+        const packageName = session.metadata?.package_name;
+
+        console.log(`Processing one-time payment for user ${userId}: ${credits} credits (${packageName})`);
+
+        if (userId && credits > 0) {
+          // Get current balance
+          const { data: currentCredits } = await supabaseAdmin
+            .from('credits')
+            .select('balance')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          const newBalance = (currentCredits?.balance || 0) + credits;
+
+          // Update credits
+          const { error: updateError } = await supabaseAdmin
+            .from('credits')
+            .upsert({
+              user_id: userId,
+              balance: newBalance,
+              updated_at: new Date().toISOString()
+            });
+
+          if (updateError) {
+            console.error('Error updating credits via webhook:', updateError);
+            throw updateError;
+          }
+
+          // Log transaction
+          await supabaseAdmin
+            .from('credit_transactions')
+            .insert({
+              user_id: userId,
+              amount: credits,
+              action: 'purchase',
+              provider: 'stripe',
+              notes: `Purchased ${packageName} package via Stripe Webhook (Session: ${session.id})`,
+            });
+
+          // Log billing event
+          await supabaseAdmin.from('billing_events').insert({
+            user_id: userId,
+            event_type: 'credit_purchase',
+            amount_cents: session.amount_total || 0,
+            currency: session.currency || 'usd',
+            stripe_payment_intent: session.payment_intent as string,
+            metadata: { credits, package: packageName },
+            status: 'completed',
+          });
+
+          console.log(`Successfully added ${credits} credits to user ${userId}`);
+        }
+
+        // Return early for payment mode
+        return new Response(JSON.stringify({ received: true }), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
+      // Handle Subscriptions
       const customerId = session.customer as string;
       const subscriptionId = session.subscription as string;
       const customerEmail = session.customer_details?.email;
-      
+
       if (!customerEmail) {
         console.error('No customer email found in session');
         throw new Error('Customer email is required');
       }
 
-      console.log('Processing checkout for email:', customerEmail);
-      
+      const userId = session.metadata?.user_id;
+      console.log('Processing checkout for email:', customerEmail, 'User ID:', userId);
+
       // Get subscription details to find the price
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const priceId = subscription.items.data[0].price.id;
       const productId = subscription.items.data[0].price.product as string;
-      
+
       // Map price IDs to tiers
       let tier = 'starter';
       let dailyLimit = 10;
-      
+
       if (priceId === 'price_1SQqaNBOqYfTntNB5NF0eqFr' || productId === 'prod_TNbnpk8TQPKkOI') {
         tier = 'starter';
         dailyLimit = 10;
@@ -69,39 +136,52 @@ serve(async (req) => {
 
       console.log('Mapped tier:', tier, 'for price:', priceId);
 
-      // Update user profile by EMAIL (stripe_customer_id not set yet)
-      const { data: updatedProfile, error: updateError } = await supabaseAdmin
+      const expiresAt = new Date(subscription.current_period_end * 1000);
+      console.log('Subscription expires at:', expiresAt.toISOString(), '(from Stripe:', subscription.current_period_end, ')');
+
+      // Calculate next midnight for daily reset to prevent drift
+      const nextMidnight = new Date();
+      nextMidnight.setUTCHours(24, 0, 0, 0);
+
+      // Update user profile by user_id if available, otherwise by EMAIL
+      let query = supabaseAdmin
         .from('profiles')
         .update({
           is_pro: tier !== 'starter',
           subscription_tier: tier,
-          subscription_expires_at: new Date(subscription.current_period_end * 1000).toISOString(),
+          subscription_expires_at: expiresAt.toISOString(),
           stripe_customer_id: customerId,
           stripe_subscription_id: subscriptionId,
           daily_limit: dailyLimit,
           daily_usage: 0,
-          daily_usage_reset_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .eq('email', customerEmail)
-        .select();
+          daily_usage_reset_at: nextMidnight.toISOString(),
+        });
+
+      if (userId) {
+        query = query.eq('id', userId);
+      } else {
+        query = query.eq('email', customerEmail);
+      }
+
+      const { data: updatedProfile, error: updateError } = await query.select();
 
       if (updateError) {
         console.error('Error updating profile:', updateError);
-        
+
         // Log webhook error to billing_events
         const { data: userProfile } = await supabaseAdmin
           .from('profiles')
           .select('id')
           .eq('email', customerEmail)
           .single();
-        
+
         if (userProfile) {
           await supabaseAdmin.from('billing_events').insert({
             user_id: userProfile.id,
             event_type: 'webhook_error',
             amount_cents: subscription.items.data[0].price.unit_amount || 0,
             stripe_subscription_id: subscriptionId,
-            metadata: { 
+            metadata: {
               error: updateError.message,
               tier,
               priceId,
@@ -110,28 +190,28 @@ serve(async (req) => {
             status: 'failed',
           });
         }
-        
+
         throw updateError;
       }
 
       // Check if profile was actually updated
       if (!updatedProfile || updatedProfile.length === 0) {
         console.error('Profile update affected 0 rows for email:', customerEmail);
-        
+
         // Log webhook error
         const { data: userProfile } = await supabaseAdmin
           .from('profiles')
           .select('id')
           .eq('email', customerEmail)
           .single();
-        
+
         if (userProfile) {
           await supabaseAdmin.from('billing_events').insert({
             user_id: userProfile.id,
             event_type: 'webhook_error',
             amount_cents: subscription.items.data[0].price.unit_amount || 0,
             stripe_subscription_id: subscriptionId,
-            metadata: { 
+            metadata: {
               error: 'Profile update affected 0 rows',
               tier,
               priceId,
@@ -140,7 +220,7 @@ serve(async (req) => {
             status: 'failed',
           });
         }
-        
+
         throw new Error('Profile not found for email: ' + customerEmail);
       }
 
@@ -173,7 +253,7 @@ serve(async (req) => {
 
       let tier = 'starter';
       let dailyLimit = 10;
-      
+
       if (priceId === 'price_1SQqaNBOqYfTntNB5NF0eqFr' || productId === 'prod_TNbnpk8TQPKkOI') {
         tier = 'starter';
         dailyLimit = 10;

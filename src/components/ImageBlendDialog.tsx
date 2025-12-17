@@ -792,6 +792,14 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
         imageUrl={blendedImage}
         defaultCaption={blendPrompt || instruction}
         defaultTitle="Image Blend"
+        // NEW: Pass metadata
+        prompt={blendPrompt || instruction}
+        toolUsed="blend"
+        params={{
+          imagesCount: images.length,
+          styles: selectedStyles,
+          instruction: instruction
+        }}
       />
     </>
   );

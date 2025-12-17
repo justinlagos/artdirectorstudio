@@ -76,6 +76,7 @@ export const ImageGenerationDialog = () => {
 
   const storePrompt = useStudioStore((state) => state.prompt);
   const storeImage = useStudioStore((state) => state.imageUrl);
+  const storeMeta = useStudioStore((state) => state.meta);
   const setStorePrompt = useStudioStore((state) => state.setPrompt);
   const setStoreImage = useStudioStore((state) => state.setImage);
   const generator = useStudioStore((state) => state.generator);
@@ -143,6 +144,7 @@ export const ImageGenerationDialog = () => {
     setReferenceImage(storeImage ?? null);
     setPreviousGeneratedPrompt("");
     setContinuationStrength(1.0);
+    setMeta(storeMeta); // Initialize with store meta
 
     if (storePrompt.length > MAX_PROMPT_LENGTH) {
       toast.info(`Prompt automatically shortened to ${MAX_PROMPT_LENGTH} characters`);
@@ -1001,6 +1003,7 @@ export const ImageGenerationDialog = () => {
           continuationStrength: continuationStrength,
         }}
         aspectRatio={options.aspectRatio}
+        remixSourceId={meta?.remixSourceId}
       />
       {zoomImageUrl && (
         <ImageZoomDialog

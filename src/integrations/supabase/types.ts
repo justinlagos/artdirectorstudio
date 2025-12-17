@@ -14,186 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      asset_bookmarks: {
-        Row: {
-          created_at: string | null
-          id: string
-          shared_asset_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          shared_asset_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          shared_asset_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "asset_bookmarks_shared_asset_id_fkey"
-            columns: ["shared_asset_id"]
-            isOneToOne: false
-            referencedRelation: "shared_assets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      asset_likes: {
-        Row: {
-          created_at: string | null
-          id: string
-          shared_asset_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          shared_asset_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          shared_asset_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "asset_likes_shared_asset_id_fkey"
-            columns: ["shared_asset_id"]
-            isOneToOne: false
-            referencedRelation: "shared_assets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      beta_invites: {
-        Row: {
-          code: string
-          created_at: string
-          email: string
-          expires_at: string
-          id: string
-          used_at: string | null
-          waitlist_id: string | null
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          email: string
-          expires_at: string
-          id?: string
-          used_at?: string | null
-          waitlist_id?: string | null
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          email?: string
-          expires_at?: string
-          id?: string
-          used_at?: string | null
-          waitlist_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "beta_invites_waitlist_id_fkey"
-            columns: ["waitlist_id"]
-            isOneToOne: false
-            referencedRelation: "beta_waitlist"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      beta_waitlist: {
-        Row: {
-          activated_at: string | null
-          consent: boolean
-          created_at: string
-          email: string
-          id: string
-          invite_sent_at: string | null
-          metadata: Json | null
-          name: string | null
-          source: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          activated_at?: string | null
-          consent?: boolean
-          created_at?: string
-          email: string
-          id?: string
-          invite_sent_at?: string | null
-          metadata?: Json | null
-          name?: string | null
-          source?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          activated_at?: string | null
-          consent?: boolean
-          created_at?: string
-          email?: string
-          id?: string
-          invite_sent_at?: string | null
-          metadata?: Json | null
-          name?: string | null
-          source?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      billing_events: {
-        Row: {
-          amount_cents: number | null
-          created_at: string | null
-          currency: string | null
-          event_type: string
-          id: string
-          metadata: Json | null
-          status: string | null
-          stripe_invoice_id: string | null
-          stripe_payment_intent: string | null
-          stripe_subscription_id: string | null
-          user_id: string
-        }
-        Insert: {
-          amount_cents?: number | null
-          created_at?: string | null
-          currency?: string | null
-          event_type: string
-          id?: string
-          metadata?: Json | null
-          status?: string | null
-          stripe_invoice_id?: string | null
-          stripe_payment_intent?: string | null
-          stripe_subscription_id?: string | null
-          user_id: string
-        }
-        Update: {
-          amount_cents?: number | null
-          created_at?: string | null
-          currency?: string | null
-          event_type?: string
-          id?: string
-          metadata?: Json | null
-          status?: string | null
-          stripe_invoice_id?: string | null
-          stripe_payment_intent?: string | null
-          stripe_subscription_id?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       community_comments: {
         Row: {
           comment_text: string
@@ -226,6 +46,27 @@ export type Database = {
           },
         ]
       }
+      community_follows: {
+        Row: {
+          created_at: string | null
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          follower_id?: string
+          following_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
       community_likes: {
         Row: {
           created_at: string
@@ -257,763 +98,187 @@ export type Database = {
       }
       community_posts: {
         Row: {
+          aspect_ratio: string | null
           caption: string | null
+          color_palette: string | null
           comments_count: number
+          context_prompt: string | null
           created_at: string
           id: string
           image_url: string
+          is_featured: boolean | null
+          is_staff_pick: boolean | null
           likes_count: number
+          model_version: string | null
+          moderation_status: string | null
+          mood: string | null
+          original_author_id: string | null
+          params: Json | null
+          prompt: string | null
+          rejected_reason: string | null
+          remix_source_id: string | null
+          shares_count: number | null
+          style: string | null
+          tags: string[] | null
+          thumbnail_url: string | null
+          tool_used: string | null
           updated_at: string
           user_id: string
+          views_count: number | null
         }
         Insert: {
+          aspect_ratio?: string | null
           caption?: string | null
+          color_palette?: string | null
           comments_count?: number
+          context_prompt?: string | null
           created_at?: string
           id?: string
           image_url: string
+          is_featured?: boolean | null
+          is_staff_pick?: boolean | null
           likes_count?: number
+          model_version?: string | null
+          moderation_status?: string | null
+          mood?: string | null
+          original_author_id?: string | null
+          params?: Json | null
+          prompt?: string | null
+          rejected_reason?: string | null
+          remix_source_id?: string | null
+          shares_count?: number | null
+          style?: string | null
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          tool_used?: string | null
           updated_at?: string
           user_id: string
+          views_count?: number | null
         }
         Update: {
+          aspect_ratio?: string | null
           caption?: string | null
+          color_palette?: string | null
           comments_count?: number
+          context_prompt?: string | null
           created_at?: string
           id?: string
           image_url?: string
+          is_featured?: boolean | null
+          is_staff_pick?: boolean | null
           likes_count?: number
+          model_version?: string | null
+          moderation_status?: string | null
+          mood?: string | null
+          original_author_id?: string | null
+          params?: Json | null
+          prompt?: string | null
+          rejected_reason?: string | null
+          remix_source_id?: string | null
+          shares_count?: number | null
+          style?: string | null
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          tool_used?: string | null
           updated_at?: string
           user_id?: string
+          views_count?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "community_posts_remix_source_id_fkey"
+            columns: ["remix_source_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      credit_transactions: {
+      community_reports: {
         Row: {
-          action: Database["public"]["Enums"]["credit_action"] | null
-          amount: number
-          asset_id: string | null
-          completed_at: string | null
-          description: string | null
+          admin_notes: string | null
+          created_at: string | null
           id: string
-          notes: string | null
-          provider: Database["public"]["Enums"]["credit_provider"] | null
-          request_id: string | null
+          post_id: string
+          reason: string
+          reporter_id: string | null
+          resolved_at: string | null
           status: string | null
-          timestamp: string
-          user_id: string
         }
         Insert: {
-          action?: Database["public"]["Enums"]["credit_action"] | null
-          amount: number
-          asset_id?: string | null
-          completed_at?: string | null
-          description?: string | null
+          admin_notes?: string | null
+          created_at?: string | null
           id?: string
-          notes?: string | null
-          provider?: Database["public"]["Enums"]["credit_provider"] | null
-          request_id?: string | null
+          post_id: string
+          reason: string
+          reporter_id?: string | null
+          resolved_at?: string | null
           status?: string | null
-          timestamp?: string
-          user_id: string
         }
         Update: {
-          action?: Database["public"]["Enums"]["credit_action"] | null
-          amount?: number
-          asset_id?: string | null
-          completed_at?: string | null
-          description?: string | null
+          admin_notes?: string | null
+          created_at?: string | null
           id?: string
-          notes?: string | null
-          provider?: Database["public"]["Enums"]["credit_provider"] | null
-          request_id?: string | null
+          post_id?: string
+          reason?: string
+          reporter_id?: string | null
+          resolved_at?: string | null
           status?: string | null
-          timestamp?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      credits: {
-        Row: {
-          balance: number
-          id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          balance?: number
-          id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          balance?: number
-          id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      custom_generation_presets: {
-        Row: {
-          category: string
-          created_at: string | null
-          description: string | null
-          icon: string | null
-          id: string
-          is_public: boolean | null
-          like_count: number | null
-          name: string
-          options: Json
-          prompt_modifier: string
-          updated_at: string | null
-          usage_count: number | null
-          user_id: string
-        }
-        Insert: {
-          category?: string
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: string
-          is_public?: boolean | null
-          like_count?: number | null
-          name: string
-          options?: Json
-          prompt_modifier: string
-          updated_at?: string | null
-          usage_count?: number | null
-          user_id: string
-        }
-        Update: {
-          category?: string
-          created_at?: string | null
-          description?: string | null
-          icon?: string | null
-          id?: string
-          is_public?: boolean | null
-          like_count?: number | null
-          name?: string
-          options?: Json
-          prompt_modifier?: string
-          updated_at?: string | null
-          usage_count?: number | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      funnel_metrics: {
-        Row: {
-          created_at: string
-          email: string | null
-          event_type: string
-          id: string
-          metadata: Json | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          email?: string | null
-          event_type: string
-          id?: string
-          metadata?: Json | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string | null
-          event_type?: string
-          id?: string
-          metadata?: Json | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      generated_assets: {
-        Row: {
-          action: string | null
-          analysis_data: Json | null
-          created_at: string
-          deleted_at: string | null
-          duration_ms: number | null
-          id: string
-          image_url: string | null
-          params: Json | null
-          prompt: string | null
-          share_slug: string | null
-          source_urls: Json | null
-          thumbnail_url: string | null
-          type: Database["public"]["Enums"]["asset_type"]
-          user_id: string
-        }
-        Insert: {
-          action?: string | null
-          analysis_data?: Json | null
-          created_at?: string
-          deleted_at?: string | null
-          duration_ms?: number | null
-          id?: string
-          image_url?: string | null
-          params?: Json | null
-          prompt?: string | null
-          share_slug?: string | null
-          source_urls?: Json | null
-          thumbnail_url?: string | null
-          type: Database["public"]["Enums"]["asset_type"]
-          user_id: string
-        }
-        Update: {
-          action?: string | null
-          analysis_data?: Json | null
-          created_at?: string
-          deleted_at?: string | null
-          duration_ms?: number | null
-          id?: string
-          image_url?: string | null
-          params?: Json | null
-          prompt?: string | null
-          share_slug?: string | null
-          source_urls?: Json | null
-          thumbnail_url?: string | null
-          type?: Database["public"]["Enums"]["asset_type"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-      idempotency_cache: {
-        Row: {
-          created_at: string | null
-          expires_at: string
-          key: string
-          response: Json
-        }
-        Insert: {
-          created_at?: string | null
-          expires_at: string
-          key: string
-          response: Json
-        }
-        Update: {
-          created_at?: string | null
-          expires_at?: string
-          key?: string
-          response?: Json
-        }
-        Relationships: []
-      }
-      inspire_activity: {
-        Row: {
-          action_type: string
-          admin_email: string
-          admin_id: string
-          created_at: string
-          id: string
-          shared_asset_id: string
-        }
-        Insert: {
-          action_type: string
-          admin_email: string
-          admin_id: string
-          created_at?: string
-          id?: string
-          shared_asset_id: string
-        }
-        Update: {
-          action_type?: string
-          admin_email?: string
-          admin_id?: string
-          created_at?: string
-          id?: string
-          shared_asset_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "inspire_activity_shared_asset_id_fkey"
-            columns: ["shared_asset_id"]
+            foreignKeyName: "community_reports_post_id_fkey"
+            columns: ["post_id"]
             isOneToOne: false
-            referencedRelation: "shared_assets"
+            referencedRelation: "community_posts"
             referencedColumns: ["id"]
           },
         ]
       }
-      newsletter_subscribers: {
-        Row: {
-          email: string
-          id: string
-          metadata: Json | null
-          source: string | null
-          status: string
-          subscribed_at: string
-          unsubscribed_at: string | null
-        }
-        Insert: {
-          email: string
-          id?: string
-          metadata?: Json | null
-          source?: string | null
-          status?: string
-          subscribed_at?: string
-          unsubscribed_at?: string | null
-        }
-        Update: {
-          email?: string
-          id?: string
-          metadata?: Json | null
-          source?: string | null
-          status?: string
-          subscribed_at?: string
-          unsubscribed_at?: string | null
-        }
-        Relationships: []
-      }
-      page_views: {
-        Row: {
-          browser: string | null
-          city: string | null
-          country: string | null
-          created_at: string | null
-          device_type: string | null
-          id: string
-          is_bounce: boolean | null
-          os: string | null
-          page_path: string
-          page_title: string | null
-          referrer: string | null
-          screen_resolution: string | null
-          session_id: string
-          time_on_page: number | null
-          user_agent: string | null
-          user_id: string | null
-          utm_campaign: string | null
-          utm_medium: string | null
-          utm_source: string | null
-        }
-        Insert: {
-          browser?: string | null
-          city?: string | null
-          country?: string | null
-          created_at?: string | null
-          device_type?: string | null
-          id?: string
-          is_bounce?: boolean | null
-          os?: string | null
-          page_path: string
-          page_title?: string | null
-          referrer?: string | null
-          screen_resolution?: string | null
-          session_id: string
-          time_on_page?: number | null
-          user_agent?: string | null
-          user_id?: string | null
-          utm_campaign?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-        }
-        Update: {
-          browser?: string | null
-          city?: string | null
-          country?: string | null
-          created_at?: string | null
-          device_type?: string | null
-          id?: string
-          is_bounce?: boolean | null
-          os?: string | null
-          page_path?: string
-          page_title?: string | null
-          referrer?: string | null
-          screen_resolution?: string | null
-          session_id?: string
-          time_on_page?: number | null
-          user_agent?: string | null
-          user_id?: string | null
-          utm_campaign?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-        }
-        Relationships: []
-      }
-      payments: {
-        Row: {
-          amount_cents: number
-          completed_at: string | null
-          created_at: string
-          credits_purchased: number
-          currency: string | null
-          id: string
-          metadata: Json | null
-          package_name: string | null
-          status: string
-          stripe_event_id: string | null
-          stripe_payment_intent: string | null
-          user_id: string
-        }
-        Insert: {
-          amount_cents: number
-          completed_at?: string | null
-          created_at?: string
-          credits_purchased: number
-          currency?: string | null
-          id?: string
-          metadata?: Json | null
-          package_name?: string | null
-          status?: string
-          stripe_event_id?: string | null
-          stripe_payment_intent?: string | null
-          user_id: string
-        }
-        Update: {
-          amount_cents?: number
-          completed_at?: string | null
-          created_at?: string
-          credits_purchased?: number
-          currency?: string | null
-          id?: string
-          metadata?: Json | null
-          package_name?: string | null
-          status?: string
-          stripe_event_id?: string | null
-          stripe_payment_intent?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      preset_likes: {
+      community_views: {
         Row: {
           created_at: string | null
           id: string
-          preset_id: string
-          user_id: string
+          post_id: string
+          session_id: string | null
+          viewer_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
-          preset_id: string
-          user_id: string
+          post_id: string
+          session_id?: string | null
+          viewer_id?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
-          preset_id?: string
-          user_id?: string
+          post_id?: string
+          session_id?: string | null
+          viewer_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "preset_likes_preset_id_fkey"
-            columns: ["preset_id"]
+            foreignKeyName: "community_views_post_id_fkey"
+            columns: ["post_id"]
             isOneToOne: false
-            referencedRelation: "custom_generation_presets"
+            referencedRelation: "community_posts"
             referencedColumns: ["id"]
           },
         ]
-      }
-      pricing_config: {
-        Row: {
-          action: string
-          active: boolean
-          credits: number
-          id: string
-          provider: string
-        }
-        Insert: {
-          action: string
-          active?: boolean
-          credits: number
-          id?: string
-          provider: string
-        }
-        Update: {
-          action?: string
-          active?: boolean
-          credits?: number
-          id?: string
-          provider?: string
-        }
-        Relationships: []
-      }
-      profiles: {
-        Row: {
-          bio: string | null
-          created_at: string
-          daily_limit: number | null
-          daily_usage: number | null
-          daily_usage_reset_at: string | null
-          email: string
-          free_credits: number | null
-          has_seen_onboarding: boolean
-          id: string
-          is_pro: boolean | null
-          stripe_customer_id: string | null
-          stripe_subscription_id: string | null
-          subscription_expires_at: string | null
-          subscription_tier: string | null
-          updated_at: string
-          username: string | null
-        }
-        Insert: {
-          bio?: string | null
-          created_at?: string
-          daily_limit?: number | null
-          daily_usage?: number | null
-          daily_usage_reset_at?: string | null
-          email: string
-          free_credits?: number | null
-          has_seen_onboarding?: boolean
-          id: string
-          is_pro?: boolean | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          subscription_expires_at?: string | null
-          subscription_tier?: string | null
-          updated_at?: string
-          username?: string | null
-        }
-        Update: {
-          bio?: string | null
-          created_at?: string
-          daily_limit?: number | null
-          daily_usage?: number | null
-          daily_usage_reset_at?: string | null
-          email?: string
-          free_credits?: number | null
-          has_seen_onboarding?: boolean
-          id?: string
-          is_pro?: boolean | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          subscription_expires_at?: string | null
-          subscription_tier?: string | null
-          updated_at?: string
-          username?: string | null
-        }
-        Relationships: []
-      }
-      shared_assets: {
-        Row: {
-          asset_id: string
-          bookmark_count: number | null
-          color_palette: string | null
-          composition: string | null
-          created_at: string
-          featured: boolean | null
-          id: string
-          is_deleted: boolean | null
-          is_inspire_approved: boolean | null
-          is_public: boolean
-          like_count: number | null
-          mood: string | null
-          share_token: string
-          staff_pick: boolean | null
-          style: string | null
-          tags: Json | null
-          updated_at: string
-          user_id: string
-          view_count: number
-        }
-        Insert: {
-          asset_id: string
-          bookmark_count?: number | null
-          color_palette?: string | null
-          composition?: string | null
-          created_at?: string
-          featured?: boolean | null
-          id?: string
-          is_deleted?: boolean | null
-          is_inspire_approved?: boolean | null
-          is_public?: boolean
-          like_count?: number | null
-          mood?: string | null
-          share_token: string
-          staff_pick?: boolean | null
-          style?: string | null
-          tags?: Json | null
-          updated_at?: string
-          user_id: string
-          view_count?: number
-        }
-        Update: {
-          asset_id?: string
-          bookmark_count?: number | null
-          color_palette?: string | null
-          composition?: string | null
-          created_at?: string
-          featured?: boolean | null
-          id?: string
-          is_deleted?: boolean | null
-          is_inspire_approved?: boolean | null
-          is_public?: boolean
-          like_count?: number | null
-          mood?: string | null
-          share_token?: string
-          staff_pick?: boolean | null
-          style?: string | null
-          tags?: Json | null
-          updated_at?: string
-          user_id?: string
-          view_count?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shared_assets_asset_id_fkey"
-            columns: ["asset_id"]
-            isOneToOne: false
-            referencedRelation: "generated_assets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shared_assets_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      testimonials: {
-        Row: {
-          avatar_url: string | null
-          content: string
-          created_at: string
-          display_order: number
-          featured: boolean
-          id: string
-          name: string
-          role: string
-          updated_at: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          content: string
-          created_at?: string
-          display_order?: number
-          featured?: boolean
-          id?: string
-          name: string
-          role: string
-          updated_at?: string
-        }
-        Update: {
-          avatar_url?: string | null
-          content?: string
-          created_at?: string
-          display_order?: number
-          featured?: boolean
-          id?: string
-          name?: string
-          role?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      user_follows: {
-        Row: {
-          created_at: string | null
-          follower_id: string
-          following_id: string
-          id: string
-        }
-        Insert: {
-          created_at?: string | null
-          follower_id: string
-          following_id: string
-          id?: string
-        }
-        Update: {
-          created_at?: string | null
-          follower_id?: string
-          following_id?: string
-          id?: string
-        }
-        Relationships: []
-      }
-      user_preferences: {
-        Row: {
-          created_at: string
-          credit_alerts: boolean
-          gallery_updates: boolean
-          id: string
-          new_features: boolean
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          credit_alerts?: boolean
-          gallery_updates?: boolean
-          id?: string
-          new_features?: boolean
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          credit_alerts?: boolean
-          gallery_updates?: boolean
-          id?: string
-          new_features?: boolean
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      adjust_user_credits: {
-        Args: {
-          amount: number
-          description_text?: string
-          target_user_id: string
-        }
-        Returns: undefined
-      }
-      cleanup_deleted_assets: { Args: { days_old?: number }; Returns: number }
-      has_active_subscription: {
-        Args: { user_id_param: string }
+      track_community_post_view: {
+        Args: { p_post_id: string; p_session_id?: string; p_viewer_id?: string }
         Returns: boolean
       }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      increment_share_view_count: {
-        Args: { share_token_param: string }
-        Returns: undefined
-      }
-      reset_daily_usage: { Args: never; Returns: undefined }
-      soft_delete_asset: { Args: { asset_id: string }; Returns: undefined }
-      undelete_asset: { Args: { asset_id: string }; Returns: undefined }
     }
     Enums: {
-      app_role: "admin" | "user"
-      asset_type: "analysis" | "image" | "prompt"
-      credit_action: "analyze" | "generate" | "refine" | "blend" | "upscale"
-      credit_provider: "lovable" | "openai" | "replicate"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1140,11 +405,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      app_role: ["admin", "user"],
-      asset_type: ["analysis", "image", "prompt"],
-      credit_action: ["analyze", "generate", "refine", "blend", "upscale"],
-      credit_provider: ["lovable", "openai", "replicate"],
-    },
+    Enums: {},
   },
 } as const

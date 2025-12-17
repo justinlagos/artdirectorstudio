@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "./useSubscription";
+import { useCredits } from "./useCredits";
 
 export interface FeatureAccessResult {
   canAccess: boolean;
@@ -17,6 +18,7 @@ export interface FeatureAccessResult {
 export const useFeatureAccess = () => {
   const { user } = useAuth();
   const { subscription } = useSubscription();
+  const { balance: creditBalance } = useCredits();
   const [freeCredits, setFreeCredits] = useState<number>(0);
   const [dailyUsage, setDailyUsage] = useState<number>(0);
   const [dailyLimit, setDailyLimit] = useState<number>(10);
@@ -87,24 +89,39 @@ export const useFeatureAccess = () => {
 
     // Starter: 10 per day limit
     if (tier === 'starter') {
-      if (dailyUsage >= dailyLimit) {
+      if (dailyUsage < dailyLimit) {
         return {
-          canAccess: false,
+          canAccess: true,
           bypass: false,
-          reason: "You've reached your daily 10 generations. Upgrade to Pro for unlimited access.",
+          reason: `${dailyLimit - dailyUsage} generations remaining today`,
           tier: 'starter',
-          requiresUpgrade: true,
+          remaining: dailyLimit - dailyUsage,
+          requiresUpgrade: false,
           dailyLimit,
           dailyUsage,
         };
       }
+
+      // If daily limit reached, check purchased credits
+      if (creditBalance && creditBalance > 0) {
+        return {
+          canAccess: true,
+          bypass: false,
+          reason: `${creditBalance} extra credits remaining`,
+          tier: 'starter',
+          remaining: creditBalance,
+          requiresUpgrade: false,
+          dailyLimit,
+          dailyUsage,
+        };
+      }
+
       return {
-        canAccess: true,
+        canAccess: false,
         bypass: false,
-        reason: `${dailyLimit - dailyUsage} generations remaining today`,
+        reason: "You've reached your daily limit. Upgrade to Pro or buy credits.",
         tier: 'starter',
-        remaining: dailyLimit - dailyUsage,
-        requiresUpgrade: false,
+        requiresUpgrade: true,
         dailyLimit,
         dailyUsage,
       };
@@ -122,7 +139,19 @@ export const useFeatureAccess = () => {
       };
     }
 
-    // Out of trial credits
+    // Check purchased credits for Free tier
+    if (creditBalance && creditBalance > 0) {
+      return {
+        canAccess: true,
+        bypass: false,
+        reason: `${creditBalance} credits remaining`,
+        tier: 'free',
+        remaining: creditBalance,
+        requiresUpgrade: false,
+      };
+    }
+
+    // Out of credits
     return {
       canAccess: false,
       bypass: false,

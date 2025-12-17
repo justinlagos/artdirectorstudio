@@ -53,7 +53,7 @@ serve(async (req) => {
     });
 
     const accessResult = await accessResponse.json();
-    
+
     if (!accessResult.allowed) {
       console.log(JSON.stringify({
         requestId,
@@ -99,7 +99,7 @@ serve(async (req) => {
     }
 
     const { image, targetSize, idempotencyKey } = requestBody;
-    
+
     // Input validation
     console.log(JSON.stringify({
       requestId,
@@ -150,17 +150,17 @@ serve(async (req) => {
         }));
         return new Response(
           JSON.stringify({ ...cached.response, cached: true }),
-          { 
-            headers: { 
-              ...corsHeaders, 
+          {
+            headers: {
+              ...corsHeaders,
               'Content-Type': 'application/json',
               'X-Idempotency-Key': idempotencyKey
-            } 
+            }
           }
         );
       }
     }
-    
+
     console.log(JSON.stringify({
       requestId,
       action: 'upscale_params',
@@ -181,7 +181,7 @@ serve(async (req) => {
     }
 
     // Use AI to upscale the image with specific instructions
-    const upscalePrompt = targetSize === '2048x2048' 
+    const upscalePrompt = targetSize === '2048x2048'
       ? "Upscale this image to ultra high resolution (2048x2048), enhancing details and clarity while preserving the original style and subject."
       : "Upscale this image to high resolution (1536x1536), enhancing details and clarity while maintaining the original composition.";
 
@@ -189,7 +189,7 @@ serve(async (req) => {
       requestId,
       action: 'api_call_start',
       provider: 'lovable-ai-gateway',
-      model: 'google/gemini-2.5-flash-image-preview',
+      model: 'google/gemini-3-pro-image-preview',
       timestamp: new Date().toISOString()
     }));
 
@@ -202,7 +202,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image-preview",
+          model: "google/gemini-3-pro-image-preview",
           messages: [
             {
               role: "user",
@@ -227,7 +227,7 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       const duration = Date.now() - startTime;
-      
+
       console.error(JSON.stringify({
         requestId,
         action: 'api_error',
@@ -269,7 +269,7 @@ serve(async (req) => {
     }
 
     // Try multiple extraction paths for the upscaled image
-    let upscaledImageUrl = 
+    let upscaledImageUrl =
       data.choices?.[0]?.message?.images?.[0]?.image_url?.url ||  // Primary path
       data.choices?.[0]?.message?.content ||                       // Fallback 1: content field
       data.images?.[0]?.url ||                                     // Fallback 2: direct images array
@@ -279,11 +279,11 @@ serve(async (req) => {
       requestId,
       action: 'image_extraction',
       found: !!upscaledImageUrl,
-      path: upscaledImageUrl 
+      path: upscaledImageUrl
         ? (data.choices?.[0]?.message?.images?.[0]?.image_url?.url ? 'choices[0].message.images[0].image_url.url' :
-           data.choices?.[0]?.message?.content ? 'choices[0].message.content' :
-           data.images?.[0]?.url ? 'images[0].url' :
-           'data[0].url')
+          data.choices?.[0]?.message?.content ? 'choices[0].message.content' :
+            data.images?.[0]?.url ? 'images[0].url' :
+              'data[0].url')
         : 'none',
       imageLength: upscaledImageUrl?.length || 0,
       timestamp: new Date().toISOString()
@@ -354,7 +354,7 @@ serve(async (req) => {
         } else {
           try {
             const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-            
+
             const fileName = `${userId}/${Date.now()}-upscaled.png`;
             console.log(JSON.stringify({
               requestId,
@@ -383,12 +383,12 @@ serve(async (req) => {
               // CRITICAL: Storage upload failure must be fatal
               throw new Error(`Storage upload failed: ${uploadError.message}`);
             }
-            
+
             // Get public URL - verify it's accessible
             const { data: urlData } = supabaseAdmin.storage
               .from('generated-images')
               .getPublicUrl(fileName);
-            
+
             if (!urlData?.publicUrl) {
               console.error(JSON.stringify({
                 requestId,
@@ -399,9 +399,9 @@ serve(async (req) => {
               }));
               throw new Error('Failed to get public URL');
             }
-            
+
             finalImageUrl = urlData.publicUrl;
-            
+
             // Verify URL format
             if (!finalImageUrl || (!finalImageUrl.startsWith('http://') && !finalImageUrl.startsWith('https://'))) {
               console.error(JSON.stringify({
@@ -412,7 +412,7 @@ serve(async (req) => {
               }));
               throw new Error(`Invalid public URL format: ${finalImageUrl?.substring(0, 100)}`);
             }
-            
+
             console.log(JSON.stringify({
               requestId,
               action: 'storage_upload_success',
@@ -536,10 +536,10 @@ serve(async (req) => {
     }
 
     // Verify URL is accessible (must be HTTP/HTTPS or data URI)
-    const isValidUrl = finalImageUrl.startsWith('http://') || 
-                      finalImageUrl.startsWith('https://') || 
-                      finalImageUrl.startsWith('data:image/');
-    
+    const isValidUrl = finalImageUrl.startsWith('http://') ||
+      finalImageUrl.startsWith('https://') ||
+      finalImageUrl.startsWith('data:image/');
+
     if (!isValidUrl) {
       console.error(JSON.stringify({
         requestId,
@@ -550,7 +550,7 @@ serve(async (req) => {
       throw new Error(`Invalid final URL format: ${finalImageUrl.substring(0, 100)}`);
     }
 
-    const result = { 
+    const result = {
       image: finalImageUrl,
       thumbnail: finalImageUrl,
       assetId: assetData?.id
@@ -584,7 +584,7 @@ serve(async (req) => {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     const errorStack = error instanceof Error ? error.stack : undefined;
-    
+
     console.error(JSON.stringify({
       requestId,
       action: 'upscale_error',
@@ -594,7 +594,7 @@ serve(async (req) => {
       duration_ms: duration,
       userId
     }));
-    
+
     // Return more specific error messages when possible
     if (errorMessage.includes('LOVABLE_API_KEY')) {
       return createErrorResponse('Service configuration error. Please contact support.', 500).response;
@@ -602,7 +602,7 @@ serve(async (req) => {
     if (errorMessage.includes('parse') || errorMessage.includes('JSON')) {
       return createErrorResponse('Invalid response from image service. Please try again.', 500).response;
     }
-    
+
     return createErrorResponse(
       ERROR_MESSAGES.PROCESSING_FAILED,
       500

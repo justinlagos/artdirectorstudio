@@ -4,17 +4,16 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { Sparkles, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
-import { Heart, MessageCircle, Sparkles, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import { useUnifiedVisualContext } from "@/store/unifiedVisualContext";
+import { useModalStore } from "@/store/modalStore";
+import { CommunityPostCard } from "@/components/community/CommunityPostCard";
+import { openStudioWithPrompt } from "@/lib/studio";
 
 const PAGE_SIZE = 12;
 
@@ -32,8 +31,6 @@ const sortLabels: Record<SortOption, string> = {
   discussed: "Most Discussed",
 };
 
-import { useModalStore } from "@/store/modalStore";
-
 const Community = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -41,7 +38,6 @@ const Community = () => {
   const openGenerateModal = useModalStore((state) => state.openGenerateModal);
   const [sort, setSort] = useState<SortOption>("trending");
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [commentsByPost, setCommentsByPost] = useState<Record<string, CommunityComment[]>>({});
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -180,13 +176,12 @@ const Community = () => {
     setLoadingComments((prev) => ({ ...prev, [postId]: false }));
   };
 
-  const handleAddComment = async (postId: string) => {
+  const handleAddComment = async (postId: string, text: string) => {
     if (!user) {
       toast.error("Sign in to comment");
       return;
     }
-    const text = commentInputs[postId]?.trim();
-    if (!text) return;
+    if (!text.trim()) return;
 
     try {
       const { data, error } = await supabase
@@ -201,7 +196,6 @@ const Community = () => {
         ...prev,
         [postId]: [data as unknown as CommunityComment, ...(prev[postId] || [])],
       }));
-      setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
       updateLocalCounts(postId, 0, 1);
       toast.success("Comment added");
     } catch (error) {
@@ -223,9 +217,14 @@ const Community = () => {
           timestamp: new Date().toISOString(),
         });
       }
+      
+      const promptContext = post.prompt ? `\n\nPrompt used: "${post.prompt}"` : "";
+      const toolContext = post.tool_used ? `\nTool used: ${post.tool_used}` : "";
+      const paramsContext = post.params ? `\nParams: ${JSON.stringify(post.params)}` : "";
+      
       history.push({
         id: messageId,
-        text: post.caption || "Let's talk about this community post.",
+        text: (post.caption || "Let's talk about this community post.") + promptContext + toolContext,
         sender: "user",
         timestamp: new Date().toISOString(),
         attachment: {
@@ -260,6 +259,12 @@ const Community = () => {
         imageId: post.id,
         prompt: post.caption || "Let's discuss this community post.",
         toolOrigin: 'artie',
+        meta: {
+          source: 'community',
+          originalPrompt: post.prompt,
+          toolUsed: post.tool_used,
+          params: post.params
+        }
       });
       unifiedContext.addImageToMemory({
         url: post.image_url,
@@ -282,125 +287,40 @@ const Community = () => {
     }
   };
 
-  const renderPostCard = (post: CommunityPost) => {
-    const username = post.profiles?.username || "Creator";
-    const initials = username.substring(0, 2).toUpperCase();
-    const liked = likedPosts.has(post.id);
-    const comments = commentsByPost[post.id] || [];
+  const handleRemix = async (post: CommunityPost) => {
+    try {
+      await openStudioWithPrompt({
+        basePrompt: post.prompt || post.caption || "Remix this image",
+        imageUrl: post.image_url,
+        meta: {
+          source: 'community_remix',
+          remixSourceId: post.id,
+          // If we had tool-specific opening logic, we'd use post.tool_used to decide which tool to open.
+          // For MVP, we default to Studio for remixing as it's the most capable.
+        }
+      });
+      toast.success("Opened in Studio for remixing");
+    } catch (error) {
+      console.error("Failed to open remix", error);
+      toast.error("Could not open in Studio");
+    }
+  };
 
-    return (
-      <Card key={post.id} className="mb-6 break-inside-avoid shadow-sm border-border/60">
-        <div className="p-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-primary/10 text-primary">{initials}</AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="font-medium leading-none">{username}</div>
-                <div className="text-xs text-muted-foreground">
-                  {post.created_at ? `${formatDistanceToNow(new Date(post.created_at))} ago` : "Just now"}
-                </div>
-              </div>
-            </div>
-            <Badge variant="secondary">{sortLabels[sort]}</Badge>
-          </div>
-
-          <div className="rounded-xl overflow-hidden bg-muted">
-            <img
-              src={post.image_url}
-              alt={post.caption ?? "Community post"}
-              className="w-full h-auto object-cover"
-              loading="lazy"
-            />
-          </div>
-
-          {post.caption && <p className="text-sm text-foreground/80 whitespace-pre-wrap">{post.caption}</p>}
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant={liked ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleLike(post.id)}
-              className="gap-2"
-            >
-              <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
-              {post.likes_count}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (!commentsByPost[post.id]) {
-                  loadComments(post.id);
-                }
-                setCommentInputs((prev) => ({ ...prev, [post.id]: prev[post.id] || "" }));
-                setLoadingComments((prev) => ({ ...prev, [post.id]: prev[post.id] ?? false }));
-              }}
-              className="gap-2"
-            >
-              <MessageCircle className="h-4 w-4" />
-              {post.comments_count}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDiscussWithArtie(post)}
-              className="gap-2 ml-auto"
-            >
-              <Sparkles className="h-4 w-4" />
-              Discuss with Artie
-            </Button>
-          </div>
-
-          {loadingComments[post.id] && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading comments...
-            </div>
-          )}
-
-          {comments.length > 0 && (
-            <div className="space-y-3 border border-border/60 rounded-lg p-3 bg-muted/30">
-              {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      {(comment.profiles?.username || "User").substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="text-sm font-medium">{comment.profiles?.username || "User"}</div>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{comment.comment_text}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Textarea
-              placeholder={user ? "Leave a comment" : "Sign in to comment"}
-              value={commentInputs[post.id] || ""}
-              onChange={(e) => setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))}
-              onFocus={() => {
-                if (!user) toast.error("Please sign in to comment");
-                if (!commentsByPost[post.id]) loadComments(post.id);
-              }}
-              disabled={!user}
-              className="min-h-[80px]"
-            />
-            <Button
-              size="sm"
-              onClick={() => handleAddComment(post.id)}
-              disabled={!user || !commentInputs[post.id]?.trim()}
-              className="w-full"
-            >
-              Post Comment
-            </Button>
-          </div>
-        </div>
-      </Card>
-    );
+  const handleOpenInStudio = async (post: CommunityPost) => {
+    try {
+      await openStudioWithPrompt({
+        basePrompt: post.prompt || post.caption || "",
+        imageUrl: post.image_url,
+        meta: {
+          source: 'community_reference',
+          originalPostId: post.id
+        }
+      });
+      toast.success("Opened in Studio");
+    } catch (error) {
+      console.error("Failed to open in Studio", error);
+      toast.error("Could not open in Studio");
+    }
   };
 
   return (
@@ -437,7 +357,22 @@ const Community = () => {
           </div>
 
           <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
-            {posts.map((post) => renderPostCard(post))}
+            {posts.map((post) => (
+              <CommunityPostCard
+                key={post.id}
+                post={post}
+                liked={likedPosts.has(post.id)}
+                onLike={handleLike}
+                onDiscuss={handleDiscussWithArtie}
+                comments={commentsByPost[post.id] || []}
+                loadingComments={loadingComments[post.id] || false}
+                onLoadComments={loadComments}
+                onAddComment={handleAddComment}
+                onRemix={handleRemix}
+                onOpenInStudio={handleOpenInStudio}
+                sortLabel={sort === 'trending' && post.likes_count > 10 ? 'Trending' : undefined}
+              />
+            ))}
           </div>
 
           {postsQuery.isFetchingNextPage && (

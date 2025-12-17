@@ -64,9 +64,32 @@ export const PricingTable = () => {
         // Redirect to Stripe Checkout
         window.location.href = data.url;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating checkout session:', error);
-      toast.error('Failed to create checkout session. Please try again.');
+
+      // Extract the most useful message from the error object
+      let errorMessage = 'Failed to create checkout session. Please try again.';
+
+      if (error) {
+        // Check for specific error message from backend (often in context or body for Edge Functions)
+        if (error.context?.error) {
+          errorMessage = error.context.error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+
+        // Sometimes the error is a JSON string in the message
+        try {
+          const parsed = JSON.parse(errorMessage);
+          if (parsed.error) errorMessage = parsed.error;
+        } catch (e) {
+          // Not a JSON string, use as is
+        }
+      }
+
+      toast.error(errorMessage);
     } finally {
       setLoading(null);
     }
@@ -75,8 +98,8 @@ export const PricingTable = () => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 py-6">
       {packages.map((pkg) => (
-        <Card 
-          key={pkg.name} 
+        <Card
+          key={pkg.name}
           className={`relative flex flex-col ${pkg.popular ? 'border-primary shadow-md' : ''}`}
         >
           {pkg.popular && (
@@ -103,8 +126,8 @@ export const PricingTable = () => {
             </ul>
           </CardContent>
           <CardFooter>
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               variant={pkg.popular ? "default" : "outline"}
               onClick={() => handlePurchase(pkg.name, pkg.credits)}
               disabled={loading === pkg.name}

@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     console.log('[RESET-DAILY-USAGE] Starting daily usage reset job...');
-    
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -38,10 +38,10 @@ serve(async (req) => {
 
     if (!usersToReset || usersToReset.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           message: 'No users needed reset',
-          resetCount: 0 
+          resetCount: 0
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -49,13 +49,18 @@ serve(async (req) => {
 
     // Reset all eligible users
     const userIds = usersToReset.map(u => u.id);
-    const nextResetTime = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+    // Calculate next reset time (next UTC midnight)
+    const nextResetTime = new Date(now);
+    nextResetTime.setUTCDate(nextResetTime.getUTCDate() + 1);
+    nextResetTime.setUTCHours(0, 0, 0, 0);
+    const nextResetIso = nextResetTime.toISOString();
 
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
       .update({
         daily_usage: 0,
-        daily_usage_reset_at: nextResetTime
+        daily_usage_reset_at: nextResetIso
       })
       .in('id', userIds);
 
@@ -73,8 +78,8 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: `Reset ${usersToReset.length} users`,
         resetCount: usersToReset.length,
         nextReset: nextResetTime,
@@ -86,13 +91,13 @@ serve(async (req) => {
   } catch (error) {
     console.error('[RESET-DAILY-USAGE] Fatal error:', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error instanceof Error ? error.message : 'Unknown error',
-        success: false 
+        success: false
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }

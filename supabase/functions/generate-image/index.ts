@@ -15,7 +15,7 @@ serve(async (req) => {
   // Generate unique request ID for tracing
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
-  
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -23,7 +23,7 @@ serve(async (req) => {
 
   try {
     console.log(`[${requestId}] Generation request started`);
-    
+
     // Extract and validate JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -74,7 +74,7 @@ serve(async (req) => {
         });
       }
     }
-    
+
     // Check feature access before processing
     console.log(`[${requestId}] Checking feature access`);
     const accessResponse = await fetchWithRetry(
@@ -91,7 +91,7 @@ serve(async (req) => {
     );
 
     const accessResult = await accessResponse.json();
-    
+
     if (!accessResult.allowed) {
       console.log(`[${requestId}] Access denied:`, accessResult.reason);
       const { response } = createErrorResponse(
@@ -107,26 +107,26 @@ serve(async (req) => {
     console.log(`[${requestId}] Access granted: ${accessResult.tier}`);
 
     // Parse request body
-    const { 
-      prompt, 
-      quality = 'auto', 
-      size = '1024x1024', 
-      background = 'auto', 
+    const {
+      prompt,
+      quality = 'auto',
+      size = '1024x1024',
+      background = 'auto',
       referenceImageUrl,
       continuationStrength = 1.0,
       previousPrompt
     } = await req.json();
-    
-    console.log(`[${requestId}] Request params:`, { 
-      promptLength: prompt?.length, 
-      quality, 
-      size, 
+
+    console.log(`[${requestId}] Request params:`, {
+      promptLength: prompt?.length,
+      quality,
+      size,
       background,
       hasReference: !!referenceImageUrl,
       continuationStrength,
       hasPreviousPrompt: !!previousPrompt
     });
-    
+
     // Parse size dimensions
     let aspectRatio = '1:1'; // Default square
     if (size === '1536x1024') {
@@ -134,7 +134,7 @@ serve(async (req) => {
     } else if (size === '1024x1536') {
       aspectRatio = '2:3'; // Portrait
     }
-    
+
     // Validate prompt
     if (!prompt) {
       console.error(`[${requestId}] Missing prompt`);
@@ -195,17 +195,17 @@ serve(async (req) => {
       return response;
     }
 
-    // Call Lovable AI Gateway with Nano banana model
+    // Call Lovable AI Gateway with Nano Banana Pro model
     const aiCallStart = Date.now();
-    console.log(`[${requestId}] Calling AI API with model: google/gemini-2.5-flash-image-preview`);
-    
+    console.log(`[${requestId}] Calling AI API with model: google/gemini-3-pro-image-preview (Nano Banana Pro)`);
+
     // Build message content with context preservation
     let messageContent: any;
-    
+
     if (referenceImageUrl) {
       console.log(`[${requestId}] Using reference image for context: ${referenceImageUrl.substring(0, 50)}...`);
       console.log(`[${requestId}] Continuation strength: ${continuationStrength} (${continuationStrength <= 0.3 ? 'high continuity' : continuationStrength <= 0.6 ? 'moderate' : continuationStrength <= 0.8 ? 'major change' : 'fresh'})`);
-      
+
       // Adjust instructions based on continuation strength
       let contextInstructions = '';
       if (continuationStrength <= 0.3) {
@@ -237,7 +237,7 @@ serve(async (req) => {
 Create: ${prompt}
 Use the reference image only as loose inspiration for general style or mood, but feel free to create something entirely new.`;
       }
-      
+
       const contextPrompt = `${contextInstructions}
 
 Aspect ratio: ${aspectRatio}
@@ -294,10 +294,10 @@ Quality tier: ${quality === 'high' ? 'Maximum - Ultra-premium, award-winning qua
 CREATIVE BRIEF: ${prompt}
 
 Now create this image with the skill and artistry of a world-renowned commercial photographer.`;
-      
+
       messageContent = enhancedPrompt;
     }
-    
+
     const aiResponse = await fetchWithRetry(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
@@ -307,7 +307,7 @@ Now create this image with the skill and artistry of a world-renowned commercial
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image-preview",
+          model: "google/gemini-3-pro-image-preview",
           messages: [
             {
               role: "user",
@@ -327,14 +327,14 @@ Now create this image with the skill and artistry of a world-renowned commercial
         status: aiResponse.status,
         error: errorText
       });
-      
+
       const friendlyMessage = mapAIError(aiResponse.status, errorText);
       const { response } = createErrorResponse(
         friendlyMessage,
         aiResponse.status,
-        aiResponse.status === 429 ? 'rate_limit' : 
-        aiResponse.status === 402 ? 'credits_exhausted' : 
-        'ai_error',
+        aiResponse.status === 429 ? 'rate_limit' :
+          aiResponse.status === 402 ? 'credits_exhausted' :
+            'ai_error',
         requestId,
         { duration: aiCallDuration, aiStatus: aiResponse.status }
       );
@@ -343,13 +343,13 @@ Now create this image with the skill and artistry of a world-renowned commercial
 
     const aiCallDuration = Date.now() - aiCallStart;
     const aiData = await aiResponse.json();
-    console.log(`[${requestId}] AI response received (${aiCallDuration}ms):`, { 
-      hasImages: !!aiData.choices?.[0]?.message?.images 
+    console.log(`[${requestId}] AI response received (${aiCallDuration}ms):`, {
+      hasImages: !!aiData.choices?.[0]?.message?.images
     });
 
     // Extract generated image
     const generatedImageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    
+
     if (!generatedImageUrl) {
       console.error(`[${requestId}] No image in AI response:`, JSON.stringify(aiData).substring(0, 200));
       const { response } = createErrorResponse(
@@ -370,11 +370,11 @@ Now create this image with the skill and artistry of a world-renowned commercial
     try {
       const storageStart = Date.now();
       console.log(`[${requestId}] Uploading to storage...`);
-      
+
       // Extract base64 data
       const base64Data = generatedImageUrl.split(',')[1];
       const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-      
+
       // Upload to storage
       const fileName = `${userId}/${Date.now()}-generated.png`;
       const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
@@ -387,7 +387,7 @@ Now create this image with the skill and artistry of a world-renowned commercial
       if (uploadError) {
         console.error(`[${requestId}] Storage upload error:`, uploadError);
         const { response } = createErrorResponse(
-          uploadError.message?.includes('quota') 
+          uploadError.message?.includes('quota')
             ? 'Storage quota exceeded. Please contact support.'
             : 'Failed to save image to storage. Please try again.',
           500,
@@ -410,11 +410,11 @@ Now create this image with the skill and artistry of a world-renowned commercial
       // Save metadata to database with retry logic
       const dbStart = Date.now();
       console.log(`[${requestId}] Saving to database...`);
-      
+
       let saveAttempts = 0;
       const maxSaveAttempts = 3;
       let saveSuccess = false;
-      
+
       while (saveAttempts < maxSaveAttempts && !saveSuccess) {
         try {
           const { data: savedAsset, error: assetError } = await supabaseAdmin
@@ -427,8 +427,8 @@ Now create this image with the skill and artistry of a world-renowned commercial
               image_url: finalImageUrl,
               source_urls: referenceImageUrl ? [referenceImageUrl] : null,
               params: {
-                quality, 
-                size, 
+                quality,
+                size,
                 background,
                 continuationStrength: referenceImageUrl ? continuationStrength : undefined,
                 hadReference: !!referenceImageUrl
@@ -449,7 +449,7 @@ Now create this image with the skill and artistry of a world-renowned commercial
               code: assetError.code,
               details: assetError.details
             });
-            
+
             if (saveAttempts < maxSaveAttempts) {
               // Wait before retry with exponential backoff
               const delay = Math.min(1000 * Math.pow(2, saveAttempts - 1), 5000);
@@ -464,8 +464,8 @@ Now create this image with the skill and artistry of a world-renowned commercial
             assetData = savedAsset;
             saveSuccess = true;
             console.log(`[${requestId}] Database save complete (${dbDuration}ms, attempt ${saveAttempts + 1})`);
-            console.log(`[${requestId}] Asset details:`, { 
-              assetId: assetData.id, 
+            console.log(`[${requestId}] Asset details:`, {
+              assetId: assetData.id,
               hasImageUrl: !!assetData.image_url,
               hasPrompt: !!assetData.prompt,
               userId: assetData.user_id
@@ -477,14 +477,14 @@ Now create this image with the skill and artistry of a world-renowned commercial
             error: dbSaveError instanceof Error ? dbSaveError.message : 'Unknown',
             stack: dbSaveError instanceof Error ? dbSaveError.stack : undefined
           });
-          
+
           if (saveAttempts < maxSaveAttempts) {
             const delay = Math.min(1000 * Math.pow(2, saveAttempts - 1), 5000);
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
       }
-      
+
       if (!saveSuccess) {
         console.warn(`[${requestId}] WARNING: Image generated but NOT saved to My Projects. Image URL: ${finalImageUrl}`);
       }
@@ -503,14 +503,14 @@ Now create this image with the skill and artistry of a world-renowned commercial
 
     const totalDuration = Date.now() - startTime;
     console.log(`[${requestId}] Generation complete (${totalDuration}ms)`);
-    
-    const successResponse = { 
+
+    const successResponse = {
       success: true,
       image: finalImageUrl,
       assetId: assetData?.id,
       message: "Image generated successfully"
     };
-    
+
     // Cache response for idempotency
     if (idempotencyKey) {
       await cacheResponse(
@@ -521,7 +521,7 @@ Now create this image with the skill and artistry of a world-renowned commercial
         3600 // 1 hour TTL
       );
     }
-    
+
     return new Response(
       JSON.stringify(successResponse),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -530,7 +530,7 @@ Now create this image with the skill and artistry of a world-renowned commercial
   } catch (error) {
     const totalDuration = Date.now() - startTime;
     console.error(`[${requestId}] Error in generate-image function (${totalDuration}ms):`, error);
-    
+
     const errorMessage = error instanceof Error ? error.message : ERROR_MESSAGES.PROCESSING_FAILED;
     const { response } = createErrorResponse(
       errorMessage,

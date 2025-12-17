@@ -58,7 +58,7 @@ serve(async (req) => {
     });
 
     const accessResult = await accessResponse.json();
-    
+
     if (!accessResult.allowed) {
       console.log(JSON.stringify({
         requestId,
@@ -150,12 +150,12 @@ serve(async (req) => {
         }));
         return new Response(
           JSON.stringify({ ...cached.response, cached: true }),
-          { 
-            headers: { 
-              ...corsHeaders, 
+          {
+            headers: {
+              ...corsHeaders,
               'Content-Type': 'application/json',
               'X-Idempotency-Key': idempotencyKey
-            } 
+            }
           }
         );
       }
@@ -215,7 +215,7 @@ serve(async (req) => {
       requestId,
       action: 'api_call_start',
       provider: 'lovable-ai-gateway',
-      model: 'google/gemini-2.5-flash-image-preview',
+      model: 'google/gemini-3-pro-image-preview',
       imageCount: images.length,
       instructionLength: enhancedInstruction.length,
       contentItems: content.length,
@@ -231,7 +231,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image-preview",
+          model: "google/gemini-3-pro-image-preview",
           messages: [{ role: "user", content }],
           modalities: ["image", "text"]
         })
@@ -288,11 +288,11 @@ serve(async (req) => {
       requestId,
       action: 'image_extraction',
       found: !!blendedImageUrl,
-      path: blendedImageUrl 
+      path: blendedImageUrl
         ? (data.choices?.[0]?.message?.images?.[0]?.image_url?.url ? 'choices[0].message.images[0].image_url.url' :
-           data.choices?.[0]?.message?.content ? 'choices[0].message.content' :
-           data.images?.[0]?.url ? 'images[0].url' :
-           'data[0].url')
+          data.choices?.[0]?.message?.content ? 'choices[0].message.content' :
+            data.images?.[0]?.url ? 'images[0].url' :
+              'data[0].url')
         : 'none',
       imageLength: blendedImageUrl?.length || 0,
       timestamp: new Date().toISOString()
@@ -359,7 +359,7 @@ serve(async (req) => {
         } else {
           try {
             const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-            
+
             const fileName = `${userId}/${Date.now()}-blended.png`;
             console.log(JSON.stringify({
               requestId,
@@ -388,12 +388,12 @@ serve(async (req) => {
               // CRITICAL: Storage upload failure must be fatal
               throw new Error(`Storage upload failed: ${uploadError.message}`);
             }
-            
+
             // Get public URL - verify it's accessible
             const { data: urlData } = supabaseAdmin.storage
               .from('generated-images')
               .getPublicUrl(fileName);
-            
+
             if (!urlData?.publicUrl) {
               console.error(JSON.stringify({
                 requestId,
@@ -404,9 +404,9 @@ serve(async (req) => {
               }));
               throw new Error('Failed to get public URL');
             }
-            
+
             finalImageUrl = urlData.publicUrl;
-            
+
             // Verify URL format
             if (!finalImageUrl || (!finalImageUrl.startsWith('http://') && !finalImageUrl.startsWith('https://'))) {
               console.error(JSON.stringify({
@@ -417,7 +417,7 @@ serve(async (req) => {
               }));
               throw new Error(`Invalid public URL format: ${finalImageUrl?.substring(0, 100)}`);
             }
-            
+
             console.log(JSON.stringify({
               requestId,
               action: 'storage_upload_success',
@@ -542,10 +542,10 @@ serve(async (req) => {
     }
 
     // Verify URL is accessible (must be HTTP/HTTPS or data URI)
-    const isValidUrl = finalImageUrl.startsWith('http://') || 
-                      finalImageUrl.startsWith('https://') || 
-                      finalImageUrl.startsWith('data:image/');
-    
+    const isValidUrl = finalImageUrl.startsWith('http://') ||
+      finalImageUrl.startsWith('https://') ||
+      finalImageUrl.startsWith('data:image/');
+
     if (!isValidUrl) {
       console.error(JSON.stringify({
         requestId,
@@ -556,7 +556,7 @@ serve(async (req) => {
       throw new Error(`Invalid final URL format: ${finalImageUrl.substring(0, 100)}`);
     }
 
-    const result = { 
+    const result = {
       image: finalImageUrl,
       thumbnail: finalImageUrl,
       assetId: assetData?.id
@@ -589,7 +589,7 @@ serve(async (req) => {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
-    
+
     console.error(JSON.stringify({
       requestId,
       action: 'blend_error',
@@ -599,7 +599,7 @@ serve(async (req) => {
       duration_ms: duration,
       userId
     }));
-    
+
     // Return more specific error messages when possible
     if (errorMessage.includes('LOVABLE_API_KEY')) {
       return createErrorResponse('Service configuration error. Please contact support.', 500).response;
@@ -607,7 +607,7 @@ serve(async (req) => {
     if (errorMessage.includes('parse') || errorMessage.includes('JSON')) {
       return createErrorResponse('Invalid response from image service. Please try again.', 500).response;
     }
-    
+
     return createErrorResponse(ERROR_MESSAGES.PROCESSING_FAILED, 500).response;
   }
 });
