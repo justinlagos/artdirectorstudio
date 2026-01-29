@@ -725,14 +725,29 @@
     transform-origin: bottom center;
   }
 
+  /* Mobile drawer positioning - use edge pinning instead of center + translate
+     The translate property doesn't work consistently on mobile Safari */
   @media (max-width: 767px) {
     [data-vaul-drawer] {
-      left: 50% !important;
-      right: auto !important;
-      width: min(100%, 640px);
-      max-width: min(100%, 640px);
-      translate: -50% 0 !important;
+      /* Pin to edges with margin for floating card effect */
+      left: 1rem !important;
+      right: 1rem !important;
+      bottom: 1rem !important;
+      width: auto !important;
+      max-width: calc(100vw - 2rem) !important;
+      /* Reset any transforms that might cause positioning issues */
+      transform: none !important;
+      translate: none !important;
       transform-origin: bottom center !important;
+    }
+
+    /* Ensure drawer is properly positioned when open state */
+    [data-vaul-drawer][data-state="open"] {
+      left: 1rem !important;
+      right: 1rem !important;
+      bottom: 1rem !important;
+      transform: none !important;
+      translate: none !important;
     }
   }
 

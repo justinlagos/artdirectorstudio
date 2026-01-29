@@ -53,23 +53,34 @@ export const ToolDrawer = ({
             "fixed z-[81] flex flex-col border border-border bg-background shadow-2xl overflow-hidden",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "duration-200 ease-out",
-            
-            // Mobile: Floating tray with explicit side pinning (No transforms!)
-            "left-4 right-4 bottom-4 w-auto rounded-[24px] outline-none",
+
+            // Mobile: Floating tray - classes as fallback
+            "rounded-[24px] outline-none",
             "max-h-[96dvh]",
-            
+
             // Desktop: Absolute centering with important overrides
             "md:!left-1/2 md:!top-1/2 md:!right-auto md:!bottom-auto",
             "md:!translate-x-[-50%] md:!translate-y-[-50%]",
             "md:w-[94vw] md:max-w-[1040px]",
             "md:rounded-3xl",
             "md:max-h-[90vh]",
-            
+
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
             "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
-            
+
             className,
           )}
+          // Force mobile positioning with inline styles to override vaul's internal transforms
+          style={isMobile ? {
+            left: '1rem',
+            right: '1rem',
+            bottom: '1rem',
+            top: 'auto',
+            width: 'auto',
+            maxWidth: 'calc(100vw - 2rem)',
+            transform: 'none',
+            translate: 'none',
+          } : undefined}
           onPointerDownOutside={(e) => {
             // Prevent closing when clicking on interactive elements inside
             const target = e.target as HTMLElement;
