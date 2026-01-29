@@ -5,6 +5,9 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useScrollFade } from "@/hooks/useScrollFade";
 
+// Z-index CSS variable names for consistent layering
+// See src/lib/zIndexMap.ts for the full hierarchy
+
 const Dialog = DialogPrimitive.Root;
 
 const DialogTrigger = DialogPrimitive.Trigger;

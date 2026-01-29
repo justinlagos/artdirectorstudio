@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, Maximize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { zIndexMap } from "@/lib/zIndexMap";
 
 interface ImageZoomDialogProps {
   open: boolean;
@@ -103,8 +104,9 @@ export const ImageZoomDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 gap-0"
+      <DialogContent
+        className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 gap-0 z-nested-modal-content"
+        style={{ zIndex: zIndexMap.nestedModalContent }}
         onInteractOutside={(e) => e.preventDefault()}
       >
         {/* Header Controls */}

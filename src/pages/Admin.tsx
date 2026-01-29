@@ -10,12 +10,13 @@ import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { PricingManagement } from "@/components/admin/PricingManagement";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { ContentModeration } from "@/components/admin/ContentModeration";
+import { CommunityModeration } from "@/components/admin/CommunityModeration";
 import { InviteTracking } from "@/components/admin/InviteTracking";
 import { SystemHealth } from "@/components/admin/SystemHealth";
 import { CreditAuditLog } from "@/components/admin/CreditAuditLog";
 import TestimonialsManagement from "@/components/admin/TestimonialsManagement";
 import { VisitorAnalytics } from "@/components/admin/VisitorAnalytics";
-import { Shield, Users, Flag, Mail, Activity, DollarSign, MessageSquare, Receipt, Eye } from "lucide-react";
+import { Shield, Users, Flag, Mail, Activity, DollarSign, MessageSquare, Receipt, Eye, Users2 } from "lucide-react";
 
 const Admin = () => {
   const { user, loading: authLoading } = useAuth();
@@ -71,6 +72,10 @@ const Admin = () => {
               <Flag className="w-4 h-4" />
               <span className="hidden sm:inline">Content</span>
             </TabsTrigger>
+            <TabsTrigger value="community" className="gap-2">
+              <Users2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Community</span>
+            </TabsTrigger>
             <TabsTrigger value="pricing" className="gap-2">
               <DollarSign className="w-4 h-4" />
               <span className="hidden sm:inline">Pricing</span>
@@ -107,6 +112,10 @@ const Admin = () => {
 
           <TabsContent value="content">
             <ContentModeration />
+          </TabsContent>
+
+          <TabsContent value="community">
+            <CommunityModeration />
           </TabsContent>
 
           <TabsContent value="pricing">

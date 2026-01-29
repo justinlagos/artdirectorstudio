@@ -9,11 +9,13 @@ export const FeaturedCommunitySection = () => {
   const { data, isLoading } = useQuery({
     queryKey: ["featured-community"],
     queryFn: async () => {
-      // First try to get curated featured posts
+      // First try to get curated featured posts that are approved
       let { data, error } = await supabase
         .from("community_posts")
         .select("id, image_url, likes_count, profiles!community_posts_user_id_fkey(username, email)")
+        .eq("is_approved", true)
         .eq("is_featured", true)
+        .order("featured_at", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(6);
 
@@ -21,20 +23,21 @@ export const FeaturedCommunitySection = () => {
         console.error("[FeaturedCommunity] Featured query error:", error);
       }
 
-      // Fallback to trending/recent if we don't have enough featured posts
+      // Fallback to approved trending/recent if we don't have enough featured posts
       if (!data || data.length < 3) {
         const { data: trendingData, error: trendingError } = await supabase
           .from("community_posts")
           .select("id, image_url, likes_count, profiles!community_posts_user_id_fkey(username, email)")
+          .eq("is_approved", true)
           .order("likes_count", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(6);
-          
+
         if (!trendingError && trendingData) {
            data = trendingData;
         }
       }
-      
+
       return data || [];
     },
     staleTime: 1000 * 60 * 5,

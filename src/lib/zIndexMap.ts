@@ -1,98 +1,91 @@
 /**
- * Centralized Z-Index Management
- * 
- * CRITICAL: Use these constants instead of arbitrary z-index values.
- * This ensures consistent layering across the entire application.
- * 
- * Hierarchy (lowest to highest):
- * - Base content: 0-9
- * - Tooltips & Popovers: 20
- * - Dropdowns & Selects: 25
- * - Modal backdrops: 30
- * - Modal content: 40
- * - Navigation: 50
- * - Artie floating icon: 60
- * - Artie panel: 70-71
- * - Artie modal: 80-81
- * - Toasts: 90
- * - Performance monitor: 95
+ * Z-Index Hierarchy Map
+ * Centralized z-index management for consistent layering across the application
+ *
+ * Layer order (lowest to highest):
+ * 1-9:     Base content
+ * 10-19:   Sticky elements (headers, sidebars)
+ * 20-29:   Tooltips, popovers, dropdowns, selects
+ * 30-39:   Modal backdrops/overlays
+ * 40-49:   Modal content
+ * 50-59:   Navigation elements
+ * 60-69:   Floating UI elements (Artie icon)
+ * 70-79:   Artie panel (special case - above floating icon)
+ * 80-89:   High-priority modals (ArtieModal)
+ * 90-94:   Toasts, notifications, alerts
+ * 95-99:   Nested modal backdrop (for modals inside modals)
+ * 100:     Nested modal content (ImageZoomDialog, etc.)
+ * 105:     Performance monitor (debug only)
  */
 
-export const Z_INDEX = {
+export const zIndexMap = {
   // Base layers
   base: 0,
+  pageContent: 1,
+
+  // Sticky elements
   sticky: 10,
-  
-  // Overlays & UI elements
+  fixedUI: 10,
+
+  // Overlays and popups
   tooltip: 20,
   popover: 20,
   dropdown: 25,
   select: 25,
-  
-  // Modals (standard)
+
+  // Standard modals
   modalBackdrop: 30,
   modalContent: 40,
   dialog: 40,
   sheet: 40,
   drawer: 40,
-  
+
   // Navigation
+  navigation: 50,
   header: 50,
   bottomNav: 50,
-  
-  // Artie system
+
+  // Artie floating elements
   artieFloating: 60,
   artiePanelBackdrop: 70,
-  artiePanelContent: 71,
+  artiePanel: 71,
   artieModalBackdrop: 80,
   artieModalContent: 81,
-  
+
   // Notifications
   toast: 90,
   alert: 90,
-  
-  // Debug/Development
-  performanceMonitor: 95,
+
+  // Nested modals (modals that open inside other modals)
+  nestedModalBackdrop: 95,
+  nestedModalContent: 100,
+
+  // Debug tools
+  performanceMonitor: 105,
 } as const;
 
-/**
- * Tailwind z-index class mapping
- * Use these in className props for consistency
- */
-export const Z_INDEX_CLASSES = {
-  tooltip: 'z-[20]',
-  popover: 'z-[20]',
-  dropdown: 'z-[25]',
-  select: 'z-[25]',
-  modalBackdrop: 'z-[30]',
-  modalContent: 'z-[40]',
-  dialog: 'z-[40]',
-  header: 'z-[50]',
-  bottomNav: 'z-[50]',
-  artieFloating: 'z-[60]',
-  artiePanelBackdrop: 'z-[70]',
-  artiePanelContent: 'z-[71]',
-  artieModalBackdrop: 'z-[80]',
-  artieModalContent: 'z-[81]',
-  toast: 'z-[90]',
-  performanceMonitor: 'z-[95]',
-} as const;
+export type ZIndexKey = keyof typeof zIndexMap;
 
 /**
- * CSS custom property mapping for use in index.css
- * These should match the values above
+ * Get z-index value by key
  */
-export const Z_INDEX_CSS_VARS = {
-  '--z-tooltip': '20',
-  '--z-popover': '20',
-  '--z-dropdown': '25',
-  '--z-modal-backdrop': '30',
-  '--z-modal-content': '40',
-  '--z-navigation': '50',
-  '--z-artie-floating': '60',
-  '--z-artie-panel-backdrop': '70',
-  '--z-artie-panel': '71',
-  '--z-artie-modal-backdrop': '80',
-  '--z-artie-modal-content': '81',
-  '--z-toast': '90',
-} as const;
+export const getZIndex = (key: ZIndexKey): number => zIndexMap[key];
+
+/**
+ * Get CSS variable string for z-index
+ */
+export const getZIndexVar = (key: ZIndexKey): string => \`var(--z-\${key})\`;
+
+/**
+ * Generate CSS custom properties for z-index values
+ * Use in :root or apply via JavaScript
+ */
+export const generateZIndexCSSVars = (): Record<string, number> => {
+  const vars: Record<string, number> = {};
+  for (const [key, value] of Object.entries(zIndexMap)) {
+    vars[\`--z-\${key}\`] = value;
+  }
+  return vars;
+};
+
+export default zIndexMap;
