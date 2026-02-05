@@ -35,6 +35,7 @@ import { PremiumValue } from "@/components/landing/PremiumValue";
 import { ProofSection } from "@/components/landing/ProofSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FeaturedCommunitySection } from "@/components/landing/FeaturedCommunitySection";
+import { FunLabSection } from "@/components/landing/FunLabSection";
 import { ImageComparisonView } from "@/components/ImageComparisonView";
 
 export interface Analysis {
@@ -750,6 +751,10 @@ const Index = () => {
           <>
             <ErrorBoundary fallback={<div className="py-20 text-center">Hero section unavailable</div>}>
               <PremiumHero user={user} />
+            </ErrorBoundary>
+
+            <ErrorBoundary fallback={null}>
+              <FunLabSection />
             </ErrorBoundary>
 
             <ErrorBoundary fallback={null}>

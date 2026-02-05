@@ -48,6 +48,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Community = lazy(() => import("./pages/Community"));
 const Analytics = lazy(() => import("./pages/Analytics"));
+const CaricatureTool = lazy(() => import("./components/CaricatureTool").then(m => ({ default: m.CaricatureTool })));
 const Insights = lazy(() => import("./pages/Insights"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Contact = lazy(() => import("./pages/Contact"));
@@ -211,6 +212,7 @@ const AppContent = () => {
                   <Route path="/signed-out" element={<SignedOut />} />
                   <Route path="/presets" element={<PresetGallery />} />
                   <Route path="/artie" element={<ArtiePage />} />
+                  <Route path="/tools/caricature" element={<CaricatureTool />} />
                   <Route path="/discover" element={<Discover />} />
                   <Route path="/designer/:username" element={<DesignerProfile />} />
                   <Route path="/case-study/:id" element={<CaseStudyDetail />} />
