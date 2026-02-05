@@ -34,6 +34,14 @@ const ImageGenerationDialog = lazy(() =>
       return { default: () => null };
     })
 );
+const KeyboardShortcutsProvider = lazy(() => 
+  import("./components/KeyboardShortcutsProvider")
+    .then(m => ({ default: m.KeyboardShortcutsProvider }))
+    .catch(err => {
+      console.error("Failed to load KeyboardShortcutsProvider:", err);
+      return { default: () => null };
+    })
+);
 
 // Lazy load non-critical routes
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -58,6 +66,9 @@ const SignedOut = lazy(() => import("./pages/SignedOut"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PresetGallery = lazy(() => import("./pages/PresetGallery"));
 const ArtiePage = lazy(() => import("./pages/ArtiePage"));
+const DesignerProfile = lazy(() => import("./pages/DesignerProfile").then(m => ({ default: m.DesignerProfile })));
+const Discover = lazy(() => import("./pages/Discover").then(m => ({ default: m.Discover })));
+const CaseStudyDetail = lazy(() => import("./pages/CaseStudyDetail").then(m => ({ default: m.CaseStudyDetail })));
 
 const TrialWelcomeToast = lazy(() => 
   import("./components/TrialWelcomeToast")
@@ -200,6 +211,9 @@ const AppContent = () => {
                   <Route path="/signed-out" element={<SignedOut />} />
                   <Route path="/presets" element={<PresetGallery />} />
                   <Route path="/artie" element={<ArtiePage />} />
+                  <Route path="/discover" element={<Discover />} />
+                  <Route path="/designer/:username" element={<DesignerProfile />} />
+                  <Route path="/case-study/:id" element={<CaseStudyDetail />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
               </Routes>
@@ -208,6 +222,7 @@ const AppContent = () => {
               <Suspense fallback={null}>
                 <ImageGenerationDialog />
                 <UnifiedToolsModal />
+                <KeyboardShortcutsProvider />
               </Suspense>
             </ErrorBoundary>
             <BottomNav />

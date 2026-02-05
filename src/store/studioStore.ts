@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { analytics } from "@/lib/analytics";
+import { convertToBackendFormat } from "@/lib/generationParams";
 
 export type StudioGenerator = (
   prompt: string,
@@ -24,15 +25,13 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
     throw new Error("Please log in to continue.");
   }
 
+  // Convert to new backend format
+  const backendParams = convertToBackendFormat(options);
+
   const { data, error } = await supabase.functions.invoke("generate-image", {
     body: {
       prompt: trimmedPrompt,
-      quality: options.quality,
-      size: options.size,
-      background: options.background,
-      referenceImageUrl: options.referenceImageUrl,
-      continuationStrength: options.continuationStrength,
-      previousPrompt: options.previousPrompt,
+      ...backendParams,
     },
     headers: {
       Authorization: `Bearer ${session.access_token}`,

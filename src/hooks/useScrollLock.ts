@@ -7,9 +7,43 @@ import { useEffect } from 'react';
  * body scroll when at least one top-level modal is open.
  * 
  * Artie panel itself should NOT lock body scroll - only its internal content scrolls.
+ * 
+ * IMPORTANT: Only applies padding compensation if scrollbar-gutter is NOT supported.
+ * Double compensation is a bug.
  */
 
 type ScrollLockSource = string;
+
+/**
+ * Check if browser supports scrollbar-gutter CSS property
+ */
+const supportsScrollbarGutter = (): boolean =>
+  typeof CSS !== 'undefined' && (CSS.supports?.('scrollbar-gutter', 'stable') ?? false);
+
+/**
+ * Get the width of the scrollbar in pixels
+ */
+const getScrollbarWidth = (): number => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return 0;
+  }
+  
+  // Create a temporary element to measure scrollbar width
+  const outer = document.createElement('div');
+  outer.style.visibility = 'hidden';
+  outer.style.overflow = 'scroll';
+  outer.style.msOverflowStyle = 'scrollbar';
+  document.body.appendChild(outer);
+  
+  const inner = document.createElement('div');
+  outer.appendChild(inner);
+  
+  const scrollbarWidth = outer.offsetWidth - inner.offsetWidth;
+  
+  outer.parentNode?.removeChild(outer);
+  
+  return scrollbarWidth;
+};
 
 class ScrollLockManager {
   private locks = new Set<ScrollLockSource>();
@@ -20,6 +54,7 @@ class ScrollLockManager {
     width: string;
     height: string;
     overscrollBehavior: string;
+    paddingRight: string;
     scrollY: number;
   } | null = null;
 
@@ -81,6 +116,7 @@ class ScrollLockManager {
    */
   private updateScrollLock(): void {
     const shouldLock = this.locks.size > 0;
+    const hasScrollbarGutter = supportsScrollbarGutter();
 
     if (shouldLock && !this.savedStyles) {
       // Save current state and lock
@@ -91,6 +127,7 @@ class ScrollLockManager {
         width: document.body.style.width || '',
         height: document.body.style.height || '',
         overscrollBehavior: document.body.style.overscrollBehavior || '',
+        paddingRight: document.body.style.paddingRight || '',
         scrollY: window.scrollY,
       };
 
@@ -106,8 +143,23 @@ class ScrollLockManager {
         document.body.style.height = `${window.innerHeight}px`;
       }
 
+      // Only apply padding compensation if scrollbar-gutter is NOT supported
+      // Double compensation is a bug
+      if (!hasScrollbarGutter) {
+        const scrollbarWidth = getScrollbarWidth();
+        if (scrollbarWidth > 0) {
+          const currentPaddingRight = parseFloat(
+            window.getComputedStyle(document.body).paddingRight
+          ) || 0;
+          document.body.style.paddingRight = `${currentPaddingRight + scrollbarWidth}px`;
+        }
+      }
+
       if (import.meta.env.DEV) {
-        console.log('[ScrollLock] Locked by:', Array.from(this.locks));
+        console.log('[ScrollLock] Locked by:', Array.from(this.locks), {
+          hasScrollbarGutter,
+          appliedPaddingCompensation: !hasScrollbarGutter
+        });
       }
     } else if (!shouldLock && this.savedStyles) {
       // Restore previous state
@@ -117,6 +169,7 @@ class ScrollLockManager {
       document.body.style.width = this.savedStyles.width;
       document.body.style.height = '';
       document.body.style.overscrollBehavior = '';
+      document.body.style.paddingRight = this.savedStyles.paddingRight;
 
       // Restore scroll position
       window.scrollTo(0, this.savedStyles.scrollY);
@@ -142,6 +195,7 @@ class ScrollLockManager {
       document.body.style.width = this.savedStyles.width;
       document.body.style.height = this.savedStyles.height;
       document.body.style.overscrollBehavior = this.savedStyles.overscrollBehavior;
+      document.body.style.paddingRight = this.savedStyles.paddingRight;
       window.scrollTo(0, this.savedStyles.scrollY);
       this.savedStyles = null;
     }

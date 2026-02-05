@@ -4,15 +4,17 @@ import { validateImageData, validateTargetSize } from '../_shared/validation.ts'
 import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
 import { fetchWithRetry } from '../_shared/retry.ts';
+import { createLogger } from '../_shared/observability.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const requestId = crypto.randomUUID();
@@ -35,12 +37,8 @@ serve(async (req) => {
       console.warn('Could not extract userId from token');
     }
 
-    console.log(JSON.stringify({
-      requestId,
-      action: 'upscale_start',
-      timestamp: new Date().toISOString(),
-      userId
-    }));
+    const logger = createLogger(requestId, userId);
+    logger.logStart('upscale_image');
 
     // Check feature access before processing
     const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
@@ -313,16 +311,10 @@ serve(async (req) => {
     }
 
     const duration = Date.now() - startTime;
-    console.log(JSON.stringify({
-      requestId,
-      action: 'upscale_success',
-      userId,
-      provider: 'lovable-ai-gateway',
-      providerStatus: 200,
-      duration_ms: duration,
-      timestamp: new Date().toISOString(),
-      imageLength: upscaledImageUrl?.length || 0
-    }));
+    logger.logSuccess('upscale_image', duration, {
+      target_size: targetSize,
+      image_length: upscaledImageUrl?.length || 0
+    });
 
     // Save to database
     const supabaseAdmin = createClient(
@@ -468,20 +460,34 @@ serve(async (req) => {
         timestamp: new Date().toISOString()
       }));
 
+      // Parse target size dimensions
+      const [targetWidth, targetHeight] = targetSize.split('x').map(Number);
+      
       const { data: savedAsset, error: assetError } = await supabaseAdmin
         .from('generated_assets')
         .insert({
           user_id: userId,
           type: 'image',
           action: 'upscale',
+          operation_type: 'upscale',
           image_url: finalImageUrl,
           prompt: `Upscaled to ${targetSize}`,
           source_urls: [image.substring(0, 100)],
+          model_used: 'google/gemini-3-pro-image-preview',
+          width: targetWidth,
+          height: targetHeight,
           params: {
             targetSize,
-            operation: 'upscale'
+            operation: 'upscale',
+            scale_factor: targetWidth === 2048 ? 4 : 2, // Approximate
           },
           duration_ms: duration,
+          analysis_data: {
+            operation_type: 'upscale',
+            target_size: targetSize,
+            processed_at: new Date().toISOString(),
+            request_id: requestId
+          }
         })
         .select()
         .single();
@@ -582,18 +588,8 @@ serve(async (req) => {
     );
   } catch (error) {
     const duration = Date.now() - startTime;
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-
-    console.error(JSON.stringify({
-      requestId,
-      action: 'upscale_error',
-      timestamp: new Date().toISOString(),
-      error: errorMessage,
-      stack: errorStack,
-      duration_ms: duration,
-      userId
-    }));
+    const logger = createLogger(requestId, userId);
+    logger.logError('upscale_image', error instanceof Error ? error : new Error(String(error)), duration);
 
     // Return more specific error messages when possible
     if (errorMessage.includes('LOVABLE_API_KEY')) {

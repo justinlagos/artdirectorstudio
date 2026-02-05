@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,10 +16,13 @@ import {
   Image as ImageIcon,
   X,
   ZoomIn,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { EnhancedPromptEditor } from "./EnhancedPromptEditor";
+import { useStreamingGeneration } from "@/hooks/useStreamingGeneration";
+import { StreamingProgressDisplay } from "./StreamingProgressDisplay";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +44,9 @@ import { ImageZoomDialog } from "./ImageZoomDialog";
 import { EmailDeliveryToggle } from "./EmailDeliveryToggle";
 import { useEmailDeliveryPreference } from "@/hooks/useEmailDeliveryPreference";
 import { sendImageEmail, showEmailSentToast } from "@/lib/emailDelivery";
+import { BrandKitSelector } from "@/components/brand/BrandKitSelector";
+import { useStylePresetCapture } from "@/hooks/useStylePresetCapture";
+import { StylePresetCapture } from "@/components/presets/StylePresetCapture";
 
 export interface GenerationOptions {
   quality: "high" | "medium" | "low" | "auto";
@@ -81,7 +87,7 @@ export const ImageGenerationDialog = () => {
   const setStoreImage = useStudioStore((state) => state.setImage);
   const generator = useStudioStore((state) => state.generator);
 
-  const { lastOptions, saveOptions } = useSmartDefaults();
+  const { lastOptions, saveOptions, getLastUsedSettings } = useSmartDefaults();
 
   const truncatedInitialPrompt = useMemo(() => truncatePrompt(storePrompt ?? ""), [storePrompt]);
 
@@ -124,6 +130,52 @@ export const ImageGenerationDialog = () => {
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const { emailDeliveryEnabled, setEmailDeliveryEnabled } = useEmailDeliveryPreference();
+  const [selectedBrandKit, setSelectedBrandKit] = useState<any>(null);
+  
+  // Style preset capture
+  const { trackSatisfaction, shouldShowCapture, captureData, dismissCapture, handlePresetCaptured } = useStylePresetCapture();
+
+  // Streaming generation hook with fallback to standard generator
+  const {
+    state: streamingState,
+    generate: streamingGenerate,
+    abort: abortStreaming,
+    reset: resetStreaming,
+  } = useStreamingGeneration({
+    fallbackGenerator: generator || undefined,
+    fallbackOnStreamError: true,
+    onProgress: useCallback((progress: number, stage: string, message: string) => {
+      setProgress(progress);
+      setGenerationStage(message);
+    }, []),
+    onComplete: useCallback(async (imageUrl: string, assetId?: string) => {
+      setGeneratedImage(imageUrl);
+      
+      // Trigger proactive Artie suggestion for generation complete
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('artie-proactive-trigger', {
+          detail: {
+            triggerType: 'generation_complete',
+            context: {
+              currentImageUrl: imageUrl,
+              generationCount: 1, // Could be enhanced to track actual count
+            },
+          },
+        }));
+      }
+      
+      // Track satisfaction for style preset capture (after successful generation)
+      // Note: Image is automatically saved by edge function, so this tracks user satisfaction
+      trackSatisfaction(imageUrl, prompt || basePrompt, options);
+      
+      setProgress(100);
+      setGenerationStage("Complete!");
+    }, [prompt, basePrompt, options, trackSatisfaction]),
+    onError: useCallback((error: Error) => {
+      const requestId = (error as any)?.requestId;
+      setLastError(requestId ? `${error.message} (Request ID: ${requestId})` : error.message);
+    }, []),
+  });
 
   useEffect(() => {
     if (!isGenerateModalOpen) {
@@ -172,38 +224,12 @@ export const ImageGenerationDialog = () => {
       return;
     }
 
-    if (!generator) {
-      toast.error("Generation is currently unavailable.");
-      return;
-    }
-
     setIsGenerating(true);
     setProgress(0);
     setGeneratedImage(null);
     setLastError(null);
     generationStartTime.current = Date.now();
-
-    // Simulate generation stages for better UX
     setGenerationStage("Initializing...");
-    setProgress(10);
-
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev < 30) {
-          setGenerationStage("Processing your prompt...");
-        } else if (prev < 60) {
-          setGenerationStage("AI is creating your image...");
-        } else if (prev < 85) {
-          setGenerationStage("Adding final touches...");
-        }
-
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 8;
-      });
-    }, 1200);
 
     try {
       // Use continuation strength from meta (style consistency) if available, otherwise use calculated
@@ -215,22 +241,44 @@ export const ImageGenerationDialog = () => {
       // Convert aspect ratio to size for API compatibility
       const size = ASPECT_RATIO_TO_SIZE[options.aspectRatio] || "1024x1024";
 
-      const optionsWithReference = {
+      // Build prompt with brand kit colors if selected
+      let finalPrompt = prompt;
+      if (selectedBrandKit?.color_palette && selectedBrandKit.color_palette.length > 0) {
+        const colorHexes = selectedBrandKit.color_palette.map((c: any) => c.hex).join(', ');
+        finalPrompt = `${prompt}\n\nUse brand colors: ${colorHexes}`;
+        
+        if (selectedBrandKit.usage_rules?.imageryStyle) {
+          finalPrompt += `\nMatch brand style: ${selectedBrandKit.usage_rules.imageryStyle}`;
+        }
+      }
+
+      // Ensure all options are properly set and visible
+      const optionsWithReference: GenerationOptions = {
         ...options,
-        size: size, // Add size for API compatibility
+        aspectRatio: options.aspectRatio || "1:1", // Ensure aspect ratio is set
+        quality: options.quality || "standard", // Ensure quality is set
+        background: options.background || "original", // Ensure background is set
+        size: size, // Legacy field for backward compatibility
         referenceImageUrl: referenceImage || undefined,
         continuationStrength: finalContinuationStrength,
         previousPrompt: previousGeneratedPrompt || undefined,
+        brandKitId: selectedBrandKit?.id,
       };
+      
+      // Log options for debugging - ensure controls are working
+      console.log('[Generate] Options:', {
+        aspectRatio: optionsWithReference.aspectRatio,
+        quality: optionsWithReference.quality,
+        background: optionsWithReference.background,
+        size: optionsWithReference.size,
+        hasReference: !!optionsWithReference.referenceImageUrl,
+      });
 
-      const imageUrl = await generator(prompt, optionsWithReference);
+      // Use streaming generation (with automatic fallback)
+      const imageUrl = await streamingGenerate(finalPrompt, optionsWithReference);
 
       // Store this prompt for future similarity calculations
       setPreviousGeneratedPrompt(prompt);
-
-      clearInterval(progressInterval);
-      setProgress(100);
-      setGenerationStage("Complete!");
 
       const totalTime = Math.round((Date.now() - generationStartTime.current) / 1000);
       setGenerationTime(totalTime);
@@ -239,12 +287,18 @@ export const ImageGenerationDialog = () => {
         setGeneratedImage(imageUrl);
         await deliverEmail(imageUrl, prompt || basePrompt);
 
+        // Save last used settings for smart defaults
+        saveOptions(optionsWithReference);
+        
+        // Track satisfaction for style preset capture
+        trackSatisfaction(imageUrl, finalPrompt, optionsWithReference);
+
         // Enhanced success feedback
         toast.success(
           <div className="flex flex-col gap-1">
-            <span className="font-semibold">✨ Image generated successfully!</span>
+            <span className="font-semibold">Image generated successfully!</span>
             <span className="text-xs text-muted-foreground">
-              Generated in {totalTime}s • {options.aspectRatio} • {options.quality}
+              Generated in {totalTime}s {options.aspectRatio} {options.quality}
             </span>
           </div>,
           { duration: 4000 }
@@ -260,14 +314,12 @@ export const ImageGenerationDialog = () => {
         }
       }
     } catch (error) {
-      clearInterval(progressInterval);
       setProgress(0);
       setGenerationStage("");
       console.error("Generation error:", error);
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       const requestId = (error as any)?.requestId;
-      const errorType = (error as any)?.errorType;
 
       // Store error with request ID for display
       setLastError(requestId ? `${errorMessage} (Request ID: ${requestId})` : errorMessage);
@@ -825,21 +877,21 @@ export const ImageGenerationDialog = () => {
               <span className="text-muted-foreground/80">Applied to the next generation</span>
             </div>
           </div>
+
+          {/* Brand Kit Selector */}
+          <div className="mt-4">
+            <BrandKitSelector onSelect={setSelectedBrandKit} />
+          </div>
         </div>
 
         {/* Status messages - outside scrollable area */}
-        {isGenerating && (
-          <div className="mt-4 space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4 shrink-0">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-foreground">{generationStage}</p>
-              <span className="text-xs text-muted-foreground">{progress}%</span>
-            </div>
-            <Progress value={progress} className="w-full" />
-            <p className="text-xs text-muted-foreground text-center">
-              This usually takes 8-15 seconds
-            </p>
-          </div>
-        )}
+        <StreamingProgressDisplay
+          progress={streamingState.progress || progress}
+          stage={streamingState.stage || generationStage}
+          message={streamingState.message || generationStage}
+          streamingEnabled={streamingState.streamingEnabled}
+          isGenerating={isGenerating}
+        />
 
         {lastError && !isGenerating && (
           <Alert variant="destructive" className="mt-4 border-destructive/50 shrink-0">
@@ -911,7 +963,13 @@ export const ImageGenerationDialog = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={handleDownload}
+                onClick={() => {
+                  handleDownload();
+                  // Track satisfaction for style preset capture
+                  if (generatedImage) {
+                    trackSatisfaction(generatedImage, prompt || basePrompt, options);
+                  }
+                }}
                 className={cn(
                   "min-h-[44px]",
                   isMobile ? "w-full" : ""
@@ -922,7 +980,13 @@ export const ImageGenerationDialog = () => {
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => setShareOpen(true)}
+                onClick={() => {
+                  setShareOpen(true);
+                  // Track satisfaction for style preset capture
+                  if (generatedImage) {
+                    trackSatisfaction(generatedImage, prompt || basePrompt, options);
+                  }
+                }}
                 className={cn(
                   "min-h-[44px]",
                   isMobile ? "w-full" : ""
@@ -944,6 +1008,24 @@ export const ImageGenerationDialog = () => {
                 )}
               >
                 <Copy className="mr-2 h-3 w-3" /> Copy Prompt
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const lastUsed = getLastUsedSettings();
+                  if (lastUsed.quality) setOptions(prev => ({ ...prev, quality: lastUsed.quality! }));
+                  if (lastUsed.aspectRatio) setOptions(prev => ({ ...prev, aspectRatio: lastUsed.aspectRatio! }));
+                  if (lastUsed.background) setOptions(prev => ({ ...prev, background: lastUsed.background! }));
+                  toast.success("Applied last used settings");
+                }}
+                className={cn(
+                  "shrink-0",
+                  isMobile ? "w-full" : ""
+                )}
+                title="Apply your last used quality, aspect ratio, and background settings"
+              >
+                <History className="mr-2 h-3 w-3" /> Use Last Settings
               </Button>
               <Button
                 onClick={handleGenerate}
@@ -1004,6 +1086,22 @@ export const ImageGenerationDialog = () => {
         }}
         aspectRatio={options.aspectRatio}
         remixSourceId={meta?.remixSourceId}
+      />
+      <StylePresetCapture
+        open={shouldShowCapture}
+        onOpenChange={(open) => {
+          if (!open && captureData) {
+            dismissCapture(captureData.imageUrl);
+          }
+        }}
+        imageUrl={captureData?.imageUrl || ''}
+        prompt={captureData?.prompt || ''}
+        options={captureData?.options || {}}
+        onCapture={(presetId) => {
+          if (captureData) {
+            handlePresetCaptured(captureData.imageUrl);
+          }
+        }}
       />
       {zoomImageUrl && (
         <ImageZoomDialog

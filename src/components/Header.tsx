@@ -40,11 +40,11 @@ export const Header = () => {
             
             {user && (
               <>
-                <Button variant="ghost" size="sm" onClick={() => openTool('blend')}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => openTool('blend')}>
                   <Layers className="mr-2 h-4 w-4" />
                   Blend
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => openTool('upscale')}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => openTool('upscale')}>
                   <Maximize2 className="mr-2 h-4 w-4" />
                   Upscale
                 </Button>
@@ -76,7 +76,7 @@ export const Header = () => {
           ) : (
             <>
               <ThemeToggle />
-              <Button onClick={() => navigate("/auth")} size="sm" className="hidden xs:flex">
+              <Button type="button" onClick={() => navigate("/auth")} size="sm" className="hidden xs:flex">
                 Sign In
               </Button>
             </>
@@ -85,7 +85,7 @@ export const Header = () => {
           {/* Mobile Menu - Hidden when user is logged in (BottomNav takes over) */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild className={user ? "hidden" : "sm:hidden"}>
-              <Button variant="ghost" size="icon" className="min-w-[44px] min-h-[44px] touch-manipulation">
+              <Button type="button" variant="ghost" size="icon" className="min-w-[44px] min-h-[44px] touch-manipulation">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
@@ -121,6 +121,7 @@ export const Header = () => {
                   {user && (
                     <>
                       <Button 
+                        type="button"
                         variant="ghost" 
                         className="justify-start min-h-[48px] w-full"
                         onClick={() => {
@@ -132,6 +133,7 @@ export const Header = () => {
                         Blend
                       </Button>
                       <Button 
+                        type="button"
                         variant="ghost" 
                         className="justify-start min-h-[48px] w-full"
                         onClick={() => {
@@ -158,6 +160,7 @@ export const Header = () => {
                   </Button>
                   
                   <Button
+                    type="button"
                     variant="ghost"
                     className="justify-start min-h-[48px] w-full"
                     onClick={() => {
@@ -171,6 +174,7 @@ export const Header = () => {
                   
                   {!user && (
                     <Button 
+                      type="button"
                       onClick={() => {
                         navigate("/auth");
                         setMobileMenuOpen(false);

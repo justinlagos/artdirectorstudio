@@ -1,165 +1,128 @@
-# Testing Checklist - Artie CIS & Studio Simplification
+# Testing Checklist - Backend & Frontend Changes
 
-## Phase 0: Setup ✅
-- [x] Branch created: `feature/artie-cis-and-studio-simplify`
-- [x] Code compiles without errors
-- [x] No new linting errors introduced
+## Backend Changes ✅
 
-## Phase 1: Standalone Artie CIS Page
+### 1. Generation Parameters Contract
+- ✅ Created `supabase/functions/_shared/generationParams.ts`
+- ✅ Validates all parameters strictly
+- ✅ Rejects unknown keys
+- ✅ Normalizes values with defaults
 
-### Test `/artie` Route
-- [ ] Navigate to `/artie` route
-- [ ] Page loads with Header and Footer
-- [ ] Centered UI displays:
-  - [ ] Large "Artie" title with "Creative Intelligent System" subtitle
-  - [ ] Description text
-  - [ ] Large chat interface in the center
-- [ ] Chat input works:
-  - [ ] Can type messages
-  - [ ] Can upload files (images, PDF, DOCX)
-  - [ ] Messages appear in chat history
-  - [ ] Artie responds to messages
+**Test:** Send a request with invalid params - should get clear error
 
-### Test Tool Integration from ArtiePage
-- [ ] Ask Artie to "Generate an image" → Opens Studio with prompt
-- [ ] Ask Artie to "Upscale this image" → Opens upscale tool
-- [ ] Ask Artie to "Blend these images" → Opens blend tool
-- [ ] Verify tools use correct context (prompts, images)
+### 2. Prompt Engine
+- ✅ Created `supabase/functions/_shared/promptEngine.ts`
+- ✅ Versioned prompts (v1.0.0)
+- ✅ Structured prompt objects stored in DB
 
-### Test File Upload
-- [ ] Upload an image → Should be processed and added to context
-- [ ] Upload a PDF/DOCX brief → Should be analyzed
-- [ ] Brief analysis should appear in chat
+**Test:** Check database - `full_prompt_object` should contain structured JSON
 
-## Phase 2: Simplified "Generate in Studio" Modal
+### 3. Generate Image Function
+- ✅ Uses new contract
+- ✅ Uses prompt engine
+- ✅ Stores full metadata
+- ✅ DEBUG mode available (header `x-debug: true`)
 
-### Test Simplified Modal
-- [ ] Open "Generate in Studio" from any entry point
-- [ ] Verify tabs are REMOVED:
-  - [ ] No "Templates" tab
-  - [ ] No "Presets" tab
-  - [ ] No "Custom Prompt" tab
-- [ ] Verify simplified layout:
-  - [ ] Left side: Image preview (if reference image exists)
-  - [ ] Right side: "Your Base Prompt" section with:
-    - [ ] Prompt textarea
-    - [ ] Enhance button
-    - [ ] Simplify button
-    - [ ] Artistic button
-  - [ ] Advanced Options collapsible section (Quality, Size, Background)
+**Test:** 
+- Generate an image - check console logs for structured params
+- Add header `x-debug: true` - should return prompt object without generating
 
-### Test Generation Flow
-- [ ] Enter a prompt in "Your Base Prompt"
-- [ ] Click "Generate" button
-- [ ] Image generates successfully
-- [ ] Generated image appears in left panel
-- [ ] Only basePrompt is used (no preset merging)
+### 4. Background Removal
+- ✅ New edge function `remove-background`
+- ✅ First-class operation with metadata
 
-## Phase 3: Disabled Custom Presets
+**Test:** Call remove-background function with image_id
 
-### Test Presets Route
-- [ ] Navigate to `/presets`
-- [ ] Should show placeholder message:
-  - [ ] "Presets Temporarily Unavailable"
-  - [ ] "This feature is paused while we rebuild it..."
-  - [ ] "Go to Studio" button works
+### 5. Database Schema
+- ✅ Migration created: `20260124_generation_metadata_enhancement.sql`
+- ✅ New columns: prompt_version, full_prompt_object, etc.
 
-### Test UI for Preset Removal
-- [ ] Check Header navigation - no "Presets" link
-- [ ] Check Footer - no preset references
-- [ ] Generate in Studio modal - no preset carousels/chips
-- [ ] No "Save as preset" actions visible
+**Test:** Run migration, check generated_assets table has new columns
 
-## Phase 4: Studio Onboarding Copy
+## Frontend Changes ✅
 
-### Test Studio Page
-- [ ] Navigate to `/` (Studio page)
-- [ ] Above image dropzone, verify:
-  - [ ] "Studio" title appears
-  - [ ] Description: "Upload a visual, layout, or campaign asset. Artie will analyse it..."
-  - [ ] Copy is readable and styled correctly
-  - [ ] Works on mobile and desktop
+### 1. Design Tokens
+- ✅ Created `src/styles/tokens.css`
+- ✅ Imported in `src/index.css`
+- ✅ Tailwind config updated
 
-## Phase 5: My Projects Save Flow (Runtime Testing)
+**Test:** Check browser devtools - CSS variables should be defined
 
-### Test Image Generation Save
-- [ ] Generate an image from Studio
-- [ ] Wait a few seconds
-- [ ] Navigate to `/history` (My Projects)
-- [ ] Verify image appears in history with:
-  - [ ] Correct prompt
-  - [ ] Correct action ("generate")
-  - [ ] Correct timestamp
-  - [ ] Image displays correctly
+### 2. Parameter Conversion
+- ✅ Created `src/lib/generationParams.ts`
+- ✅ Updated all call sites:
+  - `src/store/studioStore.ts` ✅
+  - `src/pages/Index.tsx` ✅
+  - `src/hooks/useStreamingGeneration.ts` ✅
+  - `src/components/ArtieChat.tsx` ✅
+  - `src/components/BatchProcessDialog.tsx` ✅
 
-### Test Edit Save
-- [ ] Edit an image using Edit tool
-- [ ] Navigate to `/history`
-- [ ] Verify edited image appears with action "edit"
+**Test:** 
+- Open browser network tab
+- Generate an image
+- Check request body has `aspect_ratio`, `background_mode`, `quality` (new format)
 
-### Test Upscale Save
-- [ ] Upscale an image
-- [ ] Navigate to `/history`
-- [ ] Verify upscaled image appears with action "upscale"
+### 3. Modal Architecture
+- ✅ Created modal components in `src/components/overlay/`
+- ⚠️ Not yet integrated into ImageGenerationDialog
 
-### Test Blend Save
-- [ ] Blend two images
-- [ ] Navigate to `/history`
-- [ ] Verify blended image appears with action "blend"
+**Test:** Components exist but not used yet - need to refactor ImageGenerationDialog
 
-### Test Save from Artie
-- [ ] Ask Artie to generate an image (inline)
-- [ ] Navigate to `/history`
-- [ ] Verify image appears in history
+## How to Verify Changes Are Working
 
-## Phase 6: Artie CIS Orchestration
+### Backend Verification:
+1. **Check Edge Function Logs:**
+   - Go to Supabase Dashboard → Edge Functions → generate-image
+   - Look for structured logs with `normalized_params`, `prompt_version`
 
-### Test Artie Context Awareness
-- [ ] Start conversation with Artie about a project
-- [ ] Upload images during conversation
-- [ ] Ask Artie to work with "the image I uploaded" → Should reference correct image
-- [ ] Verify Artie remembers conversation context
+2. **Test DEBUG Mode:**
+   ```bash
+   curl -X POST https://your-project.supabase.co/functions/v1/generate-image \
+     -H "Authorization: Bearer YOUR_TOKEN" \
+     -H "x-debug: true" \
+     -H "Content-Type: application/json" \
+     -d '{"prompt":"test","aspect_ratio":"1:1","background_mode":"original","quality":"standard"}'
+   ```
+   Should return prompt object without generating image
 
-### Test Brief Analysis
-- [ ] Upload a PDF/DOCX brief to Artie
-- [ ] Artie should analyze and summarize brief
-- [ ] Ask Artie to "create visuals based on this brief" → Should open Studio with relevant prompt
+3. **Check Database:**
+   ```sql
+   SELECT prompt_version, full_prompt_object, model_used, seed 
+   FROM generated_assets 
+   ORDER BY created_at DESC 
+   LIMIT 1;
+   ```
+   Should show new metadata fields populated
 
-### Test Tool Orchestration
-- [ ] Have Artie generate an image
-- [ ] Ask Artie to "create a variation" → Should open Edit tool
-- [ ] Ask Artie to "upscale that" → Should open Upscale tool
-- [ ] Verify context (images, prompts) is passed correctly between tools
+### Frontend Verification:
+1. **Check Network Requests:**
+   - Open DevTools → Network tab
+   - Generate an image
+   - Check request payload has:
+     - `aspect_ratio` (not just `size`)
+     - `background_mode` (not just `background`)
+     - `quality` (normalized to "standard" or "high")
 
-## Common Issues to Watch For
+2. **Check CSS Variables:**
+   - Open DevTools → Elements → :root
+   - Should see `--space-*`, `--radius-*`, `--shadow-*` variables
 
-- [ ] Console errors (check browser console)
-- [ ] Images not loading
-- [ ] Tool modals not opening
-- [ ] Save toast messages appearing (or not appearing)
-- [ ] Navigation issues
-- [ ] Mobile responsiveness
-- [ ] Styling issues (dark/light mode)
+3. **Test Parameter Changes:**
+   - Change aspect ratio in UI → should see change in request
+   - Change quality → should see "standard" or "high" in request
+   - Change background → should see "transparent", "solid", or "original"
 
-## Manual Testing Commands
+## Known Issues / Not Yet Implemented
 
-```bash
-# Start dev server
-npm run dev
+1. **ImageGenerationDialog** - Still uses old modal, needs refactor to ModalShell
+2. **ARtie UX** - Still verbose, needs compact rewrite
+3. **Spacing Audit** - Some components still use arbitrary values
+4. **Modal Integration** - ModalShell exists but not used yet
 
-# Run linting
-npm run lint
+## Next Steps
 
-# Build for production
-npm run build
-
-# Check for TypeScript errors
-npx tsc --noEmit
-```
-
-## Known Issues / TODOs
-
-- ArtiePage tool call handling is simplified - may need refinement for complex scenarios
-- Brief analysis in ArtiePage is placeholder - needs full implementation
-- Save flow audit requires runtime testing to verify database writes are working
-
+1. Run database migration: `supabase migration up`
+2. Deploy edge functions: `supabase functions deploy`
+3. Test generation with new parameters
+4. Verify backend logs show structured data
+5. Incrementally refactor UI components

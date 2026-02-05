@@ -4,10 +4,23 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { fetchWithRetry } from '../_shared/retry.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
 import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
+import {
+  formatSSEMessage,
+  getSSEHeaders,
+  createProgressEvent,
+  createCompleteEvent,
+  createErrorEvent,
+  type SSEProgressEvent,
+} from '../_shared/sse.ts';
+import { validateGenerationParams, normalizeGenerationParams, SIZE_TO_ASPECT_RATIO, type GenerationParams } from '../_shared/generationParams.ts';
+import { buildPrompt, buildNegativePrompt, serializePrompt, serializeNegativePrompt } from '../_shared/promptEngine.ts';
+import { createLogger } from '../_shared/observability.ts';
+import { sanitizePrompt, validateImageDataUri } from '../_shared/security.ts';
+import { checkRateLimit, getRateLimitConfig, createRateLimitHeaders } from '../_shared/rateLimit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
@@ -21,6 +34,549 @@ serve(async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  // Check if client wants SSE streaming
+  const acceptHeader = req.headers.get('Accept') || '';
+  const wantsStreaming = acceptHeader.includes('text/event-stream');
+
+  // For SSE streaming mode
+  if (wantsStreaming) {
+    return handleStreamingRequest(req, requestId, startTime);
+  }
+
+  // For standard JSON mode (existing behavior, unchanged)
+  return handleStandardRequest(req, requestId, startTime);
+});
+
+/**
+ * Handle SSE streaming request - sends real-time progress updates
+ */
+async function handleStreamingRequest(
+  req: Request,
+  requestId: string,
+  startTime: number
+): Promise<Response> {
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const encoder = new TextEncoder();
+
+  // Helper to send progress
+  const sendProgress = async (stage: string, progress: number, message: string) => {
+    const event = createProgressEvent(stage, progress, message);
+    await writer.write(encoder.encode(formatSSEMessage(event)));
+  };
+
+  // Helper to send error and close
+  const sendError = async (error: string, errorType?: string, retryable = false) => {
+    const event = createErrorEvent(error, requestId, errorType, retryable);
+    await writer.write(encoder.encode(formatSSEMessage(event)));
+    await writer.close();
+  };
+
+  // Start async processing
+  (async () => {
+    try {
+      console.log(`[${requestId}] SSE streaming generation request started`);
+
+      // Send initial progress
+      await sendProgress('init', 5, 'Analyzing your prompt...');
+
+      // Extract and validate JWT
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        console.error(`[${requestId}] No authorization header`);
+        await sendError("Please sign in to generate images", 'auth_required');
+        return;
+      }
+
+      const token = authHeader.replace('Bearer ', '');
+
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+      if (userError || !userData?.user) {
+        console.error(`[${requestId}] Unable to resolve user from token`, userError);
+        await sendError("Invalid or expired session. Please sign in again.", 'invalid_session');
+        return;
+      }
+
+      const userId = userData.user.id;
+      console.log(`[${requestId}] Authenticated user: ${userId}`);
+      await sendProgress('init', 10, 'Validating request...');
+
+      // Check for idempotency
+      const idempotencyKey = req.headers.get('idempotency-key');
+      if (idempotencyKey) {
+        const cached = await checkIdempotency(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          idempotencyKey
+        );
+        if (cached.cached && cached.response) {
+          console.log(`[${requestId}] Returning cached response via SSE`);
+          const completeEvent = createCompleteEvent(
+            cached.response.image,
+            cached.response.assetId,
+            'Image retrieved from cache'
+          );
+          await writer.write(encoder.encode(formatSSEMessage(completeEvent)));
+          await writer.close();
+          return;
+        }
+      }
+
+      // Check feature access before processing
+      console.log(`[${requestId}] Checking feature access`);
+      await sendProgress('init', 15, 'Checking access...');
+
+      const accessResponse = await fetchWithRetry(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'generate_image' }),
+        },
+        { maxRetries: 1, baseDelayMs: 1000, maxDelayMs: 10000, timeoutMs: 10000 }
+      );
+
+      const accessResult = await accessResponse.json();
+
+      if (!accessResult.allowed) {
+        console.log(`[${requestId}] Access denied:`, accessResult.reason);
+        await sendError(
+          accessResult.reason || "Access denied. Please upgrade your plan.",
+          'access_denied'
+        );
+        return;
+      }
+
+      console.log(`[${requestId}] Access granted: ${accessResult.tier}`);
+
+      const logger = createLogger(requestId, userId);
+      logger.logStart('generate_image', { tier: accessResult.tier });
+
+      // Rate limiting check
+      const rateLimitConfig = getRateLimitConfig('generate-image', accessResult.tier || 'free');
+      const rateLimitResult = await checkRateLimit(userId, 'generate-image', rateLimitConfig.maxRequests, rateLimitConfig.windowMs);
+      if (!rateLimitResult.allowed) {
+        logger.log('generate_image', 'rate_limit_exceeded', {
+          remaining: rateLimitResult.remaining,
+          resetAt: rateLimitResult.resetAt,
+        });
+        await sendError(
+          `Rate limit exceeded. Please wait ${rateLimitResult.retryAfter} seconds before trying again.`,
+          'rate_limit'
+        );
+        return;
+      }
+
+      // Parse and validate request body using generation params contract
+      let requestBody: unknown;
+      try {
+        requestBody = await req.json();
+      } catch (parseError) {
+        logger.logError('generate_image', parseError instanceof Error ? parseError : new Error('Invalid JSON'), undefined, { action: 'parse_request' });
+        await sendError("Invalid request body. Expected JSON.", 'validation_error');
+        return;
+      }
+
+      // Convert legacy format to new format for backward compatibility
+      const legacyBody = requestBody as Record<string, unknown>;
+      if (legacyBody.size && !legacyBody.aspect_ratio) {
+        legacyBody.aspect_ratio = SIZE_TO_ASPECT_RATIO[legacyBody.size as string] || '1:1';
+      }
+      if (legacyBody.referenceImageUrl) {
+        legacyBody.reference_image_url = legacyBody.referenceImageUrl;
+      }
+      if (legacyBody.continuationStrength !== undefined) {
+        legacyBody.continuation_strength = legacyBody.continuationStrength;
+      }
+      if (legacyBody.previousPrompt) {
+        legacyBody.previous_prompt = legacyBody.previousPrompt;
+      }
+
+      // Validate using generation params contract
+      const validation = validateGenerationParams(requestBody);
+      if (!validation.valid || !validation.params) {
+        logger.logError('generate_image', new Error(validation.error || 'Validation failed'), undefined, { action: 'validate_params' });
+        await sendError(validation.error || "Invalid generation parameters", 'validation_error');
+        return;
+      }
+
+      // Log received params for verification
+      logger.log('generate_image', 'params_received', {
+        raw_body: requestBody,
+        validated_params: validation.params,
+      });
+
+      // Sanitize prompt input
+      if (validation.params.prompt) {
+        validation.params.prompt = sanitizePrompt(validation.params.prompt);
+      }
+      if (validation.params.negative_prompt) {
+        validation.params.negative_prompt = sanitizePrompt(validation.params.negative_prompt);
+      }
+
+      // Validate reference image URL if provided
+      if (validation.params.reference_image_url) {
+        const urlValidation = validation.params.reference_image_url.startsWith('data:')
+          ? validateImageDataUri(validation.params.reference_image_url)
+          : { valid: validation.params.reference_image_url.startsWith('http://') || validation.params.reference_image_url.startsWith('https://') };
+        
+        if (!urlValidation.valid) {
+          logger.logError('generate_image', new Error('Invalid reference image URL'), undefined, { action: 'validate_reference' });
+          await sendError("Invalid reference image format", 'validation_error');
+          return;
+        }
+      }
+
+      // Sanitize prompt input
+      if (validation.params.prompt) {
+        validation.params.prompt = sanitizePrompt(validation.params.prompt);
+      }
+      if (validation.params.negative_prompt) {
+        validation.params.negative_prompt = sanitizePrompt(validation.params.negative_prompt);
+      }
+
+      // Validate reference image URL if provided
+      if (validation.params.reference_image_url) {
+        const urlValidation = validation.params.reference_image_url.startsWith('data:')
+          ? validateImageDataUri(validation.params.reference_image_url)
+          : { valid: validation.params.reference_image_url.startsWith('http://') || validation.params.reference_image_url.startsWith('https://') };
+        
+        if (!urlValidation.valid) {
+          logger.logError('generate_image', new Error('Invalid reference image URL'), undefined, { action: 'validate_reference' });
+          const { response } = createErrorResponse(
+            "Invalid reference image format",
+            400,
+            'validation_error',
+            requestId
+          );
+          return response;
+        }
+      }
+
+      // Normalize parameters with defaults
+      const normalizedParams = normalizeGenerationParams(validation.params);
+      logger.logParams('generate_image', normalizedParams, 'v1.0.0', 'google/gemini-3-pro-image-preview');
+
+      // Check for DEBUG mode
+      const debugMode = req.headers.get('x-debug') === 'true';
+      if (debugMode) {
+        const promptObject = buildPrompt(normalizedParams);
+        const negativePromptObject = buildNegativePrompt(normalizedParams);
+        await sendError(
+          JSON.stringify({
+            debug: true,
+            prompt_object: promptObject,
+            negative_prompt_object: negativePromptObject,
+            normalized_params: normalizedParams,
+          }, null, 2),
+          'debug_response'
+        );
+        return;
+      }
+
+      await sendProgress('init', 20, 'Prompt validated...');
+
+      // Get Lovable API key
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      if (!LOVABLE_API_KEY) {
+        logger.logError('generate_image', new Error('LOVABLE_API_KEY not configured'), undefined, { action: 'config_check' });
+        await sendError("AI service not configured. Please contact support.", 'config_error');
+        return;
+      }
+
+      // Build structured prompt using prompt engine
+      const promptObject = buildPrompt(normalizedParams);
+      const negativePromptObject = buildNegativePrompt(normalizedParams);
+      const serializedPrompt = serializePrompt(promptObject);
+      const serializedNegativePrompt = serializeNegativePrompt(negativePromptObject);
+
+      // Build message content for AI API
+      let messageContent: any;
+      if (normalizedParams.reference_image_url) {
+        messageContent = [
+          {
+            type: "text",
+            text: serializedPrompt
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: normalizedParams.reference_image_url
+            }
+          }
+        ];
+      } else {
+        messageContent = serializedPrompt;
+      }
+
+      // Call AI API with progress updates
+      const aiCallStart = Date.now();
+      console.log(`[${requestId}] Calling AI API with model: google/gemini-3-pro-image-preview`);
+      await sendProgress('generating', 25, 'Composing image...');
+
+      // Start progress simulation during AI call (incrementing while waiting)
+      let currentProgress = 25;
+      const progressInterval = setInterval(async () => {
+        if (currentProgress < 55) {
+          currentProgress += 3;
+          try {
+            await sendProgress('generating', currentProgress, 'AI is creating your image...');
+          } catch {
+            // Stream may have closed, ignore
+          }
+        }
+      }, 1500);
+
+      let aiResponse;
+      try {
+        aiResponse = await fetchWithRetry(
+          "https://ai.gateway.lovable.dev/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-3-pro-image-preview",
+              messages: [
+                {
+                  role: "user",
+                  content: messageContent
+                }
+              ],
+              modalities: ["image", "text"]
+            }),
+          },
+          { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 60000 }
+        );
+      } finally {
+        clearInterval(progressInterval);
+      }
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        const aiCallDuration = Date.now() - aiCallStart;
+        console.error(`[${requestId}] AI API error (${aiCallDuration}ms):`, {
+          status: aiResponse.status,
+          error: errorText
+        });
+
+        const friendlyMessage = mapAIError(aiResponse.status, errorText);
+        const errorType = aiResponse.status === 429 ? 'rate_limit' :
+          aiResponse.status === 402 ? 'credits_exhausted' : 'ai_error';
+        await sendError(friendlyMessage, errorType, errorType === 'rate_limit');
+        return;
+      }
+
+      const aiCallDuration = Date.now() - aiCallStart;
+      const aiData = await aiResponse.json();
+      console.log(`[${requestId}] AI response received (${aiCallDuration}ms)`);
+      await sendProgress('processing', 60, 'Refining details...');
+
+      // Extract generated image
+      const generatedImageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!generatedImageUrl) {
+        console.error(`[${requestId}] No image in AI response`);
+        await sendError(ERROR_MESSAGES.PROCESSING_FAILED, 'no_image_data');
+        return;
+      }
+
+      console.log(`[${requestId}] Image generated, base64 length: ${generatedImageUrl.length}`);
+      await sendProgress('processing', 70, 'Uploading to storage...');
+
+      // Upload to storage
+      let finalImageUrl = generatedImageUrl;
+      let assetData = null;
+
+      try {
+        const storageStart = Date.now();
+        console.log(`[${requestId}] Uploading to storage...`);
+
+        // Extract base64 data
+        const base64Data = generatedImageUrl.split(',')[1];
+        const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+
+        // Upload to storage
+        const fileName = `${userId}/${Date.now()}-generated.png`;
+        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+          .from('generated-images')
+          .upload(fileName, buffer, {
+            contentType: 'image/png',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error(`[${requestId}] Storage upload error:`, uploadError);
+          const errorMsg = uploadError.message?.includes('quota')
+            ? 'Storage quota exceeded. Please contact support.'
+            : 'Failed to save image to storage. Please try again.';
+          await sendError(errorMsg, 'storage_error');
+          return;
+        }
+
+        const storageDuration = Date.now() - storageStart;
+        console.log(`[${requestId}] Storage upload complete (${storageDuration}ms)`);
+        await sendProgress('processing', 80, 'Processing complete...');
+
+        // Get public URL
+        const { data: urlData } = supabaseAdmin.storage
+          .from('generated-images')
+          .getPublicUrl(fileName);
+        finalImageUrl = urlData.publicUrl;
+
+        await sendProgress('finalizing', 90, 'Saving to your projects...');
+
+        // Save metadata to database with retry logic
+        const dbStart = Date.now();
+        console.log(`[${requestId}] Saving to database...`);
+
+        let saveAttempts = 0;
+        const maxSaveAttempts = 3;
+        let saveSuccess = false;
+
+        while (saveAttempts < maxSaveAttempts && !saveSuccess) {
+          try {
+            const { data: savedAsset, error: assetError } = await supabaseAdmin
+              .from('generated_assets')
+              .insert({
+                user_id: userId,
+                type: 'image',
+                action: 'generate',
+                operation_type: 'generate',
+                prompt: normalizedParams.prompt,
+                image_url: finalImageUrl,
+                source_urls: normalizedParams.reference_image_url ? [normalizedParams.reference_image_url] : null,
+                prompt_version: promptObject.version,
+                full_prompt_object: promptObject,
+                negative_prompt_object: negativePromptObject,
+                model_used: 'google/gemini-3-pro-image-preview',
+                seed: normalizedParams.seed,
+                width: normalizedParams.width,
+                height: normalizedParams.height,
+                guidance_scale: normalizedParams.guidance_scale,
+                steps: normalizedParams.steps,
+                params: {
+                  quality: normalizedParams.quality,
+                  aspect_ratio: normalizedParams.aspect_ratio,
+                  background_mode: normalizedParams.background_mode,
+                  continuation_strength: normalizedParams.reference_image_url ? normalizedParams.continuation_strength : undefined,
+                  had_reference: !!normalizedParams.reference_image_url
+                },
+                analysis_data: {
+                  generation_params: normalizedParams,
+                  prompt_object: promptObject,
+                  negative_prompt_object: negativePromptObject,
+                  generated_at: new Date().toISOString(),
+                  request_id: requestId
+                }
+              })
+              .select()
+              .single();
+
+            if (assetError) {
+              saveAttempts++;
+              console.error(`[${requestId}] Database save error (attempt ${saveAttempts}/${maxSaveAttempts}):`, assetError);
+
+              if (saveAttempts < maxSaveAttempts) {
+                const delay = Math.min(1000 * Math.pow(2, saveAttempts - 1), 5000);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+            } else {
+              const dbDuration = Date.now() - dbStart;
+              assetData = savedAsset;
+              saveSuccess = true;
+              console.log(`[${requestId}] Database save complete (${dbDuration}ms)`);
+            }
+          } catch (dbSaveError) {
+            saveAttempts++;
+            console.error(`[${requestId}] Database save exception (attempt ${saveAttempts}/${maxSaveAttempts}):`, dbSaveError);
+
+            if (saveAttempts < maxSaveAttempts) {
+              const delay = Math.min(1000 * Math.pow(2, saveAttempts - 1), 5000);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        }
+
+        if (!saveSuccess) {
+          console.warn(`[${requestId}] WARNING: Image generated but NOT saved to My Projects`);
+        }
+      } catch (error) {
+        console.error(`[${requestId}] Failed to save image:`, error);
+        await sendError("Failed to save generated image. Please try again.", 'storage_error');
+        return;
+      }
+
+      const totalDuration = Date.now() - startTime;
+      logger.logSuccess('generate_image', totalDuration, {
+        asset_id: assetData?.id,
+        image_url: finalImageUrl?.substring(0, 100),
+        prompt_version: promptObject.version,
+      });
+      console.log(`[${requestId}] Generation complete (${totalDuration}ms)`);
+
+      const successResponse = {
+        success: true,
+        image: finalImageUrl,
+        assetId: assetData?.id,
+        message: "Image generated successfully"
+      };
+
+      // Cache response for idempotency
+      if (idempotencyKey) {
+        await cacheResponse(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          idempotencyKey,
+          successResponse,
+          3600
+        );
+      }
+
+      // Send completion event
+      const completeEvent = createCompleteEvent(finalImageUrl, assetData?.id);
+      await writer.write(encoder.encode(formatSSEMessage(completeEvent)));
+      await writer.close();
+
+    } catch (error) {
+      const totalDuration = Date.now() - startTime;
+      const logger = createLogger(requestId, userId);
+      logger.logError('generate_image', error instanceof Error ? error : new Error(String(error)), totalDuration);
+      console.error(`[${requestId}] Error in SSE generate-image (${totalDuration}ms):`, error);
+
+      const errorMessage = error instanceof Error ? error.message : ERROR_MESSAGES.PROCESSING_FAILED;
+      try {
+        await sendError(errorMessage, 'server_error');
+      } catch {
+        // Stream may have closed
+        await writer.close().catch(() => {});
+      }
+    }
+  })();
+
+  return new Response(readable, {
+    headers: getSSEHeaders(corsHeaders),
+  });
+}
+
+/**
+ * Handle standard JSON request (existing behavior, unchanged)
+ */
+async function handleStandardRequest(
+  req: Request,
+  requestId: string,
+  startTime: number
+): Promise<Response> {
   try {
     console.log(`[${requestId}] Generation request started`);
 
@@ -106,86 +662,102 @@ serve(async (req) => {
 
     console.log(`[${requestId}] Access granted: ${accessResult.tier}`);
 
-    // Parse request body
-    const {
-      prompt,
-      quality = 'auto',
-      size = '1024x1024',
-      background = 'auto',
-      referenceImageUrl,
-      continuationStrength = 1.0,
-      previousPrompt
-    } = await req.json();
+    const logger = createLogger(requestId, userId);
+    logger.logStart('generate_image', { tier: accessResult.tier });
 
-    console.log(`[${requestId}] Request params:`, {
-      promptLength: prompt?.length,
-      quality,
-      size,
-      background,
-      hasReference: !!referenceImageUrl,
-      continuationStrength,
-      hasPreviousPrompt: !!previousPrompt
+    // Rate limiting check
+    const rateLimitConfig = getRateLimitConfig('generate-image', accessResult.tier || 'free');
+    const rateLimitResult = await checkRateLimit(userId, 'generate-image', rateLimitConfig.maxRequests, rateLimitConfig.windowMs);
+    if (!rateLimitResult.allowed) {
+      logger.log('generate_image', 'rate_limit_exceeded', {
+        remaining: rateLimitResult.remaining,
+        resetAt: rateLimitResult.resetAt,
+      });
+      const { response } = createErrorResponse(
+        `Rate limit exceeded. Please wait ${rateLimitResult.retryAfter} seconds before trying again.`,
+        429,
+        'rate_limit',
+        requestId,
+        { retryAfter: rateLimitResult.retryAfter }
+      );
+      return response;
+    }
+
+    // Parse and validate request body using generation params contract
+    let requestBody: unknown;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      logger.logError('generate_image', parseError instanceof Error ? parseError : new Error('Invalid JSON'), undefined, { action: 'parse_request' });
+      const { response } = createErrorResponse(
+        "Invalid request body. Expected JSON.",
+        400,
+        'validation_error',
+        requestId
+      );
+      return response;
+    }
+
+    // Convert legacy format to new format for backward compatibility
+    const legacyBody = requestBody as Record<string, unknown>;
+    if (legacyBody.size && !legacyBody.aspect_ratio) {
+      legacyBody.aspect_ratio = SIZE_TO_ASPECT_RATIO[legacyBody.size as string] || '1:1';
+    }
+    if (legacyBody.referenceImageUrl) {
+      legacyBody.reference_image_url = legacyBody.referenceImageUrl;
+    }
+    if (legacyBody.continuationStrength !== undefined) {
+      legacyBody.continuation_strength = legacyBody.continuationStrength;
+    }
+    if (legacyBody.previousPrompt) {
+      legacyBody.previous_prompt = legacyBody.previousPrompt;
+    }
+
+    // Validate using generation params contract
+    const validation = validateGenerationParams(requestBody);
+    if (!validation.valid || !validation.params) {
+      logger.logError('generate_image', new Error(validation.error || 'Validation failed'), undefined, { action: 'validate_params' });
+      const { response } = createErrorResponse(
+        validation.error || "Invalid generation parameters",
+        400,
+        'validation_error',
+        requestId
+      );
+      return response;
+    }
+
+    // Log received params for verification
+    logger.log('generate_image', 'params_received', {
+      raw_body: requestBody,
+      validated_params: validation.params,
     });
 
-    // Parse size dimensions
-    let aspectRatio = '1:1'; // Default square
-    if (size === '1536x1024') {
-      aspectRatio = '3:2'; // Landscape
-    } else if (size === '1024x1536') {
-      aspectRatio = '2:3'; // Portrait
-    }
+    // Normalize parameters with defaults
+    const normalizedParams = normalizeGenerationParams(validation.params);
+    logger.logParams('generate_image', normalizedParams, 'v1.0.0', 'google/gemini-3-pro-image-preview');
 
-    // Validate prompt
-    if (!prompt) {
-      console.error(`[${requestId}] Missing prompt`);
-      const { response } = createErrorResponse(
-        "Prompt is required to generate an image",
-        400,
-        'validation_error',
-        requestId
+    // Check for DEBUG mode
+    const debugMode = req.headers.get('x-debug') === 'true';
+    if (debugMode) {
+      const promptObject = buildPrompt(normalizedParams);
+      const negativePromptObject = buildNegativePrompt(normalizedParams);
+      return new Response(
+        JSON.stringify({
+          debug: true,
+          prompt_object: promptObject,
+          negative_prompt_object: negativePromptObject,
+          normalized_params: normalizedParams,
+        }, null, 2),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       );
-      return response;
-    }
-
-    if (typeof prompt !== 'string') {
-      console.error(`[${requestId}] Invalid prompt type`);
-      const { response } = createErrorResponse(
-        ERROR_MESSAGES.INVALID_INPUT,
-        400,
-        'validation_error',
-        requestId
-      );
-      return response;
-    }
-
-    if (prompt.length < 3) {
-      console.error(`[${requestId}] Prompt too short: ${prompt.length} characters`);
-      const { response } = createErrorResponse(
-        "Prompt too short. Please provide at least 3 characters describing what you want to generate.",
-        400,
-        'validation_error',
-        requestId,
-        { promptLength: prompt.length }
-      );
-      return response;
-    }
-
-    if (prompt.length > 2000) {
-      console.error(`[${requestId}] Prompt too long: ${prompt.length} characters`);
-      const { response } = createErrorResponse(
-        `Prompt too long (${prompt.length} characters). Maximum 2000 characters allowed. Try being more concise.`,
-        400,
-        'validation_error',
-        requestId,
-        { promptLength: prompt.length }
-      );
-      return response;
     }
 
     // Get Lovable API key
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      console.error(`[${requestId}] LOVABLE_API_KEY not configured`);
+      logger.logError('generate_image', new Error('LOVABLE_API_KEY not configured'), undefined, { action: 'config_check' });
       const { response } = createErrorResponse(
         "AI service not configured. Please contact support.",
         500,
@@ -195,108 +767,34 @@ serve(async (req) => {
       return response;
     }
 
-    // Call Lovable AI Gateway with Nano Banana Pro model
-    const aiCallStart = Date.now();
-    console.log(`[${requestId}] Calling AI API with model: google/gemini-3-pro-image-preview (Nano Banana Pro)`);
+    // Build structured prompt using prompt engine
+    const promptObject = buildPrompt(normalizedParams);
+    const negativePromptObject = buildNegativePrompt(normalizedParams);
+    const serializedPrompt = serializePrompt(promptObject);
+    const serializedNegativePrompt = serializeNegativePrompt(negativePromptObject);
 
-    // Build message content with context preservation
+    // Build message content for AI API
     let messageContent: any;
-
-    if (referenceImageUrl) {
-      console.log(`[${requestId}] Using reference image for context: ${referenceImageUrl.substring(0, 50)}...`);
-      console.log(`[${requestId}] Continuation strength: ${continuationStrength} (${continuationStrength <= 0.3 ? 'high continuity' : continuationStrength <= 0.6 ? 'moderate' : continuationStrength <= 0.8 ? 'major change' : 'fresh'})`);
-
-      // Adjust instructions based on continuation strength
-      let contextInstructions = '';
-      if (continuationStrength <= 0.3) {
-        // High continuity - minor edits only
-        contextInstructions = `CRITICAL: This is a MINOR REFINEMENT. Preserve nearly everything from the reference image.
-1. Keep the EXACT same subject, composition, framing, and perspective
-2. Maintain the EXACT same artistic style, technique, and mood
-3. Preserve the EXACT same color palette and lighting setup
-4. Only make MINIMAL changes as explicitly mentioned: ${prompt}
-5. If unclear what to change, keep everything identical to the reference`;
-      } else if (continuationStrength <= 0.6) {
-        // Moderate - balance preservation and change
-        contextInstructions = `IMPORTANT: This is a MODERATE REFINEMENT. Balance preservation with intentional changes.
-1. Keep the core subject, general composition, and framing
-2. Maintain the overall artistic style and mood
-3. Preserve the general color palette unless explicitly changed
-4. Apply these specific changes while keeping context: ${prompt}
-5. Ensure changes feel natural and cohesive with the original`;
-      } else if (continuationStrength <= 0.8) {
-        // Major - significant changes but maintain some context
-        contextInstructions = `NOTE: This is a MAJOR REVISION. Make significant changes while maintaining some visual connection.
-1. Transform based on: ${prompt}
-2. You may alter composition, style, and colors as needed
-3. Keep some recognizable elements from the reference if appropriate
-4. Prioritize the new vision while honoring the reference's essence`;
-      } else {
-        // Fresh - minimal constraint
-        contextInstructions = `This is a FRESH GENERATION inspired by the reference.
-Create: ${prompt}
-Use the reference image only as loose inspiration for general style or mood, but feel free to create something entirely new.`;
-      }
-
-      const contextPrompt = `${contextInstructions}
-
-Aspect ratio: ${aspectRatio}
-
-${previousPrompt ? `Previous prompt was: "${previousPrompt}"` : ''}`;
-
+    if (normalizedParams.reference_image_url) {
       messageContent = [
         {
           type: "text",
-          text: contextPrompt
+          text: serializedPrompt
         },
         {
           type: "image_url",
           image_url: {
-            url: referenceImageUrl
+            url: normalizedParams.reference_image_url
           }
         }
       ];
     } else {
-      // Ad agency level, top photography quality prompt
-      const enhancedPrompt = `You are a world-class commercial photographer and creative director working for top-tier advertising agencies. Your work appears in Vogue, National Geographic, and award-winning campaigns.
-
-TASK: Create a stunning, publication-ready image that would impress the most demanding creative directors and art buyers.
-
-PROFESSIONAL STANDARDS:
-1. **Award-Winning Composition**: Master-level composition using rule of thirds, golden ratio, leading lines, and perfect visual balance. Every element placed with intention.
-2. **Commercial Photography Quality**: Studio-grade lighting, perfect exposure, razor-sharp focus, and professional depth of field. Image quality suitable for billboards and print campaigns.
-3. **Art Direction Excellence**: Sophisticated color grading, harmonious color palettes, and visual hierarchy that guides the eye naturally through the image.
-4. **Detail & Craftsmanship**: Ultra-high detail, realistic textures, perfect rendering. Every pixel crafted to perfection. No artifacts, no imperfections.
-5. **Brand-Ready Aesthetics**: Image quality that agencies would confidently present to Fortune 500 clients. Polished, refined, and commercially viable.
-6. **Aspect Ratio Optimization**: Composition expertly designed for ${aspectRatio} format, maximizing visual impact within these dimensions.
-
-CREATIVE EXECUTION:
-- Analyze the core creative intent: What story does this image tell? What emotion should it evoke?
-- Determine the optimal visual style: Is this editorial, commercial, artistic, or documentary? Execute accordingly.
-- Master lighting design: Natural light, studio lighting, or dramatic lighting - choose and execute flawlessly.
-- Color psychology: Select colors that enhance the message, mood, and brand positioning.
-- Composition mastery: Arrange elements for maximum visual impact, ensuring nothing distracts from the main subject.
-- Professional polish: Every detail refined to perfection - shadows, highlights, midtones all balanced expertly.
-
-QUALITY SPECIFICATIONS:
-- Resolution: Maximum detail, suitable for large format printing
-- Sharpness: Professional-grade sharpness throughout, with appropriate depth of field
-- Color Accuracy: Perfect color reproduction, suitable for professional color grading
-- Artifact-Free: Zero compression artifacts, noise, or imperfections
-- Background: ${background === 'transparent' ? 'Perfect transparent background with clean edges, no halos or artifacts' : background === 'opaque' ? 'Professionally composed background that enhances the subject without distraction' : 'Intelligently chosen background that serves the creative vision'}
-
-OUTPUT REQUIREMENT:
-Generate a single, world-class image that would win awards at Cannes Lions, D&AD, or One Show. This image should be portfolio-worthy and suitable for premium brand campaigns.
-
-Aspect ratio: ${aspectRatio}
-Quality tier: ${quality === 'high' ? 'Maximum - Ultra-premium, award-winning quality' : quality === 'medium' ? 'High - Professional commercial quality' : quality === 'low' ? 'Standard - Good commercial quality' : 'Auto - Optimal quality based on creative requirements'}
-
-CREATIVE BRIEF: ${prompt}
-
-Now create this image with the skill and artistry of a world-renowned commercial photographer.`;
-
-      messageContent = enhancedPrompt;
+      messageContent = serializedPrompt;
     }
+
+    // Call Lovable AI Gateway with Nano Banana Pro model
+    const aiCallStart = Date.now();
+    console.log(`[${requestId}] Calling AI API with model: google/gemini-3-pro-image-preview (Nano Banana Pro)`);
 
     const aiResponse = await fetchWithRetry(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -423,18 +921,30 @@ Now create this image with the skill and artistry of a world-renowned commercial
               user_id: userId,
               type: 'image',
               action: 'generate',
-              prompt: prompt,
+              operation_type: 'generate',
+              prompt: normalizedParams.prompt,
               image_url: finalImageUrl,
-              source_urls: referenceImageUrl ? [referenceImageUrl] : null,
+              source_urls: normalizedParams.reference_image_url ? [normalizedParams.reference_image_url] : null,
+              prompt_version: promptObject.version,
+              full_prompt_object: promptObject,
+              negative_prompt_object: negativePromptObject,
+              model_used: 'google/gemini-3-pro-image-preview',
+              seed: normalizedParams.seed,
+              width: normalizedParams.width,
+              height: normalizedParams.height,
+              guidance_scale: normalizedParams.guidance_scale,
+              steps: normalizedParams.steps,
               params: {
-                quality,
-                size,
-                background,
-                continuationStrength: referenceImageUrl ? continuationStrength : undefined,
-                hadReference: !!referenceImageUrl
+                quality: normalizedParams.quality,
+                aspect_ratio: normalizedParams.aspect_ratio,
+                background_mode: normalizedParams.background_mode,
+                continuation_strength: normalizedParams.reference_image_url ? normalizedParams.continuation_strength : undefined,
+                had_reference: !!normalizedParams.reference_image_url
               },
               analysis_data: {
-                generation_params: { quality, size, background },
+                generation_params: normalizedParams,
+                prompt_object: promptObject,
+                negative_prompt_object: negativePromptObject,
                 generated_at: new Date().toISOString(),
                 request_id: requestId
               }
@@ -502,6 +1012,11 @@ Now create this image with the skill and artistry of a world-renowned commercial
     }
 
     const totalDuration = Date.now() - startTime;
+    logger.logSuccess('generate_image', totalDuration, {
+      asset_id: assetData?.id,
+      image_url: finalImageUrl?.substring(0, 100),
+      prompt_version: promptObject.version,
+    });
     console.log(`[${requestId}] Generation complete (${totalDuration}ms)`);
 
     const successResponse = {
@@ -529,6 +1044,8 @@ Now create this image with the skill and artistry of a world-renowned commercial
 
   } catch (error) {
     const totalDuration = Date.now() - startTime;
+    const logger = createLogger(requestId);
+    logger.logError('generate_image', error instanceof Error ? error : new Error(String(error)), totalDuration);
     console.error(`[${requestId}] Error in generate-image function (${totalDuration}ms):`, error);
 
     const errorMessage = error instanceof Error ? error.message : ERROR_MESSAGES.PROCESSING_FAILED;
@@ -541,4 +1058,8 @@ Now create this image with the skill and artistry of a world-renowned commercial
     );
     return response;
   }
-});
+}
+
+// Legacy buildMessageContent function removed - now using prompt engine
+// This function is kept for reference but should not be used
+// All prompt building is now handled by the prompt engine in _shared/promptEngine.ts

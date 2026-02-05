@@ -17,6 +17,8 @@ import { ShareToCommunityDialog } from "@/components/community/ShareToCommunityD
 import { extractTextFromBriefFile } from "@/lib/documentParser";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { ArtieModal } from "./artie/ArtieModal";
+import { useProactiveArtie } from "@/hooks/useProactiveArtie";
+import { ProactiveSuggestionCard } from "./artie/ProactiveSuggestionCard";
 import { 
   addImageToMemory, 
   getAllImagesFromMemory, 
@@ -128,6 +130,9 @@ export const ArtieChat = () => {
   const [editorInstruction, setEditorInstruction] = useState<string>("");
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareDefaults, setShareDefaults] = useState<{ imageUrl: string; caption?: string }>({ imageUrl: "" });
+  
+  // Proactive Artie suggestions
+  const { suggestions, isEnabled, dismissSuggestion, markActionTaken, triggerAnalysis } = useProactiveArtie();
   
   useScrollLock(isOpen, 'artie-panel', isMobile);
   
@@ -941,6 +946,13 @@ export const ArtieChat = () => {
             toast.success("Brief processed", {
               description: `I've summarized ${file.name}.`,
             });
+            
+            // Trigger proactive analysis for brief
+            if (isEnabled && extractedText) {
+              triggerAnalysis('brief_uploaded', {
+                briefContent: extractedText,
+              });
+            }
           } catch (docError) {
             const errorMessage = docError instanceof Error ? docError.message : 'Document analysis failed';
             console.error('[ARTIE] Brief analysis error:', docError);
@@ -1861,6 +1873,47 @@ export const ArtieChat = () => {
           )}
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
+          {/* Proactive Suggestions */}
+          {isEnabled && suggestions.length > 0 && (
+            <div className="space-y-3 mb-4">
+              {suggestions.map((suggestion) => (
+                <ProactiveSuggestionCard
+                  key={suggestion.id}
+                  suggestion={suggestion}
+                  onDismiss={async (id) => {
+                    await dismissSuggestion(id);
+                  }}
+                  onAction={async (id, action) => {
+                    if (action === 'dont_show_again') {
+                      await dismissSuggestion(id);
+                    } else if (action === 'not_now') {
+                      await dismissSuggestion(id);
+                    } else {
+                      await markActionTaken(id);
+                      // Handle action based on suggestion context
+                      const suggestionData = suggestions.find(s => s.id === id);
+                      if (suggestionData?.context?.imageUrl) {
+                        if (suggestionData.triggerType === 'generation_complete') {
+                          openTool('upscale');
+                        }
+                      }
+                    }
+                  }}
+                  onShowMe={(suggestion) => {
+                    // Handle "Show me" action based on suggestion type
+                    if (suggestion.context?.imageUrl) {
+                      openStudioWithPrompt({
+                        basePrompt: '',
+                        imageUrl: suggestion.context.imageUrl,
+                      });
+                    }
+                    markActionTaken(suggestion.id);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          
           {messages.map((message) => {
             const inlineImageUrls = extractSupabaseImageUrls(message.text);
             return (
@@ -2280,6 +2333,10 @@ export const ArtieChat = () => {
                     timestamp: new Date()
                   }]);
 
+                  // Convert to new backend format
+                  const { convertToBackendFormat } = await import("@/lib/generationParams");
+                  const backendParams = convertToBackendFormat(generationOptions);
+
                   const { data: { session } } = await supabase.auth.getSession();
                   const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`, {
                     method: 'POST',
@@ -2289,7 +2346,7 @@ export const ArtieChat = () => {
                     },
                     body: JSON.stringify({ 
                       prompt: generationPrompt,
-                      ...generationOptions
+                      ...backendParams
                     })
                   });
 

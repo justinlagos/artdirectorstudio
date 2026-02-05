@@ -1,0 +1,210 @@
+/**
+ * Design System Tokens
+ * Single source of truth for spacing, radius, typography, color, shadow, z-index, motion
+ * 
+ * Rules:
+ * - Every component uses Tailwind classes that map to CSS variables
+ * - No arbitrary spacing like p-[13px], mt-[18px]
+ * - No raw hex in components. Use CSS vars only.
+ * - No "random" animation durations. Use tokens only.
+ */
+
+:root {
+    /* ============================================
+       A. CORE COLOR TOKENS (HSL only)
+       ============================================ */
+    
+    /* Light Mode */
+    --background: 0 0% 100%;
+    --foreground: 240 5% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 5% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 5% 8%;
+
+    --primary: 240 6% 10%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 4% 96%;
+    --secondary-foreground: 240 5% 12%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 240 5% 94%;
+    --accent-foreground: 240 6% 10%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 240 6% 10%;
+
+    /* Surface depth */
+    --surface-1: 0 0% 99%;
+    --surface-2: 240 5% 97%;
+    --surface-3: 240 5% 95%;
+
+    /* ============================================
+       B. SPACING TOKENS (The Scale)
+       ============================================ */
+    --space-0: 0px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-7: 28px;
+    --space-8: 32px;
+    --space-9: 40px;
+    --space-10: 48px;
+    --space-11: 56px;
+    --space-12: 64px;
+    --space-13: 80px;
+    --space-14: 96px;
+    --space-15: 112px;
+    --space-16: 128px;
+
+    /* ============================================
+       C. RADIUS TOKENS
+       ============================================ */
+    --radius-xs: 6px;
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
+
+    /* ============================================
+       D. SHADOW TOKENS (Light)
+       ============================================ */
+    --shadow-xs: 0 1px 2px 0 hsl(240 5% 8% / 0.04);
+    --shadow-sm: 0 1px 3px 0 hsl(240 5% 8% / 0.06), 0 1px 2px -1px hsl(240 5% 8% / 0.04);
+    --shadow-md: 0 10px 15px -3px hsl(240 5% 8% / 0.10), 0 4px 6px -4px hsl(240 5% 8% / 0.08);
+    --shadow-lg: 0 20px 25px -5px hsl(240 5% 8% / 0.12), 0 8px 10px -6px hsl(240 5% 8% / 0.08);
+    --shadow-xl: 0 25px 50px -12px hsl(240 5% 8% / 0.16);
+    --shadow-glow: 0 0 0 1px hsl(var(--primary) / 0.06), 0 10px 40px -10px hsl(var(--primary) / 0.10);
+
+    /* ============================================
+       E. TYPOGRAPHY TOKENS
+       ============================================ */
+    --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+    /* Type sizes */
+    --text-xs: 12px;
+    --text-xs-line: 16px;
+    --text-sm: 14px;
+    --text-sm-line: 20px;
+    --text-md: 16px;
+    --text-md-line: 24px;
+    --text-lg: 18px;
+    --text-lg-line: 28px;
+    --text-xl: 20px;
+    --text-xl-line: 28px;
+    --text-2xl: 24px;
+    --text-2xl-line: 32px;
+    --text-3xl: 30px;
+    --text-3xl-line: 36px;
+    --text-4xl: 36px;
+    --text-4xl-line: 40px;
+
+    /* Weights */
+    --weight-regular: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+    --weight-bold: 700;
+
+    /* Letter spacing */
+    --tracking-tight: -0.02em;
+    --tracking-normal: 0em;
+
+    /* ============================================
+       F. MOTION TOKENS
+       ============================================ */
+    --dur-1: 120ms;
+    --dur-2: 160ms;
+    --dur-3: 240ms;
+    --dur-4: 320ms;
+
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+    --transition-fast: 120ms var(--ease-out);
+    --transition-base: 160ms var(--ease-smooth);
+    --transition-slow: 240ms var(--ease-smooth);
+
+    /* ============================================
+       G. Z-INDEX TOKENS
+       ============================================ */
+    --z-base: 0;
+    --z-sticky: 20;
+    --z-dropdown: 50;
+    --z-overlay: 70;
+    --z-modal-backdrop: 80;
+    --z-modal: 90;
+    --z-toast: 100;
+
+    /* ============================================
+       H. COMPONENT-LEVEL TOKENS
+       ============================================ */
+    /* Buttons */
+    --btn-height-sm: 36px;
+    --btn-height-md: 40px;
+    --btn-height-lg: 44px;
+
+    /* Inputs */
+    --input-height: 44px;
+
+    /* Modal sizing */
+    --modal-sm: 520px;
+    --modal-md: 720px;
+    --modal-lg: 960px;
+    --modal-xl: 1120px;
+    --modal-max-h: 88vh;
+  }
+
+  /* Dark Mode */
+  .dark {
+    --background: 240 6% 6%;
+    --foreground: 240 5% 96%;
+
+    --card: 240 6% 8%;
+    --card-foreground: 240 5% 96%;
+
+    --popover: 240 6% 8%;
+    --popover-foreground: 240 5% 96%;
+
+    --primary: 0 0% 100%;
+    --primary-foreground: 240 6% 8%;
+
+    --secondary: 240 5% 14%;
+    --secondary-foreground: 240 5% 96%;
+
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 4% 64%;
+
+    --accent: 240 5% 16%;
+    --accent-foreground: 240 5% 96%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 5% 18%;
+    --input: 240 5% 18%;
+    --ring: 240 5% 90%;
+
+    --surface-1: 240 6% 9%;
+    --surface-2: 240 6% 12%;
+    --surface-3: 240 5% 16%;
+
+    /* Dark shadows */
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow-md: 0 10px 15px -3px hsl(0 0% 0% / 0.5), 0 4px 6px -4px hsl(0 0% 0% / 0.4);
+    --shadow-lg: 0 20px 25px -5px hsl(0 0% 0% / 0.6), 0 8px 10px -6px hsl(0 0% 0% / 0.5);
+    --shadow-xl: 0 25px 50px -12px hsl(0 0% 0% / 0.7);
+    --shadow-glow: 0 0 0 1px hsl(0 0% 100% / 0.04), 0 10px 40px -10px hsl(0 0% 0% / 0.6);
+  }

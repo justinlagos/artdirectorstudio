@@ -29,7 +29,7 @@ export const UserMenu = () => {
     .toUpperCase() || "U";
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10">
@@ -62,26 +62,61 @@ export const UserMenu = () => {
           </div>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer">
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigate("/settings");
+          }} 
+          className="cursor-pointer"
+        >
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate("/insights")} className="cursor-pointer">
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigate("/insights");
+          }} 
+          className="cursor-pointer"
+        >
           <BarChart3 className="mr-2 h-4 w-4" />
           <span>Insights</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate("/plans")} className="cursor-pointer">
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigate("/plans");
+          }} 
+          className="cursor-pointer"
+        >
           <Crown className="mr-2 h-4 w-4" />
           <span>Plans</span>
         </DropdownMenuItem>
         {isAdmin && (
-          <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">
+          <DropdownMenuItem 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate("/admin");
+            }} 
+            className="cursor-pointer"
+          >
             <Shield className="mr-2 h-4 w-4" />
             <span>Admin Dashboard</span>
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer">
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            signOut();
+          }} 
+          className="text-destructive cursor-pointer"
+        >
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sign Out</span>
         </DropdownMenuItem>

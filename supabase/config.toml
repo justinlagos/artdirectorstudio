@@ -41,3 +41,12 @@ verify_jwt = false
 
 [functions.get-similar-works]
 verify_jwt = true
+
+[functions.documents]
+verify_jwt = true
+
+[functions.actions]
+verify_jwt = true
+
+[functions.assets]
+verify_jwt = true

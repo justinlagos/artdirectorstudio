@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ImageBlendDialog } from "./ImageBlendDialog";
 import { ImageUpscaleDialog } from "./ImageUpscaleDialog";
+import { CampaignBuilder } from "./campaign/CampaignBuilder";
 // Batch feature temporarily disabled
 // import { BatchProcessDialog } from "./BatchProcessDialog";
 
@@ -31,6 +32,17 @@ export const UnifiedToolsModal = () => {
         open={activeTool === "upscale"}
         onOpenChange={(open) => !open && closeTool()}
       />
+      <Dialog open={activeTool === "campaign"} onOpenChange={(open) => !open && closeTool()}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Campaign Builder</DialogTitle>
+            <DialogDescription>
+              Generate coordinated assets for multiple formats in one operation
+            </DialogDescription>
+          </DialogHeader>
+          <CampaignBuilder />
+        </DialogContent>
+      </Dialog>
       {/* Batch feature temporarily disabled */}
       {/* <BatchProcessDialog
         open={activeTool === "batch"}

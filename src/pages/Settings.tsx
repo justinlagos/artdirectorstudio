@@ -11,10 +11,13 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useSubscription } from "@/hooks/useSubscription";
-import { User, Shield, CreditCard, Settings2, Bell, Sparkles, Crown, Wand2 } from "lucide-react";
+import { User, Shield, CreditCard, Settings2, Bell, Sparkles, Crown, Wand2, FlaskConical, Palette } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { CustomPresetsManager } from "@/components/CustomPresetsManager";
+import { ExperimentalFeaturesSettings } from "@/components/settings/ExperimentalFeaturesSettings";
+import { BrandKitUpload } from "@/components/brand/BrandKitUpload";
+import { BrandKitManager } from "@/components/brand/BrandKitManager";
 
 const Settings = () => {
   const { user } = useAuth();
@@ -251,6 +254,14 @@ const Settings = () => {
               <TabsTrigger value="notifications" className="gap-2 flex-shrink-0">
                 <Bell className="w-4 h-4" />
                 <span className="hidden sm:inline">Notifications</span>
+              </TabsTrigger>
+              <TabsTrigger value="brand-kits" className="gap-2 flex-shrink-0">
+                <Palette className="w-4 h-4" />
+                <span className="hidden sm:inline">Brand Kits</span>
+              </TabsTrigger>
+              <TabsTrigger value="experimental" className="gap-2 flex-shrink-0">
+                <FlaskConical className="w-4 h-4" />
+                <span className="hidden sm:inline">Experimental</span>
               </TabsTrigger>
             </TabsList>
 
@@ -521,6 +532,32 @@ const Settings = () => {
                   </Button>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="brand-kits" className="mt-6">
+              <div className="space-y-6">
+                <Card className="glass">
+                  <CardHeader>
+                    <CardTitle>Brand Kits</CardTitle>
+                    <CardDescription>Upload and manage brand guidelines for consistent generation</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <BrandKitUpload onUploadComplete={() => window.location.reload()} />
+                  </CardContent>
+                </Card>
+                <Card className="glass">
+                  <CardHeader>
+                    <CardTitle>Your Brand Kits</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <BrandKitManager />
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="experimental" className="mt-6">
+              <ExperimentalFeaturesSettings />
             </TabsContent>
           </Tabs>
         </div>

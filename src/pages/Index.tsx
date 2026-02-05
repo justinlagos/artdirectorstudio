@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { useRef } from "react";
 import { analytics } from "@/lib/analytics";
 import { Header } from "@/components/Header";
 import { UploadSection } from "@/components/UploadSection";
@@ -78,7 +80,72 @@ const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { preferences, isLoading: preferencesLoading } = useUserPreferences();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  // Use ref to track stable workspace mode and prevent flickering during refetches
+  // Initialize from localStorage to persist across page refreshes
+  const stableWorkspaceModeRef = useRef<'classic' | 'auto' | null>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('workspaceMode');
+      if (stored === 'classic' || stored === 'auto') {
+        return stored;
+      }
+    }
+    return null;
+  });
+  
+  // Get generation count for Auto mode
+  const { data: generationCount } = useQuery({
+    queryKey: ['generationCount', user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      const { count } = await supabase
+        .from('generated_assets')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('action', 'generate');
+      return count || 0;
+    },
+    enabled: !!user && (preferences?.workspaceMode === 'auto' || !preferences),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Update ref synchronously when preferences change (not just in useEffect)
+  // This ensures the ref is always up-to-date even during refetches
+  // CRITICAL: Update ref BEFORE computing workspaceMode to prevent fallback issues
+  // Also update ref from the hook's safePreferences to ensure we capture optimistic updates
+  // Persist to localStorage to survive page refreshes
+  const currentWorkspaceMode = preferences?.workspaceMode;
+  if (currentWorkspaceMode) {
+    if (stableWorkspaceModeRef.current !== currentWorkspaceMode) {
+      stableWorkspaceModeRef.current = currentWorkspaceMode;
+      // Persist to localStorage for resilience across refreshes
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('workspaceMode', currentWorkspaceMode);
+      }
+    }
+  }
+  
+  // Determine which view to show
+  // PRIORITY: Use preferences first, then ref (which is always up-to-date), then localStorage, then default
+  // The ref acts as a stable fallback during refetches when preferences might be undefined
+  // CRITICAL: Use nullish coalescing (??) not logical OR (||) to properly handle falsy values
+  const workspaceMode = currentWorkspaceMode ?? stableWorkspaceModeRef.current ?? 
+    (typeof window !== 'undefined' ? (localStorage.getItem('workspaceMode') as 'classic' | 'auto' | null) : null) ?? 
+    'classic';
+
+  // Debug logging for view mode changes
+  useEffect(() => {
+    console.log('[Index] View mode state:', {
+      workspaceMode,
+      stableRef: stableWorkspaceModeRef.current,
+      preferencesLoading,
+      hasPreferences: !!preferences,
+      preferencesWorkspaceMode: preferences?.workspaceMode,
+      generationCount,
+    });
+  }, [workspaceMode, preferencesLoading, preferences, generationCount]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showProgressiveFeedback, setShowProgressiveFeedback] = useState(false);
@@ -109,24 +176,45 @@ const Index = () => {
 
   // Scroll to studio section when authenticated user arrives
   useEffect(() => {
-    if (user && !loading) {
+    if (user && !loading && !preferencesLoading) {
       const studioSection = document.getElementById("studio-section");
       if (studioSection) {
-        studioSection.scrollIntoView({ behavior: "smooth" });
+        // Use requestAnimationFrame to ensure DOM is ready
+        requestAnimationFrame(() => {
+          studioSection.scrollIntoView({ behavior: "smooth" });
+        });
       }
     }
-  }, [user, loading]);
+  }, [user, loading, preferencesLoading]);
 
+  // One-time guard to prevent repeated processing of the same studioPrefill state
+  const hasProcessedPrefillRef = useRef(false);
+
+  // Process studioPrefill state once per navigation state
   useEffect(() => {
     const state = location.state as { studioPrefill?: { prompt: string; imageUrl?: string } } | null;
-    if (state?.studioPrefill && user) {
-      openStudioWithPrompt({
-        basePrompt: state.studioPrefill.prompt,
-        imageUrl: state.studioPrefill.imageUrl,
-      });
-      navigate(location.pathname, { replace: true, state: {} });
+
+    if (!user) return;
+    if (!state?.studioPrefill) return;
+    if (hasProcessedPrefillRef.current) return;
+
+    hasProcessedPrefillRef.current = true;
+
+    openStudioWithPrompt({
+      basePrompt: state.studioPrefill.prompt,
+      imageUrl: state.studioPrefill.imageUrl,
+    });
+
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state, user, navigate, location.pathname]);
+
+  // Reset guard when studioPrefill is no longer in state, so future prefill navigations still work
+  useEffect(() => {
+    const state = location.state as { studioPrefill?: unknown } | null;
+    if (!state?.studioPrefill) {
+      hasProcessedPrefillRef.current = false;
     }
-  }, [location.pathname, user]);
+  }, [location.state]);
 
   // Cleanup on unmount - MUST be before early returns
   useEffect(() => {
@@ -181,6 +269,12 @@ const Index = () => {
             basePrompt: result.full_regeneration_prompt,
             imageUrl: previewUrl ?? undefined,
             meta: { source: 'analysis-shortcut' },
+          });
+        } else if (user) {
+          // Open studio even without analysis result
+          openStudioWithPrompt({
+            basePrompt: '',
+            meta: { source: 'keyboard-shortcut' },
           });
         }
       },
@@ -445,13 +539,15 @@ const Index = () => {
         return null;
       }
 
+      // Convert to new backend format
+      const { convertToBackendFormat } = await import("@/lib/generationParams");
+      const backendParams = convertToBackendFormat(options);
+
       // Call generate-image edge function
       const { data, error } = await supabase.functions.invoke("generate-image", {
         body: {
           prompt,
-          quality: options.quality,
-          size: options.size,
-          background: options.background
+          ...backendParams,
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -616,13 +712,26 @@ const Index = () => {
     }
   }, [loading]);
 
-  // Show skeleton only if loading and not timed out
-  if (loading && !loadingTimeout) {
-    return <PageSkeleton />;
+
+  // Gate rendering to prevent UI instability during async state changes
+  // Show skeleton with Header when loading or preferences are loading
+  if (loading || preferencesLoading) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <PageSkeleton />
+      </div>
+    );
   }
 
   // Log render state
-  console.log('[Index] Rendering page', { user: !!user, loading, loadingTimeout });
+  console.log('[Index] Rendering page', { 
+    user: !!user, 
+    loading, 
+    loadingTimeout, 
+    workspaceMode, 
+    preferencesLoading 
+  });
 
   return (
     <ErrorBoundary>

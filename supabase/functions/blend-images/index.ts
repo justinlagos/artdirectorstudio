@@ -4,10 +4,12 @@ import { validateImages, validateInstruction } from '../_shared/validation.ts';
 import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
 import { fetchWithRetry } from '../_shared/retry.ts';
+import { createLogger } from '../_shared/observability.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 const STYLE_HINTS: Record<string, string> = {
@@ -20,7 +22,7 @@ const STYLE_HINTS: Record<string, string> = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const requestId = crypto.randomUUID();
@@ -41,12 +43,8 @@ serve(async (req) => {
       console.warn('Could not extract userId from token');
     }
 
-    console.log(JSON.stringify({
-      requestId,
-      action: 'blend_start',
-      timestamp: new Date().toISOString(),
-      userId
-    }));
+    const logger = createLogger(requestId, userId);
+    logger.logStart('blend_images');
 
     const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
       method: 'POST',
@@ -319,15 +317,10 @@ serve(async (req) => {
     }
 
     const duration = Date.now() - startTime;
-    console.log(JSON.stringify({
-      requestId,
-      action: 'blend_success',
-      userId,
-      provider: 'lovable-ai-gateway',
-      providerStatus: 200,
-      duration_ms: duration,
-      timestamp: new Date().toISOString()
-    }));
+    logger.logSuccess('blend_images', duration, {
+      image_count: images.length,
+      has_style_presets: presetList.length > 0
+    });
 
     // Save to database
     const supabaseAdmin = createClient(
@@ -479,15 +472,24 @@ serve(async (req) => {
           user_id: userId,
           type: 'image',
           action: 'blend',
+          operation_type: 'blend',
           image_url: finalImageUrl,
           prompt: trimmedInstruction || 'Blended images',
           source_urls: images.map((img: string) => img.substring(0, 100)),
+          model_used: 'google/gemini-3-pro-image-preview',
           params: {
             stylePresets: presetList,
             operation: 'blend',
             imageCount: images.length
           },
           duration_ms: duration,
+          analysis_data: {
+            operation_type: 'blend',
+            image_count: images.length,
+            style_presets: presetList,
+            processed_at: new Date().toISOString(),
+            request_id: requestId
+          }
         })
         .select()
         .single();
@@ -587,18 +589,8 @@ serve(async (req) => {
     );
   } catch (error) {
     const duration = Date.now() - startTime;
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-
-    console.error(JSON.stringify({
-      requestId,
-      action: 'blend_error',
-      timestamp: new Date().toISOString(),
-      error: errorMessage,
-      stack: errorStack,
-      duration_ms: duration,
-      userId
-    }));
+    const logger = createLogger(requestId, userId);
+    logger.logError('blend_images', error instanceof Error ? error : new Error(String(error)), duration);
 
     // Return more specific error messages when possible
     if (errorMessage.includes('LOVABLE_API_KEY')) {

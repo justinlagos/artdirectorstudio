@@ -375,11 +375,19 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
       throw new Error("Please enter a prompt for generation");
     }
 
+    // Convert to new backend format
+    const { convertToBackendFormat } = await import("@/lib/generationParams");
+    const backendParams = convertToBackendFormat({
+      quality: 'auto',
+      size: '1024x1024',
+      aspectRatio: '1:1',
+      background: 'original',
+    });
+
     const { data, error } = await supabase.functions.invoke("generate-image", {
       body: { 
         prompt: generatePrompt,
-        quality: 'auto',
-        size: '1024x1024',
+        ...backendParams,
         idempotencyKey: item.idempotencyKey 
       },
       headers: { Authorization: `Bearer ${session.access_token}` },

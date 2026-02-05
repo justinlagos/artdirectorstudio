@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2, Maximize2, Image as ImageIcon, Sparkles } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { OptimizedImage } from "@/components/ui/optimized-image";
+import { ProgressiveImage } from "@/components/ui/progressive-image";
 import { openStudioWithPrompt } from "@/lib/studio";
+import { useImageSelectionStore } from "@/store/imageSelectionStore";
 
 interface GeneratedImage {
   id: string;
@@ -22,6 +24,42 @@ interface GeneratedImagesGalleryProps {
 export const GeneratedImagesGallery = ({ images, onDelete }: GeneratedImagesGalleryProps) => {
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
+  
+  // Sync images with image selection store for J/K navigation
+  useEffect(() => {
+    if (images.length > 0) {
+      const imageList = images.map((img) => ({
+        id: img.id,
+        url: img.imageUrl,
+        prompt: img.prompt,
+        data: { timestamp: img.timestamp },
+      }));
+      useImageSelectionStore.getState().setImageList(imageList);
+      
+      // Set selected image if one is selected
+      if (selectedImage) {
+        const active = imageList.find((img) => img.id === selectedImage.id);
+        if (active) {
+          useImageSelectionStore.getState().setSelectedImage(active);
+        }
+      }
+    }
+  }, [images, selectedImage]);
+  
+  // Listen for image selection events from keyboard shortcuts
+  useEffect(() => {
+    const handleImageSelected = (event: CustomEvent) => {
+      const selected = images.find((img) => img.id === event.detail.id);
+      if (selected) {
+        setSelectedImage(selected);
+      }
+    };
+    
+    window.addEventListener('image-selected', handleImageSelected as EventListener);
+    return () => {
+      window.removeEventListener('image-selected', handleImageSelected as EventListener);
+    };
+  }, [images]);
 
   const handleDownload = (image: GeneratedImage, e: React.MouseEvent) => {
     e.stopPropagation();
