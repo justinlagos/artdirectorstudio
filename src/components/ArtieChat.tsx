@@ -399,15 +399,30 @@ export const ArtieChat = () => {
     };
   }, []);
 
-  const scrollToBottom = () => {
-    if (chatBodyRef.current) {
-      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+  // Smart auto-scroll with threshold
+  const SCROLL_THRESHOLD = 120; // pixels from bottom
+
+  const scrollToBottom = useCallback((force = false) => {
+    if (!chatBodyRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = chatBodyRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+    // Only auto-scroll if user is near bottom OR force=true
+    // This prevents snapping the user back down if they're reading history
+    if (force || distanceFromBottom <= SCROLL_THRESHOLD) {
+      chatBodyRef.current.scrollTo({
+        top: scrollHeight,
+        behavior: 'smooth'
+      });
     }
-  };
+  }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // For new messages, respect the scroll threshold
+    // Don't force scroll - let user stay where they are if reading history
+    scrollToBottom(false);
+  }, [messages, scrollToBottom]);
 
   // Track processed images to prevent duplicate processing
   const processedImagesRef = useRef<Set<string>>(new Set());
@@ -983,6 +998,9 @@ export const ArtieChat = () => {
       setInputValue("");
       setUploadedFiles([]);
       setIsUploading(false);
+
+      // Force scroll to bottom when user sends a message
+      setTimeout(() => scrollToBottom(true), 100);
 
       const assistantMessageId = (Date.now() + 1).toString();
       
@@ -1860,7 +1878,7 @@ export const ArtieChat = () => {
         </div>
 
         {/* Chat Body - Scrollable with proper spacing and padding */}
-        <div 
+        <div
           ref={chatBodyRef}
           className={cn(
             "flex-1 overflow-y-auto overscroll-contain min-h-0",
@@ -1871,7 +1889,11 @@ export const ArtieChat = () => {
             // Desktop: padding bottom for sticky input
             !isMobile && "pb-4"
           )}
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            maxHeight: '100%',  // Prevent growth beyond flex bounds
+            overflowY: 'auto',  // Ensure internal scrolling
+          }}
         >
           {/* Proactive Suggestions */}
           {isEnabled && suggestions.length > 0 && (
