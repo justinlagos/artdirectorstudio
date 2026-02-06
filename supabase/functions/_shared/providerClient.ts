@@ -85,8 +85,20 @@ export async function callProvider(
 }
 
 /**
+ * Parse a data URI into its mimeType and raw base64 data.
+ * Returns { mimeType, base64Data } or null if the string isn't a data URI.
+ */
+function parseDataUri(dataUri: string): { mimeType: string; base64Data: string } | null {
+  const match = dataUri.match(/^data:([^;]+);base64,(.+)$/s);
+  if (match) {
+    return { mimeType: match[1], base64Data: match[2] };
+  }
+  return null;
+}
+
+/**
  * Call Google Gemini API
- * Uses google/gemini-3-pro-image-preview for image generation
+ * Uses gemini-3-pro-image-preview for image generation
  */
 async function callGemini(
   request: ProviderRequest,
@@ -103,38 +115,45 @@ async function callGemini(
   let model = request.options?.model;
   if (!model) {
     if (request.action === 'generate' || request.action === 'caricature') {
-      model = 'google/gemini-3-pro-image-preview';
+      model = 'gemini-3-pro-image-preview';
     } else if (request.action === 'chat' || request.action === 'analyze') {
-      model = 'google/gemini-pro';
+      model = 'gemini-pro';
     } else {
-      model = 'google/gemini-3-pro-image-preview';
+      model = 'gemini-3-pro-image-preview';
     }
   }
 
-  // Build message content
-  let messageContent: any;
+  // Strip any namespace prefix (e.g. "google/") for the API URL
+  const modelForUrl = model.includes('/') ? model.split('/').pop()! : model;
+
+  // Build message parts for Gemini API
+  const parts: any[] = [{ text: request.prompt }];
+
   if (request.image) {
-    messageContent = [
-      {
-        type: "text",
-        text: request.prompt
-      },
-      {
-        type: "image_url",
-        image_url: {
-          url: request.image
+    const parsed = parseDataUri(request.image);
+    if (parsed) {
+      parts.push({
+        inlineData: {
+          mimeType: parsed.mimeType,
+          data: parsed.base64Data,
         }
-      }
-    ];
-  } else {
-    messageContent = request.prompt;
+      });
+    } else {
+      // Assume raw base64 PNG if no data URI prefix
+      parts.push({
+        inlineData: {
+          mimeType: 'image/png',
+          data: request.image,
+        }
+      });
+    }
   }
 
-  console.log(`${logPrefix} Gemini request: model=${model}`);
+  console.log(`${logPrefix} Gemini request: model=${modelForUrl}`);
 
   // Call Gemini via Google AI API
   const response = await fetchWithRetry(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_AI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelForUrl}:generateContent?key=${GOOGLE_AI_API_KEY}`,
     {
       method: "POST",
       headers: {
@@ -142,9 +161,7 @@ async function callGemini(
       },
       body: JSON.stringify({
         contents: [{
-          parts: Array.isArray(messageContent)
-            ? messageContent.map(c => c.type === 'text' ? { text: c.text } : { inlineData: { data: c.image_url.url } })
-            : [{ text: messageContent }]
+          parts,
         }],
         generationConfig: {
           temperature: request.options?.temperature ?? 0.9,
@@ -206,6 +223,7 @@ async function callGemini(
 /**
  * Call OpenAI API
  * Uses DALL-E 3 for image generation/editing
+ * For caricature: uses GPT-4o Vision to describe the face, then DALL-E 3 to generate
  */
 async function callOpenAI(
   request: ProviderRequest,
@@ -218,11 +236,140 @@ async function callOpenAI(
     throw new Error('OPENAI_API_KEY not configured');
   }
 
+  const authHeaders = {
+    "Authorization": `Bearer ${OPENAI_API_KEY}`,
+    "Content-Type": "application/json",
+  };
+
+  // Caricature action: two-step approach because DALL-E 3 doesn't accept input images.
+  // Step 1: Use GPT-4o Vision to describe the person's face from the uploaded photo.
+  // Step 2: Use that description + the caricature style prompt with DALL-E 3.
+  if (request.action === 'caricature' && request.image) {
+    console.log(`${logPrefix} OpenAI caricature: step 1 – describing face with GPT-4o`);
+
+    const describeResponse = await fetchWithRetry(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Describe this person's facial features in vivid detail for an artist creating a caricature. Include: face shape, hair color/style, eye color/shape, nose shape, mouth/lip features, skin tone, any distinctive marks, glasses, facial hair, expression, and overall proportions. Be specific and visual. Output ONLY the description, no preamble."
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: request.image }
+                }
+              ]
+            }
+          ],
+          max_tokens: 500,
+          temperature: 0.7,
+        }),
+      },
+      { maxRetries: 2, baseDelayMs: 2000, maxDelayMs: 15000, timeoutMs: 30000 }
+    );
+
+    if (!describeResponse.ok) {
+      const errorText = await describeResponse.text();
+      console.error(`${logPrefix} OpenAI Vision describe error:`, { status: describeResponse.status, error: errorText });
+      const friendlyMessage = mapAIError(describeResponse.status, errorText);
+      return {
+        success: false,
+        error: friendlyMessage,
+        errorType: describeResponse.status === 429 ? 'rate_limit' : 'ai_error',
+        metadata: { provider: 'openai', model: 'gpt-4o' }
+      };
+    }
+
+    const describeData = await describeResponse.json();
+    const faceDescription = describeData.choices?.[0]?.message?.content;
+
+    if (!faceDescription) {
+      console.error(`${logPrefix} No face description returned from GPT-4o`);
+      return {
+        success: false,
+        error: 'Could not analyze the portrait. Please try a clearer photo.',
+        errorType: 'no_content',
+        metadata: { provider: 'openai', model: 'gpt-4o' }
+      };
+    }
+
+    console.log(`${logPrefix} OpenAI caricature: step 2 – generating with DALL-E 3`);
+
+    // Combine the face description with the caricature style prompt
+    const combinedPrompt = `Create a caricature of a person with these features: ${faceDescription}\n\nArtistic style: ${request.prompt}`;
+
+    const generateResponse = await fetchWithRetry(
+      'https://api.openai.com/v1/images/generations',
+      {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          model: 'dall-e-3',
+          prompt: combinedPrompt,
+          n: 1,
+          size: request.options?.size ?? '1024x1024',
+          quality: request.options?.quality ?? 'standard',
+          style: request.options?.style ?? 'vivid',
+        }),
+      },
+      { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 90000 }
+    );
+
+    if (!generateResponse.ok) {
+      const errorText = await generateResponse.text();
+      console.error(`${logPrefix} OpenAI DALL-E 3 caricature error:`, { status: generateResponse.status, error: errorText });
+      const friendlyMessage = mapAIError(generateResponse.status, errorText);
+      return {
+        success: false,
+        error: friendlyMessage,
+        errorType: generateResponse.status === 429 ? 'rate_limit' : 'ai_error',
+        metadata: { provider: 'openai', model: 'dall-e-3' }
+      };
+    }
+
+    const generateData = await generateResponse.json();
+    const imageUrl = generateData.data?.[0]?.url || generateData.data?.[0]?.b64_json;
+
+    if (!imageUrl) {
+      console.error(`${logPrefix} No image in OpenAI DALL-E 3 caricature response`);
+      return {
+        success: false,
+        error: ERROR_MESSAGES.PROCESSING_FAILED,
+        errorType: 'no_content',
+        metadata: { provider: 'openai', model: 'dall-e-3' }
+      };
+    }
+
+    return {
+      success: true,
+      image: imageUrl,
+      metadata: {
+        provider: 'openai',
+        model: 'dall-e-3',
+        usage: describeData.usage ? {
+          promptTokens: describeData.usage.prompt_tokens,
+          completionTokens: describeData.usage.completion_tokens,
+          totalTokens: describeData.usage.total_tokens,
+        } : undefined
+      }
+    };
+  }
+
+  // --- Standard (non-caricature) OpenAI flow ---
+
   // Determine endpoint and model
   let endpoint: string;
   let model = request.options?.model;
 
-  if (request.action === 'generate' || request.action === 'caricature') {
+  if (request.action === 'generate') {
     endpoint = 'https://api.openai.com/v1/images/generations';
     model = model || 'dall-e-3';
   } else if (request.action === 'edit') {
@@ -276,10 +423,7 @@ async function callOpenAI(
     endpoint,
     {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: authHeaders,
       body: JSON.stringify(requestBody),
     },
     { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 90000 }
