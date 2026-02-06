@@ -19,52 +19,73 @@ export const useCredits = () => {
     }
 
     try {
-      // Fetch profile data (subscription tier + free credits)
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_pro, subscription_tier, subscription_expires_at, free_credits, daily_usage, daily_limit')
-        .eq('id', user.id)
-        .single();
+      let profileCredits = 0;
+      let profileTier = 'free';
+      let unlimited = false;
 
-      const now = new Date();
-      const userTier = profile?.subscription_tier || 'free';
-      setTier(userTier);
+      // Try to fetch profile data (subscription tier + free credits)
+      // Wrapped in its own try/catch so a profile query failure doesn't
+      // block reading the credits table
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('is_pro, subscription_tier, subscription_expires_at, free_credits, daily_usage, daily_limit')
+          .eq('id', user.id)
+          .single();
 
-      const isSubscriptionActive = profile?.is_pro &&
-        (profile.subscription_expires_at && new Date(profile.subscription_expires_at) > now);
+        if (!profileError && profile) {
+          const now = new Date();
+          profileTier = profile.subscription_tier || 'free';
 
-      // Pro/Enterprise: unlimited access
-      if ((userTier === 'enterprise' || userTier === 'pro' || profile?.is_pro) && isSubscriptionActive) {
+          const isSubscriptionActive = profile.is_pro &&
+            profile.subscription_expires_at &&
+            new Date(profile.subscription_expires_at) > now;
+
+          // Pro/Enterprise: unlimited access
+          if ((profileTier === 'enterprise' || profileTier === 'pro' || profile.is_pro) && isSubscriptionActive) {
+            unlimited = true;
+          }
+
+          // Starter tier: remaining daily uses
+          if (!unlimited && profileTier === 'starter' && isSubscriptionActive) {
+            const dailyUsage = profile.daily_usage || 0;
+            const dailyLimit = profile.daily_limit || 0;
+            profileCredits += Math.max(0, dailyLimit - dailyUsage);
+          }
+
+          // Free trial credits
+          profileCredits += (profile.free_credits || 0);
+        }
+      } catch (profileErr) {
+        console.warn("Could not fetch profile credits:", profileErr);
+      }
+
+      if (unlimited) {
         setIsUnlimited(true);
-        setBalance(999999); // High sentinel value so credit checks pass
+        setTier(profileTier);
+        setBalance(999999);
         setLoading(false);
         return;
       }
 
       setIsUnlimited(false);
+      setTier(profileTier);
 
-      // Starter tier: compute remaining daily uses
-      let starterRemaining = 0;
-      if (userTier === 'starter' && isSubscriptionActive) {
-        const dailyUsage = profile?.daily_usage || 0;
-        const dailyLimit = profile?.daily_limit || 0;
-        starterRemaining = Math.max(0, dailyLimit - dailyUsage);
+      // Top-up credits from credits table (always try this)
+      let topUpBalance = 0;
+      try {
+        const { data: creditsData } = await supabase
+          .from('credits')
+          .select('balance')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        topUpBalance = creditsData?.balance || 0;
+      } catch (creditsErr) {
+        console.warn("Could not fetch top-up credits:", creditsErr);
       }
 
-      // Free trial credits from profiles table
-      const freeCredits = profile?.free_credits || 0;
-
-      // Top-up credits from credits table
-      const { data: creditsData } = await supabase
-        .from('credits')
-        .select('balance')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      const topUpBalance = creditsData?.balance || 0;
-
-      // Effective balance is the sum of all available credit sources
-      setBalance(starterRemaining + freeCredits + topUpBalance);
+      setBalance(profileCredits + topUpBalance);
     } catch (error) {
       console.error("Error fetching credits:", error);
       setBalance(0);
@@ -81,7 +102,7 @@ export const useCredits = () => {
 
     fetchBalance();
 
-    // Subscribe to credit changes - only if user.id is defined
+    // Subscribe to credit changes
     const creditChannel = supabase
       .channel('credits-changes')
       .on(
@@ -98,7 +119,7 @@ export const useCredits = () => {
       )
       .subscribe();
 
-    // Also subscribe to profile changes (free credits, daily usage, subscription)
+    // Subscribe to profile changes (free credits, daily usage, subscription)
     const profileChannel = supabase
       .channel('profile-credits-changes')
       .on(

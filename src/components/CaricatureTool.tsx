@@ -65,9 +65,7 @@ export function CaricatureTool() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [results, setResults] = useState<GenerationResult[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { balance, isUnlimited, tier, refetch: refetchCredits } = useCredits();
-
-  const totalCreditCost = 10; // 3 for Gemini + 7 for OpenAI
+  const { balance, isUnlimited, refetch: refetchCredits } = useCredits();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,7 +113,7 @@ export function CaricatureTool() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || `${provider} generation failed`);
+        throw new Error(data.error || data.reason || `${provider} generation failed`);
       }
 
       return {
@@ -141,8 +139,10 @@ export function CaricatureTool() {
       return;
     }
 
-    if (!isUnlimited && (balance === null || balance < totalCreditCost)) {
-      toast.error(`Insufficient credits. You need ${totalCreditCost} credits (3 Gemini + 7 OpenAI).`);
+    // Authentication check first
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error('Please sign in to generate caricatures');
       return;
     }
 
@@ -153,15 +153,8 @@ export function CaricatureTool() {
     ]);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Please sign in to generate caricatures');
-        setIsGenerating(false);
-        setResults([]);
-        return;
-      }
-
       // Generate both caricatures in parallel
+      // The backend check-feature-access handles all credit/subscription validation
       const [geminiResult, openaiResult] = await Promise.all([
         generateWithProvider('gemini', session),
         generateWithProvider('openai', session),
@@ -174,7 +167,9 @@ export function CaricatureTool() {
         toast.success(`${successCount} caricature${successCount > 1 ? 's' : ''} created!`);
         refetchCredits();
       } else {
-        toast.error('Both generations failed. Please try again.');
+        // Show the actual backend error if both failed
+        const firstError = geminiResult.error || openaiResult.error || 'Both generations failed.';
+        toast.error(firstError);
       }
     } catch (error) {
       console.error('Caricature error:', error);
@@ -184,6 +179,9 @@ export function CaricatureTool() {
       setIsGenerating(false);
     }
   };
+
+  // Balance display: show the effective balance for informational purposes
+  const balanceDisplay = isUnlimited ? 'Unlimited' : `${balance ?? 0} credits`;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-surface-1 to-background py-12 px-4 sm:px-6 lg:px-8">
@@ -288,15 +286,13 @@ export function CaricatureTool() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Your balance</span>
-                    <span className="font-semibold">
-                      {isUnlimited ? 'Unlimited' : `${balance ?? 0} credits`}
-                    </span>
+                    <span className="font-semibold">{balanceDisplay}</span>
                   </div>
                   <Button
                     size="lg"
                     className="w-full h-12 rounded-xl font-medium shadow-subtle hover:shadow-medium transition-all"
                     onClick={handleGenerate}
-                    disabled={!selectedFile || !consent || isGenerating || (!isUnlimited && (balance === null || balance < totalCreditCost))}
+                    disabled={!selectedFile || !consent || isGenerating}
                   >
                     {isGenerating ? (
                       <>
