@@ -50,3 +50,42 @@ verify_jwt = true
 
 [functions.assets]
 verify_jwt = true
+
+[functions.caricature-image]
+verify_jwt = true
+
+[functions.check-feature-access]
+verify_jwt = true
+
+[functions.blend-images]
+verify_jwt = true
+
+[functions.remove-background]
+verify_jwt = true
+
+[functions.upscale-image]
+verify_jwt = true
+
+[functions.process-brand-kit]
+verify_jwt = true
+
+[functions.check-brand-consistency]
+verify_jwt = true
+
+[functions.send-image-email]
+verify_jwt = true
+
+[functions.send-notification-email]
+verify_jwt = true
+
+[functions.send-invoice-email]
+verify_jwt = true
+
+[functions.reset-daily-usage]
+verify_jwt = false
+
+[functions.generate-campaign]
+verify_jwt = true
+
+[functions.artie-proactive-analysis]
+verify_jwt = true

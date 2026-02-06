@@ -99,6 +99,7 @@ export function CaricatureTool() {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
           },
           body: JSON.stringify({
             image: previewUrl,
