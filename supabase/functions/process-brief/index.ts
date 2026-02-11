@@ -40,11 +40,12 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("[PROCESS-BRIEF] Missing LOVABLE_API_KEY");
+    const { chatWithProvider, getDefaultProvider } = await import("../_shared/providerClient.ts");
+    const provider = getDefaultProvider();
+    const hasKey = provider === "gemini" ? !!Deno.env.get("GOOGLE_AI_API_KEY") : !!Deno.env.get("OPENAI_API_KEY");
+    if (!hasKey) {
       return new Response(
-        JSON.stringify({ error: "AI service not configured" }),
+        JSON.stringify({ error: "AI service not configured. Set GOOGLE_AI_API_KEY or OPENAI_API_KEY in Edge Function secrets." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -56,91 +57,32 @@ serve(async (req) => {
 - Extract strategic essentials succinctly
 - Identify visual, tonal, and experiential opportunities
 - Output confident, production-ready recommendations
-- Respond in JSON only.`;
+- Respond with ONLY a valid JSON object (no markdown, no code blocks) with these keys: summary (string), project_type (string), target_audience (string), key_insights (array of strings, at least 1), deliverables (array of strings), tonal_keywords (array of strings), suggested_actions (array of strings).`;
 
     const userPrompt = `Filename: ${filename}
 
 Brief:
 ${truncatedBrief}`;
 
-    const modelResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: userPrompt,
-          },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "creative_brief_analysis",
-            schema: {
-              type: "object",
-              required: ["summary", "key_insights"],
-              properties: {
-                summary: {
-                  type: "string",
-                  description: "1-2 sentence overview of the brief's core ask.",
-                },
-                project_type: {
-                  type: "string",
-                  description: "Category or project archetype inferred from the brief.",
-                },
-                target_audience: {
-                  type: "string",
-                  description: "Primary audience description if present or implied.",
-                },
-                key_insights: {
-                  type: "array",
-                  items: { type: "string" },
-                  description: "3-5 punchy insights or mandates from the brief.",
-                  minItems: 1,
-                },
-                deliverables: {
-                  type: "array",
-                  items: { type: "string" },
-                  description: "Notable assets, channels, or deliverables called out.",
-                },
-                tonal_keywords: {
-                  type: "array",
-                  items: { type: "string" },
-                  description: "Mood, tone, or stylistic anchors to honor.",
-                },
-                suggested_actions: {
-                  type: "array",
-                  items: { type: "string" },
-                  description: "Next-step recommendations Artie can offer.",
-                },
-              },
-            },
-          },
-        },
-      }),
-    });
+    const result = await chatWithProvider(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      { model: provider === "gemini" ? "gemini-2.5-flash" : "gpt-4o" }
+    );
 
-    if (!modelResponse.ok) {
-      const errorText = await modelResponse.text();
-      console.error("[PROCESS-BRIEF] Model error:", modelResponse.status, errorText);
+    if (!result.success || !result.text) {
+      console.error("[PROCESS-BRIEF] Model error:", result.error);
       return new Response(
-        JSON.stringify({ error: "Failed to interpret brief" }),
+        JSON.stringify({ error: result.error || "Failed to interpret brief" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const data = await modelResponse.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content) {
-      console.error("[PROCESS-BRIEF] Empty model response", data);
-      throw new Error("AI response was empty");
-    }
+    let content = result.text;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) content = jsonMatch[0];
 
     let parsed: BriefResponse;
     try {

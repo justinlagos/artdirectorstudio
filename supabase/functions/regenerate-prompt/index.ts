@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.77.0';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { fetchWithRetry } from '../_shared/retry.ts';
 
@@ -137,37 +137,21 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured");
+    const { chatWithProvider, getDefaultProvider } = await import('../_shared/providerClient.ts');
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
       return new Response(
-        JSON.stringify({ error: "AI service not configured" }),
+        JSON.stringify({ error: "AI service not configured. Set GOOGLE_AI_API_KEY or OPENAI_API_KEY in Edge Function secrets." }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log("Regenerating prompt with user edits...");
 
-    // Merge user edits into base analysis
-    const mergedAnalysis = {
-      ...base_analysis,
-      ...user_edits
-    };
+    const mergedAnalysis = { ...base_analysis, ...user_edits };
 
-    const response = await fetchWithRetry(
-      'https://ai.gateway.lovable.dev/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a professional AI prompt engineer. Given an image analysis with user edits, synthesize an improved, coherent Full Regeneration Prompt.
+    const systemPrompt = `You are a professional AI prompt engineer. Given an image analysis with user edits, synthesize an improved, coherent Full Regeneration Prompt.
 
 The prompt should:
 - Be 150-200 words in a single flowing paragraph
@@ -180,58 +164,34 @@ You MUST respond with ONLY a valid JSON object in this format:
 {
   "full_regeneration_prompt": "your regenerated prompt here",
   "analysis": { ...the same analysis object passed in... }
-}`
-            },
-            {
-              role: 'user',
-              content: `Here is the updated image analysis with user edits. Generate an improved Full Regeneration Prompt that incorporates these details naturally:
+}`;
 
-${JSON.stringify(mergedAnalysis, null, 2)}
-
-Return ONLY the JSON object, no markdown, no extra text.`
-            }
-          ],
-        }),
-      },
-      { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 45000 }
+    const result = await chatWithProvider(
+      [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: `Here is the updated image analysis with user edits. Generate an improved Full Regeneration Prompt that incorporates these details naturally:\n\n${JSON.stringify(mergedAnalysis, null, 2)}\n\nReturn ONLY the JSON object, no markdown, no extra text.`,
+        },
+      ],
+      { model: provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o' }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Lovable AI error:", response.status, errorText);
-      
-      if (response.status === 429) {
+    if (!result.success || !result.text) {
+      if (result.errorType === 'rate_limit') {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits to your workspace." }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
       return new Response(
-        JSON.stringify({ error: "AI regeneration failed" }),
+        JSON.stringify({ error: result.error || "AI regeneration failed" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const data = await response.json();
+    const messageContent = result.text;
     console.log("AI regeneration response received");
-    
-    const messageContent = data.choices?.[0]?.message?.content;
-    
-    if (!messageContent) {
-      console.error("No content in AI response", JSON.stringify(data));
-      return new Response(
-        JSON.stringify({ error: "Invalid AI response" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     // Parse the JSON from the AI response
     let regeneratedData;

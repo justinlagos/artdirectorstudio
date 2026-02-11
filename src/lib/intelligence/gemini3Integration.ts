@@ -1,11 +1,10 @@
 /**
- * Gemini 3 Integration - Extension Points
- * 
- * This file contains placeholder functions for future Gemini 3 integration.
- * These functions define the interface for enhanced AI capabilities but currently
- * return simple implementations or placeholders.
- * 
- * See docs/ai-roadmap.md for the full integration plan.
+ * Intelligence integration - extension points
+ *
+ * Placeholder functions for enhanced AI capabilities. These define the interface
+ * used by Art Director Studio; implementations call backend AI via Edge Functions.
+ *
+ * See docs/ai-roadmap.md for the integration plan.
  */
 
 // ============================================================================
@@ -24,9 +23,7 @@ export interface ArtDirectionParams {
  * Generate enhanced art direction prompt using AI analysis
  * 
  * CURRENT: Template-based prompt assembly
- * FUTURE (Phase A): Gemini 3 text analysis for superior prompt understanding
- * 
- * Model: google/gemini-3 (when available) or google/gemini-2.5-pro
+ * FUTURE (Phase A): Backend AI text analysis for superior prompt understanding
  * Input: Text-only (user prompt + context)
  * Output: Enhanced creative direction prompt
  * 
@@ -41,13 +38,10 @@ export interface ArtDirectionParams {
 export async function generateArtDirectionPrompt(
   params: ArtDirectionParams
 ): Promise<string> {
-  // TODO: Phase A - Integrate Gemini 3 via Lovable AI Gateway
-  // Call: https://ai.gateway.lovable.dev/v1/chat/completions
-  // Model: google/gemini-3 or google/gemini-2.5-pro
-  // System prompt: "You are an expert art director. Enhance this creative brief..."
+  // TODO: Phase A - Integrate via Edge Functions (art director prompt enhancement)
 
   // Current implementation: Return user prompt as-is
-  console.log('[Gemini3] generateArtDirectionPrompt called (placeholder implementation)');
+  console.log('[Intelligence] generateArtDirectionPrompt (placeholder)');
   return params.userPrompt;
 }
 
@@ -98,9 +92,7 @@ export interface ImageAnalysisResult {
  * Analyze image composition using multimodal AI
  * 
  * CURRENT: Client-side color extraction only
- * FUTURE (Phase B): Gemini 3 multimodal for deep visual understanding
- * 
- * Model: google/gemini-3 (multimodal)
+ * FUTURE (Phase B): Backend AI multimodal for deep visual understanding
  * Input: Image + specific analysis questions
  * Output: Structured visual insights
  * 
@@ -114,13 +106,10 @@ export interface ImageAnalysisResult {
 export async function analyzeImageComposition(
   params: ImageAnalysisParams
 ): Promise<ImageAnalysisResult> {
-  // TODO: Phase B - Integrate Gemini 3 multimodal via Lovable AI Gateway
-  // Call: https://ai.gateway.lovable.dev/v1/chat/completions
-  // Model: google/gemini-3 (when available) with multimodal support
-  // Messages: [{ role: "user", content: [{ type: "image_url", ... }, { type: "text", ... }] }]
+  // TODO: Phase B - Integrate via Edge Functions (multimodal image analysis)
 
   // Current implementation: Return placeholder
-  console.log('[Gemini3] analyzeImageComposition called (placeholder implementation)');
+  console.log('[Intelligence] analyzeImageComposition (placeholder)');
   return {
     composition: {
       layout: 'Unknown',
@@ -187,23 +176,21 @@ export interface ModelSelectionResult {
  *   hasReferenceImage: true,
  *   styleConsistency: "high"
  * });
- * // Returns: { model: "google/gemini-3", reasoning: "Complex task with style requirements" }
+ * // Returns: { model: "...", reasoning: "Complex task with style requirements" }
  */
 export async function selectBestModelForTask(
   params: ModelSelectionParams
 ): Promise<ModelSelectionResult> {
   // TODO: Phase C - Implement intelligent model selection
   // Logic:
-  // - Simple tasks → google/gemini-3-pro-image-preview (Nano Banana Pro)
-  // - Complex reasoning → google/gemini-3-pro-image-preview (Nano Banana Pro)
-  // - Multimodal understanding → google/gemini-3-pro-image-preview (Nano Banana Pro)
+  // - Simple / complex / multimodal → backend default model
   // - Cost-sensitive users → cheaper models
   // - Time-sensitive users → faster models
 
   // Current implementation: Default to Nano Banana Pro
-  console.log('[Gemini3] selectBestModelForTask called (placeholder implementation)');
+  console.log('[Intelligence] selectBestModelForTask (placeholder)');
   return {
-    model: 'google/gemini-3-pro-image-preview',
+    model: 'default',
     reasoning: 'Nano Banana Pro - Superior quality with 4K support (default)',
     estimatedCost: 'low',
     estimatedTime: 'fast'
@@ -215,21 +202,17 @@ export async function selectBestModelForTask(
 // ============================================================================
 
 /**
- * Check if Gemini 3 is available via Lovable AI Gateway
- * 
- * This function will be used to detect when Gemini 3 becomes available
- * and automatically enable enhanced features.
+ * Check if enhanced AI is available (backend feature flag).
  */
 export async function isGemini3Available(): Promise<boolean> {
-  // TODO: Implement availability check
-  // Could ping the gateway with a test request or check a feature flag
-  console.log('[Gemini3] isGemini3Available called (placeholder implementation)');
+  // TODO: Implement availability check (health check or feature flag)
+  console.log('[Intelligence] isGemini3Available (placeholder)');
   return false;
 }
 
 /**
- * Get feature flags for Gemini 3 integration
- * 
+ * Get feature flags for intelligence integration
+ *
  * Controls gradual rollout of each phase
  */
 export interface Gemini3FeatureFlags {
@@ -242,7 +225,7 @@ export interface Gemini3FeatureFlags {
 export async function getGemini3FeatureFlags(): Promise<Gemini3FeatureFlags> {
   // TODO: Implement feature flag checks
   // Could be from Supabase, environment variables, or a config service
-  console.log('[Gemini3] getGemini3FeatureFlags called (placeholder implementation)');
+  console.log('[Intelligence] getGemini3FeatureFlags (placeholder)');
   return {
     phaseA_promptIntelligence: false,
     phaseB_multimodalAnalysis: false,
@@ -252,7 +235,7 @@ export async function getGemini3FeatureFlags(): Promise<Gemini3FeatureFlags> {
 }
 
 /**
- * Log Gemini 3 usage for monitoring and optimization
+ * Log intelligence usage for monitoring and optimization
  */
 export async function logGemini3Usage(params: {
   phase: 'A' | 'B' | 'C';
@@ -264,5 +247,5 @@ export async function logGemini3Usage(params: {
 }): Promise<void> {
   // TODO: Implement usage logging
   // Send to analytics, Supabase, or monitoring service
-  console.log('[Gemini3] Usage logged:', params);
+  console.log('[Intelligence] Usage logged:', params);
 }

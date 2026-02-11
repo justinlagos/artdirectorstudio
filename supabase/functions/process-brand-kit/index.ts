@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,38 +39,24 @@ serve(async (req) => {
     const userId = userData.user.id;
     const { brandKitId, logoUrl, guidelinesText } = await req.json();
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
+    const { chatWithProvider, getDefaultProvider } = await import('../_shared/providerClient.ts');
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
       return new Response(
-        JSON.stringify({ error: 'AI service not configured' }),
+        JSON.stringify({ error: 'AI service not configured. Set GOOGLE_AI_API_KEY or OPENAI_API_KEY in Edge Function secrets.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Process brand kit with AI
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a brand guideline analyzer. Extract structured information from brand guidelines and return JSON.',
-          },
-          {
-            role: 'user',
-            content: `Analyze these brand guidelines and extract:
+    const userContent = `Analyze these brand guidelines and extract:
 1. Typography rules (primary font, secondary font, heading font, body font)
 2. Usage rules (logo placement, color usage, imagery style, tone)
 
 ${guidelinesText ? `Guidelines text:\n${guidelinesText}` : 'No guidelines text provided.'}
 ${logoUrl ? `Logo URL: ${logoUrl}` : ''}
 
-Return JSON in this format:
+Return ONLY a valid JSON object (no markdown) in this format:
 {
   "typography": {
     "primaryFont": "...",
@@ -84,19 +70,24 @@ Return JSON in this format:
     "imageryStyle": "...",
     "tone": "..."
   }
-}`,
-          },
-        ],
-        response_format: { type: 'json_object' },
-      }),
-    });
+}`;
 
-    if (!response.ok) {
-      throw new Error('AI processing failed');
+    const result = await chatWithProvider(
+      [
+        { role: 'system', content: 'You are a brand guideline analyzer. Extract structured information from brand guidelines and return JSON only.' },
+        { role: 'user', content: userContent },
+      ],
+      { model: provider === 'gemini' ? 'gemini-2.5-pro' : 'gpt-4o' }
+    );
+
+    if (!result.success || !result.text) {
+      throw new Error(result.error || 'AI processing failed');
     }
 
-    const data = await response.json();
-    const aiAnalysis = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+    let raw = result.text;
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) raw = jsonMatch[0];
+    const aiAnalysis = JSON.parse(raw || '{}');
 
     // Update brand kit with AI analysis
     if (brandKitId) {

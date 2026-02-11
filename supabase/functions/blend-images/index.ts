@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateImages, validateInstruction } from '../_shared/validation.ts';
 import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
+import { callProvider, getDefaultProvider } from '../_shared/providerClient.ts';
 import { fetchWithRetry } from '../_shared/retry.ts';
 import { createLogger } from '../_shared/observability.ts';
 
@@ -159,16 +160,19 @@ serve(async (req) => {
       }
     }
 
-    // Validate API key
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
       console.error(JSON.stringify({
         requestId,
         action: 'config_error',
-        error: 'LOVABLE_API_KEY missing',
+        error: `${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} missing`,
         timestamp: new Date().toISOString()
       }));
-      throw new Error('LOVABLE_API_KEY is not configured');
+      return createErrorResponse(
+        `AI service not configured. Set ${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} in Edge Function secrets.`,
+        500
+      ).response;
     }
 
     const trimmedInstruction = typeof instruction === 'string' ? instruction.trim() : '';
@@ -189,96 +193,51 @@ serve(async (req) => {
 
     const enhancedInstruction = `${combinedInstruction}. Create a seamless blend that feels unified and cohesive.`;
 
-    type BlendContentEntry =
-      | { type: "text"; text: string }
-      | { type: "image_url"; image_url: { url: string } };
-
-    // Build content array with validation
-    const content: BlendContentEntry[] = [{ type: "text", text: enhancedInstruction }];
-    for (let i = 0; i < images.length; i++) {
-      const img = images[i];
-      if (!img || typeof img !== 'string') {
-        console.error(JSON.stringify({
-          requestId,
-          action: 'content_build_error',
-          error: `Image ${i} is invalid`,
-          timestamp: new Date().toISOString()
-        }));
-        return createErrorResponse(`Image ${i + 1} is invalid`, 400).response;
-      }
-      content.push({ type: "image_url", image_url: { url: img } });
+    const validImages = images.filter((img: unknown): img is string => typeof img === 'string' && !!img);
+    if (validImages.length !== images.length) {
+      return createErrorResponse('All image entries must be non-empty strings.', 400).response;
     }
 
     console.log(JSON.stringify({
       requestId,
       action: 'api_call_start',
-      provider: 'lovable-ai-gateway',
-      model: 'google/gemini-3-pro-image-preview',
-      imageCount: images.length,
+      provider,
+      imageCount: validImages.length,
       instructionLength: enhancedInstruction.length,
-      contentItems: content.length,
       timestamp: new Date().toISOString()
     }));
 
-    const response = await fetchWithRetry(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
+    const providerResponse = await callProvider(
       {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-pro-image-preview",
-          messages: [{ role: "user", content }],
-          modalities: ["image", "text"]
-        })
+        provider,
+        action: 'generate',
+        prompt: enhancedInstruction,
+        images: validImages,
+        options: { temperature: 0.9, maxTokens: 2048 },
       },
-      { maxRetries: 2, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 45000 }
+      requestId
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
+    if (!providerResponse.success) {
       const duration = Date.now() - startTime;
       console.error(JSON.stringify({
         requestId,
         action: 'api_error',
-        provider: 'lovable-ai-gateway',
-        providerStatus: response.status,
-        errorCode: response.status >= 500 ? 'SERVER_ERROR' : 'CLIENT_ERROR',
+        provider,
         duration_ms: duration,
         timestamp: new Date().toISOString()
       }));
-      const errorMessage = mapAIError(response.status, errorText);
-      return createErrorResponse(errorMessage, response.status).response;
+      return createErrorResponse(
+        providerResponse.error || ERROR_MESSAGES.PROCESSING_FAILED,
+        providerResponse.errorType === 'rate_limit' ? 429 : 500
+      ).response;
     }
 
-    // Parse and extract image from response
-    let data;
-    try {
-      data = await response.json();
-      console.log(JSON.stringify({
-        requestId,
-        action: 'api_response_received',
-        hasChoices: !!data.choices,
-        choicesLength: data.choices?.length || 0,
-        responseKeys: Object.keys(data),
-        timestamp: new Date().toISOString()
-      }));
-    } catch (parseError) {
-      console.error(JSON.stringify({
-        requestId,
-        action: 'api_response_parse_error',
-        error: parseError instanceof Error ? parseError.message : 'Unknown',
-        timestamp: new Date().toISOString()
-      }));
-      throw new Error('Failed to parse API response');
-    }
+    const data = { image: providerResponse.image };
 
     // Try multiple extraction paths with detailed logging
     const blendedImageUrl =
-      data.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
-      data.choices?.[0]?.message?.content ||
+      data.image ||
       data.images?.[0]?.url ||
       data.data?.[0]?.url;
 
@@ -286,12 +245,6 @@ serve(async (req) => {
       requestId,
       action: 'image_extraction',
       found: !!blendedImageUrl,
-      path: blendedImageUrl
-        ? (data.choices?.[0]?.message?.images?.[0]?.image_url?.url ? 'choices[0].message.images[0].image_url.url' :
-          data.choices?.[0]?.message?.content ? 'choices[0].message.content' :
-            data.images?.[0]?.url ? 'images[0].url' :
-              'data[0].url')
-        : 'none',
       imageLength: blendedImageUrl?.length || 0,
       timestamp: new Date().toISOString()
     }));
@@ -591,10 +544,10 @@ serve(async (req) => {
     const duration = Date.now() - startTime;
     const logger = createLogger(requestId, userId);
     logger.logError('blend_images', error instanceof Error ? error : new Error(String(error)), duration);
+    const errorMessage = error instanceof Error ? error.message : String(error);
 
-    // Return more specific error messages when possible
-    if (errorMessage.includes('LOVABLE_API_KEY')) {
-      return createErrorResponse('Service configuration error. Please contact support.', 500).response;
+    if (errorMessage.includes('not configured') || errorMessage.includes('API_KEY')) {
+      return createErrorResponse('AI service not configured. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY) in Edge Function secrets.', 500).response;
     }
     if (errorMessage.includes('parse') || errorMessage.includes('JSON')) {
       return createErrorResponse('Invalid response from image service. Please try again.', 500).response;

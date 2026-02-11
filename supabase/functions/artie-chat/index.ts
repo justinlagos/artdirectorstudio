@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { artieSystemPrompt } from "./systemPrompt.ts";
 import { buildContextPrompt, extractContextFromEnvironment } from "./contextPrompt.ts";
+import { getDefaultProvider } from "../_shared/providerClient.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,16 +53,13 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-
-    if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY is not configured');
+    const provider = getDefaultProvider();
+    const apiKey = provider === 'gemini' ? Deno.env.get('GOOGLE_AI_API_KEY') : Deno.env.get('OPENAI_API_KEY');
+    if (!apiKey) {
+      console.error(`${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} is not configured`);
       return new Response(
-        JSON.stringify({ error: 'Server configuration error: LOVABLE_API_KEY is not configured' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        JSON.stringify({ error: 'AI service not configured. Set GOOGLE_AI_API_KEY or OPENAI_API_KEY in Edge Function secrets.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -197,36 +195,34 @@ serve(async (req) => {
       }
     ];
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const systemMessages: Array<{ role: string; content: string }> = [
+      { role: 'system', content: systemPrompt },
+      ...(environmentContext ? [{ role: 'system' as const, content: `Environment context: ${JSON.stringify(environmentContext)}` }] : []),
+    ];
+    const allMessages = [...systemMessages, ...messages];
+
+    const url = provider === 'openai'
+      ? 'https://api.openai.com/v1/chat/completions'
+      : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const body = provider === 'openai'
+      ? { model: 'gpt-4o', tools, messages: allMessages, stream: true }
+      : (() => {
+          const systemInstruction = allMessages.filter(m => m.role === 'system').map(m => (m as any).content).join('\n\n');
+          const contents = allMessages.filter(m => m.role !== 'system').map((m: any) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }],
+          }));
+          return {
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            contents,
+            generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
+          };
+        })();
+
+    const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        tools: tools,
-        messages: (() => {
-          // Build messages with system prompt and optional environment context
-          const systemMessages: Array<{ role: string; content: string }> = [
-            { role: 'system', content: systemPrompt }
-          ];
-
-          // Add environment context as a system message if provided
-          if (environmentContext) {
-            systemMessages.push({
-              role: 'system',
-              content: `Environment context: ${JSON.stringify(environmentContext)}`
-            });
-          }
-
-          return [
-            ...systemMessages,
-            ...messages
-          ];
-        })(),
-        stream: true,
-      }),
+      headers: provider === 'openai' ? { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -256,6 +252,22 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
+    }
+
+    if (provider === 'gemini') {
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || '';
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: 'stop' }] })}\n\n`));
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
+      });
     }
 
     return new Response(response.body, {

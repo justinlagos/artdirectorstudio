@@ -1,8 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { validateImageData } from '../_shared/validation.ts';
 import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
+import { chatWithProvider, getDefaultProvider } from '../_shared/providerClient.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -155,15 +156,11 @@ serve(async (req) => {
       }
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error(JSON.stringify({
-        requestId,
-        action: 'config_error',
-        timestamp: new Date().toISOString()
-      }));
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
       const { response } = createErrorResponse(
-        "AI service not configured",
+        "AI service not configured. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY) in Edge Function secrets.",
         500,
         'config_error',
         requestId
@@ -171,24 +168,7 @@ serve(async (req) => {
       return response;
     }
 
-    console.log(JSON.stringify({
-      requestId,
-      action: 'ai_call_start',
-      timestamp: new Date().toISOString()
-    }));
-
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a professional image analysis AI that creates comprehensive creative briefs for image reconstruction.
+    const systemPrompt = `You are a professional image analysis AI that creates comprehensive creative briefs for image reconstruction.
 
 Analyze the uploaded image in extreme detail across 12 professional categories. Be specific, technical, and actionable.
 
@@ -218,56 +198,33 @@ Respond with ONLY this exact JSON structure:
     "art_direction_influence": "Creative direction, visual influences, and cultural references",
     "intended_use": "Recommended applications and platforms"
   }
-}`
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Analyze this image across all 12 categories with professional-level detail. Return ONLY the JSON object, no markdown formatting, no extra text.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: image
-                }
-              }
-            ]
-          }
-        ],
-      }),
-    });
+}`;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(JSON.stringify({
-        requestId,
-        action: 'ai_error',
-        status: response.status,
-        error: errorText.substring(0, 500),
-        timestamp: new Date().toISOString()
-      }));
+    const chatResult = await chatWithProvider(
+      [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Analyze this image across all 12 categories with professional-level detail. Return ONLY the JSON object, no markdown formatting, no extra text.' },
+            { type: 'image_url', image_url: { url: image } },
+          ],
+        },
+      ],
+      { model: provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o', requestId }
+    );
 
-      const errorMessage = mapAIError(response.status, errorText);
+    if (!chatResult.success || !chatResult.text) {
       const { response: errorResponse } = createErrorResponse(
-        errorMessage,
-        response.status,
-        response.status === 429 ? 'rate_limit' : 'ai_error',
-        requestId,
-        { aiStatus: response.status }
+        chatResult.error || ERROR_MESSAGES.PROCESSING_FAILED,
+        500,
+        chatResult.errorType || 'ai_error',
+        requestId
       );
       return errorResponse;
     }
 
-    const data = await response.json();
-    console.log(JSON.stringify({
-      requestId,
-      action: 'ai_response_received',
-      timestamp: new Date().toISOString()
-    }));
-    
-    const messageContent = data.choices?.[0]?.message?.content;
+    const messageContent = chatResult.text;
     
     if (!messageContent) {
       console.error(JSON.stringify({

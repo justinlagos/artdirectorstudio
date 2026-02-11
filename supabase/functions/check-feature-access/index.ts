@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +37,19 @@ serve(async (req) => {
     }
 
     const { action } = await req.json();
+
+    // Special-case: allow caricature tool during beta/testing without consuming credits
+    if (action === 'caricature_image') {
+      return new Response(
+        JSON.stringify({
+          allowed: true,
+          bypass: true,
+          tier: 'beta',
+          reason: 'Caricature tool is free during testing'
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Fetch user profile with subscription and usage data
     const { data: profile, error: profileError } = await supabaseClient

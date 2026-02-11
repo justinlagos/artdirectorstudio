@@ -1,7 +1,7 @@
 /**
  * Unified Provider Client
- * Centralized API calls to OpenAI and Gemini (Google AI)
- * Replaces lovable.dev gateway with direct provider calls
+ * Centralized API calls to OpenAI and Gemini (Google AI).
+ * Default: Gemini (GOOGLE_AI_API_KEY). Set AI_PROVIDER=openai to use OpenAI (OPENAI_API_KEY).
  */
 
 import { fetchWithRetry } from './retry.ts';
@@ -9,11 +9,67 @@ import { mapAIError, ERROR_MESSAGES } from './errors.ts';
 
 export type ProviderType = 'openai' | 'gemini';
 
+/** Resolve provider from env: AI_PROVIDER=openai uses OpenAI, otherwise Gemini. */
+export function getDefaultProvider(): ProviderType {
+  const env = (Deno.env.get('AI_PROVIDER') || '').toLowerCase();
+  return env === 'openai' ? 'openai' : 'gemini';
+}
+
+/** OpenAI-style message for chat. content can be string or array of part objects (text / image_url). */
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+}
+
+export interface ChatWithProviderOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  requestId?: string;
+}
+
+export interface ChatWithProviderResult {
+  success: boolean;
+  text?: string;
+  error?: string;
+  errorType?: string;
+  metadata?: { provider: string; model?: string };
+}
+
+/**
+ * Chat completion using default provider (Gemini or OpenAI).
+ * Accepts OpenAI-format messages; converts to provider format internally.
+ */
+export async function chatWithProvider(
+  messages: ChatMessage[],
+  options: ChatWithProviderOptions = {}
+): Promise<ChatWithProviderResult> {
+  const provider = getDefaultProvider();
+  const requestId = options.requestId || '';
+  const logPrefix = requestId ? `[${requestId}]` : '';
+
+  try {
+    if (provider === 'gemini') {
+      return await chatWithGemini(messages, options);
+    }
+    return await chatWithOpenAI(messages, options);
+  } catch (error) {
+    console.error(`${logPrefix} chatWithProvider failed:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : ERROR_MESSAGES.PROCESSING_FAILED,
+      errorType: 'provider_error',
+      metadata: { provider }
+    };
+  }
+}
+
 export interface ProviderRequest {
   provider: ProviderType;
   action: 'generate' | 'edit' | 'analyze' | 'chat' | 'caricature';
   prompt: string;
-  image?: string;  // base64 data URI or HTTPS URL
+  image?: string;  // base64 data URI or HTTPS URL (single image)
+  images?: string[];  // multiple images (e.g. for blend)
   negativePrompt?: string;
   options?: {
     model?: string;
@@ -96,6 +152,124 @@ function parseDataUri(dataUri: string): { mimeType: string; base64Data: string }
   return null;
 }
 
+/** Fetch image URL to base64 data URI for Gemini inlineData. */
+async function imageUrlToInlineData(url: string): Promise<{ mimeType: string; data: string } | null> {
+  const parsed = parseDataUri(url);
+  if (parsed) return { mimeType: parsed.mimeType, data: parsed.base64Data };
+  if (!url.startsWith('http')) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const ct = res.headers.get('content-type') || 'image/png';
+    return { mimeType: ct, data: b64 };
+  } catch {
+    return null;
+  }
+}
+
+async function chatWithGemini(
+  messages: ChatMessage[],
+  options: ChatWithProviderOptions
+): Promise<ChatWithProviderResult> {
+  const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
+  if (!GOOGLE_AI_API_KEY) {
+    return { success: false, error: 'GOOGLE_AI_API_KEY not configured', errorType: 'config_error', metadata: { provider: 'gemini' } };
+  }
+  const model = options.model || 'gemini-2.5-flash';
+  const modelForUrl = model.includes('/') ? model.split('/').pop()! : model;
+  const systemParts: string[] = [];
+  const contents: Array<{ role: 'user' | 'model'; parts: any[] }> = [];
+  for (const msg of messages) {
+    if (msg.role === 'system') {
+      systemParts.push(typeof msg.content === 'string' ? msg.content : msg.content.map(p => p.type === 'text' ? p.text : '').join('\n'));
+      continue;
+    }
+    const parts: any[] = [];
+    if (msg.role === 'user' && typeof msg.content !== 'string' && Array.isArray(msg.content)) {
+      for (const p of msg.content) {
+        if (p.type === 'text') parts.push({ text: p.text });
+        else if (p.type === 'image_url' && p.image_url?.url) {
+          const inline = await imageUrlToInlineData(p.image_url.url);
+          if (inline) parts.push({ inlineData: { mimeType: inline.mimeType, data: inline.data } });
+        }
+      }
+    } else {
+      parts.push({ text: typeof msg.content === 'string' ? msg.content : (msg.content as any).map((p: any) => p.type === 'text' ? p.text : '').join('\n') });
+    }
+    if (parts.length) contents.push({ role: msg.role === 'assistant' ? 'model' : 'user', parts });
+  }
+  const body: any = {
+    contents: contents.map(c => ({ role: c.role, parts: c.parts })),
+    generationConfig: {
+      temperature: options.temperature ?? 0.7,
+      maxOutputTokens: options.maxTokens ?? 2048,
+    },
+  };
+  if (systemParts.length) body.systemInstruction = { parts: [{ text: systemParts.join('\n\n') }] };
+  const response = await fetchWithRetry(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelForUrl}:generateContent?key=${GOOGLE_AI_API_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    { maxRetries: 2, baseDelayMs: 2000, maxDelayMs: 10000, timeoutMs: 100000 }
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    return {
+      success: false,
+      error: mapAIError(response.status, errorText),
+      errorType: response.status === 429 ? 'rate_limit' : 'ai_error',
+      metadata: { provider: 'gemini', model },
+    };
+  }
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (text == null) {
+    return { success: false, error: ERROR_MESSAGES.PROCESSING_FAILED, errorType: 'no_content', metadata: { provider: 'gemini', model } };
+  }
+  return { success: true, text, metadata: { provider: 'gemini', model } };
+}
+
+async function chatWithOpenAI(
+  messages: ChatMessage[],
+  options: ChatWithProviderOptions
+): Promise<ChatWithProviderResult> {
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  if (!OPENAI_API_KEY) {
+    return { success: false, error: 'OPENAI_API_KEY not configured', errorType: 'config_error', metadata: { provider: 'openai' } };
+  }
+  const model = options.model || 'gpt-4o';
+  const response = await fetchWithRetry(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.maxTokens ?? 2048,
+      }),
+    },
+    { maxRetries: 2, baseDelayMs: 2000, maxDelayMs: 10000, timeoutMs: 100000 }
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    return {
+      success: false,
+      error: mapAIError(response.status, errorText),
+      errorType: response.status === 429 ? 'rate_limit' : 'ai_error',
+      metadata: { provider: 'openai', model },
+    };
+  }
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content;
+  if (text == null) {
+    return { success: false, error: ERROR_MESSAGES.PROCESSING_FAILED, errorType: 'no_content', metadata: { provider: 'openai', model } };
+  }
+  return { success: true, text, metadata: { provider: 'openai', model } };
+}
+
 /**
  * Call Google Gemini API
  * Uses gemini-3-pro-image-preview for image generation
@@ -129,8 +303,9 @@ async function callGemini(
   // Build message parts for Gemini API
   const parts: any[] = [{ text: request.prompt }];
 
-  if (request.image) {
-    const parsed = parseDataUri(request.image);
+  const imageList = request.images?.length ? request.images : (request.image ? [request.image] : []);
+  for (const img of imageList) {
+    const parsed = parseDataUri(img);
     if (parsed) {
       parts.push({
         inlineData: {
@@ -138,12 +313,14 @@ async function callGemini(
           data: parsed.base64Data,
         }
       });
+    } else if (img.startsWith('http')) {
+      const inline = await imageUrlToInlineData(img);
+      if (inline) parts.push({ inlineData: { mimeType: inline.mimeType, data: inline.data } });
     } else {
-      // Assume raw base64 PNG if no data URI prefix
       parts.push({
         inlineData: {
           mimeType: 'image/png',
-          data: request.image,
+          data: img,
         }
       });
     }
@@ -188,9 +365,12 @@ async function callGemini(
   const data = await response.json();
   console.log(`${logPrefix} Gemini response received`);
 
-  // Extract generated content
-  const generatedImageUrl = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data ||
-                            data.candidates?.[0]?.content?.parts?.[0]?.image_url?.url;
+  // Extract generated content (inlineData.data is raw base64; normalize to data URI)
+  const rawImage = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data ||
+                   data.candidates?.[0]?.content?.parts?.[0]?.image_url?.url;
+  const mimeType = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || 'image/png';
+  const generatedImageUrl = rawImage && !rawImage.startsWith('data:')
+    ? `data:${mimeType};base64,${rawImage}` : rawImage;
   const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!generatedImageUrl && !generatedText) {

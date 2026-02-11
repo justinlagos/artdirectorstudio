@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface Tool {
+export interface FunLabTool {
   id: string;
   name: string;
   description: string;
@@ -15,7 +15,7 @@ interface Tool {
   badge?: string;
 }
 
-const TOOLS: Tool[] = [
+export const FUN_LAB_TOOLS: FunLabTool[] = [
   {
     id: 'caricature',
     name: 'Caricature Studio',
@@ -63,7 +63,7 @@ const TOOLS: Tool[] = [
     description: 'Deep AI analysis of composition, style, and art direction',
     icon: '🔍',
     gradient: 'from-red-500/20 to-rose-500/20',
-    route: '/studio',
+        route: '/studio',
   },
 ];
 
@@ -139,7 +139,7 @@ export function FunLabSection() {
           viewport={{ once: true, margin: "-100px" }}
           className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {TOOLS.map((tool) => (
+          {FUN_LAB_TOOLS.map((tool) => (
             <motion.div key={tool.id} variants={itemVariants}>
               <Card
                 className={cn(
@@ -192,7 +192,7 @@ export function FunLabSection() {
         >
           <Button
             size="lg"
-            onClick={() => navigate('/register')}
+            onClick={() => navigate('/auth')}
             className="gap-2 shadow-lg hover:shadow-xl transition-shadow"
           >
             <Sparkles className="h-5 w-5" />

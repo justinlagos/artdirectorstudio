@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.77.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,48 +61,31 @@ serve(async (req) => {
     const prompts = userWorks.map(w => w.prompt).filter(Boolean).slice(0, 10);
     console.log(`[get-similar-works] Analyzing ${prompts.length} prompts`);
 
-    // Use Lovable AI to analyze user preferences
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error('[get-similar-works] LOVABLE_API_KEY not configured');
+    const { chatWithProvider, getDefaultProvider } = await import('../_shared/providerClient.ts');
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
+      console.error('[get-similar-works] AI API key not configured');
       throw new Error("AI service not configured");
     }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{
-          role: "user",
-          content: `Analyze these image generation prompts and extract key themes, styles, subjects, and aesthetic preferences. Return ONLY a JSON object (no markdown, no code blocks) with these arrays: {"styles": [], "subjects": [], "moods": [], "keywords": []}. Keep each array to max 8 items. Prompts: ${prompts.join('; ')}`
-        }]
-      }),
-    });
+    const result = await chatWithProvider(
+      [{
+        role: "user",
+        content: `Analyze these image generation prompts and extract key themes, styles, subjects, and aesthetic preferences. Return ONLY a JSON object (no markdown, no code blocks) with these arrays: {"styles": [], "subjects": [], "moods": [], "keywords": []}. Keep each array to max 8 items. Prompts: ${prompts.join('; ')}`,
+      }],
+      { model: provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o' }
+    );
 
-    if (!aiResponse.ok) {
-      console.error('[get-similar-works] AI API error:', aiResponse.status);
-      const errorText = await aiResponse.text();
-      console.error('[get-similar-works] AI API error details:', errorText);
-      throw new Error(`AI service error: ${aiResponse.status}`);
+    if (!result.success || !result.text) {
+      console.error('[get-similar-works] AI API error:', result.error);
+      throw new Error(result.error || "AI service error");
     }
 
-    const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content;
-    if (!content) {
-      console.error('[get-similar-works] No content in AI response');
-      throw new Error("Invalid AI response");
-    }
-
-    // Parse AI response - remove markdown code blocks if present
-    let cleanedContent = content.trim();
+    let cleanedContent = result.text.trim();
     if (cleanedContent.startsWith('```')) {
       cleanedContent = cleanedContent.replace(/^```json?\s*/, '').replace(/```\s*$/, '');
     }
-    
     const analysis = JSON.parse(cleanedContent);
     console.log('[get-similar-works] AI analysis:', analysis);
 

@@ -36,9 +36,15 @@ export default function Auth() {
     const { error } = await signIn(email, password);
 
     if (error) {
+      let description = error.message;
+      if (description?.includes("Invalid login credentials")) {
+        description =
+          "Invalid email or password, or this account does not exist in this Supabase project. " +
+          "If you recently switched Supabase projects (e.g. vsbjx… → gpyx…), sign up again with this email.";
+      }
       toast({
         title: "Error signing in",
-        description: error.message,
+        description,
         variant: "destructive",
       });
     } else {

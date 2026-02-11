@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { fetchWithRetry } from '../_shared/retry.ts';
+import { chatWithProvider, getDefaultProvider } from '../_shared/providerClient.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,13 +21,13 @@ serve(async (req) => {
       throw new Error('Prompt is required');
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
+      throw new Error(`${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} is not configured`);
     }
 
     let systemPrompt = "";
-    
     switch (improvementType) {
       case "enhance":
         systemPrompt = "You are an expert at enhancing image generation prompts. Take the user's prompt and make it more detailed, specific, and effective for AI image generation. Add relevant artistic details, lighting, composition, and style elements. Return ONLY the improved prompt, nothing else.";
@@ -42,37 +42,20 @@ serve(async (req) => {
         systemPrompt = "You are an expert at improving image generation prompts. Take the user's prompt and make it more effective for AI image generation. Return ONLY the improved prompt, nothing else.";
     }
 
-    const response = await fetchWithRetry(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: prompt }
-          ]
-        })
-      },
-      { maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 20000, timeoutMs: 30000 }
+    const result = await chatWithProvider(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+      { model: provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o' }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Suggest API error:', response.status, errorText);
-      throw new Error(`Failed to generate suggestions: ${response.statusText}`);
+    if (!result.success || !result.text) {
+      console.error('Suggest API error:', result.error);
+      throw new Error(result.error || 'Failed to generate suggestions');
     }
 
-    const data = await response.json();
-    const suggestedPrompt = data.choices?.[0]?.message?.content;
-
-    if (!suggestedPrompt) {
-      throw new Error('No suggestion returned from API');
-    }
+    const suggestedPrompt = result.text;
 
     return new Response(
       JSON.stringify({ suggestion: suggestedPrompt.trim() }),

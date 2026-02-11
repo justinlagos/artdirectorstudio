@@ -1,8 +1,9 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchWithRetry } from '../_shared/retry.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
+import { callProvider, getDefaultProvider } from '../_shared/providerClient.ts';
 import { checkIdempotency, cacheResponse } from '../_shared/idempotency.ts';
 import {
   formatSSEMessage,
@@ -284,45 +285,26 @@ async function handleStreamingRequest(
 
       await sendProgress('init', 20, 'Prompt validated...');
 
-      // Get Lovable API key
-      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-      if (!LOVABLE_API_KEY) {
-        logger.logError('generate_image', new Error('LOVABLE_API_KEY not configured'), undefined, { action: 'config_check' });
-        await sendError("AI service not configured. Please contact support.", 'config_error');
+      const provider = getDefaultProvider();
+      const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+      if (!hasKey) {
+        logger.logError('generate_image', new Error(`${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} not configured`), undefined, { action: 'config_check' });
+        await sendError("AI service not configured. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY with AI_PROVIDER=openai) in Edge Function secrets.", 'config_error');
         return;
       }
 
-      // Build structured prompt using prompt engine
       const promptObject = buildPrompt(normalizedParams);
       const negativePromptObject = buildNegativePrompt(normalizedParams);
       const serializedPrompt = serializePrompt(promptObject);
       const serializedNegativePrompt = serializeNegativePrompt(negativePromptObject);
+      const promptWithNegative = serializedNegativePrompt
+        ? `${serializedPrompt}\n\nAvoid: ${serializedNegativePrompt}`
+        : serializedPrompt;
 
-      // Build message content for AI API
-      let messageContent: any;
-      if (normalizedParams.reference_image_url) {
-        messageContent = [
-          {
-            type: "text",
-            text: serializedPrompt
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: normalizedParams.reference_image_url
-            }
-          }
-        ];
-      } else {
-        messageContent = serializedPrompt;
-      }
-
-      // Call AI API with progress updates
       const aiCallStart = Date.now();
-      console.log(`[${requestId}] Calling AI API with model: google/gemini-3-pro-image-preview`);
+      console.log(`[${requestId}] Calling AI API with provider: ${provider}`);
       await sendProgress('generating', 25, 'Composing image...');
 
-      // Start progress simulation during AI call (incrementing while waiting)
       let currentProgress = 25;
       const progressInterval = setInterval(async () => {
         if (currentProgress < 55) {
@@ -335,61 +317,36 @@ async function handleStreamingRequest(
         }
       }, 1500);
 
-      let aiResponse;
+      let providerResponse;
       try {
-        aiResponse = await fetchWithRetry(
-          "https://ai.gateway.lovable.dev/v1/chat/completions",
+        providerResponse = await callProvider(
           {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "Content-Type": "application/json",
+            provider,
+            action: 'generate',
+            prompt: promptWithNegative,
+            image: normalizedParams.reference_image_url || undefined,
+            options: {
+              temperature: 0.9,
+              maxTokens: 2048,
             },
-            body: JSON.stringify({
-              model: "google/gemini-3-pro-image-preview",
-              messages: [
-                {
-                  role: "user",
-                  content: messageContent
-                }
-              ],
-              modalities: ["image", "text"]
-            }),
           },
-          { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 60000 }
+          requestId
         );
       } finally {
         clearInterval(progressInterval);
       }
 
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-        const aiCallDuration = Date.now() - aiCallStart;
-        console.error(`[${requestId}] AI API error (${aiCallDuration}ms):`, {
-          status: aiResponse.status,
-          error: errorText
-        });
-
-        const friendlyMessage = mapAIError(aiResponse.status, errorText);
-        const errorType = aiResponse.status === 429 ? 'rate_limit' :
-          aiResponse.status === 402 ? 'credits_exhausted' : 'ai_error';
-        await sendError(friendlyMessage, errorType, errorType === 'rate_limit');
+      if (!providerResponse.success || !providerResponse.image) {
+        const err = providerResponse?.error || ERROR_MESSAGES.PROCESSING_FAILED;
+        const errorType = providerResponse?.errorType === 'rate_limit' ? 'rate_limit' : 'ai_error';
+        await sendError(err, errorType, errorType === 'rate_limit');
         return;
       }
 
       const aiCallDuration = Date.now() - aiCallStart;
-      const aiData = await aiResponse.json();
+      const generatedImageUrl = providerResponse.image;
       console.log(`[${requestId}] AI response received (${aiCallDuration}ms)`);
       await sendProgress('processing', 60, 'Refining details...');
-
-      // Extract generated image
-      const generatedImageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-      if (!generatedImageUrl) {
-        console.error(`[${requestId}] No image in AI response`);
-        await sendError(ERROR_MESSAGES.PROCESSING_FAILED, 'no_image_data');
-        return;
-      }
 
       console.log(`[${requestId}] Image generated, base64 length: ${generatedImageUrl.length}`);
       await sendProgress('processing', 70, 'Uploading to storage...');
@@ -754,12 +711,12 @@ async function handleStandardRequest(
       );
     }
 
-    // Get Lovable API key
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      logger.logError('generate_image', new Error('LOVABLE_API_KEY not configured'), undefined, { action: 'config_check' });
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
+      logger.logError('generate_image', new Error(`${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} not configured`), undefined, { action: 'config_check' });
       const { response } = createErrorResponse(
-        "AI service not configured. Please contact support.",
+        "AI service not configured. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY with AI_PROVIDER=openai) in Edge Function secrets.",
         500,
         'config_error',
         requestId
@@ -767,97 +724,48 @@ async function handleStandardRequest(
       return response;
     }
 
-    // Build structured prompt using prompt engine
     const promptObject = buildPrompt(normalizedParams);
     const negativePromptObject = buildNegativePrompt(normalizedParams);
     const serializedPrompt = serializePrompt(promptObject);
     const serializedNegativePrompt = serializeNegativePrompt(negativePromptObject);
+    const promptWithNegative = serializedNegativePrompt
+      ? `${serializedPrompt}\n\nAvoid: ${serializedNegativePrompt}`
+      : serializedPrompt;
 
-    // Build message content for AI API
-    let messageContent: any;
-    if (normalizedParams.reference_image_url) {
-      messageContent = [
-        {
-          type: "text",
-          text: serializedPrompt
-        },
-        {
-          type: "image_url",
-          image_url: {
-            url: normalizedParams.reference_image_url
-          }
-        }
-      ];
-    } else {
-      messageContent = serializedPrompt;
-    }
-
-    // Call Lovable AI Gateway with Nano Banana Pro model
     const aiCallStart = Date.now();
-    console.log(`[${requestId}] Calling AI API with model: google/gemini-3-pro-image-preview (Nano Banana Pro)`);
+    console.log(`[${requestId}] Calling AI API with provider: ${provider}`);
 
-    const aiResponse = await fetchWithRetry(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
+    const providerResponse = await callProvider(
       {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
+        provider,
+        action: 'generate',
+        prompt: promptWithNegative,
+        image: normalizedParams.reference_image_url || undefined,
+        options: {
+          temperature: 0.9,
+          maxTokens: 2048,
         },
-        body: JSON.stringify({
-          model: "google/gemini-3-pro-image-preview",
-          messages: [
-            {
-              role: "user",
-              content: messageContent
-            }
-          ],
-          modalities: ["image", "text"]
-        }),
       },
-      { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 60000 }
+      requestId
     );
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      const aiCallDuration = Date.now() - aiCallStart;
-      console.error(`[${requestId}] AI API error (${aiCallDuration}ms):`, {
-        status: aiResponse.status,
-        error: errorText
-      });
-
-      const friendlyMessage = mapAIError(aiResponse.status, errorText);
+    if (!providerResponse.success || !providerResponse.image) {
+      const err = providerResponse?.error || ERROR_MESSAGES.PROCESSING_FAILED;
       const { response } = createErrorResponse(
-        friendlyMessage,
-        aiResponse.status,
-        aiResponse.status === 429 ? 'rate_limit' :
-          aiResponse.status === 402 ? 'credits_exhausted' :
-            'ai_error',
+        err,
+        500,
+        providerResponse?.errorType === 'rate_limit' ? 'rate_limit' : 'ai_error',
         requestId,
-        { duration: aiCallDuration, aiStatus: aiResponse.status }
+        { duration: Date.now() - aiCallStart }
       );
       return response;
     }
 
     const aiCallDuration = Date.now() - aiCallStart;
-    const aiData = await aiResponse.json();
+    const generatedImageUrl = providerResponse.image;
     console.log(`[${requestId}] AI response received (${aiCallDuration}ms):`, {
-      hasImages: !!aiData.choices?.[0]?.message?.images
+      hasImages: true
     });
-
-    // Extract generated image
-    const generatedImageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (!generatedImageUrl) {
-      console.error(`[${requestId}] No image in AI response:`, JSON.stringify(aiData).substring(0, 200));
-      const { response } = createErrorResponse(
-        ERROR_MESSAGES.PROCESSING_FAILED,
-        500,
-        'no_image_data',
-        requestId
-      );
-      return response;
-    }
 
     console.log(`[${requestId}] Image generated, base64 length: ${generatedImageUrl.length}`);
 

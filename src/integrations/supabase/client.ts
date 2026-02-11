@@ -4,6 +4,80 @@ import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+
+/**
+ * Best-effort runtime validation of Supabase environment configuration.
+ * Logs console warnings in the browser if configuration is likely incorrect.
+ */
+function validateSupabaseEnv() {
+  if (typeof window === 'undefined') {
+    // Skip validation during SSR / build
+    return;
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    console.warn(
+      '[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. ' +
+      'Auth and API calls will fail until .env is updated and the dev server is restarted.'
+    );
+    return;
+  }
+
+  let projectRefFromUrl: string | null = null;
+  let projectRefFromEnvId: string | null = null;
+  let projectRefFromKey: string | null = null;
+
+  try {
+    const url = new URL(SUPABASE_URL);
+    projectRefFromUrl = url.hostname.split('.')[0] || null;
+  } catch {
+    console.warn('[Supabase] VITE_SUPABASE_URL is not a valid URL:', SUPABASE_URL);
+  }
+
+  if (SUPABASE_PROJECT_ID && typeof SUPABASE_PROJECT_ID === 'string') {
+    const trimmed = SUPABASE_PROJECT_ID.trim();
+    projectRefFromEnvId = trimmed.length ? trimmed : null;
+  }
+
+  try {
+    if (SUPABASE_PUBLISHABLE_KEY.startsWith('eyJ') && typeof atob === 'function') {
+      // Legacy anon key (JWT) – extract project ref from iss claim if present
+      const parts = SUPABASE_PUBLISHABLE_KEY.split('.');
+      if (parts.length >= 2) {
+        const payloadJson = JSON.parse(
+          atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+        );
+        const iss: string | undefined = payloadJson.iss;
+        if (iss) {
+          const issUrl = new URL(iss);
+          projectRefFromKey = issUrl.hostname.split('.')[0] || null;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[Supabase] Failed to inspect Supabase publishable key for project ref', error);
+  }
+
+  const refs = [projectRefFromUrl, projectRefFromEnvId, projectRefFromKey].filter(
+    (v): v is string => !!v
+  );
+
+  if (refs.length >= 2) {
+    const [first, ...rest] = refs;
+    const mismatch = rest.some(ref => ref !== first);
+    if (mismatch) {
+      console.warn(
+        '[Supabase] Possible project mismatch between VITE_SUPABASE_URL, ' +
+        'VITE_SUPABASE_PUBLISHABLE_KEY, and VITE_SUPABASE_PROJECT_ID. ' +
+        'If you recently switched projects (e.g. vsbjx… → gpyx…), ' +
+        'make sure all three values come from the same Supabase project and restart the dev server.'
+      );
+    }
+  }
+}
+
+validateSupabaseEnv();
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

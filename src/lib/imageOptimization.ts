@@ -217,6 +217,46 @@ export async function generateBase64LQIP(
   });
 }
 
+/** Max dimension for analysis-optimized images. Vision APIs work well at this size and payload stays small. */
+const ANALYSIS_MAX_DIMENSION = 1536;
+
+/** Quality for JPEG compression when resizing for analysis. Balances file size and detail. */
+const ANALYSIS_JPEG_QUALITY = 0.88;
+
+/**
+ * Resize an image for analysis to reduce upload time and AI processing latency.
+ * If the image is already small enough, returns the original.
+ * Output is JPEG base64 data URL suitable for analyze-image.
+ */
+export async function resizeImageForAnalysis(dataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const { naturalWidth: w, naturalHeight: h } = img;
+      if (w <= ANALYSIS_MAX_DIMENSION && h <= ANALYSIS_MAX_DIMENSION) {
+        resolve(dataUrl);
+        return;
+      }
+      const scale = Math.min(ANALYSIS_MAX_DIMENSION / w, ANALYSIS_MAX_DIMENSION / h);
+      const width = Math.round(w * scale);
+      const height = Math.round(h * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', ANALYSIS_JPEG_QUALITY));
+    };
+    img.onerror = () => reject(new Error('Failed to load image for resizing'));
+    img.src = dataUrl;
+  });
+}
+
 /**
  * Get optimized image URL using Cloudflare Images
  * Wraps image URLs with Cloudflare optimization parameters

@@ -1,7 +1,8 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchWithRetry } from '../_shared/retry.ts';
+import { callProvider, getDefaultProvider } from '../_shared/providerClient.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -158,12 +159,12 @@ serve(async (req) => {
       console.log(`[${requestId}] Converted filename to URL: ${fullImageUrl.substring(0, 100)}...`);
     }
 
-    // Get Lovable API key
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error(`[${requestId}] LOVABLE_API_KEY not configured`);
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
+      console.error(`[${requestId}] ${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} not configured`);
       return new Response(
-        JSON.stringify({ error: "AI service not configured" }),
+        JSON.stringify({ error: "AI service not configured. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY) in Edge Function secrets." }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -176,8 +177,7 @@ serve(async (req) => {
       aspectRatio = '2:3';
     }
 
-    // Call Lovable AI Gateway with image editing
-    console.log(`[${requestId}] Calling Lovable AI Gateway for image editing...`);
+    console.log(`[${requestId}] Calling ${provider} for image editing...`);
 
     // Build instruction with region/mask context
     let enhancedInstruction = trimmedInstruction;
@@ -191,139 +191,53 @@ serve(async (req) => {
       enhancedInstruction += ` Use the provided mask to guide the editing precisely.`;
     }
 
-    // FIX: Build AI request with structured region parameters if supported
-    const aiRequestBody: any = {
-      model: "google/gemini-3-pro-image-preview",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `${enhancedInstruction} Generate with aspect ratio ${aspectRatio}.`
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: fullImageUrl,
-                // Include structured region if available (for models that support it)
-                ...(region && typeof region === 'object' && region.x !== undefined && {
-                  region: {
-                    x: Math.round(region.x),
-                    y: Math.round(region.y),
-                    width: Math.round(region.width),
-                    height: Math.round(region.height)
-                  }
-                })
-              }
-            }
-          ]
-        }
-      ],
-      modalities: ["image", "text"]
-    };
+    enhancedInstruction = `${enhancedInstruction} Generate with aspect ratio ${aspectRatio}.`;
 
-    // Add mask parameter if provided
-    if (mask) {
-      aiRequestBody.mask = mask;
-    }
-
-    console.log(`[${requestId}] AI request instruction length: ${enhancedInstruction.length}, has region: ${!!region}, has mask: ${!!mask}`);
-
-    let aiResponse;
+    let providerResponse;
     try {
-      aiResponse = await fetchWithRetry(
-        "https://ai.gateway.lovable.dev/v1/chat/completions",
+      providerResponse = await callProvider(
         {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
+          provider,
+          action: 'edit',
+          prompt: enhancedInstruction,
+          image: fullImageUrl,
+          options: {
+            mask: mask || undefined,
+            size: size || '1024x1024',
+            temperature: 0.8,
+            maxTokens: 2048,
           },
-          body: JSON.stringify(aiRequestBody),
         },
-        { maxRetries: 3, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 60000 }
+        requestId
       );
     } catch (aiFetchError) {
-      console.error(`[${requestId}] AI Gateway fetch error:`, aiFetchError);
+      console.error(`[${requestId}] AI fetch error:`, aiFetchError);
       return new Response(
         JSON.stringify({ error: "Failed to connect to AI service. Please try again." }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!aiResponse.ok) {
-      let errorText = '';
-      try {
-        errorText = await aiResponse.text();
-      } catch (e) {
-        errorText = 'Unable to read error response';
-      }
-      console.error(`[${requestId}] Lovable AI error:`, aiResponse.status, errorText.substring(0, 200));
-
-      if (aiResponse.status === 429) {
+    if (!providerResponse.success) {
+      if (providerResponse.errorType === 'rate_limit') {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please wait a moment and try again." }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI service credits exhausted. Please try again later or contact support." }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
       return new Response(
-        JSON.stringify({ error: `Failed to edit image: AI service returned error ${aiResponse.status}` }),
+        JSON.stringify({ error: providerResponse.error || "Image edit failed. Please try again." }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    let aiData;
-    try {
-      aiData = await aiResponse.json();
-    } catch (parseError) {
-      console.error(`[${requestId}] Failed to parse AI response:`, parseError);
-      return new Response(
-        JSON.stringify({ error: "Failed to process AI response. Please try again." }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const aiData = { image: providerResponse.image };
 
     console.log(`[${requestId}] AI response received:`, {
-      hasChoices: !!aiData.choices,
-      hasMessage: !!aiData.choices?.[0]?.message,
-      hasImages: !!aiData.choices?.[0]?.message?.images,
-      imageCount: aiData.choices?.[0]?.message?.images?.length || 0
+      hasImage: !!aiData.image
     });
 
-    // Extract edited image - handle multiple possible response structures
-    let editedImageUrl = null;
-
-    // Try primary structure: choices[0].message.images[0].image_url.url
-    if (aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url) {
-      editedImageUrl = aiData.choices[0].message.images[0].image_url.url;
-    }
-    // Try alternative structure: choices[0].message.content (if it's an image)
-    else if (aiData.choices?.[0]?.message?.content) {
-      const content = aiData.choices[0].message.content;
-      if (typeof content === 'string' && content.startsWith('data:image/')) {
-        editedImageUrl = content;
-      } else if (Array.isArray(content)) {
-        const imageContent = content.find(item => item.type === 'image_url' || item.type === 'image');
-        if (imageContent?.image_url?.url) {
-          editedImageUrl = imageContent.image_url.url;
-        } else if (imageContent?.url) {
-          editedImageUrl = imageContent.url;
-        }
-      }
-    }
-    // Try direct image field
-    else if (aiData.image) {
-      editedImageUrl = aiData.image;
-    }
+    const editedImageUrl = aiData.image;
 
     if (!editedImageUrl) {
       console.error(`[${requestId}] No image in AI response. Full response:`, JSON.stringify(aiData).substring(0, 500));
@@ -350,10 +264,7 @@ serve(async (req) => {
         const supabaseUrl = Deno.env.get('SUPABASE_URL');
         if (url.startsWith(`${supabaseUrl}/storage/`)) return true;
 
-        // Allow Lovable AI gateway and Google storage URLs
-        if (url.includes('ai.gateway.lovable.dev') || url.includes('storage.googleapis.com')) {
-          return true;
-        }
+        if (url.includes('storage.googleapis.com')) return true;
 
         return false;
       } catch {

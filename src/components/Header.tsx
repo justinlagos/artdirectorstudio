@@ -34,27 +34,23 @@ export const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/">Studio</Link>
-            </Button>
-            
-            {user && (
-              <>
-                <Button type="button" variant="ghost" size="sm" onClick={() => openTool('blend')}>
-                  <Layers className="mr-2 h-4 w-4" />
-                  Blend
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => openTool('upscale')}>
-                  <Maximize2 className="mr-2 h-4 w-4" />
-                  Upscale
-                </Button>
-              </>
+            {user ? (
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/canvas">Canvas</Link>
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/">Studio</Link>
+              </Button>
             )}
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/funbox">Fun Box</Link>
+            </Button>
 
             <Button variant="ghost" size="sm" asChild>
               <Link to="/community">Community</Link>
             </Button>
-            
+
             <Button variant="ghost" size="sm" asChild>
               <Link to="/artie">Artie</Link>
             </Button>
@@ -115,6 +111,17 @@ export const Header = () => {
                     <Link to="/">
                       <Home className="mr-3 h-4 w-4" />
                       Studio
+                    </Link>
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    asChild 
+                    className="justify-start min-h-[48px]"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Link to="/funbox">
+                      <Palette className="mr-3 h-4 w-4" />
+                      Fun Box
                     </Link>
                   </Button>
                   

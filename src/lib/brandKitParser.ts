@@ -147,90 +147,35 @@ export async function parseGuidelinesPDF(pdfText: string): Promise<{
 }
 
 /**
- * Process brand kit with AI to extract structured information
+ * Process brand kit with AI via Edge Function.
+ * Pass the Supabase client so the function can be invoked with auth.
  */
 export async function processBrandKitWithAI(
   logoUrl: string,
   guidelinesText: string,
-  apiKey: string
+  supabaseClient: { functions: { invoke: (name: string, opts: { body: Record<string, unknown> }) => Promise<{ data?: unknown; error?: unknown }> } }
 ): Promise<ParsedBrandKit> {
   try {
-    // Extract colors from logo
     const colors = await extractColorsFromLogo(logoUrl);
-    
-    // Use AI to extract structured information from guidelines
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a brand guideline analyzer. Extract structured information from brand guidelines and return JSON.',
-          },
-          {
-            role: 'user',
-            content: `Analyze these brand guidelines and extract:
-1. Typography rules (primary font, secondary font, heading font, body font)
-2. Usage rules (logo placement, color usage, imagery style, tone)
 
-Guidelines text:
-${guidelinesText}
-
-Return JSON in this format:
-{
-  "typography": {
-    "primaryFont": "...",
-    "secondaryFont": "...",
-    "headingFont": "...",
-    "bodyFont": "..."
-  },
-  "usageRules": {
-    "logoPlacement": ["..."],
-    "colorUsage": ["..."],
-    "imageryStyle": "...",
-    "tone": "..."
-  }
-}`,
-          },
-        ],
-        response_format: { type: 'json_object' },
-      }),
+    const { data, error } = await supabaseClient.functions.invoke('process-brand-kit', {
+      body: { logoUrl, guidelinesText },
     });
-    
-    if (!response.ok) {
-      throw new Error('AI processing failed');
-    }
-    
-    const data = await response.json();
-    const aiAnalysis = JSON.parse(data.choices?.[0]?.message?.content || '{}');
-    
-    // Parse guidelines text for fallback
+
+    if (error) throw new Error(typeof error === 'string' ? error : 'AI processing failed');
+    const res = data as { typography?: BrandTypography; usageRules?: BrandUsageRules; error?: string } | null;
+    if (res?.error) throw new Error(res.error);
+
     const parsed = await parseGuidelinesPDF(guidelinesText);
-    
     return {
       colors,
-      typography: {
-        ...parsed.typography,
-        ...aiAnalysis.typography,
-      },
-      usageRules: {
-        ...parsed.usageRules,
-        ...aiAnalysis.usageRules,
-      },
+      typography: { ...parsed.typography, ...(res?.typography || {}) },
+      usageRules: { ...parsed.usageRules, ...(res?.usageRules || {}) },
     };
   } catch (error) {
     console.error('[brandKitParser] Error processing brand kit:', error);
-    // Fallback to basic parsing
     const colors = await extractColorsFromLogo(logoUrl).catch(() => []);
     const parsed = await parseGuidelinesPDF(guidelinesText);
-    return {
-      colors,
-      ...parsed,
-    };
+    return { colors, ...parsed };
   }
 }

@@ -75,3 +75,40 @@ npm run preview
 
 - Issues and feature requests: https://github.com/justinlagos/artdirectorstudio/issues
 - General inquiries: please open an issue or contact the repository owner via GitHub profile
+
+## Switching Supabase projects
+
+If you clone this repo or move between Supabase projects (for example, from `vsbjx…` to `gpyx…`), follow these steps to avoid auth and sign-in issues:
+
+1. **Update `.env` with the new project values**
+   - In the Supabase dashboard for your target project (`Project Settings → API`), copy:
+     - Project URL
+     - Project ID (ref)
+     - `anon`/publishable key
+   - Update the root `.env` file:
+     ```bash
+     VITE_SUPABASE_URL="https://YOUR-PROJECT.supabase.co"
+     VITE_SUPABASE_PROJECT_ID="YOUR_PROJECT_ID"
+     VITE_SUPABASE_PUBLISHABLE_KEY="YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY"
+     ```
+
+2. **Restart the dev server**
+   - Stop `npm run dev` (Ctrl+C) and start it again so Vite picks up the new env values.
+
+3. **Clear local storage and cached session data**
+   - In your browser dev tools, clear `Local Storage` for `http://localhost:5173` (or your app origin).
+   - Optionally clear cookies for the app origin as well.
+
+4. **Verify Supabase Auth redirect URLs**
+   - In the Supabase dashboard (`Authentication → URL Configuration`):
+     - Ensure your `Site URL` includes your local dev URL (e.g. `http://localhost:5173`).
+     - Add any additional redirect URLs used in the app (e.g. `http://localhost:5173/auth/callback`).
+
+After these steps, the frontend Supabase client (`src/integrations/supabase/client.ts`) and all edge function calls will use the new project (`VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PROJECT_ID`), and sign-in should work against the correct Supabase instance.
+
+### Image generation and AI features
+
+Image generation and other AI features use **Gemini** by default (Google AI). Optional: use **OpenAI** by setting `AI_PROVIDER=openai` and `OPENAI_API_KEY`. 
+1. **Gemini (default):** Get an API key from [Google AI Studio](https://aistudio.google.com/apikey), then set GOOGLE_AI_API_KEY in Edge Function secrets (Dashboard: Project Settings → Edge Functions → Secrets).
+2. **OpenAI (optional):** Set `AI_PROVIDER=openai` and `OPENAI_API_KEY` in Edge Function secrets.
+3. Redeploy or restart Edge Functions after changing secrets.

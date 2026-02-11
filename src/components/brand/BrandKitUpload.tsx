@@ -91,9 +91,8 @@ export const BrandKitUpload = ({ onUploadComplete }: BrandKitUploadProps) => {
         guidelinesText = 'Brand guidelines document uploaded';
       }
 
-      // Process with AI to extract brand information
-      const LOVABLE_API_KEY = import.meta.env.VITE_LOVABLE_API_KEY || '';
-      const parsed = await processBrandKitWithAI(logoUrl, guidelinesText, LOVABLE_API_KEY);
+      // Process with AI via Edge Function
+      const parsed = await processBrandKitWithAI(logoUrl, guidelinesText, supabase);
 
       // Save to database
       const { data: brandKit, error: dbError } = await supabase

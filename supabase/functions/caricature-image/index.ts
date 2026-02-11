@@ -57,10 +57,7 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       const { response } = createErrorResponse("Authentication required", 401, 'auth_required', requestId);
-      return new Response(JSON.stringify(response), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return response;
     }
 
     // Extract user ID
@@ -73,10 +70,7 @@ serve(async (req) => {
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !userData?.user) {
       const { response } = createErrorResponse("Invalid session", 401, 'invalid_session', requestId);
-      return new Response(JSON.stringify(response), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return response;
     }
 
     userId = userData.user.id;
@@ -97,10 +91,7 @@ serve(async (req) => {
         'consent_required',
         requestId
       );
-      return new Response(JSON.stringify(response), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return response;
     }
 
     // Validate preset
@@ -111,19 +102,13 @@ serve(async (req) => {
         'invalid_preset',
         requestId
       );
-      return new Response(JSON.stringify(response), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return response;
     }
 
     // Validate image
     if (!image || typeof image !== 'string') {
       const { response } = createErrorResponse("Image is required", 400, 'missing_image', requestId);
-      return new Response(JSON.stringify(response), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return response;
     }
 
     // Check idempotency
@@ -164,10 +149,7 @@ serve(async (req) => {
         'insufficient_credits',
         requestId
       );
-      return new Response(JSON.stringify(response), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return response;
     }
 
     // Get preset configuration
@@ -196,19 +178,13 @@ serve(async (req) => {
         providerResponse.errorType || 'provider_error',
         requestId
       );
-      return new Response(JSON.stringify(response), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return response;
     }
 
     const generatedImageUrl = providerResponse.image || providerResponse.imageUrl;
     if (!generatedImageUrl) {
       const { response } = createErrorResponse(ERROR_MESSAGES.PROCESSING_FAILED, 500, 'no_image', requestId);
-      return new Response(JSON.stringify(response), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return response;
     }
 
     console.log(`[${requestId}] Caricature generated, uploading to storage...`);
@@ -313,9 +289,6 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : ERROR_MESSAGES.PROCESSING_FAILED;
     const { response } = createErrorResponse(errorMessage, 500, 'server_error', requestId);
 
-    return new Response(JSON.stringify(response), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return response;
   }
 });

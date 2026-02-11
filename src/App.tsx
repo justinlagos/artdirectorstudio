@@ -67,6 +67,8 @@ const SignedOut = lazy(() => import("./pages/SignedOut"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PresetGallery = lazy(() => import("./pages/PresetGallery"));
 const ArtiePage = lazy(() => import("./pages/ArtiePage"));
+const FunBox = lazy(() => import("./pages/FunBox"));
+const CanvasPage = lazy(() => import("./pages/CanvasPage"));
 const DesignerProfile = lazy(() => import("./pages/DesignerProfile").then(m => ({ default: m.DesignerProfile })));
 const Discover = lazy(() => import("./pages/Discover").then(m => ({ default: m.Discover })));
 const CaseStudyDetail = lazy(() => import("./pages/CaseStudyDetail").then(m => ({ default: m.CaseStudyDetail })));
@@ -212,6 +214,9 @@ const AppContent = () => {
                   <Route path="/signed-out" element={<SignedOut />} />
                   <Route path="/presets" element={<PresetGallery />} />
                   <Route path="/artie" element={<ArtiePage />} />
+                  <Route path="/funbox" element={<FunBox />} />
+                  <Route path="/canvas" element={<CanvasPage />} />
+                  <Route path="/canvas/:projectId" element={<CanvasPage />} />
                   <Route path="/tools/caricature" element={<CaricatureTool />} />
                   <Route path="/discover" element={<Discover />} />
                   <Route path="/designer/:username" element={<DesignerProfile />} />

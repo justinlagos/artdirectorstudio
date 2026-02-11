@@ -479,8 +479,8 @@ const Settings = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Default AI Model</Label>
-                    <Input value="Lovable AI" disabled />
+                    <Label>AI</Label>
+                    <Input value="Art Director Studio" disabled />
                   </div>
                   <div className="space-y-2">
                     <Label>Default Image Format</Label>

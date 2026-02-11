@@ -79,57 +79,13 @@ export const CaseStudyBuilder = ({ onSave }: CaseStudyBuilderProps) => {
         results: results || '',
       };
 
-      // If narrative fields are empty, generate with AI
+      // Use placeholder narrative when fields are empty (AI generation is done via Edge Functions)
       if (!challenge && !solution && !results) {
-        try {
-          const LOVABLE_API_KEY = import.meta.env.VITE_LOVABLE_API_KEY || '';
-          if (LOVABLE_API_KEY) {
-            const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'google/gemini-2.5-pro',
-                messages: [
-                  {
-                    role: 'system',
-                    content: 'You are a creative director analyzing a design project. Generate a compelling case study narrative from selected assets.',
-                  },
-                  {
-                    role: 'user',
-                    content: `Generate a case study narrative for a design project with ${selectedAssets.length} assets. Include:
-1. Challenge: What was the creative challenge?
-2. Solution: How was it solved?
-3. Results: What were the outcomes?
-
-Return JSON with challenge, solution, and results fields.`,
-                  },
-                ],
-                response_format: { type: 'json_object' },
-              }),
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-              const aiNarrative = JSON.parse(data.choices?.[0]?.message?.content || '{}');
-              narrative = {
-                challenge: aiNarrative.challenge || 'Design challenge description',
-                solution: aiNarrative.solution || 'Creative solution approach',
-                results: aiNarrative.results || 'Project outcomes and impact',
-              };
-            }
-          }
-        } catch (aiError) {
-          console.error('Error generating AI narrative:', aiError);
-          // Fallback to defaults
-          narrative = {
-            challenge: challenge || 'Design challenge description',
-            solution: solution || 'Creative solution approach',
-            results: results || 'Project outcomes and impact',
-          };
-        }
+        narrative = {
+          challenge: challenge || 'Design challenge description',
+          solution: solution || 'Creative solution approach',
+          results: results || 'Project outcomes and impact',
+        };
       }
 
       const { data: caseStudy, error } = await supabase

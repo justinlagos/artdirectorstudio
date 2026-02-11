@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import { KeyboardShortcutsGuide } from "@/components/KeyboardShortcutsGuide";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Keyboard, Lightbulb } from "lucide-react";
+import { Keyboard, Lightbulb, Sparkles, ArrowRight } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useKeyboardShortcuts, KeyboardShortcut, getModifierKey } from "@/hooks/useKeyboardShortcuts";
@@ -37,6 +37,9 @@ import { PricingSection } from "@/components/landing/PricingSection";
 import { FeaturedCommunitySection } from "@/components/landing/FeaturedCommunitySection";
 import { FunLabSection } from "@/components/landing/FunLabSection";
 import { ImageComparisonView } from "@/components/ImageComparisonView";
+import { Card } from "@/components/ui/card";
+import { FUN_LAB_TOOLS } from "@/components/landing/FunLabSection";
+import { resizeImageForAnalysis } from "@/lib/imageOptimization";
 
 export interface Analysis {
   image_overview: string;
@@ -376,58 +379,91 @@ const Index = () => {
       const reader = new FileReader();
       reader.readAsDataURL(selectedFile);
 
+      const ANALYSIS_TIMEOUT_MS = 120_000; // 2 min: allows for large images + slow AI; under Supabase 150s limit
+      const resetAnalyzingState = () => {
+        setIsAnalyzing(false);
+        setShowProgressiveFeedback(false);
+      };
+
       reader.onload = async () => {
-        const base64Image = reader.result as string;
-
-        const { data, error } = await supabase.functions.invoke("analyze-image", {
-          body: { image: base64Image },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        if (error) {
-          console.error("Analysis error:", error);
-
-          // Extract error details
-          let errorMessage = "Failed to analyze image. Please try again.";
-          let errorData: any = error;
-
-          // Try to parse error context if available
-          if (error.context) {
-            try {
-              errorData = typeof error.context === 'string'
-                ? JSON.parse(error.context)
-                : error.context;
-            } catch {
-              errorData = error;
-            }
-          }
-
-          // Check for 402 (credits exhausted) or specific error messages
-          if (errorData?.details?.aiStatus === 402 ||
-            errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402 ||
-            error.message?.includes('402') ||
-            error.message?.includes('Credits exhausted') ||
-            error.message?.includes('credits exhausted')) {
-            errorMessage = "Your credits are used up. Choose a plan to continue.";
-          } else if (errorData?.error) {
-            errorMessage = errorData.error;
-          } else if (error.message) {
-            errorMessage = error.message;
-          }
-
+        let base64Image = reader.result as string;
+        try {
+          base64Image = await resizeImageForAnalysis(base64Image);
+        } catch (resizeErr) {
+          console.warn("Image resize skipped, using original:", resizeErr);
+        }
+        let data: unknown;
+        let error: unknown;
+        try {
+          const invokePromise = supabase.functions.invoke("analyze-image", {
+            body: { image: base64Image },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("Analysis is taking too long. Please try again.")), ANALYSIS_TIMEOUT_MS);
+          });
+          const result = await Promise.race([invokePromise, timeoutPromise]);
+          data = result.data;
+          error = result.error;
+        } catch (raceError) {
+          const err = raceError instanceof Error ? raceError : new Error("Analysis failed");
+          console.error("Analysis error:", err);
           analytics.track("Image Analysis", {
             tool: "analyze",
             action: "analyze",
             success: false,
-            error_type: errorData?.errorType || error.message?.substring(0, 50) || "unknown",
+            error_type: err.message?.substring(0, 50) || "unknown",
+          });
+          toast.error(err.message);
+          resetAnalyzingState();
+          return;
+        }
+
+        if (error) {
+          console.error("Analysis error:", error);
+          let errorMessage = "Failed to analyze image. Please try again.";
+          let errorData: any = error;
+          if (error && typeof error === 'object' && 'context' in error && error.context) {
+            try {
+              errorData = typeof (error as any).context === 'string'
+                ? JSON.parse((error as any).context)
+                : (error as any).context;
+            } catch {
+              errorData = error;
+            }
+          }
+          const errMsg = error && typeof error === 'object' && 'message' in error ? String((error as any).message) : '';
+          if (errorData?.details?.aiStatus === 402 ||
+            (errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402) ||
+            errMsg?.includes('402') ||
+            errMsg?.includes('Credits exhausted') ||
+            errMsg?.includes('credits exhausted')) {
+            errorMessage = "Your credits are used up. Choose a plan to continue.";
+          } else if (errorData?.error) {
+            errorMessage = errorData.error;
+          } else if (errMsg) {
+            errorMessage = errMsg;
+          }
+          analytics.track("Image Analysis", {
+            tool: "analyze",
+            action: "analyze",
+            success: false,
+            error_type: errorData?.errorType || errMsg?.substring(0, 50) || "unknown",
             status_code: errorData?.details?.aiStatus || errorData?.status,
           });
-
           toast.error(errorMessage);
-          setIsAnalyzing(false);
-          setShowProgressiveFeedback(false);
+          resetAnalyzingState();
+          return;
+        }
+
+        const valid = data && typeof data === 'object' && data !== null &&
+          'full_regeneration_prompt' in data && 'analysis' in data;
+        if (!valid) {
+          console.error("Analysis returned invalid shape:", data);
+          toast.error("Analysis returned unexpected data. Please try again.");
+          resetAnalyzingState();
           return;
         }
 
@@ -435,19 +471,15 @@ const Index = () => {
         setTimeout(() => {
           setResult(data as AnalysisResult);
           setAnalysisComplete(true);
-          setIsAnalyzing(false);
-          setShowProgressiveFeedback(false);
-
-          // Track successful analysis
+          resetAnalyzingState();
           const duration = Date.now() - startTime;
           analytics.track("Image Analysis", {
             tool: "analyze",
             action: "analyze",
             success: true,
             duration_ms: duration,
-            asset_id: data?.assetId || undefined,
+            asset_id: (data as any)?.assetId || undefined,
           });
-
           toast.success("Image analyzed successfully!");
         }, 3000);
       };
@@ -725,13 +757,20 @@ const Index = () => {
     );
   }
 
+  // Redirect authenticated users to canvas (the new primary workspace)
+  // Skip redirect if coming from a specific studio prefill or explicit navigation
+  const hasPrefill = location.state && (location.state as any).prefill;
+  if (user && !hasPrefill) {
+    return <Navigate to="/canvas" replace />;
+  }
+
   // Log render state
-  console.log('[Index] Rendering page', { 
-    user: !!user, 
-    loading, 
-    loadingTimeout, 
-    workspaceMode, 
-    preferencesLoading 
+  console.log('[Index] Rendering page', {
+    user: !!user,
+    loading,
+    loadingTimeout,
+    workspaceMode,
+    preferencesLoading
   });
 
   return (
@@ -769,7 +808,7 @@ const Index = () => {
 
         {/* Studio Section - Only for authenticated users */}
         {user && (
-          <div id="studio-section" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6 md:pb-16 space-y-6 md:space-y-8">
+          <div id="studio-section" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6 md:pb-16 space-y-6 md:space-y-10">
             <OnboardingPopup />
 
             {/* Studio Onboarding Copy - Centered with breathing room */}
@@ -839,6 +878,51 @@ const Index = () => {
                 />
               </div>
             )}
+
+            {/* Fun Box strip for logged-in users */}
+            <section className="mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+                    Fun Box
+                  </h3>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs gap-1"
+                  onClick={() => navigate("/funbox")}
+                >
+                  Explore all tools
+                  <ArrowRight className="h-3 w-3" />
+                </Button>
+              </div>
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {FUN_LAB_TOOLS.slice(0, 4).map((tool) => (
+                  <Card
+                    key={tool.id}
+                    className="p-3 cursor-pointer border-border/60 hover:border-primary/40 transition-all duration-200 hover:shadow-sm bg-card/80"
+                    onClick={() => navigate(tool.route)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="text-2xl">
+                        {tool.icon}
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium leading-tight">
+                          {tool.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {tool.description}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </section>
           </div>
         )}
 

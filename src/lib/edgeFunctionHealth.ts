@@ -50,9 +50,11 @@ export async function checkFunctionHealth(
   timeoutMs = 5000
 ): Promise<HealthCheckResult> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const publicKey =
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY; // Backwards compatibility with older env names
 
-  if (!supabaseUrl || !anonKey) {
+  if (!supabaseUrl || !publicKey) {
     return {
       function: functionName,
       healthy: false,
@@ -71,7 +73,7 @@ export async function checkFunctionHealth(
       {
         method: 'OPTIONS',
         headers: {
-          'apikey': anonKey,
+          'apikey': publicKey,
           'Origin': window.location.origin,
         },
         signal: controller.signal,

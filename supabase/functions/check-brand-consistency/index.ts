@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,31 +61,17 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
+    const { chatWithProvider, getDefaultProvider } = await import('../_shared/providerClient.ts');
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
       return new Response(
         JSON.stringify({ consistent: true, message: 'AI service not configured' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check consistency with AI
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a brand consistency checker. Analyze if an image matches brand guidelines.',
-          },
-          {
-            role: 'user',
-            content: `Check if this generated image matches the brand guidelines:
+    const userContent = `Check if this generated image matches the brand guidelines:
 
 Brand Colors: ${JSON.stringify(brandKit.color_palette || [])}
 Brand Style: ${brandKit.usage_rules?.imageryStyle || 'Not specified'}
@@ -94,27 +80,27 @@ Brand Tone: ${brandKit.usage_rules?.tone || 'Not specified'}
 Generated Prompt: ${prompt || 'Not provided'}
 Image URL: ${imageUrl}
 
-Return JSON:
-{
-  "consistent": true/false,
-  "deviations": ["reason1", "reason2"],
-  "score": 0-100
-}`,
-          },
-        ],
-        response_format: { type: 'json_object' },
-      }),
-    });
+Return ONLY a valid JSON object (no markdown): {"consistent": true or false, "deviations": ["reason1"], "score": 0-100}`;
 
-    if (!response.ok) {
+    const result = await chatWithProvider(
+      [
+        { role: 'system', content: 'You are a brand consistency checker. Analyze if an image matches brand guidelines. Respond with JSON only.' },
+        { role: 'user', content: userContent },
+      ],
+      { model: provider === 'gemini' ? 'gemini-2.5-pro' : 'gpt-4o' }
+    );
+
+    if (!result.success || !result.text) {
       return new Response(
         JSON.stringify({ consistent: true, message: 'Consistency check unavailable' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const data = await response.json();
-    const analysis = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+    let raw = result.text;
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) raw = jsonMatch[0];
+    const analysis = JSON.parse(raw || '{}');
 
     return new Response(
       JSON.stringify({

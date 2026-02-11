@@ -73,7 +73,7 @@ You MUST NEVER drift into randomness. Stay consistent with the established creat
 Produce prompts that:
 • Are visually rich and production-ready
 • Avoid clutter and generic descriptions
-• Match the actual capabilities of the backend models (Gemini, etc.)
+• Match the actual capabilities of the backend AI
 • Stay consistent with brand direction
 • Include specific details: lighting, composition, color palette, mood, style
 

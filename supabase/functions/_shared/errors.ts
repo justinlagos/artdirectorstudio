@@ -9,6 +9,9 @@ export const ERROR_MESSAGES = {
   CREDITS_EXHAUSTED: 'Credits exhausted. Please add credits to your workspace to continue.',
   INVALID_INPUT: 'Invalid input. Please check your data and try again.',
   PROCESSING_FAILED: 'Processing failed. Please try again.',
+  PROVIDER_KEY_INVALID: 'AI image API key is invalid or missing. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY with AI_PROVIDER=openai) in Supabase Edge Function secrets.',
+  PROVIDER_QUOTA_EXCEEDED: 'AI service quota exceeded. Please try again later.',
+  PROVIDER_UNAVAILABLE: 'AI service is temporarily unavailable. Please try again later.',
 } as const;
 
 export interface ErrorResponse {
@@ -58,14 +61,27 @@ export function createErrorResponse(
  * Maps AI gateway errors to user-friendly messages
  */
 export function mapAIError(status: number, errorText: string): string {
-  if (status === 429) {
-    return ERROR_MESSAGES.RATE_LIMIT;
+  const lower = (errorText || '').toLowerCase();
+  if (
+    lower.includes('api key not valid') ||
+    lower.includes('api_key_invalid') ||
+    lower.includes('invalid_api_key') ||
+    lower.includes('incorrect api key') ||
+    lower.includes('invalid x-goog-api-key') ||
+    lower.includes('permission_denied') ||
+    (status === 401 && (lower.includes('invalid') || lower.includes('key'))) ||
+    (status === 403 && lower.includes('api'))
+  ) {
+    return ERROR_MESSAGES.PROVIDER_KEY_INVALID;
+  }
+  if (status === 429 || lower.includes('quota') || lower.includes('rate_limit') || lower.includes('rate limit')) {
+    return lower.includes('quota') ? ERROR_MESSAGES.PROVIDER_QUOTA_EXCEEDED : ERROR_MESSAGES.RATE_LIMIT;
   }
   if (status === 402) {
     return ERROR_MESSAGES.CREDITS_EXHAUSTED;
   }
   if (status >= 500) {
-    return ERROR_MESSAGES.NETWORK_ERROR;
+    return ERROR_MESSAGES.PROVIDER_UNAVAILABLE;
   }
   return ERROR_MESSAGES.PROCESSING_FAILED;
 }

@@ -1356,8 +1356,8 @@ export function useArtieCore() {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
         let userFriendlyMessage = errorMessage;
-        if (errorMessage.includes('LOVABLE_API_KEY')) {
-          userFriendlyMessage = 'Server configuration error. Please contact support.';
+        if (errorMessage.includes('not configured') || errorMessage.includes('API_KEY')) {
+          userFriendlyMessage = 'AI service is not configured. Please contact support or check Edge Function secrets.';
         } else if (errorMessage.includes('No active session') || errorMessage.includes('Authentication')) {
           userFriendlyMessage = 'Please sign in to use Artie.';
         } else if (errorMessage.includes('VITE_SUPABASE_URL')) {

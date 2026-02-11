@@ -1,14 +1,17 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Sparkles, Loader2, Check, Download, Maximize2 } from "lucide-react";
+import { Upload, Sparkles, Loader2, Check, Download, Maximize2, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCredits } from "@/hooks/useCredits";
 import { motion, AnimatePresence } from "framer-motion";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 
 interface CaricaturePreset {
   id: 'studio' | 'editorial' | 'toy' | 'sticker';
@@ -50,7 +53,6 @@ const PRESETS: CaricaturePreset[] = [
 ];
 
 interface GenerationResult {
-  provider: 'gemini' | 'openai';
   url: string;
   assetId: string;
   loading: boolean;
@@ -58,6 +60,7 @@ interface GenerationResult {
 }
 
 export function CaricatureTool() {
+  const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<string>('studio');
@@ -90,7 +93,7 @@ export function CaricatureTool() {
     setResults([]);
   };
 
-  const generateWithProvider = async (provider: 'gemini' | 'openai', session: any): Promise<GenerationResult> => {
+  const generateCaricature = async (session: { access_token: string }): Promise<GenerationResult> => {
     try {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/caricature-image`,
@@ -104,9 +107,8 @@ export function CaricatureTool() {
           body: JSON.stringify({
             image: previewUrl,
             preset: selectedPreset,
-            provider,
             consent: true,
-            idempotencyKey: `caricature-${provider}-${Date.now()}`,
+            idempotencyKey: `caricature-${Date.now()}`,
           }),
         }
       );
@@ -114,18 +116,16 @@ export function CaricatureTool() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || data.reason || `${provider} generation failed`);
+        throw new Error(data.error || data.reason || 'Generation failed');
       }
 
       return {
-        provider,
         url: data.image,
         assetId: data.assetId,
         loading: false,
       };
     } catch (error) {
       return {
-        provider,
         url: '',
         assetId: '',
         loading: false,
@@ -148,29 +148,17 @@ export function CaricatureTool() {
     }
 
     setIsGenerating(true);
-    setResults([
-      { provider: 'gemini', url: '', assetId: '', loading: true },
-      { provider: 'openai', url: '', assetId: '', loading: true },
-    ]);
+    setResults([{ url: '', assetId: '', loading: true }]);
 
     try {
-      // Generate both caricatures in parallel
-      // The backend check-feature-access handles all credit/subscription validation
-      const [geminiResult, openaiResult] = await Promise.all([
-        generateWithProvider('gemini', session),
-        generateWithProvider('openai', session),
-      ]);
+      const result = await generateCaricature(session);
+      setResults([result]);
 
-      setResults([geminiResult, openaiResult]);
-
-      const successCount = [geminiResult, openaiResult].filter(r => !r.error).length;
-      if (successCount > 0) {
-        toast.success(`${successCount} caricature${successCount > 1 ? 's' : ''} created!`);
+      if (!result.error) {
+        toast.success('Caricature created!');
         refetchCredits();
       } else {
-        // Show the actual backend error if both failed
-        const firstError = geminiResult.error || openaiResult.error || 'Both generations failed.';
-        toast.error(firstError);
+        toast.error(result.error);
       }
     } catch (error) {
       console.error('Caricature error:', error);
@@ -185,25 +173,49 @@ export function CaricatureTool() {
   const balanceDisplay = isUnlimited ? 'Unlimited' : `${balance ?? 0} credits`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-surface-1 to-background py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4 mb-12"
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 backdrop-blur-xl border border-border/50">
-            <span className="text-2xl">🎨</span>
-            <span className="text-sm font-medium">Caricature Studio</span>
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header />
+      <main className="flex-1 bg-gradient-to-b from-background via-surface-1 to-background py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Back nav */}
+          <div className="flex items-center gap-2 mb-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/funbox")}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Fun Box
+            </Button>
+            <span className="text-muted-foreground/60">|</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/")}
+            >
+              Studio
+            </Button>
           </div>
+
+          {/* Hero */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center space-y-4 mb-12"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 backdrop-blur-xl border border-border/50">
+              <span className="text-2xl">🎨</span>
+              <span className="text-sm font-medium">Caricature Studio</span>
+            </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
             Transform portraits into
             <br />
             <span className="text-muted-foreground font-normal">stylized caricatures</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Upload a portrait and get two AI-generated caricatures—compare styles and pick your favorite
+            Upload a portrait and get a stylized caricature in your chosen style
           </p>
         </motion.div>
 
@@ -298,7 +310,7 @@ export function CaricatureTool() {
                     {isGenerating ? (
                       <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Generating both styles...
+                        Generating...
                       </>
                     ) : (
                       <>
@@ -308,7 +320,7 @@ export function CaricatureTool() {
                     )}
                   </Button>
                   <p className="text-xs text-center text-muted-foreground">
-                    Generates 2 caricatures (Gemini + OpenAI)
+                    10 credits per caricature
                   </p>
                 </div>
               </div>
@@ -385,8 +397,8 @@ export function CaricatureTool() {
             <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50 shadow-subtle h-full">
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold mb-1">Results</h3>
-                  <p className="text-sm text-muted-foreground">Compare AI-generated styles</p>
+                  <h3 className="text-lg font-semibold mb-1">Result</h3>
+                  <p className="text-sm text-muted-foreground">Your caricature</p>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -402,7 +414,7 @@ export function CaricatureTool() {
                         <Sparkles className="w-10 h-10 text-muted-foreground/50" />
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Your caricatures will appear here
+                        Your caricature will appear here
                       </p>
                     </motion.div>
                   ) : (
@@ -414,20 +426,17 @@ export function CaricatureTool() {
                     >
                       {results.map((result, idx) => (
                         <motion.div
-                          key={result.provider}
+                          key={idx}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: idx * 0.1 }}
                           className="space-y-2"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                              {result.provider}
-                            </span>
-                            {result.error && (
+                          {result.error && (
+                            <div className="flex items-center justify-end">
                               <span className="text-xs text-red-500">Failed</span>
-                            )}
-                          </div>
+                            </div>
+                          )}
 
                           <div className="relative aspect-square rounded-xl overflow-hidden bg-muted/20 border border-border/50">
                             {result.loading ? (
@@ -442,7 +451,7 @@ export function CaricatureTool() {
                               <>
                                 <img
                                   src={result.url}
-                                  alt={`${result.provider} caricature`}
+                                  alt="Caricature"
                                   className="w-full h-full object-cover"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent opacity-0 hover:opacity-100 transition-opacity flex items-end p-3 gap-2">
@@ -462,7 +471,7 @@ export function CaricatureTool() {
                                     onClick={() => {
                                       const a = document.createElement('a');
                                       a.href = result.url;
-                                      a.download = `caricature-${result.provider}-${Date.now()}.png`;
+                                      a.download = `caricature-${Date.now()}.png`;
                                       a.click();
                                     }}
                                   >
@@ -482,7 +491,9 @@ export function CaricatureTool() {
             </Card>
           </motion.div>
         </div>
-      </div>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 }

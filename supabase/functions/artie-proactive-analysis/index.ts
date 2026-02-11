@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,23 +61,22 @@ serve(async (req) => {
     // Parse request body
     const { triggerType, context } = await req.json();
 
-    // Get LOVABLE_API_KEY for AI analysis
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
+    const { chatWithProvider, getDefaultProvider } = await import('../_shared/providerClient.ts');
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
       return new Response(
-        JSON.stringify({ error: 'AI service not configured' }),
+        JSON.stringify({ error: 'AI service not configured. Set GOOGLE_AI_API_KEY or OPENAI_API_KEY in Edge Function secrets.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Generate suggestion based on trigger type
     let suggestion = null;
 
     switch (triggerType) {
       case 'brief_uploaded':
         if (context.briefContent) {
-          // Analyze brief with AI
-          const briefAnalysis = await analyzeBriefWithAI(context.briefContent, LOVABLE_API_KEY);
+          const briefAnalysis = await analyzeBriefWithAI(context.briefContent, provider);
           if (briefAnalysis) {
             suggestion = {
               triggerType: 'brief_uploaded',
@@ -164,41 +163,29 @@ serve(async (req) => {
  */
 async function analyzeBriefWithAI(
   briefContent: string,
-  apiKey: string
+  provider: 'gemini' | 'openai'
 ): Promise<{ suggestion: string; context: any; priority: string } | null> {
   try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a creative assistant analyzing creative briefs. Identify missing information and suggest what would help create better results. Be concise and helpful.',
-          },
-          {
-            role: 'user',
-            content: `Analyze this creative brief and suggest what information might be missing:\n\n${briefContent}`,
-          },
-        ],
-        max_tokens: 200,
-      }),
-    });
+    const { chatWithProvider } = await import('../_shared/providerClient.ts');
+    const result = await chatWithProvider(
+      [
+        {
+          role: 'system',
+          content: 'You are a creative assistant analyzing creative briefs. Identify missing information and suggest what would help create better results. Be concise and helpful.',
+        },
+        {
+          role: 'user',
+          content: `Analyze this creative brief and suggest what information might be missing:\n\n${briefContent}`,
+        },
+      ],
+      { model: provider === 'gemini' ? 'gemini-2.5-pro' : 'gpt-4o', maxTokens: 200 }
+    );
 
-    if (!response.ok) {
+    if (!result.success || !result.text) {
       return null;
     }
 
-    const data = await response.json();
-    const analysis = data.choices?.[0]?.message?.content;
-
-    if (!analysis) {
-      return null;
-    }
+    const analysis = result.text;
 
     // Extract missing elements from analysis
     const missingElements: string[] = [];

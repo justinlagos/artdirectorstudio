@@ -84,7 +84,7 @@ export const ShareToCommunityDialog = ({
           aspect_ratio: aspectRatio,
           remix_source_id: remixSourceId,
           thumbnail_url: thumbnailUrl,
-          model_version: 'google/gemini-3-pro-image-preview',
+          model_version: 'art-director-studio',
         })
         .select("id")
         .single();

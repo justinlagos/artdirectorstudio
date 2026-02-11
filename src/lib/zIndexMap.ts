@@ -74,7 +74,7 @@ export const getZIndex = (key: ZIndexKey): number => zIndexMap[key];
 /**
  * Get CSS variable string for z-index
  */
-export const getZIndexVar = (key: ZIndexKey): string => \`var(--z-\${key})\`;
+export const getZIndexVar = (key: ZIndexKey): string => `var(--z-${key})`;
 
 /**
  * Generate CSS custom properties for z-index values
@@ -83,7 +83,7 @@ export const getZIndexVar = (key: ZIndexKey): string => \`var(--z-\${key})\`;
 export const generateZIndexCSSVars = (): Record<string, number> => {
   const vars: Record<string, number> = {};
   for (const [key, value] of Object.entries(zIndexMap)) {
-    vars[\`--z-\${key}\`] = value;
+    vars[`--z-${key}`] = value;
   }
   return vars;
 };

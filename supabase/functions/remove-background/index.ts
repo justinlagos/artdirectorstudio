@@ -13,9 +13,10 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateImageData } from '../_shared/validation.ts';
 import { createErrorResponse, mapAIError, ERROR_MESSAGES } from '../_shared/errors.ts';
+import { callProvider, getDefaultProvider } from '../_shared/providerClient.ts';
 import { fetchWithRetry } from '../_shared/retry.ts';
 import { createLogger } from '../_shared/observability.ts';
 
@@ -140,14 +141,13 @@ serve(async (req) => {
       return createErrorResponse('Either image or image_id is required', 400, 'validation_error', requestId).response;
     }
 
-    // Validate API key
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      logger.logError('remove_background', new Error('LOVABLE_API_KEY not configured'), undefined, { action: 'config_check' });
-      return createErrorResponse('AI service not configured. Please contact support.', 500, 'config_error', requestId).response;
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
+      logger.logError('remove_background', new Error(`${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} not configured`), undefined, { action: 'config_check' });
+      return createErrorResponse('AI service not configured. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY) in Edge Function secrets.', 500, 'config_error', requestId).response;
     }
 
-    // Build prompt for background removal
     const removalPrompt = method === 'ai_mask'
       ? 'Remove the background from this image completely. Create a perfect transparent background with clean edges, no halos, no artifacts, and no background remnants. The subject should be isolated perfectly with smooth, natural edges.'
       : method === 'chroma'
@@ -156,70 +156,36 @@ serve(async (req) => {
 
     logger.log('remove_background', 'api_call_start', {
       method,
+      provider,
       has_source_asset: !!sourceAssetId,
       image_url_length: inputImageUrl.length,
     });
 
-    // Call AI API for background removal
     const aiCallStart = Date.now();
-    const aiResponse = await fetchWithRetry(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
+    const providerResponse = await callProvider(
       {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: removalPrompt
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: inputImageUrl
-                  }
-                }
-              ]
-            }
-          ],
-          modalities: ["image", "text"]
-        })
+        provider,
+        action: 'generate',
+        prompt: removalPrompt,
+        image: inputImageUrl,
+        options: { temperature: 0.7, maxTokens: 2048 },
       },
-      { maxRetries: 2, baseDelayMs: 2000, maxDelayMs: 30000, timeoutMs: 45000 }
+      requestId
     );
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
+    if (!providerResponse.success || !providerResponse.image) {
       const aiCallDuration = Date.now() - aiCallStart;
-      logger.logError('remove_background', new Error(mapAIError(aiResponse.status, errorText)), aiCallDuration, {
-        action: 'api_error',
-        status: aiResponse.status,
-      });
+      logger.logError('remove_background', new Error(providerResponse.error || 'No image'), aiCallDuration, { action: 'api_error' });
       return createErrorResponse(
-        mapAIError(aiResponse.status, errorText),
-        aiResponse.status,
-        aiResponse.status === 429 ? 'rate_limit' : 'ai_error',
+        providerResponse.error || ERROR_MESSAGES.PROCESSING_FAILED,
+        providerResponse.errorType === 'rate_limit' ? 429 : 500,
+        providerResponse.errorType || 'ai_error',
         requestId
       ).response;
     }
 
-    const aiData = await aiResponse.json();
     const aiCallDuration = Date.now() - aiCallStart;
-
-    // Extract result image
-    const resultImageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (!resultImageUrl) {
-      logger.logError('remove_background', new Error('No image in AI response'), aiCallDuration, { action: 'extract_image' });
-      return createErrorResponse(ERROR_MESSAGES.PROCESSING_FAILED, 500, 'no_image_data', requestId).response;
-    }
+    const resultImageUrl = providerResponse.image;
 
     logger.log('remove_background', 'api_success', {
       duration_ms: aiCallDuration,
