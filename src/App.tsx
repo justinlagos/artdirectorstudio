@@ -17,15 +17,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
+// UnifiedToolsModal removed from workspace flow — kept for community/legacy pages
 // Lazy load heavy components with error handling
-const UnifiedToolsModal = lazy(() => 
-  import("./components/UnifiedToolsModal")
-    .then(m => ({ default: m.UnifiedToolsModal }))
-    .catch(err => {
-      console.error("Failed to load UnifiedToolsModal:", err);
-      return { default: () => null };
-    })
-);
 const ImageGenerationDialog = lazy(() => 
   import("./components/ImageGenerationDialog")
     .then(m => ({ default: m.ImageGenerationDialog }))
@@ -44,11 +37,11 @@ const KeyboardShortcutsProvider = lazy(() =>
 );
 
 // Lazy load non-critical routes
-const Dashboard = lazy(() => import("./pages/Dashboard"));
+// Dashboard removed — redirects to /canvas
 const Admin = lazy(() => import("./pages/Admin"));
 const Community = lazy(() => import("./pages/Community"));
 const Analytics = lazy(() => import("./pages/Analytics"));
-const CaricatureTool = lazy(() => import("./components/CaricatureTool").then(m => ({ default: m.CaricatureTool })));
+// CaricatureTool removed — replaced by Fun Lab drawer in workspace
 const Insights = lazy(() => import("./pages/Insights"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Contact = lazy(() => import("./pages/Contact"));
@@ -67,7 +60,7 @@ const SignedOut = lazy(() => import("./pages/SignedOut"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PresetGallery = lazy(() => import("./pages/PresetGallery"));
 const ArtiePage = lazy(() => import("./pages/ArtiePage"));
-const FunBox = lazy(() => import("./pages/FunBox"));
+// FunBox removed — replaced by Fun Lab drawer in workspace
 const CanvasPage = lazy(() => import("./pages/CanvasPage"));
 const DesignerProfile = lazy(() => import("./pages/DesignerProfile").then(m => ({ default: m.DesignerProfile })));
 const Discover = lazy(() => import("./pages/Discover").then(m => ({ default: m.Discover })));
@@ -190,7 +183,7 @@ const AppContent = () => {
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/" element={<Index />} />
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard" element={<Navigate to="/canvas" replace />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/community" element={<Community />} />
                 <Route path="/gallery" element={<Navigate to="/community" replace />} />
@@ -214,10 +207,10 @@ const AppContent = () => {
                   <Route path="/signed-out" element={<SignedOut />} />
                   <Route path="/presets" element={<PresetGallery />} />
                   <Route path="/artie" element={<ArtiePage />} />
-                  <Route path="/funbox" element={<FunBox />} />
+                  <Route path="/funbox" element={<Navigate to="/canvas" replace />} />
                   <Route path="/canvas" element={<CanvasPage />} />
                   <Route path="/canvas/:projectId" element={<CanvasPage />} />
-                  <Route path="/tools/caricature" element={<CaricatureTool />} />
+                  <Route path="/tools/caricature" element={<Navigate to="/canvas" replace />} />
                   <Route path="/discover" element={<Discover />} />
                   <Route path="/designer/:username" element={<DesignerProfile />} />
                   <Route path="/case-study/:id" element={<CaseStudyDetail />} />
@@ -228,7 +221,6 @@ const AppContent = () => {
             <ErrorBoundary>
               <Suspense fallback={null}>
                 <ImageGenerationDialog />
-                <UnifiedToolsModal />
                 <KeyboardShortcutsProvider />
               </Suspense>
             </ErrorBoundary>

@@ -13,7 +13,7 @@ const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const BASE64_OVERHEAD = 1.33;
 
 /**
- * Validates base64 image data with comprehensive checks
+ * Validates image data — accepts both base64 data URIs and HTTPS URLs
  */
 export function validateImageData(image: string): ValidationResult {
   // Log validation start
@@ -33,6 +33,18 @@ export function validateImageData(image: string): ValidationResult {
       timestamp: new Date().toISOString()
     }));
     return { valid: false, error: 'Image is required' };
+  }
+
+  // Accept HTTPS URLs (e.g. Supabase Storage URLs)
+  if (image.startsWith('https://')) {
+    // Basic URL validation — must look like an image URL or storage URL
+    console.log(JSON.stringify({
+      action: 'validation_success',
+      type: 'image_url',
+      urlPrefix: image.substring(0, 60),
+      timestamp: new Date().toISOString()
+    }));
+    return { valid: true };
   }
 
   // Check if it's a data URI

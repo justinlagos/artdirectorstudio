@@ -25,6 +25,32 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
+async function commitReservation(authHeader: string, reservationId: string, action: 'commit' | 'refund') {
+  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/commit-credits`;
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reservation_id: reservationId, action }),
+  });
+}
+
+async function validateReservation(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  reservationId: string | undefined
+): Promise<{ valid: boolean }> {
+  if (!reservationId || typeof reservationId !== 'string') return { valid: false };
+  const { data: row, error } = await supabaseAdmin
+    .from('credit_transactions')
+    .select('id, user_id, status, expires_at')
+    .eq('id', reservationId)
+    .single();
+  if (error || !row || row.user_id !== userId || row.status !== 'pending') return { valid: false };
+  const now = new Date().toISOString();
+  if (row.expires_at && row.expires_at <= now) return { valid: false };
+  return { valid: true };
+}
+
 serve(async (req) => {
   // Generate unique request ID for tracing
   const requestId = crypto.randomUUID();
@@ -128,43 +154,33 @@ async function handleStreamingRequest(
         }
       }
 
-      // Check feature access before processing
-      console.log(`[${requestId}] Checking feature access`);
-      await sendProgress('init', 15, 'Checking access...');
+      await sendProgress('init', 15, 'Validating request...');
 
-      const accessResponse = await fetchWithRetry(
-        `${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': authHeader,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ action: 'generate_image' }),
-        },
-        { maxRetries: 1, baseDelayMs: 1000, maxDelayMs: 10000, timeoutMs: 10000 }
-      );
+      const logger = createLogger(requestId, userId);
+      logger.logStart('generate_image', {});
 
-      const accessResult = await accessResponse.json();
-
-      if (!accessResult.allowed) {
-        console.log(`[${requestId}] Access denied:`, accessResult.reason);
-        await sendError(
-          accessResult.reason || "Access denied. Please upgrade your plan.",
-          'access_denied'
-        );
+      // Parse body first to get reservation_id and params
+      let requestBody: unknown;
+      try {
+        requestBody = await req.json();
+      } catch (parseError) {
+        logger.logError('generate_image', parseError instanceof Error ? parseError : new Error('Invalid JSON'), undefined, { action: 'parse_request' });
+        await sendError("Invalid request body. Expected JSON.", 'validation_error');
         return;
       }
 
-      console.log(`[${requestId}] Access granted: ${accessResult.tier}`);
-
-      const logger = createLogger(requestId, userId);
-      logger.logStart('generate_image', { tier: accessResult.tier });
+      const reservationId = (requestBody as Record<string, unknown>)?.reservation_id as string | undefined;
+      const reservationValid = await validateReservation(supabaseAdmin, userId, reservationId);
+      if (!reservationValid.valid) {
+        await sendError("Invalid or expired reservation", 'invalid_reservation');
+        return;
+      }
 
       // Rate limiting check
-      const rateLimitConfig = getRateLimitConfig('generate-image', accessResult.tier || 'free');
+      const rateLimitConfig = getRateLimitConfig('generate-image', 'free');
       const rateLimitResult = await checkRateLimit(userId, 'generate-image', rateLimitConfig.maxRequests, rateLimitConfig.windowMs);
       if (!rateLimitResult.allowed) {
+        await commitReservation(authHeader, reservationId!, 'refund');
         logger.log('generate_image', 'rate_limit_exceeded', {
           remaining: rateLimitResult.remaining,
           resetAt: rateLimitResult.resetAt,
@@ -173,16 +189,6 @@ async function handleStreamingRequest(
           `Rate limit exceeded. Please wait ${rateLimitResult.retryAfter} seconds before trying again.`,
           'rate_limit'
         );
-        return;
-      }
-
-      // Parse and validate request body using generation params contract
-      let requestBody: unknown;
-      try {
-        requestBody = await req.json();
-      } catch (parseError) {
-        logger.logError('generate_image', parseError instanceof Error ? parseError : new Error('Invalid JSON'), undefined, { action: 'parse_request' });
-        await sendError("Invalid request body. Expected JSON.", 'validation_error');
         return;
       }
 
@@ -204,6 +210,7 @@ async function handleStreamingRequest(
       // Validate using generation params contract
       const validation = validateGenerationParams(requestBody);
       if (!validation.valid || !validation.params) {
+        await commitReservation(authHeader, reservationId!, 'refund');
         logger.logError('generate_image', new Error(validation.error || 'Validation failed'), undefined, { action: 'validate_params' });
         await sendError(validation.error || "Invalid generation parameters", 'validation_error');
         return;
@@ -230,35 +237,10 @@ async function handleStreamingRequest(
           : { valid: validation.params.reference_image_url.startsWith('http://') || validation.params.reference_image_url.startsWith('https://') };
         
         if (!urlValidation.valid) {
+          await commitReservation(authHeader, reservationId!, 'refund');
           logger.logError('generate_image', new Error('Invalid reference image URL'), undefined, { action: 'validate_reference' });
           await sendError("Invalid reference image format", 'validation_error');
           return;
-        }
-      }
-
-      // Sanitize prompt input
-      if (validation.params.prompt) {
-        validation.params.prompt = sanitizePrompt(validation.params.prompt);
-      }
-      if (validation.params.negative_prompt) {
-        validation.params.negative_prompt = sanitizePrompt(validation.params.negative_prompt);
-      }
-
-      // Validate reference image URL if provided
-      if (validation.params.reference_image_url) {
-        const urlValidation = validation.params.reference_image_url.startsWith('data:')
-          ? validateImageDataUri(validation.params.reference_image_url)
-          : { valid: validation.params.reference_image_url.startsWith('http://') || validation.params.reference_image_url.startsWith('https://') };
-        
-        if (!urlValidation.valid) {
-          logger.logError('generate_image', new Error('Invalid reference image URL'), undefined, { action: 'validate_reference' });
-          const { response } = createErrorResponse(
-            "Invalid reference image format",
-            400,
-            'validation_error',
-            requestId
-          );
-          return response;
         }
       }
 
@@ -285,13 +267,14 @@ async function handleStreamingRequest(
 
       await sendProgress('init', 20, 'Prompt validated...');
 
-      const provider = getDefaultProvider();
-      const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
-      if (!hasKey) {
-        logger.logError('generate_image', new Error(`${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} not configured`), undefined, { action: 'config_check' });
-        await sendError("AI service not configured. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY with AI_PROVIDER=openai) in Edge Function secrets.", 'config_error');
-        return;
-      }
+    const provider = getDefaultProvider();
+    const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
+    if (!hasKey) {
+      await commitReservation(authHeader, reservationId!, 'refund');
+      logger.logError('generate_image', new Error(`${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} not configured`), undefined, { action: 'config_check' });
+      await sendError("AI service not configured. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY with AI_PROVIDER=openai) in Edge Function secrets.", 'config_error');
+      return;
+    }
 
       const promptObject = buildPrompt(normalizedParams);
       const negativePromptObject = buildNegativePrompt(normalizedParams);
@@ -337,6 +320,7 @@ async function handleStreamingRequest(
       }
 
       if (!providerResponse.success || !providerResponse.image) {
+        await commitReservation(authHeader, reservationId!, 'refund');
         const err = providerResponse?.error || ERROR_MESSAGES.PROCESSING_FAILED;
         const errorType = providerResponse?.errorType === 'rate_limit' ? 'rate_limit' : 'ai_error';
         await sendError(err, errorType, errorType === 'rate_limit');
@@ -373,6 +357,7 @@ async function handleStreamingRequest(
           });
 
         if (uploadError) {
+          await commitReservation(authHeader, reservationId!, 'refund');
           console.error(`[${requestId}] Storage upload error:`, uploadError);
           const errorMsg = uploadError.message?.includes('quota')
             ? 'Storage quota exceeded. Please contact support.'
@@ -469,6 +454,7 @@ async function handleStreamingRequest(
           console.warn(`[${requestId}] WARNING: Image generated but NOT saved to My Projects`);
         }
       } catch (error) {
+        await commitReservation(authHeader, reservationId!, 'refund');
         console.error(`[${requestId}] Failed to save image:`, error);
         await sendError("Failed to save generated image. Please try again.", 'storage_error');
         return;
@@ -500,6 +486,8 @@ async function handleStreamingRequest(
         );
       }
 
+      await commitReservation(authHeader, reservationId!, 'commit');
+
       // Send completion event
       const completeEvent = createCompleteEvent(finalImageUrl, assetData?.id);
       await writer.write(encoder.encode(formatSSEMessage(completeEvent)));
@@ -510,7 +498,9 @@ async function handleStreamingRequest(
       const logger = createLogger(requestId, userId);
       logger.logError('generate_image', error instanceof Error ? error : new Error(String(error)), totalDuration);
       console.error(`[${requestId}] Error in SSE generate-image (${totalDuration}ms):`, error);
-
+      if (reservationId && authHeader) {
+        await commitReservation(authHeader, reservationId, 'refund').catch(() => {});
+      }
       const errorMessage = error instanceof Error ? error.message : ERROR_MESSAGES.PROCESSING_FAILED;
       try {
         await sendError(errorMessage, 'server_error');
@@ -534,6 +524,7 @@ async function handleStandardRequest(
   requestId: string,
   startTime: number
 ): Promise<Response> {
+  let reservationIdStd: string | undefined;
   try {
     console.log(`[${requestId}] Generation request started`);
 
@@ -588,59 +579,9 @@ async function handleStandardRequest(
       }
     }
 
-    // Check feature access before processing
-    console.log(`[${requestId}] Checking feature access`);
-    const accessResponse = await fetchWithRetry(
-      `${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action: 'generate_image' }),
-      },
-      { maxRetries: 1, baseDelayMs: 1000, maxDelayMs: 10000, timeoutMs: 10000 }
-    );
-
-    const accessResult = await accessResponse.json();
-
-    if (!accessResult.allowed) {
-      console.log(`[${requestId}] Access denied:`, accessResult.reason);
-      const { response } = createErrorResponse(
-        accessResult.reason || "Access denied. Please upgrade your plan.",
-        403,
-        'access_denied',
-        requestId,
-        { tier: accessResult.tier }
-      );
-      return response;
-    }
-
-    console.log(`[${requestId}] Access granted: ${accessResult.tier}`);
-
     const logger = createLogger(requestId, userId);
-    logger.logStart('generate_image', { tier: accessResult.tier });
+    logger.logStart('generate_image', {});
 
-    // Rate limiting check
-    const rateLimitConfig = getRateLimitConfig('generate-image', accessResult.tier || 'free');
-    const rateLimitResult = await checkRateLimit(userId, 'generate-image', rateLimitConfig.maxRequests, rateLimitConfig.windowMs);
-    if (!rateLimitResult.allowed) {
-      logger.log('generate_image', 'rate_limit_exceeded', {
-        remaining: rateLimitResult.remaining,
-        resetAt: rateLimitResult.resetAt,
-      });
-      const { response } = createErrorResponse(
-        `Rate limit exceeded. Please wait ${rateLimitResult.retryAfter} seconds before trying again.`,
-        429,
-        'rate_limit',
-        requestId,
-        { retryAfter: rateLimitResult.retryAfter }
-      );
-      return response;
-    }
-
-    // Parse and validate request body using generation params contract
     let requestBody: unknown;
     try {
       requestBody = await req.json();
@@ -651,6 +592,32 @@ async function handleStandardRequest(
         400,
         'validation_error',
         requestId
+      );
+      return response;
+    }
+
+    const reservationIdStd = (requestBody as Record<string, unknown>)?.reservation_id as string | undefined;
+    const reservationValid = await validateReservation(supabaseAdmin, userId, reservationIdStd);
+    if (!reservationValid.valid) {
+      const { response } = createErrorResponse(
+        "Invalid or expired reservation",
+        402,
+        'invalid_reservation',
+        requestId
+      );
+      return response;
+    }
+
+    const rateLimitConfig = getRateLimitConfig('generate-image', 'free');
+    const rateLimitResult = await checkRateLimit(userId, 'generate-image', rateLimitConfig.maxRequests, rateLimitConfig.windowMs);
+    if (!rateLimitResult.allowed) {
+      await commitReservation(authHeader, reservationIdStd!, 'refund');
+      const { response } = createErrorResponse(
+        `Rate limit exceeded. Please wait ${rateLimitResult.retryAfter} seconds before trying again.`,
+        429,
+        'rate_limit',
+        requestId,
+        { retryAfter: rateLimitResult.retryAfter }
       );
       return response;
     }
@@ -673,6 +640,7 @@ async function handleStandardRequest(
     // Validate using generation params contract
     const validation = validateGenerationParams(requestBody);
     if (!validation.valid || !validation.params) {
+      await commitReservation(authHeader, reservationIdStd!, 'refund');
       logger.logError('generate_image', new Error(validation.error || 'Validation failed'), undefined, { action: 'validate_params' });
       const { response } = createErrorResponse(
         validation.error || "Invalid generation parameters",
@@ -714,6 +682,7 @@ async function handleStandardRequest(
     const provider = getDefaultProvider();
     const hasKey = provider === 'gemini' ? !!Deno.env.get('GOOGLE_AI_API_KEY') : !!Deno.env.get('OPENAI_API_KEY');
     if (!hasKey) {
+      await commitReservation(authHeader, reservationIdStd!, 'refund');
       logger.logError('generate_image', new Error(`${provider === 'gemini' ? 'GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY'} not configured`), undefined, { action: 'config_check' });
       const { response } = createErrorResponse(
         "AI service not configured. Set GOOGLE_AI_API_KEY (or OPENAI_API_KEY with AI_PROVIDER=openai) in Edge Function secrets.",
@@ -750,6 +719,7 @@ async function handleStandardRequest(
     );
 
     if (!providerResponse.success || !providerResponse.image) {
+      await commitReservation(authHeader, reservationIdStd!, 'refund');
       const err = providerResponse?.error || ERROR_MESSAGES.PROCESSING_FAILED;
       const { response } = createErrorResponse(
         err,
@@ -791,6 +761,7 @@ async function handleStandardRequest(
         });
 
       if (uploadError) {
+        await commitReservation(authHeader, reservationIdStd!, 'refund');
         console.error(`[${requestId}] Storage upload error:`, uploadError);
         const { response } = createErrorResponse(
           uploadError.message?.includes('quota')
@@ -945,6 +916,8 @@ async function handleStandardRequest(
       );
     }
 
+    await commitReservation(authHeader, reservationIdStd!, 'commit');
+
     return new Response(
       JSON.stringify(successResponse),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -952,6 +925,10 @@ async function handleStandardRequest(
 
   } catch (error) {
     const totalDuration = Date.now() - startTime;
+    const authHeaderForRefund = req.headers.get('Authorization');
+    if (reservationIdStd && authHeaderForRefund) {
+      await commitReservation(authHeaderForRefund, reservationIdStd, 'refund').catch(() => {});
+    }
     const logger = createLogger(requestId);
     logger.logError('generate_image', error instanceof Error ? error : new Error(String(error)), totalDuration);
     console.error(`[${requestId}] Error in generate-image function (${totalDuration}ms):`, error);

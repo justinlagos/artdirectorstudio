@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useCanvasViewport } from '@/hooks/canvas/useCanvasViewport';
 import { useCanvasSelection } from '@/hooks/canvas/useCanvasSelection';
 import { useCanvasDropZone } from '@/hooks/canvas/useCanvasDropZone';
@@ -10,15 +11,19 @@ import { EmptyState } from './EmptyState';
 
 export const CanvasViewport = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const panMode = useWorkspaceStore((s) => s.panMode);
   const zoom = useCanvasStore((s) => s.zoom);
   const panX = useCanvasStore((s) => s.panX);
   const panY = useCanvasStore((s) => s.panY);
   const items = useCanvasStore((s) => s.items);
-  const hasItems = items.filter((i) => !i.deleted_at).length > 0;
+  const currentCanvasId = useCanvasStore((s) => s.currentCanvasId);
+  const showGrid = useWorkspaceStore((s) => s.showGrid);
+  const hasItems = items.filter((i) => !i.deleted_at && i.canvas_id === currentCanvasId).length > 0;
 
   const {
     handleWheel,
     handlePanStart,
+    handlePanStartFromPoint,
     handlePanMove,
     handlePanEnd,
     screenToCanvas,
@@ -40,9 +45,14 @@ export const CanvasViewport = () => {
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      // Pan: middle click or alt+click
+      // Pan: middle click, alt+click, or panMode + left click (container receives mousedown = background, items stopPropagation)
       if (e.button === 1 || (e.button === 0 && e.altKey)) {
         handlePanStart(e);
+        return;
+      }
+      if (panMode && e.button === 0) {
+        handlePanStartFromPoint(e.clientX, e.clientY);
+        e.preventDefault();
         return;
       }
 
@@ -53,7 +63,13 @@ export const CanvasViewport = () => {
         handleSelectionStart(e, canvasPos.x, canvasPos.y);
       }
     },
-    [handlePanStart, handleSelectionStart, screenToCanvas]
+    [
+      panMode,
+      handlePanStart,
+      handlePanStartFromPoint,
+      handleSelectionStart,
+      screenToCanvas,
+    ]
   );
 
   const handleMouseMove = useCallback(
@@ -112,7 +128,7 @@ export const CanvasViewport = () => {
       onDrop={onDrop}
     >
       {/* Grid background */}
-      <CanvasGrid zoom={zoom} />
+      {showGrid && <CanvasGrid zoom={zoom} />}
 
       {/* Transformed canvas layer */}
       <div

@@ -1,5 +1,6 @@
 /* Design tokens - must be imported before @tailwind directives */
 @import './styles/tokens.css';
+@import './styles/swedish-spatial.css';
 
 @tailwind base;
 @tailwind components;

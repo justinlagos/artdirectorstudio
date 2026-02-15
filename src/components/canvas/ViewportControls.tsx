@@ -1,6 +1,8 @@
 import React from 'react';
-import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, Grid3x3 } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useWorkspaceStore } from '@/store/workspaceStore';
+import { mc } from '@/lib/microcopy';
 
 interface ViewportControlsProps {
   onZoomToFit: () => void;
@@ -8,6 +10,8 @@ interface ViewportControlsProps {
 
 export const ViewportControls = ({ onZoomToFit }: ViewportControlsProps) => {
   const zoom = useCanvasStore(s => s.zoom);
+  const showGrid = useWorkspaceStore((s) => s.showGrid);
+  const toggleShowGrid = useWorkspaceStore((s) => s.toggleShowGrid);
 
   return (
     <div className="flex items-center gap-1">
@@ -34,6 +38,17 @@ export const ViewportControls = ({ onZoomToFit }: ViewportControlsProps) => {
         title="Fit to view"
       >
         <Maximize2 className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={toggleShowGrid}
+        className={`p-1 rounded transition-colors ml-1 ${
+          showGrid
+            ? 'text-[var(--sw-accent)] bg-[var(--sw-accent-dim)]'
+            : 'text-white/40 hover:text-white/70'
+        }`}
+        title={showGrid ? mc.grid.hide : mc.grid.show}
+      >
+        <Grid3x3 className="w-3.5 h-3.5" />
       </button>
     </div>
   );

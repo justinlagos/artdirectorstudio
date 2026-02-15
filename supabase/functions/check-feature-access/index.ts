@@ -7,6 +7,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Cost per action for UX (aligned with src/lib/costs.ts)
+const COST_BY_ACTION: Record<string, number> = {
+  analyze: 3,
+  analyze_image: 3,
+  regenerate: 6,
+  generate_image: 6,
+  funlab_3_options: 10,
+  effects_commit_server: 3,
+  background_remove: 4,
+  upscale: 5,
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -36,202 +48,190 @@ serve(async (req) => {
       );
     }
 
-    const { action } = await req.json();
+    const { action } = await req.json().catch(() => ({}));
 
     // Special-case: allow caricature tool during beta/testing without consuming credits
-    if (action === 'caricature_image') {
+    if (action === "caricature_image") {
       return new Response(
         JSON.stringify({
           allowed: true,
           bypass: true,
-          tier: 'beta',
-          reason: 'Caricature tool is free during testing'
+          tier: "beta",
+          reason: "Caricature tool is free during testing",
+          balance: 0,
+          cost: 0,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Fetch user profile with subscription and usage data
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('is_pro, subscription_tier, subscription_expires_at, free_credits, daily_usage, daily_limit, daily_usage_reset_at')
-      .eq('id', user.id)
-      .single();
+    const cost = typeof action === "string" ? (COST_BY_ACTION[action] ?? 1) : 1;
 
-    if (profileError) throw profileError;
-
-    // Fetch top-up credits balance
-    const { data: creditsData } = await supabaseClient
-      .from('credits')
-      .select('balance')
-      .eq('user_id', user.id)
+    // Admin bypass: check user_roles table
+    const { data: adminRole, error: roleError } = await supabaseClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
       .maybeSingle();
 
-    const creditBalance = creditsData?.balance || 0;
+    if (roleError) {
+      console.error("check-feature-access: Failed to check admin role:", roleError);
+      // Don't fail the request, just log and continue to normal credit check
+    }
 
-    const tier = profile.subscription_tier || 'free';
+    if (adminRole) {
+      console.log(`check-feature-access: Admin bypass granted for user ${user.id}, action: ${action}`);
+      return new Response(
+        JSON.stringify({
+          allowed: true,
+          bypass: true,
+          tier: "admin",
+          reason: "Admin access",
+          balance: 99999,
+          cost,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Profile: subscription + free_credits
+    const { data: profile, error: profileError } = await supabaseClient
+      .from("profiles")
+      .select("subscription_tier, subscription_status, subscription_expires_at, free_credits, daily_usage, daily_limit, daily_usage_reset_at")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return new Response(
+        JSON.stringify({ error: "Failed to load profile" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Top-up credits
+    const { data: creditsData } = await supabaseClient
+      .from("credits")
+      .select("balance")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const creditBalance = creditsData?.balance ?? 0;
+    const freeCredits = profile.free_credits ?? 0;
+    const grossBalance = freeCredits + creditBalance;
+
+    // Pending reservations (negative amounts)
+    const { data: pendingRows } = await supabaseClient
+      .from("credit_transactions")
+      .select("amount")
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString());
+
+    const pendingSum = (pendingRows ?? []).reduce((sum, row) => sum + Math.abs(Number(row.amount)), 0);
+    const balance = Math.max(0, grossBalance - pendingSum);
+
+    const tier = profile.subscription_tier || "free";
     const now = new Date();
+    const isSubscriptionActive =
+      profile.subscription_status === "active" &&
+      profile.subscription_expires_at &&
+      new Date(profile.subscription_expires_at) > now;
 
-    // Check if subscription is active
-    const isSubscriptionActive = profile.is_pro &&
-      (profile.subscription_expires_at && new Date(profile.subscription_expires_at) > now);
-
-    // 1. Enterprise: Unlimited + API access
-    if (tier === 'enterprise' && isSubscriptionActive) {
+    // Enterprise: unlimited
+    if (tier === "enterprise" && isSubscriptionActive) {
       return new Response(
         JSON.stringify({
           allowed: true,
           bypass: true,
-          tier: 'enterprise',
-          reason: 'Unlimited access'
+          tier: "enterprise",
+          reason: "Unlimited access",
+          balance,
+          cost,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 2. Pro: Unlimited
-    if ((tier === 'pro' || profile.is_pro) && isSubscriptionActive) {
+    // Pro: unlimited
+    if (tier === "pro" && isSubscriptionActive) {
       return new Response(
         JSON.stringify({
           allowed: true,
           bypass: true,
-          tier: 'pro',
-          reason: 'Unlimited access'
+          tier: "pro",
+          reason: "Unlimited access",
+          balance,
+          cost,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 3. Starter: Check daily limit
-    if (tier === 'starter' && isSubscriptionActive) {
-      // Reset daily usage if needed
+    // Starter: daily limit
+    if (tier === "starter" && isSubscriptionActive) {
       if (profile.daily_usage_reset_at && new Date(profile.daily_usage_reset_at) <= now) {
-        // Calculate next reset time (next midnight)
-        const nextReset = new Date(now);
-        nextReset.setDate(nextReset.getDate() + 1);
-        nextReset.setHours(0, 0, 0, 0);
-
-        await supabaseClient
-          .from('profiles')
-          .update({
-            daily_usage: 0,
-            daily_usage_reset_at: nextReset.toISOString()
-          })
-          .eq('id', user.id);
-
-        return new Response(
-          JSON.stringify({
-            allowed: true,
-            tier: 'starter',
-            reason: 'Daily limit reset',
-            remaining: profile.daily_limit,
-            willDeduct: true
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      if (profile.daily_usage < profile.daily_limit) {
-        // Increment daily usage
-        await supabaseClient
-          .from('profiles')
-          .update({ daily_usage: profile.daily_usage + 1 })
-          .eq('id', user.id);
-
-        const newUsage = profile.daily_usage + 1;
-
-        // Check notifications (80% and 100%)
-        // ... (keeping existing notification logic simplified for brevity, but it's good to keep)
-
         return new Response(
           JSON.stringify({
             allowed: true,
             bypass: false,
-            tier: 'starter',
-            reason: `${profile.daily_limit - newUsage} remaining today`,
-            remaining: profile.daily_limit - newUsage,
-            daily_usage: newUsage,
-            daily_limit: profile.daily_limit,
-            deducted: 1
+            tier: "starter",
+            reason: "Daily limit reset",
+            balance,
+            cost,
+            remaining: profile.daily_limit,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      // If daily limit reached, fall through to check credits
+      if (profile.daily_usage < profile.daily_limit) {
+        return new Response(
+          JSON.stringify({
+            allowed: true,
+            bypass: false,
+            tier: "starter",
+            reason: `${profile.daily_limit - (profile.daily_usage ?? 0)} remaining today`,
+            balance,
+            cost,
+            remaining: profile.daily_limit - (profile.daily_usage ?? 0),
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    // 4. Free Credits (Trial)
-    if (profile.free_credits > 0) {
-      const newBalance = profile.free_credits - 1;
-
-      await supabaseClient
-        .from('profiles')
-        .update({ free_credits: newBalance })
-        .eq('id', user.id);
-
+    // Free / credits: check balance vs cost
+    if (balance >= cost) {
       return new Response(
         JSON.stringify({
           allowed: true,
           bypass: false,
-          tier: 'free',
-          reason: `${newBalance} free credits remaining`,
-          remaining: newBalance,
-          deducted: 1
+          tier: tier,
+          reason: `${balance} credits available`,
+          balance,
+          cost,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 5. Top-up Credits (Purchased)
-    if (creditBalance > 0) {
-      const newBalance = creditBalance - 1;
-
-      // Update credits table
-      await supabaseClient
-        .from('credits')
-        .update({ balance: newBalance })
-        .eq('user_id', user.id);
-
-      // Log transaction
-      await supabaseClient
-        .from('credit_transactions')
-        .insert({
-          user_id: user.id,
-          amount: -1,
-          action: action || 'usage',
-          notes: 'Deducted from top-up credits'
-        });
-
-      return new Response(
-        JSON.stringify({
-          allowed: true,
-          bypass: false,
-          tier: 'credits',
-          reason: `${newBalance} credits remaining`,
-          remaining: newBalance,
-          deducted: 1
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // 6. No Access
     return new Response(
       JSON.stringify({
         allowed: false,
         bypass: false,
         tier: tier,
         reason: "You have run out of credits. Please upgrade or purchase more credits.",
+        balance,
+        cost,
         upgrade_required: true,
         daily_usage: profile.daily_usage,
-        daily_limit: profile.daily_limit
+        daily_limit: profile.daily_limit,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
   } catch (error) {
     console.error("Error checking feature access:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

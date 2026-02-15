@@ -2,52 +2,95 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCanvasStore } from '@/store/canvasStore';
+import { debugLog, debugError } from '@/lib/debug';
 import type { CanvasItem, Project, Canvas } from '@/types/canvas';
 
 const SYNC_DEBOUNCE_MS = 500;
+const LAST_CANVAS_KEY = 'ads_last_canvas_id';
 
 export const useCanvasSync = (userId: string | undefined) => {
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didInit = useRef(false);
+  const accessTokenRef = useRef<string | null>(null);
   const isDirty = useCanvasStore(s => s.isDirty);
 
-  // Mutation to save items
+  // Keep access token ref up-to-date for beforeunload (can't await in unload)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      accessTokenRef.current = data.session?.access_token ?? null;
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      accessTokenRef.current = session?.access_token ?? null;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ---------- sync mutation ----------
   const syncMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (targetCanvasId?: string) => {
       const state = useCanvasStore.getState();
-      if (!state.currentCanvasId || !userId) return;
+      const canvasId = targetCanvasId ?? state.currentCanvasId;
+      if (!canvasId || !userId) return;
 
       useCanvasStore.setSyncing(true);
 
-      // Upsert all items for current canvas
+      // Sync items that belong to the target canvas (not "current")
       const itemsToSync = state.items
-        .filter(item => item.canvas_id === state.currentCanvasId)
+        .filter(item => item.canvas_id === canvasId)
         .map(item => ({
-          ...item,
-          data: item.data as any, // JSONB
+          id: item.id,
+          canvas_id: item.canvas_id,
           user_id: userId,
+          type: item.type,
+          position_x: item.position_x,
+          position_y: item.position_y,
+          width: item.width,
+          height: item.height,
+          rotation: item.rotation,
+          z_index: item.z_index,
+          data: item.data as any,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          deleted_at: item.deleted_at ?? null,
+          image_version_id: item.image_version_id ?? null,
+          root_image_id: item.root_image_id ?? null,
         }));
+
+      debugLog('canvasSync', {
+        action: 'upsert',
+        canvasId,
+        itemCount: itemsToSync.length,
+      });
 
       if (itemsToSync.length > 0) {
         const { error } = await supabase
           .from('canvas_items')
           .upsert(itemsToSync, { onConflict: 'id' });
 
-        if (error) throw error;
+        if (error) {
+          debugError('canvasSync', { action: 'upsert_error', error: error.message, code: error.code });
+          throw error;
+        }
       }
 
       // Save canvas viewport state
-      const currentCanvas = state.canvases.find(c => c.id === state.currentCanvasId);
-      if (currentCanvas) {
-        const { error: canvasError } = await supabase
-          .from('canvases')
-          .update({
-            zoom_level: state.zoom,
-            pan_x: state.panX,
-            pan_y: state.panY,
-          })
-          .eq('id', state.currentCanvasId);
+      if (canvasId === state.currentCanvasId) {
+        const currentCanvas = state.canvases.find(c => c.id === canvasId);
+        if (currentCanvas) {
+          const { error: canvasError } = await supabase
+            .from('canvases')
+            .update({
+              zoom_level: state.zoom,
+              pan_x: state.panX,
+              pan_y: state.panY,
+            })
+            .eq('id', canvasId);
 
-        if (canvasError) throw canvasError;
+          if (canvasError) {
+            debugError('canvasSync', { action: 'viewport_save_error', error: canvasError.message });
+            throw canvasError;
+          }
+        }
       }
     },
     onSuccess: () => {
@@ -57,11 +100,12 @@ export const useCanvasSync = (userId: string | undefined) => {
     },
     onError: (error) => {
       console.error('[Canvas Sync] Error:', error);
+      debugError('canvasSync', { action: 'sync_error', error: String(error) });
       useCanvasStore.setSyncing(false);
     },
   });
 
-  // Watch isDirty and debounce sync
+  // ---------- debounced sync ----------
   useEffect(() => {
     if (!isDirty || !userId) return;
 
@@ -80,9 +124,94 @@ export const useCanvasSync = (userId: string | undefined) => {
     };
   }, [isDirty, userId, syncMutation]);
 
-  // Load projects and canvases
+  // ---------- beforeunload: flush sync ----------
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const state = useCanvasStore.getState();
+      if (!state.isDirty || !state.currentCanvasId || !userId) return;
+
+      // Cancel debounce timer
+      if (syncTimer.current) {
+        clearTimeout(syncTimer.current);
+      }
+
+      // Synchronous sendBeacon for items
+      const itemsToSync = state.items
+        .filter(item => item.canvas_id === state.currentCanvasId)
+        .map(item => ({
+          id: item.id,
+          canvas_id: item.canvas_id,
+          user_id: userId,
+          type: item.type,
+          position_x: item.position_x,
+          position_y: item.position_y,
+          width: item.width,
+          height: item.height,
+          rotation: item.rotation,
+          z_index: item.z_index,
+          data: item.data,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          deleted_at: item.deleted_at ?? null,
+          image_version_id: item.image_version_id ?? null,
+          root_image_id: item.root_image_id ?? null,
+        }));
+
+      if (itemsToSync.length > 0) {
+        // Use fetch with keepalive (more reliable than sendBeacon for POST+JSON)
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/canvas_items`;
+        const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+        try {
+          fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': apiKey,
+              'Authorization': `Bearer ${accessTokenRef.current ?? ''}`,
+              'Prefer': 'resolution=merge-duplicates',
+            },
+            body: JSON.stringify(itemsToSync),
+            keepalive: true,
+          });
+        } catch {
+          // Best-effort — can't block unload
+        }
+      }
+
+      // Persist current canvas id
+      try {
+        localStorage.setItem(LAST_CANVAS_KEY, state.currentCanvasId!);
+      } catch { /* ignore */ }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [userId]);
+
+  // ---------- flush sync for a specific canvas ----------
+  const flushSync = useCallback(async (canvasId?: string) => {
+    if (syncTimer.current) {
+      clearTimeout(syncTimer.current);
+      syncTimer.current = null;
+    }
+
+    const state = useCanvasStore.getState();
+    if (!state.isDirty) return;
+
+    try {
+      await syncMutation.mutateAsync(canvasId);
+    } catch (err) {
+      debugError('canvasSync', { action: 'flush_error', error: String(err) });
+    }
+  }, [syncMutation]);
+
+  // ---------- load projects + canvases (idempotent, StrictMode safe) ----------
   const loadProjects = useCallback(async () => {
     if (!userId) return;
+    // StrictMode guard
+    if (didInit.current) return;
+    didInit.current = true;
+
     useCanvasStore.setLoading(true);
 
     try {
@@ -127,6 +256,8 @@ export const useCanvasSync = (userId: string | undefined) => {
           currentProjectId: newProject.id,
           currentCanvasId: newCanvas.id,
         });
+
+        try { localStorage.setItem(LAST_CANVAS_KEY, newCanvas.id); } catch { /* ignore */ }
       } else {
         // Load first project's canvases
         const currentProject = projects[0];
@@ -139,10 +270,10 @@ export const useCanvasSync = (userId: string | undefined) => {
 
         if (canvasesError) throw canvasesError;
 
-        let activeCanvas = canvases?.[0];
+        let activeCanvases = canvases ?? [];
 
-        if (!canvases || canvases.length === 0) {
-          // Create default canvas
+        if (activeCanvases.length === 0) {
+          // Create default canvas only if truly zero
           const { data: newCanvas, error: canvasError } = await supabase
             .from('canvases')
             .insert({
@@ -155,8 +286,16 @@ export const useCanvasSync = (userId: string | undefined) => {
             .single();
 
           if (canvasError) throw canvasError;
-          activeCanvas = newCanvas;
+          activeCanvases = [newCanvas];
         }
+
+        // Restore last-used canvas if still exists, else first
+        let restoredCanvasId: string | null = null;
+        try {
+          restoredCanvasId = localStorage.getItem(LAST_CANVAS_KEY);
+        } catch { /* ignore */ }
+
+        const activeCanvas = activeCanvases.find(c => c.id === restoredCanvasId) ?? activeCanvases[0];
 
         // Load items for active canvas
         const { data: items, error: itemsError } = await supabase
@@ -167,9 +306,17 @@ export const useCanvasSync = (userId: string | undefined) => {
 
         if (itemsError) throw itemsError;
 
+        debugLog('canvasSync', {
+          action: 'loadProjects',
+          projectId: currentProject.id,
+          canvasCount: activeCanvases.length,
+          activeCanvasId: activeCanvas!.id,
+          itemCount: (items ?? []).length,
+        });
+
         useCanvasStore.hydrate({
           projects: projects as Project[],
-          canvases: (canvases || [activeCanvas!]) as Canvas[],
+          canvases: activeCanvases as Canvas[],
           items: (items || []) as CanvasItem[],
           currentProjectId: currentProject.id,
           currentCanvasId: activeCanvas!.id,
@@ -180,18 +327,36 @@ export const useCanvasSync = (userId: string | undefined) => {
           useCanvasStore.setZoom(activeCanvas.zoom_level || 1);
           useCanvasStore.setPan(activeCanvas.pan_x || 0, activeCanvas.pan_y || 0);
         }
+
+        try { localStorage.setItem(LAST_CANVAS_KEY, activeCanvas!.id); } catch { /* ignore */ }
       }
     } catch (error) {
       console.error('[Canvas Sync] Load error:', error);
+      debugError('canvasSync', { action: 'loadProjects_error', error: String(error) });
       useCanvasStore.setError('Failed to load canvas data');
+      didInit.current = false; // Allow retry
     } finally {
       useCanvasStore.setLoading(false);
     }
   }, [userId]);
 
-  // Load items when canvas changes
+  // ---------- load items for a specific canvas ----------
   const loadCanvasItems = useCallback(async (canvasId: string) => {
     if (!userId) return;
+
+    const state = useCanvasStore.getState();
+    const previousCanvasId = state.currentCanvasId;
+
+    debugLog('canvasSync', {
+      action: 'switchCanvas',
+      previousId: previousCanvasId,
+      nextId: canvasId,
+    });
+
+    // Flush pending sync for previous canvas BEFORE switching
+    if (previousCanvasId && previousCanvasId !== canvasId && state.isDirty) {
+      await flushSync(previousCanvasId);
+    }
 
     const { data: items, error } = await supabase
       .from('canvas_items')
@@ -201,22 +366,31 @@ export const useCanvasSync = (userId: string | undefined) => {
 
     if (error) {
       console.error('[Canvas Sync] Load items error:', error);
+      debugError('canvasSync', { action: 'loadItems_error', canvasId, error: error.message });
       return;
     }
 
-    // Update store with new items (replace items for this canvas)
-    const state = useCanvasStore.getState();
-    const otherItems = state.items.filter(i => i.canvas_id !== canvasId);
-    useCanvasStore.hydrate({
-      projects: state.projects,
-      canvases: state.canvases,
-      items: [...otherItems, ...(items || []) as CanvasItem[]],
-      currentProjectId: state.currentProjectId || undefined,
-      currentCanvasId: canvasId,
+    debugLog('canvasSync', {
+      action: 'loadCanvasItems',
+      canvasId,
+      loadedCount: (items ?? []).length,
     });
-  }, [userId]);
 
-  // Create new canvas
+    // Use targeted merge — does NOT reset isDirty/undo/redo
+    useCanvasStore.setItemsForCanvas(canvasId, (items || []) as CanvasItem[]);
+
+    // Restore viewport for this canvas
+    const canvas = state.canvases.find(c => c.id === canvasId);
+    if (canvas) {
+      useCanvasStore.setZoom(canvas.zoom_level || 1);
+      useCanvasStore.setPan(canvas.pan_x || 0, canvas.pan_y || 0);
+    }
+
+    // Persist last canvas
+    try { localStorage.setItem(LAST_CANVAS_KEY, canvasId); } catch { /* ignore */ }
+  }, [userId, flushSync]);
+
+  // ---------- create canvas ----------
   const createCanvas = useCallback(async (projectId: string, name?: string) => {
     if (!userId) return null;
 
@@ -241,16 +415,16 @@ export const useCanvasSync = (userId: string | undefined) => {
 
     useCanvasStore.addCanvas(newCanvas as Canvas);
     useCanvasStore.setCurrentCanvas(newCanvas.id);
+    useCanvasStore.clearSelection();
+
+    try { localStorage.setItem(LAST_CANVAS_KEY, newCanvas.id); } catch { /* ignore */ }
     return newCanvas;
   }, [userId]);
 
-  // Force sync (for before navigation)
+  // ---------- force sync (public API) ----------
   const forceSync = useCallback(async () => {
-    if (syncTimer.current) {
-      clearTimeout(syncTimer.current);
-    }
-    await syncMutation.mutateAsync();
-  }, [syncMutation]);
+    await flushSync();
+  }, [flushSync]);
 
   return {
     loadProjects,

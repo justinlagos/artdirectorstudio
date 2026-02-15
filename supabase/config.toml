@@ -89,3 +89,15 @@ verify_jwt = true
 
 [functions.artie-proactive-analysis]
 verify_jwt = true
+
+[functions.reserve-credits]
+verify_jwt = true
+
+[functions.commit-credits]
+verify_jwt = true
+
+[functions.funlab-generate]
+verify_jwt = true
+
+[functions.apply-effects]
+verify_jwt = true

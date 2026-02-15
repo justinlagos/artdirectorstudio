@@ -1,17 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { debugLog } from "@/lib/debug";
 
 export const useCredits = () => {
   const { user } = useAuth();
   const [balance, setBalance] = useState<number | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isUnlimited, setIsUnlimited] = useState(false);
   const [tier, setTier] = useState<string>('free');
 
-  const fetchBalance = async () => {
+  const fetchBalance = useCallback(async () => {
     if (!user) {
       setBalance(null);
+      setPendingCount(0);
       setIsUnlimited(false);
       setTier('free');
       setLoading(false);
@@ -24,12 +27,10 @@ export const useCredits = () => {
       let unlimited = false;
 
       // Try to fetch profile data (subscription tier + free credits)
-      // Wrapped in its own try/catch so a profile query failure doesn't
-      // block reading the credits table
       try {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('is_pro, subscription_tier, subscription_expires_at, free_credits, daily_usage, daily_limit')
+          .select('subscription_tier, subscription_status, subscription_expires_at, free_credits, daily_usage, daily_limit')
           .eq('id', user.id)
           .single();
 
@@ -37,12 +38,12 @@ export const useCredits = () => {
           const now = new Date();
           profileTier = profile.subscription_tier || 'free';
 
-          const isSubscriptionActive = profile.is_pro &&
+          const isSubscriptionActive = profile.subscription_status === 'active' &&
             profile.subscription_expires_at &&
             new Date(profile.subscription_expires_at) > now;
 
           // Pro/Enterprise: unlimited access
-          if ((profileTier === 'enterprise' || profileTier === 'pro' || profile.is_pro) && isSubscriptionActive) {
+          if ((profileTier === 'enterprise' || profileTier === 'pro') && isSubscriptionActive) {
             unlimited = true;
           }
 
@@ -64,6 +65,7 @@ export const useCredits = () => {
         setIsUnlimited(true);
         setTier(profileTier);
         setBalance(999999);
+        setPendingCount(0);
         setLoading(false);
         return;
       }
@@ -71,7 +73,7 @@ export const useCredits = () => {
       setIsUnlimited(false);
       setTier(profileTier);
 
-      // Top-up credits from credits table (always try this)
+      // Top-up credits from credits table
       let topUpBalance = 0;
       try {
         const { data: creditsData } = await supabase
@@ -79,20 +81,48 @@ export const useCredits = () => {
           .select('balance')
           .eq('user_id', user.id)
           .maybeSingle();
-
         topUpBalance = creditsData?.balance || 0;
       } catch (creditsErr) {
         console.warn("Could not fetch top-up credits:", creditsErr);
       }
 
-      setBalance(profileCredits + topUpBalance);
+      const grossBalance = profileCredits + topUpBalance;
+
+      // Pending reservations: sum absolute amount of pending, not expired
+      let pendingSum = 0;
+      let pendingRowCount = 0;
+      try {
+        const { data: pendingRows } = await supabase
+          .from('credit_transactions')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('status', 'pending')
+          .gt('expires_at', new Date().toISOString());
+        pendingRowCount = pendingRows?.length ?? 0;
+        pendingSum = (pendingRows ?? []).reduce((sum, row) => sum + Math.abs(Number(row.amount)), 0);
+      } catch {
+        // ignore
+      }
+
+      const available = Math.max(0, grossBalance - pendingSum);
+
+      debugLog('credits', {
+        grossBalance,
+        pendingSum,
+        pendingRowCount,
+        available,
+        tier: profileTier,
+      });
+
+      setPendingCount(pendingRowCount);
+      setBalance(available);
     } catch (error) {
       console.error("Error fetching credits:", error);
       setBalance(0);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -136,11 +166,29 @@ export const useCredits = () => {
       )
       .subscribe();
 
+    // Subscribe to credit_transactions changes (reservation create/commit/refund)
+    const txnChannel = supabase
+      .channel('credit-txn-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'credit_transactions',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          fetchBalance();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(creditChannel);
       supabase.removeChannel(profileChannel);
+      supabase.removeChannel(txnChannel);
     };
-  }, [user?.id]);
+  }, [user?.id, fetchBalance]);
 
-  return { balance, loading, isUnlimited, tier, refetch: fetchBalance };
+  return { balance, pendingCount, loading, isUnlimited, tier, refetch: fetchBalance };
 };

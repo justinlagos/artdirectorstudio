@@ -1,0 +1,21 @@
+<svg viewBox="0 0 320 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:0.6" />
+    </linearGradient>
+  </defs>
+  <rect width="320" height="200" fill="#1a1a1a"/>
+  <circle cx="160" cy="100" r="55" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0.8"/>
+  <circle cx="160" cy="100" r="45" fill="none" stroke="#3b82f6" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="160" cy="100" r="35" fill="none" stroke="#a855f7" stroke-width="1" opacity="0.5"/>
+  <g opacity="0.7">
+    <line x1="100" y1="40" x2="220" y2="40" stroke="#ec4899" stroke-width="4"/>
+    <line x1="100" y1="55" x2="220" y2="55" stroke="#f97316" stroke-width="4"/>
+    <line x1="100" y1="70" x2="220" y2="70" stroke="#fbbf24" stroke-width="4"/>
+  </g>
+  <path d="M 140 100 L 180 100" stroke="#06b6d4" stroke-width="2" opacity="0.6"/>
+  <path d="M 160 80 L 160 120" stroke="#06b6d4" stroke-width="2" opacity="0.6"/>
+  <polygon points="155,85 165,85 160,75" fill="#fbbf24" opacity="0.6"/>
+  <circle cx="160" cy="100" r="8" fill="#06b6d4" opacity="0.5"/>
+</svg>

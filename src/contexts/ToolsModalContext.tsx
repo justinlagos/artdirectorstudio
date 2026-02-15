@@ -1,3 +1,9 @@
+/**
+ * @deprecated Legacy ToolsModal context.
+ * Workspace now uses workspaceStore.activeTool + Inspector drawers.
+ * Kept because community pages (Header, BottomNav, ArtieChat, etc.) still import it.
+ * Remove once those pages are migrated.
+ */
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';

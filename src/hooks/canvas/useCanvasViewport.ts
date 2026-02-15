@@ -30,7 +30,7 @@ export const useCanvasViewport = () => {
   }, []);
 
   const handlePanStart = useCallback((e: React.MouseEvent) => {
-    // Middle click or alt+click
+    // Middle click or alt+click (or panMode on mobile)
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       isPanning.current = true;
       const state = useCanvasStore.getState();
@@ -38,6 +38,13 @@ export const useCanvasViewport = () => {
       panOffset.current = { x: state.panX, y: state.panY };
       e.preventDefault();
     }
+  }, []);
+
+  const handlePanStartFromPoint = useCallback((clientX: number, clientY: number) => {
+    isPanning.current = true;
+    const state = useCanvasStore.getState();
+    panStart.current = { x: clientX, y: clientY };
+    panOffset.current = { x: state.panX, y: state.panY };
   }, []);
 
   const handlePanMove = useCallback((e: React.MouseEvent) => {
@@ -100,11 +107,20 @@ export const useCanvasViewport = () => {
     useCanvasStore.setPan(newPanX, newPanY);
   }, []);
 
+  const handlePanMoveFromPoint = useCallback((clientX: number, clientY: number) => {
+    if (!isPanning.current) return;
+    const dx = clientX - panStart.current.x;
+    const dy = clientY - panStart.current.y;
+    useCanvasStore.setPan(panOffset.current.x + dx, panOffset.current.y + dy);
+  }, []);
+
   return {
     isPanning: isPanning.current,
     handleWheel,
     handlePanStart,
+    handlePanStartFromPoint,
     handlePanMove,
+    handlePanMoveFromPoint,
     handlePanEnd,
     screenToCanvas,
     canvasToScreen,

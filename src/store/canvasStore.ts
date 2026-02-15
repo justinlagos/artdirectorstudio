@@ -376,7 +376,58 @@ const store = {
     setState({ error });
   },
 
-  // Hydration
+  // Version management
+  updateItemVersion: (itemId: string, versionId: string, url: string): void => {
+    const itemIndex = state.items.findIndex((i) => i.id === itemId);
+    if (itemIndex === -1) return;
+
+    const oldItem = state.items[itemIndex];
+    const oldData = oldItem.data as any;
+    const newData = { ...oldData, url };
+    const newItem = {
+      ...oldItem,
+      image_version_id: versionId,
+      data: newData,
+      updated_at: new Date().toISOString(),
+    };
+    const newItems = [...state.items];
+    newItems[itemIndex] = newItem;
+
+    setState({ items: newItems });
+    recordAction('update', itemId, {
+      image_version_id: oldItem.image_version_id,
+      data: oldItem.data,
+    }, {
+      image_version_id: versionId,
+      data: newData,
+    });
+    store.markDirty();
+  },
+
+  // Derived getters
+  getActiveItemType: (): CanvasItem['type'] | null => {
+    const firstId = [...state.selectedItemIds][0];
+    if (!firstId) return null;
+    const item = state.items.find((i) => i.id === firstId);
+    return item?.type ?? null;
+  },
+
+  isWorkingImage: (itemId: string): boolean => {
+    const item = state.items.find((i) => i.id === itemId);
+    return item?.type === 'image';
+  },
+
+  // Merge items for a single canvas without destroying undo/redo/isDirty.
+  // Removes existing items for that canvasId, then inserts loaded items.
+  setItemsForCanvas: (canvasId: string, loadedItems: CanvasItem[]): void => {
+    const otherItems = state.items.filter((i) => i.canvas_id !== canvasId);
+    setState({
+      items: [...otherItems, ...loadedItems],
+      currentCanvasId: canvasId,
+    });
+  },
+
+  // Hydration (full reset — only use on initial load)
   hydrate: (data: {
     projects: Project[];
     canvases: Canvas[];

@@ -66,6 +66,10 @@ export default {
           2: "hsl(var(--surface-2))",
           3: "hsl(var(--surface-3))",
         },
+        sw: {
+          accent: "#5B7FFF",
+          "accent-dim": "rgba(91,127,255,0.08)",
+        },
       },
       spacing: {
         // Design token spacing scale
@@ -86,6 +90,13 @@ export default {
         14: "var(--space-14)",
         15: "var(--space-15)",
         16: "var(--space-16)",
+        "sw-1": "4px",
+        "sw-2": "8px",
+        "sw-3": "12px",
+        "sw-4": "16px",
+        "sw-5": "24px",
+        "sw-6": "32px",
+        "sw-7": "48px",
       },
       borderRadius: {
         xs: "var(--radius-xs)",
@@ -94,6 +105,9 @@ export default {
         md: "var(--radius-md)",
         lg: "var(--radius-lg)",
         xl: "var(--radius-xl)",
+        "sw-panel": "10px",
+        "sw-card": "14px",
+        "sw-pill": "999px",
       },
       boxShadow: {
         xs: "var(--shadow-xs)",
@@ -106,10 +120,12 @@ export default {
         subtle: "var(--shadow-subtle)",
         medium: "var(--shadow-medium)",
         strong: "var(--shadow-strong)",
+        "sw-float": "0 4px 24px rgba(0,0,0,0.12)",
       },
       transitionTimingFunction: {
         'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
         'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+        'sw-ease': 'cubic-bezier(0.25, 0.1, 0.25, 1)',
       },
       keyframes: {
         "accordion-down": {

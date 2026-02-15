@@ -7,7 +7,7 @@ interface CanvasGridProps {
 export const CanvasGrid = React.memo(({ zoom }: CanvasGridProps) => {
   const dotSize = 1;
   const spacing = 20;
-  const opacity = Math.min(0.3, zoom * 0.2);
+  const opacity = Math.min(0.15, zoom * 0.1);
 
   return (
     <div

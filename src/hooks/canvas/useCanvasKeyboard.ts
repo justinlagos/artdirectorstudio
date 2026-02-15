@@ -1,18 +1,40 @@
 import { useEffect } from 'react';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useWorkspaceStore } from '@/store/workspaceStore';
+import { mc } from '@/lib/microcopy';
+
+const isInputFocused = () => {
+  const el = document.activeElement;
+  if (!el || !(el instanceof HTMLElement)) return false;
+  return (
+    el.tagName === 'INPUT' ||
+    el.tagName === 'TEXTAREA' ||
+    el.getAttribute('contenteditable') === 'true'
+  );
+};
 
 export const useCanvasKeyboard = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmd = e.metaKey || e.ctrlKey;
-      const target = e.target as HTMLElement;
+      const inputFocused = isInputFocused();
 
-      // Don't capture when typing in input/textarea
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      // Escape always works: close Inspector first, then deselect
+      if (e.key === 'Escape') {
+        const workspaceState = useWorkspaceStore.getState();
+        if (workspaceState.activeTool !== null) {
+          useWorkspaceStore.getState().closeInspector();
+          e.preventDefault();
+        } else {
+          useCanvasStore.clearSelection();
+        }
         return;
       }
 
-      // Undo: Cmd+Z
+      // Skip all other shortcuts when typing in input
+      if (inputFocused) return;
+
+      // Undo: Cmd+Z - let browser handle text undo when input focused
       if (isCmd && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         useCanvasStore.undo();
@@ -26,10 +48,19 @@ export const useCanvasKeyboard = () => {
         return;
       }
 
-      // Delete selected items
+      // Delete selected items with confirm dialog
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        useCanvasStore.deleteSelectedItems();
+        const selectedIds = useCanvasStore.getState().selectedItemIds;
+        if (selectedIds.size === 0) return;
+        useWorkspaceStore.getState().showConfirmDialog({
+          title: mc.confirmDialogs.deleteItem.title,
+          body: mc.confirmDialogs.deleteItem.body,
+          confirmLabel: mc.confirmDialogs.deleteItem.confirm,
+          cancelLabel: mc.confirmDialogs.deleteItem.cancel,
+          destructive: true,
+          onConfirm: () => useCanvasStore.deleteSelectedItems(),
+        });
         return;
       }
 
@@ -44,12 +75,6 @@ export const useCanvasKeyboard = () => {
       if (isCmd && e.key === 'a') {
         e.preventDefault();
         useCanvasStore.selectAll();
-        return;
-      }
-
-      // Deselect: Escape
-      if (e.key === 'Escape') {
-        useCanvasStore.clearSelection();
         return;
       }
 

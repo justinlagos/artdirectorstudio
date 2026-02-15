@@ -3,7 +3,9 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { analytics } from "@/lib/analytics";
+import { mc } from "@/lib/microcopy";
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +13,9 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  signInWithGoogle: () => Promise<{ error: any }>;
+  sendOTP: (email: string) => Promise<{ error: any }>;
+  verifyOTP: (email: string, token: string) => Promise<{ error: any }>;
   loading: boolean;
 }
 
@@ -76,24 +81,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           try {
             if (event === "SIGNED_IN" && session?.user) {
               analytics.identify(session.user.id);
-              analytics.track("User Logged In", {
-                success: true,
-              });
-              
-              // Set user properties (async, don't block)
+              analytics.track("User Logged In", { success: true });
+
               supabase
                 .from("profiles")
-                .select("subscription_tier, free_credits")
+                .select("id, free_credits")
                 .eq("id", session.user.id)
                 .single()
-                .then(({ data: profile, error: profileError }) => {
-                  if (profile && !profileError) {
-                    analytics.setUserProperties({
-                      subscription_tier: profile.subscription_tier || "free",
-                      credits: profile.free_credits || 0,
-                    });
-                  } else if (profileError) {
-                    console.error("Error fetching user profile for analytics:", profileError);
+                .then(async ({ data: profile, error: profileError }) => {
+                  const email = session.user?.email ?? "";
+                  if (profileError?.code === "PGRST116" || !profile) {
+                    const { error: upsertErr } = await supabase.from("profiles").upsert(
+                      { id: session.user.id, email, free_credits: 59 },
+                      { onConflict: "id" }
+                    );
+                    if (!upsertErr) toast.success(mc.toasts.success.signupCredits);
+                  } else if (profile && (profile.free_credits == null || profile.free_credits === 0)) {
+                    await supabase.from("profiles").update({ free_credits: 59 }).eq("id", session.user.id);
+                    toast.success(mc.toasts.success.signupCredits);
+                  }
+                  const { data: p } = await supabase.from("profiles").select("subscription_tier, free_credits").eq("id", session.user.id).single();
+                  if (p) {
+                    analytics.setUserProperties({ subscription_tier: p.subscription_tier || "free", credits: p.free_credits || 0 });
                   }
                 });
             } else if (event === "SIGNED_OUT") {
@@ -206,6 +215,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return { error };
   };
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google" });
+    if (error) {
+      toast.error(mc.toasts.errors.authGoogle);
+      return { error };
+    }
+    return { error: null };
+  };
+
+  const sendOTP = async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    if (error) {
+      toast.error(mc.toasts.errors.authOtpSend);
+      return { error };
+    }
+    return { error: null };
+  };
+
+  const verifyOTP = async (email: string, token: string) => {
+    const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+    if (error) {
+      toast.error(mc.toasts.errors.authOtpInvalid);
+      return { error };
+    }
+    return { error: null };
+  };
+
   const signOut = async () => {
     try {
       // Clear any pending toasts or overlays
@@ -244,7 +280,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, signUp, signIn, signOut, loading }}>
+    <AuthContext.Provider value={{ user, session, signUp, signIn, signOut, signInWithGoogle, sendOTP, verifyOTP, loading }}>
       {children}
     </AuthContext.Provider>
   );

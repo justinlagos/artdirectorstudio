@@ -1,6 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { fetchWithRetry } from '../_shared/retry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,11 +7,21 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+async function commitReservation(authHeader: string, reservationId: string, action: 'commit' | 'refund') {
+  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/commit-credits`;
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reservation_id: reservationId, action }),
+  });
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  let reservationIdForRefund: string | undefined;
   try {
     const authHeader = req.headers.get('Authorization');
     console.log("Regenerate-prompt: Received auth header:", authHeader ? "present" : "missing");
@@ -52,71 +61,55 @@ serve(async (req) => {
 
     console.log("Regenerate-prompt: User authenticated:", user.id);
 
-    // Check feature access directly by querying profile
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('subscription_tier, free_credits, daily_usage, daily_limit')
-      .eq('id', user.id)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    let body: { base_analysis?: unknown; user_edits?: unknown; reservation_id?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const reservation_id = body.reservation_id;
+    reservationIdForRefund = reservation_id;
+    if (!reservation_id || typeof reservation_id !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Missing reservation_id" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: reservation, error: resErr } = await supabaseAdmin
+      .from('credit_transactions')
+      .select('id, user_id, status, expires_at')
+      .eq('id', reservation_id)
       .single();
 
-    if (profileError) {
-      console.error("Profile fetch error:", profileError);
+    if (resErr || !reservation || reservation.user_id !== user.id || reservation.status !== 'pending') {
       return new Response(
-        JSON.stringify({ error: "Failed to fetch user profile" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Invalid or expired reservation" }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const now = new Date().toISOString();
+    if (reservation.expires_at && reservation.expires_at <= now) {
+      return new Response(
+        JSON.stringify({ error: "Reservation expired" }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log("User profile:", profile);
-
-    // Check access based on tier
-    let allowed = false;
-    let reason = "";
-    
-    if (profile.subscription_tier === 'enterprise' || profile.subscription_tier === 'pro') {
-      allowed = true;
-    } else if (profile.subscription_tier === 'starter') {
-      if (profile.daily_usage < profile.daily_limit) {
-        allowed = true;
-        // Increment daily usage
-        await supabaseClient
-          .from('profiles')
-          .update({ daily_usage: profile.daily_usage + 1 })
-          .eq('id', user.id);
-      } else {
-        reason = "Daily limit reached for Starter tier";
-      }
-    } else if (profile.subscription_tier === 'free') {
-      if (profile.free_credits > 0) {
-        allowed = true;
-        // Deduct free credit
-        await supabaseClient
-          .from('profiles')
-          .update({ free_credits: profile.free_credits - 1 })
-          .eq('id', user.id);
-      } else {
-        reason = "No free credits remaining";
-      }
-    }
-
-    if (!allowed) {
-      console.log("Access denied:", reason);
-      return new Response(
-        JSON.stringify({ 
-          error: reason || "Access denied",
-          upgrade_required: true,
-          tier: profile.subscription_tier
-        }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log("Access granted for regenerate");
-
-    const { base_analysis, user_edits } = await req.json();
+    const { base_analysis, user_edits } = body;
 
     // Validate input structure
     if (!base_analysis || typeof base_analysis !== 'object') {
+      await commitReservation(authHeader, reservation_id, 'refund');
       return new Response(
         JSON.stringify({ error: "Invalid base_analysis structure" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -124,15 +117,9 @@ serve(async (req) => {
     }
 
     if (!user_edits || typeof user_edits !== 'object') {
+      await commitReservation(authHeader, reservation_id, 'refund');
       return new Response(
         JSON.stringify({ error: "Invalid user_edits structure" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (!base_analysis || !user_edits) {
-      return new Response(
-        JSON.stringify({ error: "Missing base_analysis or user_edits" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -178,6 +165,7 @@ You MUST respond with ONLY a valid JSON object in this format:
     );
 
     if (!result.success || !result.text) {
+      await commitReservation(authHeader, reservation_id, 'refund');
       if (result.errorType === 'rate_limit') {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
@@ -210,6 +198,7 @@ You MUST respond with ONLY a valid JSON object in this format:
         throw new Error("Missing full_regeneration_prompt in response");
       }
     } catch (e) {
+      await commitReservation(authHeader, reservation_id, 'refund');
       const errorMessage = e instanceof Error ? e.message : "Unknown parsing error";
       console.error("Failed to parse AI response:", errorMessage);
       return new Response(
@@ -217,6 +206,8 @@ You MUST respond with ONLY a valid JSON object in this format:
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    await commitReservation(authHeader, reservation_id, 'commit');
 
     return new Response(
       JSON.stringify(regeneratedData),
@@ -226,6 +217,9 @@ You MUST respond with ONLY a valid JSON object in this format:
     );
 
   } catch (error) {
+    if (reservationIdForRefund && req.headers.get('Authorization')) {
+      await commitReservation(req.headers.get('Authorization')!, reservationIdForRefund, 'refund').catch(() => {});
+    }
     console.error("Error in regenerate-prompt function:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),

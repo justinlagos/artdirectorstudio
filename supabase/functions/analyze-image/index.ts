@@ -11,6 +11,15 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
+async function commitReservation(authHeader: string, reservationId: string, action: 'commit' | 'refund') {
+  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/commit-credits`;
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reservation_id: reservationId, action }),
+  });
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -18,6 +27,7 @@ serve(async (req) => {
 
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
+  let reservationIdForRefund: string | undefined;
 
   try {
     const authHeader = req.headers.get('Authorization');
@@ -79,47 +89,57 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     }));
 
-    // Check feature access before processing
-    const accessResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-feature-access`, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ action: 'analyze_image' }),
-    });
+    let body: { image?: string; idempotencyKey?: string; reservation_id?: string };
+    try {
+      body = await req.json();
+    } catch {
+      const { response } = createErrorResponse("Invalid JSON body", 400, 'validation_error', requestId);
+      return response;
+    }
 
-    const accessResult = await accessResponse.json();
-    
-    if (!accessResult.allowed) {
-      console.log(JSON.stringify({
-        requestId,
-        action: 'access_denied',
-        reason: accessResult.reason,
-        timestamp: new Date().toISOString()
-      }));
+    const reservation_id = body.reservation_id;
+    reservationIdForRefund = reservation_id;
+    if (!reservation_id || typeof reservation_id !== 'string') {
+      const { response } = createErrorResponse("Missing reservation_id", 400, 'validation_error', requestId);
+      return response;
+    }
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+    const { data: reservation, error: resErr } = await supabaseAdmin
+      .from('credit_transactions')
+      .select('id, user_id, status, expires_at')
+      .eq('id', reservation_id)
+      .single();
+
+    if (resErr || !reservation || reservation.user_id !== userId || reservation.status !== 'pending') {
       const { response } = createErrorResponse(
-        accessResult.reason || ERROR_MESSAGES.INVALID_INPUT,
-        403,
-        'access_denied',
-        requestId,
-        { tier: accessResult.tier }
+        'Invalid or expired reservation',
+        402,
+        'invalid_reservation',
+        requestId
+      );
+      return response;
+    }
+    const now = new Date().toISOString();
+    if (reservation.expires_at && reservation.expires_at <= now) {
+      const { response } = createErrorResponse(
+        'Reservation expired',
+        402,
+        'invalid_reservation',
+        requestId
       );
       return response;
     }
 
-    console.log(JSON.stringify({
-      requestId,
-      action: 'access_granted',
-      tier: accessResult.tier,
-      timestamp: new Date().toISOString()
-    }));
-
-    const { image, idempotencyKey } = await req.json();
+    const { image, idempotencyKey } = body;
     
     // Input validation
     const validation = validateImageData(image);
     if (!validation.valid) {
+      await commitReservation(authHeader, reservation_id, 'refund');
       console.error(JSON.stringify({
         requestId,
         action: 'validation_failed',
@@ -215,6 +235,7 @@ Respond with ONLY this exact JSON structure:
     );
 
     if (!chatResult.success || !chatResult.text) {
+      await commitReservation(authHeader, reservation_id, 'refund');
       const { response: errorResponse } = createErrorResponse(
         chatResult.error || ERROR_MESSAGES.PROCESSING_FAILED,
         500,
@@ -227,6 +248,7 @@ Respond with ONLY this exact JSON structure:
     const messageContent = chatResult.text;
     
     if (!messageContent) {
+      await commitReservation(authHeader, reservation_id, 'refund');
       console.error(JSON.stringify({
         requestId,
         action: 'no_content',
@@ -304,6 +326,7 @@ Respond with ONLY this exact JSON structure:
         timestamp: new Date().toISOString()
       }));
       
+      await commitReservation(authHeader, reservation_id, 'refund');
       const { response } = createErrorResponse(
         "Failed to parse AI analysis. The AI returned malformed data. Please try again.",
         500,
@@ -333,6 +356,8 @@ Respond with ONLY this exact JSON structure:
       );
     }
 
+    await commitReservation(authHeader, reservation_id, 'commit');
+
     return new Response(
       JSON.stringify(analysisData),
       { 
@@ -343,6 +368,9 @@ Respond with ONLY this exact JSON structure:
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown';
+    if (reservationIdForRefund && req.headers.get('Authorization')) {
+      await commitReservation(req.headers.get('Authorization')!, reservationIdForRefund, 'refund').catch(() => {});
+    }
     console.error(JSON.stringify({
       requestId,
       action: 'analyze_error',

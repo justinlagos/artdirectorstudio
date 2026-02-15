@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Canvas } from '@/components/canvas/Canvas';
+import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 
 const CanvasPage = () => {
   const { user, loading } = useAuth();
@@ -18,7 +18,7 @@ const CanvasPage = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  return <Canvas />;
+  return <WorkspaceShell />;
 };
 
 export default CanvasPage;

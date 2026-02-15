@@ -1,4 +1,6 @@
 import * as React from "react";
+import { useWorkspaceStore } from "@/store/workspaceStore";
+import type { LayoutBreakpoint } from "@/store/workspaceStore";
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -16,4 +18,8 @@ export function useIsMobile() {
   }, []);
 
   return !!isMobile;
+}
+
+export function useBreakpoint(): LayoutBreakpoint {
+  return useWorkspaceStore((s) => s.layoutBreakpoint);
 }

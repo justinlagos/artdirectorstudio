@@ -30,6 +30,15 @@ export interface Canvas {
 // Canvas Item types
 export type CanvasItemType = 'image' | 'reference' | 'note' | 'comparison';
 
+export interface EffectLayer {
+  id: string;
+  type: string;
+  lane: 'instant' | 'server';
+  enabled: boolean;
+  order: number;
+  params: Record<string, number | string | boolean>;
+}
+
 export interface ImageItemData {
   url: string;
   originalUrl?: string;
@@ -39,6 +48,10 @@ export interface ImageItemData {
   fileSize?: number;
   naturalWidth?: number;
   naturalHeight?: number;
+  locked_description?: string;
+  editable_direction?: string;
+  analysis_data?: Record<string, unknown>;
+  effects_stack?: EffectLayer[];
 }
 
 export interface ReferenceItemData {
@@ -76,6 +89,8 @@ export interface CanvasItem {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  image_version_id?: string | null;
+  root_image_id?: string | null;
 }
 
 // Canvas Action (undo/redo)
