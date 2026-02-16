@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOptimizedQuery } from './useOptimizedQuery';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,9 +22,6 @@ export function useUserPreferences() {
   } = useOptimizedQuery({
     queryKey: ['userPreferences', user?.id],
     queryFn: async (): Promise<UserUIPreferences> => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserPreferences.tsx:22',message:'queryFn: fetching preferences',data:{hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       if (!user) {
         return DEFAULT_PREFS;
       }
@@ -45,9 +42,6 @@ export function useUserPreferences() {
         ...DEFAULT_PREFS,
         ...(data?.ui_preferences as UserUIPreferences),
       };
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserPreferences.tsx:42',message:'queryFn: returning preferences',data:{workspaceMode:result.workspaceMode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return result;
     },
     enabled: !!user,
@@ -55,9 +49,6 @@ export function useUserPreferences() {
     // Keep previous data during refetch to prevent flickering
     // CRITICAL: Return DEFAULT_PREFS if no previous data to prevent undefined state
     placeholderData: (previousData) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserPreferences.tsx:52',message:'placeholderData called',data:{hasPreviousData:!!previousData,workspaceMode:previousData?.workspaceMode,returningDefault:!previousData},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       // Return previous data if available, otherwise return defaults to prevent undefined
       return previousData || DEFAULT_PREFS;
     },
@@ -68,12 +59,6 @@ export function useUserPreferences() {
     // CRITICAL: Don't refetch on window focus - this prevents resetting optimistic updates
     refetchOnWindowFocus: false,
   });
-  
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserPreferences.tsx:48',message:'preferences query state changed',data:{isLoading,hasPreferences:!!preferences,workspaceMode:preferences?.workspaceMode,error:!!error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  }, [preferences, isLoading, error]);
-  // #endregion
 
   // Mutation for updating preferences
   const updateMutation = useMutation({
@@ -125,9 +110,6 @@ export function useUserPreferences() {
     },
     onMutate: async (updates) => {
       console.log('[useUserPreferences] onMutate: starting optimistic update', { updates, workspaceModeUpdate: updates.workspaceMode });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserPreferences.tsx:122',message:'onMutate: starting optimistic update',data:{updates,workspaceModeUpdate:updates.workspaceMode},timestamp:Date.now(),sessionId:'debug-session',runId:'run6',hypothesisId:'D'})}).catch((e)=>{console.error('[useUserPreferences] Log failed',e);});
-      // #endregion
       // Optimistic update
       await queryClient.cancelQueries({ queryKey: ['userPreferences', user?.id] });
 
@@ -137,9 +119,6 @@ export function useUserPreferences() {
       ]);
 
       console.log('[useUserPreferences] onMutate: got previous prefs', { hasPreviousPrefs: !!previousPrefs, previousWorkspaceMode: previousPrefs?.workspaceMode });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserPreferences.tsx:133',message:'onMutate: got previous prefs',data:{hasPreviousPrefs:!!previousPrefs,previousWorkspaceMode:previousPrefs?.workspaceMode},timestamp:Date.now(),sessionId:'debug-session',runId:'run7',hypothesisId:'D'})}).catch((e)=>{console.error('[useUserPreferences] Log failed',e);});
-      // #endregion
 
       // CRITICAL: Always create optimistic prefs, even if previousPrefs is undefined
       // Use DEFAULT_PREFS as base to ensure we always have valid data
@@ -162,9 +141,6 @@ export function useUserPreferences() {
       };
 
       console.log('[useUserPreferences] onMutate: setting optimistic prefs', { optimisticWorkspaceMode: optimisticPrefs.workspaceMode, hadPreviousPrefs: !!previousPrefs });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserPreferences.tsx:162',message:'onMutate: setting optimistic prefs',data:{optimisticWorkspaceMode:optimisticPrefs.workspaceMode,hadPreviousPrefs:!!previousPrefs},timestamp:Date.now(),sessionId:'debug-session',runId:'run7',hypothesisId:'D'})}).catch((e)=>{console.error('[useUserPreferences] Log failed',e);});
-      // #endregion
       // CRITICAL: Set query data and mark as fresh to prevent refetches
       queryClient.setQueryData(['userPreferences', user?.id], optimisticPrefs);
       // Also update the ref immediately in Index component by ensuring the query data is fresh
@@ -178,9 +154,6 @@ export function useUserPreferences() {
       // This ensures the optimistic update is confirmed with actual server data
       // CRITICAL: Don't invalidate or refetch - just update the data directly
       queryClient.setQueryData(['userPreferences', user?.id], data);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserPreferences.tsx:168',message:'onSuccess: mutation succeeded',data:{workspaceMode:data.workspaceMode},timestamp:Date.now(),sessionId:'debug-session',runId:'run7',hypothesisId:'D'})}).catch((e)=>{console.error('[useUserPreferences] Log failed',e);});
-      // #endregion
     },
     onError: (err, updates, context) => {
       // Harden against preference bounce: if workspaceMode was updated, don't roll it back
@@ -284,12 +257,6 @@ export function useUserPreferences() {
   // Use placeholderData to ensure we always have data during refetches
   // CRITICAL: preferences should never be undefined due to placeholderData returning DEFAULT_PREFS
   const safePreferences = preferences ?? DEFAULT_PREFS;
-  
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useUserPreferences.tsx:232',message:'Returning preferences',data:{hasPreferences:!!preferences,workspaceMode:safePreferences.workspaceMode,isLoading,isUpdating:updateMutation.isPending,usingDefault:!preferences},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'A'})}).catch(()=>{});
-  }, [preferences, safePreferences.workspaceMode, isLoading, updateMutation.isPending]);
-  // #endregion
   
   return {
     preferences: safePreferences,

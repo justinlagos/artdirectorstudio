@@ -12,6 +12,7 @@ import { BeforeAfterSlider } from "@/components/ui/before-after-slider";
 import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
+import { parseEdgeFunctionError } from "@/lib/edgeFunctionErrors";
 import { ToolDrawer } from "./ToolDrawer";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { analytics } from "@/lib/analytics";
@@ -300,7 +301,12 @@ export const ImageUpscaleDialog = ({ open, onOpenChange }: ImageUpscaleDialogPro
       clearInterval(progressInterval);
       console.error("❌ [Upscale] Error:", error);
 
-      const errorMessage = mapErrorMessage(error);
+      const parsed = await parseEdgeFunctionError(error);
+      const parsedMessage =
+        parsed.message && parsed.message !== "Edge Function returned a non-2xx status code"
+          ? parsed.message
+          : null;
+      const errorMessage = parsedMessage || mapErrorMessage(error);
       toolState.handleError(errorMessage);
       toast.error(errorMessage);
       

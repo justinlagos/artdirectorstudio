@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,53 +8,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout, LayoutGrid, Sparkles, Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export const ViewModeSwitcher = () => {
   const { user } = useAuth();
   const { preferences, update, isLoading } = useUserPreferences();
-  const [generationCount, setGenerationCount] = useState<number | null>(null);
-  const [isLoadingCount, setIsLoadingCount] = useState(false);
 
   const workspaceMode = preferences.workspaceMode || 'classic';
 
-  // Load generation count for Auto mode
-  useEffect(() => {
-    if (user && workspaceMode === 'auto') {
-      setIsLoadingCount(true);
-      supabase
-        .from('generated_assets')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('action', 'generate')
-        .then(({ count, error }) => {
-          if (!error && count !== null) {
-            setGenerationCount(count);
-          }
-          setIsLoadingCount(false);
-        });
-    }
-  }, [user, workspaceMode]);
-
   const handleModeChange = (mode: 'classic' | 'auto') => {
-    console.log('[ViewModeSwitcher] handleModeChange called', { mode, currentMode: workspaceMode });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ViewModeSwitcher.tsx:43',message:'handleModeChange called',data:{newMode:mode,currentMode:workspaceMode,isLoading},timestamp:Date.now(),sessionId:'debug-session',runId:'run6',hypothesisId:'D'})}).catch((e)=>{console.error('[ViewModeSwitcher] Log failed',e);});
-    // #endregion
-    
     // Write to localStorage immediately for stable local fallback
     if (typeof window !== 'undefined') {
       localStorage.setItem('workspaceMode', mode);
     }
     
     update({ workspaceMode: mode });
-    console.log('[ViewModeSwitcher] update called', { mode });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/a8d9adf8-d545-4cbd-a8c1-856264c9a379',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ViewModeSwitcher.tsx:47',message:'update called',data:{mode},timestamp:Date.now(),sessionId:'debug-session',runId:'run6',hypothesisId:'D'})}).catch((e)=>{console.error('[ViewModeSwitcher] Log failed',e);});
-    // #endregion
   };
 
   const modeDisplayName = workspaceMode === 'auto' 

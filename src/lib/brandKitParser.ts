@@ -4,6 +4,8 @@
  * Extracts brand information from logos and PDF guidelines
  */
 
+import { parseEdgeFunctionError } from "@/lib/edgeFunctionErrors";
+
 export interface BrandColor {
   name: string;
   hex: string;
@@ -162,7 +164,14 @@ export async function processBrandKitWithAI(
       body: { logoUrl, guidelinesText },
     });
 
-    if (error) throw new Error(typeof error === 'string' ? error : 'AI processing failed');
+    if (error) {
+      const parsed = await parseEdgeFunctionError(error);
+      const message =
+        parsed.message && parsed.message !== 'Edge Function returned a non-2xx status code'
+          ? parsed.message
+          : 'AI processing failed';
+      throw new Error(message);
+    }
     const res = data as { typography?: BrandTypography; usageRules?: BrandUsageRules; error?: string } | null;
     if (res?.error) throw new Error(res.error);
 

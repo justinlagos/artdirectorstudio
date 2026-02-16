@@ -13,6 +13,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { parseEdgeFunctionError } from "@/lib/edgeFunctionErrors";
 
 export interface ImageUnderstanding {
   // Scene Analysis
@@ -132,33 +133,26 @@ export async function analyzeImageDeep(imageUrl: string): Promise<ImageUnderstan
     });
 
     if (error) {
-      // Extract error details
-      let errorData: any = error;
-      
-      // Try to parse error context if available
-      if (error.context) {
-        try {
-          errorData = typeof error.context === 'string' 
-            ? JSON.parse(error.context) 
-            : error.context;
-        } catch {
-          errorData = error;
-        }
-      }
-      
-      // Check for 402 (credits exhausted)
-      if (errorData?.details?.aiStatus === 402 || 
-          errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402 ||
-          error.message?.includes('402') ||
-          error.message?.includes('Credits exhausted') ||
-          error.message?.includes('credits exhausted')) {
+      const parsedError = await parseEdgeFunctionError(error);
+      const rawMessage = parsedError.rawMessage || '';
+      const msgLower = parsedError.message.toLowerCase();
+
+      // Check for credits exhausted
+      if (parsedError.errorType === 'insufficient_credits' ||
+          parsedError.details?.aiStatus === 402 ||
+          parsedError.status === 402 ||
+          rawMessage.includes('402') ||
+          msgLower.includes('credits exhausted')) {
         console.warn('[ImageUnderstanding] Credits exhausted, using cached or basic understanding');
         // Don't throw - return cached or basic understanding instead
         const cached = await getCachedUnderstanding(imageUrl);
         return cached || getBasicUnderstanding(imageUrl);
       }
-      
-      // For other errors, throw to be caught by outer catch
+
+      // For other errors, throw parsed message if available.
+      if (parsedError.message && parsedError.message !== 'Edge Function returned a non-2xx status code') {
+        throw new Error(parsedError.message);
+      }
       throw error;
     }
 

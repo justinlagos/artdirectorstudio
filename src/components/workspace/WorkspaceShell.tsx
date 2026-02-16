@@ -24,6 +24,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { DrawerContent } from './inspector/DrawerContent';
 import { CanvasViewport } from '@/components/canvas/CanvasViewport';
 import { ViewportControls } from '@/components/canvas/ViewportControls';
+import { DevModePanel } from '@/components/DevModePanel';
 
 export const WorkspaceShell: React.FC = () => {
   const { user } = useAuth();
@@ -247,6 +248,8 @@ export const WorkspaceShell: React.FC = () => {
         }}
         onCancel={closeConfirmDialog}
       />
+
+      <DevModePanel />
     </div>
   );
 };

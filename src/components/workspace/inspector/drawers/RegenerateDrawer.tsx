@@ -9,6 +9,7 @@ import { useCreditReservation } from '@/hooks/useCreditReservation';
 import { usePromptSystem } from '@/hooks/usePromptSystem';
 import { useImageVersions } from '@/hooks/useImageVersions';
 import { supabase } from '@/integrations/supabase/client';
+import { parseEdgeFunctionError } from '@/lib/edgeFunctionErrors';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import type { ImageItemData, CanvasItem } from '@/types/canvas';
@@ -187,7 +188,12 @@ export const RegenerateDrawer: React.FC<RegenerateDrawerProps> = ({
       console.error('[RegenerateDrawer] error:', err);
       await refund().catch(() => {});
       updateJob(jobId, { status: 'failed' });
-      toast.error(mc.toasts.errors.networkRegenerate);
+      const parsed = await parseEdgeFunctionError(err);
+      const message =
+        parsed.message && parsed.message !== 'Edge Function returned a non-2xx status code'
+          ? parsed.message
+          : mc.toasts.errors.networkRegenerate;
+      toast.error(message);
     } finally {
       setIsGenerating(false);
     }

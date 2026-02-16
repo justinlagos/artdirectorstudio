@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ImageZoomDialog } from "./ImageZoomDialog";
 import { useToolState } from "@/hooks/useToolState";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
+import { parseEdgeFunctionError } from "@/lib/edgeFunctionErrors";
 import { ToolDrawer } from "./ToolDrawer";
 import { openStudioWithPrompt } from "@/lib/studio";
 import { analytics } from "@/lib/analytics";
@@ -425,12 +426,17 @@ export const ImageBlendDialog = ({ open, onOpenChange }: ImageBlendDialogProps) 
       clearInterval(progressInterval);
       console.error("❌ [Blend] Error occurred:", error);
       const fallbackMessage = "Blend failed. Try a smaller image or a simpler style.";
-      const errorMessage = mapErrorMessage(error);
+      const parsed = await parseEdgeFunctionError(error);
+      const parsedMessage =
+        parsed.message && parsed.message !== "Edge Function returned a non-2xx status code"
+          ? parsed.message
+          : null;
+      const errorMessage = parsedMessage || mapErrorMessage(error) || fallbackMessage;
       if (errorMessage && errorMessage !== fallbackMessage) {
         console.warn("Blend error detail:", errorMessage);
       }
-      toolState.handleError(fallbackMessage);
-      toast.error(fallbackMessage);
+      toolState.handleError(errorMessage);
+      toast.error(errorMessage);
       
       // Track blend failure (if not already tracked above)
       if (error && !(error as any).__analyticsTracked) {

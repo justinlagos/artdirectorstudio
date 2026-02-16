@@ -39,8 +39,6 @@ if (SENTRY_DSN) {
     console.error("[Sentry] Failed to initialize:", error);
     // Continue without Sentry - don't block the app
   }
-} else {
-  console.log("[Sentry] DSN not provided, error tracking disabled");
 }
 
 // Export Sentry and initialization status

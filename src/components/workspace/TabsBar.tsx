@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Plus, X, Undo2, Redo2, Loader2 } from 'lucide-react';
+import { Plus, X, Undo2, Redo2, Loader2, LogOut } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { CreditsDisplay } from './CreditsDisplay';
 import { mc } from '@/lib/microcopy';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TabsBarProps {
   onCreateCanvas: () => void;
@@ -15,6 +16,7 @@ export const TabsBar: React.FC<TabsBarProps> = ({
   onCreateCanvas,
   onSwitchCanvas,
 }) => {
+  const { signOut } = useAuth();
   const canvases = useCanvasStore((s) => s.canvases);
   const currentCanvasId = useCanvasStore((s) => s.currentCanvasId);
   const undoStack = useCanvasStore((s) => s.undoStack);
@@ -217,6 +219,16 @@ export const TabsBar: React.FC<TabsBarProps> = ({
           </button>
         </div>
         <CreditsDisplay />
+        <button
+          onClick={() => {
+            void signOut();
+          }}
+          className="p-1 text-white/40 hover:text-white/80 rounded transition-colors"
+          title="Sign out"
+          aria-label="Sign out"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

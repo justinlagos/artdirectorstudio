@@ -8,9 +8,52 @@ import type { CanvasItem, Project, Canvas } from '@/types/canvas';
 const SYNC_DEBOUNCE_MS = 500;
 const LAST_CANVAS_KEY = 'ads_last_canvas_id';
 
+const didInitGlobal = { current: false };
+
+function mergeItemsByTimestamp(
+  localItems: CanvasItem[],
+  serverItems: CanvasItem[]
+): CanvasItem[] {
+  const merged = new Map<string, CanvasItem>();
+  
+  for (const item of localItems) {
+    merged.set(item.id, item);
+  }
+  
+  for (const serverItem of serverItems) {
+    const localItem = merged.get(serverItem.id);
+    
+    if (!localItem) {
+      merged.set(serverItem.id, serverItem);
+      continue;
+    }
+    
+    const localTime = new Date(localItem.updated_at).getTime();
+    const serverTime = new Date(serverItem.updated_at).getTime();
+    
+    if (serverTime > localTime) {
+      debugLog('canvasSync', { 
+        action: 'server_wins', 
+        itemId: serverItem.id,
+        localTime,
+        serverTime 
+      });
+      merged.set(serverItem.id, serverItem);
+    } else {
+      debugLog('canvasSync', { 
+        action: 'local_wins', 
+        itemId: localItem.id,
+        localTime,
+        serverTime 
+      });
+    }
+  }
+  
+  return Array.from(merged.values());
+}
+
 export const useCanvasSync = (userId: string | undefined) => {
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const didInit = useRef(false);
   const accessTokenRef = useRef<string | null>(null);
   const isDirty = useCanvasStore(s => s.isDirty);
 
@@ -208,9 +251,9 @@ export const useCanvasSync = (userId: string | undefined) => {
   // ---------- load projects + canvases (idempotent, StrictMode safe) ----------
   const loadProjects = useCallback(async () => {
     if (!userId) return;
-    // StrictMode guard
-    if (didInit.current) return;
-    didInit.current = true;
+    // StrictMode guard - use global ref so all hook instances share state
+    if (didInitGlobal.current) return;
+    didInitGlobal.current = true;
 
     useCanvasStore.setLoading(true);
 
@@ -334,7 +377,7 @@ export const useCanvasSync = (userId: string | undefined) => {
       console.error('[Canvas Sync] Load error:', error);
       debugError('canvasSync', { action: 'loadProjects_error', error: String(error) });
       useCanvasStore.setError('Failed to load canvas data');
-      didInit.current = false; // Allow retry
+      didInitGlobal.current = false; // Allow retry
     } finally {
       useCanvasStore.setLoading(false);
     }
@@ -376,8 +419,11 @@ export const useCanvasSync = (userId: string | undefined) => {
       loadedCount: (items ?? []).length,
     });
 
-    // Use targeted merge — does NOT reset isDirty/undo/redo
-    useCanvasStore.setItemsForCanvas(canvasId, (items || []) as CanvasItem[]);
+    const state = useCanvasStore.getState();
+    const localItems = state.items.filter(i => i.canvas_id === canvasId);
+    const mergedItems = mergeItemsByTimestamp(localItems, (items || []) as CanvasItem[]);
+
+    useCanvasStore.setItemsForCanvas(canvasId, mergedItems);
 
     // Restore viewport for this canvas
     const canvas = state.canvases.find(c => c.id === canvasId);

@@ -11,6 +11,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
+const ANALYZE_CREDITS_COST = 3;
+
 async function commitReservation(authHeader: string, reservationId: string, action: 'commit' | 'refund') {
   const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/commit-credits`;
   await fetch(url, {
@@ -18,6 +20,52 @@ async function commitReservation(authHeader: string, reservationId: string, acti
     headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
     body: JSON.stringify({ reservation_id: reservationId, action }),
   });
+}
+
+type ReservationAcquireResult =
+  | { ok: true; reservationId: string }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      available?: number;
+      required?: number;
+    };
+
+async function reserveCredits(
+  authHeader: string,
+  amount: number,
+  action: string,
+  description: string
+): Promise<ReservationAcquireResult> {
+  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/reserve-credits`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount, action, description }),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (payload?.reserved && typeof payload?.reservation_id === 'string') {
+    return { ok: true, reservationId: payload.reservation_id };
+  }
+
+  if (payload?.reserved === false) {
+    return {
+      ok: false,
+      status: 402,
+      error: payload?.error || 'Insufficient credits',
+      available: typeof payload?.available === 'number' ? payload.available : undefined,
+      required: typeof payload?.required === 'number' ? payload.required : amount,
+    };
+  }
+
+  return {
+    ok: false,
+    status: response.status || 500,
+    error: payload?.error || `Failed to reserve credits (${response.status})`,
+  };
 }
 
 serve(async (req) => {
@@ -97,12 +145,37 @@ serve(async (req) => {
       return response;
     }
 
-    const reservation_id = body.reservation_id;
-    reservationIdForRefund = reservation_id;
-    if (!reservation_id || typeof reservation_id !== 'string') {
-      const { response } = createErrorResponse("Missing reservation_id", 400, 'validation_error', requestId);
+    let reservation_id = typeof body.reservation_id === 'string' ? body.reservation_id : undefined;
+    if (!reservation_id) {
+      console.warn(JSON.stringify({
+        requestId,
+        action: 'missing_reservation_auto_acquire',
+        userId,
+        timestamp: new Date().toISOString()
+      }));
+      const acquired = await reserveCredits(authHeader, ANALYZE_CREDITS_COST, 'analyze', 'Analyze image');
+      if (!acquired.ok) {
+        const status = acquired.status === 402 ? 402 : acquired.status >= 400 ? acquired.status : 500;
+        const errorType = status === 402 ? 'insufficient_credits' : 'reservation_error';
+        const details: Record<string, unknown> = {};
+        if (typeof acquired.available === 'number') details.available = acquired.available;
+        if (typeof acquired.required === 'number') details.required = acquired.required;
+
+        const message =
+          status === 402 && typeof acquired.available === 'number' && typeof acquired.required === 'number'
+            ? `Insufficient credits: ${acquired.available} available, ${acquired.required} needed`
+            : acquired.error;
+        const { response } = createErrorResponse(message, status, errorType, requestId, details);
+        return response;
+      }
+      reservation_id = acquired.reservationId;
+    }
+    const activeReservationId = reservation_id;
+    if (!activeReservationId) {
+      const { response } = createErrorResponse("Failed to reserve credits", 500, 'reservation_error', requestId);
       return response;
     }
+    reservationIdForRefund = activeReservationId;
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -111,7 +184,7 @@ serve(async (req) => {
     const { data: reservation, error: resErr } = await supabaseAdmin
       .from('credit_transactions')
       .select('id, user_id, status, expires_at')
-      .eq('id', reservation_id)
+      .eq('id', activeReservationId)
       .single();
 
     if (resErr || !reservation || reservation.user_id !== userId || reservation.status !== 'pending') {
@@ -139,7 +212,7 @@ serve(async (req) => {
     // Input validation
     const validation = validateImageData(image);
     if (!validation.valid) {
-      await commitReservation(authHeader, reservation_id, 'refund');
+      await commitReservation(authHeader, activeReservationId, 'refund');
       console.error(JSON.stringify({
         requestId,
         action: 'validation_failed',
@@ -235,12 +308,22 @@ Respond with ONLY this exact JSON structure:
     );
 
     if (!chatResult.success || !chatResult.text) {
-      await commitReservation(authHeader, reservation_id, 'refund');
+      await commitReservation(authHeader, activeReservationId, 'refund');
+      
+      const details: Record<string, unknown> = {};
+      if (chatResult.providerStatus) {
+        details.provider_status = chatResult.providerStatus;
+      }
+      if (chatResult.providerMessage) {
+        details.provider_message = chatResult.providerMessage;
+      }
+      
       const { response: errorResponse } = createErrorResponse(
         chatResult.error || ERROR_MESSAGES.PROCESSING_FAILED,
         500,
         chatResult.errorType || 'ai_error',
-        requestId
+        requestId,
+        Object.keys(details).length > 0 ? details : undefined
       );
       return errorResponse;
     }
@@ -248,7 +331,7 @@ Respond with ONLY this exact JSON structure:
     const messageContent = chatResult.text;
     
     if (!messageContent) {
-      await commitReservation(authHeader, reservation_id, 'refund');
+      await commitReservation(authHeader, activeReservationId, 'refund');
       console.error(JSON.stringify({
         requestId,
         action: 'no_content',
@@ -326,7 +409,7 @@ Respond with ONLY this exact JSON structure:
         timestamp: new Date().toISOString()
       }));
       
-      await commitReservation(authHeader, reservation_id, 'refund');
+      await commitReservation(authHeader, activeReservationId, 'refund');
       const { response } = createErrorResponse(
         "Failed to parse AI analysis. The AI returned malformed data. Please try again.",
         500,
@@ -356,7 +439,7 @@ Respond with ONLY this exact JSON structure:
       );
     }
 
-    await commitReservation(authHeader, reservation_id, 'commit');
+    await commitReservation(authHeader, activeReservationId, 'commit');
 
     return new Response(
       JSON.stringify(analysisData),

@@ -28,12 +28,25 @@ export async function reconcileJobsOnLoad(userId: string): Promise<void> {
     (j) => j.status === 'done' || j.status === 'failed'
   );
 
-  // Already-resolved jobs: nothing to reconcile
+  // Already-resolved jobs: remove from store to prevent memory leak
+  for (const job of alreadyResolved) {
+    store.removeJob(job.id);
+  }
+
   // Active jobs: check server truth
   for (const job of activeJobs) {
     try {
       const resolved = await reconcileSingleJob(job, userId);
       store.updateJob(job.id, { status: resolved });
+      
+      // Auto-cleanup: remove job after reconciliation
+      setTimeout(() => {
+        const currentState = useWorkspaceStore.getState();
+        const currentJob = currentState.jobs.find(j => j.id === job.id);
+        if (currentJob && (currentJob.status === 'done' || currentJob.status === 'failed')) {
+          currentState.removeJob(job.id);
+        }
+      }, 5000);
     } catch (err) {
       console.error(`[reconcileJobs] Failed to reconcile job ${job.id}:`, err);
       // Safe default: mark failed. Server reservation expiry handles credit refund.

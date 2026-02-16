@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { Separator } from "@/components/ui/separator";
+import { parseEdgeFunctionError } from "@/lib/edgeFunctionErrors";
 
 interface ImageBlendDialogEnhancedProps {
   open: boolean;
@@ -182,27 +183,35 @@ Requirements:
       
       console.log('🎉 [BlendPro] Blend completed successfully');
       toast.success("Images blended professionally!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearInterval(progressInterval);
       console.error("❌ [BlendPro] Error:", {
-        message: error?.message,
+        message: error instanceof Error ? error.message : String(error),
         details: error
       });
+      const parsed = await parseEdgeFunctionError(error);
+      const message =
+        parsed.message && parsed.message !== "Edge Function returned a non-2xx status code"
+          ? parsed.message
+          : error instanceof Error
+            ? error.message
+            : "Please try again.";
+      const messageLower = message.toLowerCase();
       
       // Check for specific error types
-      if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
+      if (parsed.status === 429 || parsed.errorType === "rate_limit" || messageLower.includes('rate limit') || messageLower.includes('429')) {
         toast.error("Rate limit exceeded", {
           description: "Please wait a minute and try again. The AI service needs a moment to recover.",
           duration: 5000,
         });
-      } else if (error?.message?.includes('Credits exhausted') || error?.message?.includes('402')) {
+      } else if (parsed.status === 402 || parsed.errorType === "insufficient_credits" || messageLower.includes('credits exhausted') || messageLower.includes('insufficient credits') || messageLower.includes('402')) {
         toast.error("Credits exhausted", {
           description: "Please add credits to your workspace in Settings to continue.",
           duration: 7000,
         });
       } else {
         toast.error("Failed to blend images", {
-          description: error?.message || "Please try again.",
+          description: message || "Please try again.",
         });
       }
     } finally {

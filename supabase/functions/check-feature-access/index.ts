@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveAdminAccess } from "../_shared/adminAccess.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,21 +68,11 @@ serve(async (req) => {
 
     const cost = typeof action === "string" ? (COST_BY_ACTION[action] ?? 1) : 1;
 
-    // Admin bypass: check user_roles table
-    const { data: adminRole, error: roleError } = await supabaseClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .maybeSingle();
-
-    if (roleError) {
-      console.error("check-feature-access: Failed to check admin role:", roleError);
-      // Don't fail the request, just log and continue to normal credit check
-    }
-
-    if (adminRole) {
-      console.log(`check-feature-access: Admin bypass granted for user ${user.id}, action: ${action}`);
+    const adminAccess = await resolveAdminAccess(supabaseClient, user, "check-feature-access");
+    if (adminAccess.isAdmin) {
+      console.log(
+        `check-feature-access: Admin bypass granted for user ${user.id}, action: ${action}, source: ${adminAccess.source}`
+      );
       return new Response(
         JSON.stringify({
           allowed: true,
@@ -95,18 +86,44 @@ serve(async (req) => {
       );
     }
 
-    // Profile: subscription + free_credits
-    const { data: profile, error: profileError } = await supabaseClient
+    // Profile: subscription + free_credits (be resilient when profile row is missing)
+    let { data: profile, error: profileError } = await supabaseClient
       .from("profiles")
       .select("subscription_tier, subscription_status, subscription_expires_at, free_credits, daily_usage, daily_limit, daily_usage_reset_at")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (profileError || !profile) {
-      return new Response(
-        JSON.stringify({ error: "Failed to load profile" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (profileError) {
+      console.error("check-feature-access profile lookup error:", profileError);
+    }
+    if (!profile) {
+      const { error: upsertProfileError } = await supabaseClient
+        .from("profiles")
+        .upsert(
+          {
+            id: user.id,
+            email: user.email ?? null,
+            subscription_tier: "free",
+            free_credits: 59,
+            daily_usage: 0,
+            daily_limit: 0,
+          },
+          { onConflict: "id" }
+        );
+
+      if (upsertProfileError) {
+        console.error("check-feature-access profile upsert error:", upsertProfileError);
+      }
+
+      profile = {
+        subscription_tier: "free",
+        subscription_status: null,
+        subscription_expires_at: null,
+        free_credits: upsertProfileError ? 0 : 59,
+        daily_usage: 0,
+        daily_limit: 0,
+        daily_usage_reset_at: null,
+      };
     }
 
     // Top-up credits

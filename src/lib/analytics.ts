@@ -33,8 +33,6 @@ if (MIXPANEL_TOKEN) {
       // Silently fail - analytics is not critical
     });
   }, 0);
-} else {
-  console.log("[Analytics] Mixpanel token not provided, analytics disabled");
 }
 
 interface AnalyticsProperties {

@@ -1,5 +1,22 @@
 import { create } from 'zustand';
 
+function getTabId(): string {
+  try {
+    let tabId = sessionStorage.getItem('ads_tab_id');
+    if (!tabId) {
+      tabId = crypto.randomUUID();
+      sessionStorage.setItem('ads_tab_id', tabId);
+    }
+    return tabId;
+  } catch {
+    return 'default-tab';
+  }
+}
+
+const TAB_ID = getTabId();
+const TAB_JOBS_KEY = `ads_tab_${TAB_ID}_workspace_jobs`;
+const TAB_EFFECTS_KEY = `ads_tab_${TAB_ID}_effects_preview`;
+
 export type WorkspaceTool =
   | 'import'
   | 'references'
@@ -33,7 +50,6 @@ export interface EffectLayer {
   [key: string]: unknown;
 }
 
-const SESSION_JOBS_KEY = 'ads_workspace_jobs';
 const TOOL_RAIL_EXPANDED_KEY = 'ads_tool_rail_expanded';
 const SHOW_GRID_KEY = 'ads_show_grid';
 
@@ -68,7 +84,7 @@ function persistJobs(jobs: AsyncJob[]) {
       expected_outputs: j.expected_outputs,
       status: j.status,
     }));
-    sessionStorage.setItem(SESSION_JOBS_KEY, JSON.stringify(minimal));
+    sessionStorage.setItem(TAB_JOBS_KEY, JSON.stringify(minimal));
   } catch {
     // Ignore storage errors
   }
@@ -76,7 +92,7 @@ function persistJobs(jobs: AsyncJob[]) {
 
 function loadPersistedJobs(): AsyncJob[] {
   try {
-    const raw = sessionStorage.getItem(SESSION_JOBS_KEY);
+    const raw = sessionStorage.getItem(TAB_JOBS_KEY);
     if (!raw) return [];
     return JSON.parse(raw) as AsyncJob[];
   } catch {
@@ -207,7 +223,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   clearPersistedJobs: () => {
     try {
-      sessionStorage.removeItem(SESSION_JOBS_KEY);
+      sessionStorage.removeItem(TAB_JOBS_KEY);
     } catch {
       // Ignore
     }

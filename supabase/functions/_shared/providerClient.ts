@@ -34,6 +34,8 @@ export interface ChatWithProviderResult {
   error?: string;
   errorType?: string;
   metadata?: { provider: string; model?: string };
+  providerStatus?: number;
+  providerMessage?: string;
 }
 
 /**
@@ -220,6 +222,8 @@ async function chatWithGemini(
       error: mapAIError(response.status, errorText),
       errorType: response.status === 429 ? 'rate_limit' : 'ai_error',
       metadata: { provider: 'gemini', model },
+      providerStatus: response.status,
+      providerMessage: errorText.substring(0, 500),
     };
   }
   const data = await response.json();
@@ -260,6 +264,8 @@ async function chatWithOpenAI(
       error: mapAIError(response.status, errorText),
       errorType: response.status === 429 ? 'rate_limit' : 'ai_error',
       metadata: { provider: 'openai', model },
+      providerStatus: response.status,
+      providerMessage: errorText.substring(0, 500),
     };
   }
   const data = await response.json();

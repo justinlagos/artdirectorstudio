@@ -10,6 +10,7 @@ import { useCredits } from '@/hooks/useCredits';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { interpolateTemplate, type FunLabPack } from '@/lib/funlab/packs';
+import { parseEdgeFunctionError } from '@/lib/edgeFunctionErrors';
 import { PackBrowser } from '@/components/workspace/funlab/PackBrowser';
 import { PackOptions } from '@/components/workspace/funlab/PackOptions';
 import { ResultTiles, type FunLabResult } from '@/components/workspace/funlab/ResultTiles';
@@ -240,7 +241,12 @@ export const FunLabDrawer: React.FC<FunLabDrawerProps> = ({ onRequestAuth }) => 
       console.error('[FunLabDrawer] error:', err);
       await refund().catch(() => {});
       updateJob(jobId, { status: 'failed' });
-      toast.error(mc.toasts.errors.networkFunLab);
+      const parsed = await parseEdgeFunctionError(err);
+      const message =
+        parsed.message && parsed.message !== 'Edge Function returned a non-2xx status code'
+          ? parsed.message
+          : mc.toasts.errors.networkFunLab;
+      toast.error(message);
     } finally {
       setIsGenerating(false);
     }

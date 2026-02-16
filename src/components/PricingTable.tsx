@@ -5,6 +5,7 @@ import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { parseEdgeFunctionError } from "@/lib/edgeFunctionErrors";
 
 const packages = [
   {
@@ -64,31 +65,13 @@ export const PricingTable = () => {
         // Redirect to Stripe Checkout
         window.location.href = data.url;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating checkout session:', error);
-
-      // Extract the most useful message from the error object
-      let errorMessage = 'Failed to create checkout session. Please try again.';
-
-      if (error) {
-        // Check for specific error message from backend (often in context or body for Edge Functions)
-        if (error.context?.error) {
-          errorMessage = error.context.error;
-        } else if (error.message) {
-          errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        }
-
-        // Sometimes the error is a JSON string in the message
-        try {
-          const parsed = JSON.parse(errorMessage);
-          if (parsed.error) errorMessage = parsed.error;
-        } catch (e) {
-          // Not a JSON string, use as is
-        }
-      }
-
+      const parsed = await parseEdgeFunctionError(error);
+      const errorMessage =
+        parsed.message && parsed.message !== "Edge Function returned a non-2xx status code"
+          ? parsed.message
+          : 'Failed to create checkout session. Please try again.';
       toast.error(errorMessage);
     } finally {
       setLoading(null);

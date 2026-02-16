@@ -1,7 +1,39 @@
 import { useEffect, useState, useCallback } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { debugLog } from "@/lib/debug";
+
+const ADMIN_ROLE_STRINGS = new Set(["admin", "owner", "super_admin", "superadmin"]);
+const ADMIN_BALANCE_SENTINEL = 999999;
+
+const roleContainsAdmin = (value: unknown): boolean => {
+  if (typeof value === "string") {
+    return ADMIN_ROLE_STRINGS.has(value.trim().toLowerCase());
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => typeof item === "string" && ADMIN_ROLE_STRINGS.has(item.trim().toLowerCase()));
+  }
+  return false;
+};
+
+const hasAdminClaim = (user: User): boolean => {
+  const appMeta = user?.app_metadata ?? {};
+  const userMeta = user?.user_metadata ?? {};
+
+  if (appMeta?.is_admin === true || userMeta?.is_admin === true) {
+    return true;
+  }
+
+  return (
+    roleContainsAdmin(appMeta?.role) ||
+    roleContainsAdmin(userMeta?.role) ||
+    roleContainsAdmin(appMeta?.roles) ||
+    roleContainsAdmin(userMeta?.roles) ||
+    roleContainsAdmin(appMeta?.app_role) ||
+    roleContainsAdmin(userMeta?.app_role)
+  );
+};
 
 export const useCredits = () => {
   const { user } = useAuth();
@@ -22,6 +54,42 @@ export const useCredits = () => {
     }
 
     try {
+      let adminBypass = hasAdminClaim(user);
+      if (!adminBypass) {
+        try {
+          const { data: adminRole, error: roleError } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .eq("role", "admin")
+            .maybeSingle();
+
+          adminBypass = !!adminRole;
+
+          // If roles table is unavailable, defer to server-side admin resolution.
+          if (!adminBypass && roleError) {
+            const { data: accessData, error: accessError } = await supabase.functions.invoke(
+              "check-feature-access",
+              { body: { action: "analyze" } }
+            );
+            if (!accessError && accessData?.allowed && accessData?.tier === "admin") {
+              adminBypass = true;
+            }
+          }
+        } catch (adminErr) {
+          console.warn("Could not verify admin credit bypass:", adminErr);
+        }
+      }
+
+      if (adminBypass) {
+        setIsUnlimited(true);
+        setTier("admin");
+        setBalance(ADMIN_BALANCE_SENTINEL);
+        setPendingCount(0);
+        setLoading(false);
+        return;
+      }
+
       let profileCredits = 0;
       let profileTier = 'free';
       let unlimited = false;

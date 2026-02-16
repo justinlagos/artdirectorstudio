@@ -4,6 +4,7 @@ import type { GenerationOptions } from "@/components/ImageGenerationDialog";
 import { mapErrorMessage } from "@/lib/toolErrorMessages";
 import { analytics } from "@/lib/analytics";
 import { convertToBackendFormat } from "@/lib/generationParams";
+import { parseEdgeFunctionError } from "@/lib/edgeFunctionErrors";
 
 export type StudioGenerator = (
   prompt: string,
@@ -48,29 +49,20 @@ const defaultStudioGenerator: StudioGenerator = async (prompt, options) => {
       error_type: error.message?.substring(0, 50) || "unknown",
     });
 
-    // Parse structured error response
-    let errorData: any = error;
-    
-    // Try to extract error details from FunctionsHttpError
-    if (error.context) {
-      try {
-        errorData = typeof error.context === 'string' 
-          ? JSON.parse(error.context) 
-          : error.context;
-      } catch {
-        errorData = error;
-      }
-    }
-    
-    // Use the error mapping utility to get user-friendly message
-    const friendlyMessage = mapErrorMessage(errorData);
+    const parsedError = await parseEdgeFunctionError(error);
+
+    // Prefer parsed server message when available, then map to fallback copy.
+    const friendlyMessage =
+      parsedError.message && parsedError.message !== "Edge Function returned a non-2xx status code"
+        ? parsedError.message
+        : mapErrorMessage({ message: parsedError.rawMessage, status: parsedError.status });
     
     // Create enriched error with request ID for debugging
     const enrichedError = new Error(friendlyMessage);
-    (enrichedError as any).requestId = errorData?.requestId;
-    (enrichedError as any).errorType = errorData?.errorType;
-    (enrichedError as any).details = errorData?.details;
-    (enrichedError as any).retryable = errorData?.retryable;
+    (enrichedError as any).requestId = parsedError.details?.requestId || undefined;
+    (enrichedError as any).errorType = parsedError.errorType;
+    (enrichedError as any).details = parsedError.details;
+    (enrichedError as any).retryable = parsedError.status === 429 || (parsedError.status != null && parsedError.status >= 500);
     
     throw enrichedError;
   }

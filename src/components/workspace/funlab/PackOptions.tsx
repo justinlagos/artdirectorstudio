@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { mc } from '@/lib/microcopy';
-import { COSTS } from '@/lib/costs';
 import type { FunLabPack, PackControl } from '@/lib/funlab/packs';
 
 interface PackOptionsProps {
@@ -42,7 +41,7 @@ export const PackOptions: React.FC<PackOptionsProps> = ({
   const isTypography = pack.category === 'typography_structure';
   const textInput = String(values['user_text'] || '');
   const insufficientCredits = creditsAvailable < pack.cost;
-  const disabled = isGenerating || isReserving || insufficientCredits;
+  const disabled = isGenerating || isReserving;
 
   const handleChange = (id: string, value: string | number) => {
     setValues((prev) => ({ ...prev, [id]: value }));
@@ -193,11 +192,7 @@ export const PackOptions: React.FC<PackOptionsProps> = ({
           aria-label={mc.buttons.primary.generate3}
         >
           {(isGenerating || isReserving) && <Loader2 className="w-4 h-4 animate-spin" />}
-          {isGenerating
-            ? mc.progress.generating3Options
-            : insufficientCredits
-              ? 'Not enough credits'
-              : `${mc.buttons.primary.generate3} (cost: ${pack.cost})`}
+          {isGenerating ? mc.progress.generating3Options : `${mc.buttons.primary.generate3} (cost: ${pack.cost})`}
         </button>
         {insufficientCredits && (
           <p className="text-[10px] text-amber-400/70 text-center mt-1.5">

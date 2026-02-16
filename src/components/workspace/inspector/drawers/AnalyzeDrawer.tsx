@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { debugLog, debugError } from '@/lib/debug';
+import { parseEdgeFunctionError, getErrorMessage } from '@/lib/edgeFunctionErrors';
 import type { ImageItemData } from '@/types/canvas';
 
 interface AnalyzeDrawerProps {
@@ -94,7 +95,7 @@ export const AnalyzeDrawer: React.FC<AnalyzeDrawerProps> = ({ onRequestAuth }) =
       return;
     }
 
-    const { reservationId, commit, refund } = result;
+    const { reservationId, refund } = result;
 
     // Add job
     const jobId = crypto.randomUUID();
@@ -158,24 +159,26 @@ export const AnalyzeDrawer: React.FC<AnalyzeDrawerProps> = ({ onRequestAuth }) =
 
       updateJob(jobId, { status: 'done' });
       toast.success(mc.toasts.success.analyze);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[AnalyzeDrawer] error:', err);
       await refund().catch(() => {});
       updateJob(jobId, { status: 'failed' });
 
-      // Show meaningful error to user
-      const msg = err?.message || 'Unknown error';
-      if (msg.includes('invalid_reservation') || msg.includes('402')) {
-        toast.error('Reservation expired or invalid. Credits were not charged.');
-      } else if (msg.includes('parse_error')) {
-        toast.error('AI returned unexpected format. Credits refunded. Please try again.');
-      } else if (msg.includes('config_error')) {
-        toast.error('AI service not configured. Contact support.');
-      } else if (msg.includes('429') || msg.includes('rate_limit')) {
-        toast.error('Rate limited. Please wait a moment and try again.');
-      } else {
-        toast.error(`Analysis failed: ${msg.substring(0, 100)}`);
-      }
+      const parsed = await parseEdgeFunctionError(err);
+      const userMessage = getErrorMessage(parsed);
+
+      debugError('analyze', {
+        action: 'analyze_failed',
+        message: parsed.message,
+        errorType: parsed.errorType,
+        status: parsed.status,
+        details: parsed.details,
+        providerStatus: parsed.providerStatus,
+        providerMessage: parsed.providerMessage,
+        userMessage,
+      });
+
+      toast.error(userMessage);
     } finally {
       setIsAnalyzing(false);
     }

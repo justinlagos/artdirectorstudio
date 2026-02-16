@@ -6,6 +6,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { analytics } from "@/lib/analytics";
 import { mc } from "@/lib/microcopy";
+import { useCanvasStore } from "@/store/canvasStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 
 interface AuthContextType {
   user: User | null;
@@ -20,6 +22,27 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const isInvalidRefreshTokenError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const maybeError = error as { message?: string; name?: string };
+  const message = (maybeError.message ?? "").toLowerCase();
+  return (
+    message.includes("invalid refresh token") ||
+    message.includes("refresh token not found")
+  );
+};
+
+const clearStaleSupabaseAuthStorage = () => {
+  if (typeof window === "undefined") return;
+
+  for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+      localStorage.removeItem(key);
+    }
+  }
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -66,6 +89,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
+
+    const recoverInvalidSession = async (error: unknown) => {
+      console.warn("Recovering from invalid refresh token session:", error);
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      clearStaleSupabaseAuthStorage();
+
+      if (!mounted) return;
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+    };
     
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -120,7 +154,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     // THEN check for existing session with timeout
-    const sessionPromise = supabase.auth.getSession();
+    const sessionPromise = supabase.auth
+      .getSession()
+      .catch((error) => ({ data: { session: null }, error }));
     const timeoutPromise = new Promise((resolve) => {
       setTimeout(() => {
         resolve({ data: { session: null }, error: null });
@@ -130,11 +166,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     Promise.race([sessionPromise, timeoutPromise])
       .then(async (result: any) => {
         if (!mounted) return;
-        
+
+        if (result?.error) {
+          if (isInvalidRefreshTokenError(result.error)) {
+            await recoverInvalidSession(result.error);
+            return;
+          }
+          console.error("Error getting session:", result.error);
+          setLoading(false);
+          return;
+        }
+
         const { data: { session } } = result;
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
 
         // Identify existing session (async, don't block)
         if (session?.user) {
@@ -147,8 +193,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }, 0);
         }
       })
-      .catch((error) => {
+      .catch(async (error) => {
         console.error("Error getting session:", error);
+        if (isInvalidRefreshTokenError(error)) {
+          await recoverInvalidSession(error);
+          return;
+        }
         if (mounted) {
           setLoading(false);
         }
@@ -265,6 +315,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // Sign out from Supabase
       await supabase.auth.signOut();
+      
+      // Clear canvas store - reset to initial state
+      useCanvasStore.hydrate({
+        projects: [],
+        canvases: [],
+        items: [],
+        currentProjectId: null,
+        currentCanvasId: null,
+      });
+      useCanvasStore.clearSelection();
+      useCanvasStore.markClean();
+      
+      // Clear workspace store jobs and effects
+      useWorkspaceStore.getState().clearPersistedJobs();
+      useWorkspaceStore.getState().resetEffectsPreview();
+      useWorkspaceStore.setState({ 
+        jobs: [], 
+        effectsPreviewStack: [],
+        tabBadges: {},
+      });
       
       // Clear local state
       setUser(null);

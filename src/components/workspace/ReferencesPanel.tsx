@@ -97,7 +97,15 @@ export const ReferencesPanel: React.FC = () => {
               message: uploadError.message,
               statusCode: (uploadError as any).statusCode,
             });
-            toast.error(`Upload failed: ${uploadError.message}`);
+            
+            const statusCode = (uploadError as any)?.statusCode;
+            if (statusCode === 401 || statusCode === 403) {
+              toast.error('Upload blocked by policy. Please sign in again.');
+            } else if (statusCode === 413) {
+              toast.error('File too large. Maximum 15MB allowed.');
+            } else {
+              toast.error(`Upload failed: ${uploadError.message}`);
+            }
             continue;
           }
 

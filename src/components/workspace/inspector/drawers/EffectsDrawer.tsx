@@ -10,6 +10,7 @@ import { useImageVersions } from '@/hooks/useImageVersions';
 import { EFFECT_REGISTRY, EFFECT_CATEGORIES, getEffectsByCategory, getEffectDefinition } from '@/lib/effects/registry';
 import { BUILT_IN_PRESETS } from '@/lib/effects/presets';
 import { renderEffects } from '@/lib/effects/renderPipeline';
+import { parseEdgeFunctionError } from '@/lib/edgeFunctionErrors';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, Plus, Eye, EyeOff, GripVertical, ChevronDown } from 'lucide-react';
@@ -246,7 +247,12 @@ export const EffectsDrawer: React.FC<EffectsDrawerProps> = ({ onRequestAuth }) =
     } catch (err) {
       console.error('[EffectsDrawer] commit error:', err);
       updateJob(jobId, { status: 'failed' });
-      toast.error(mc.toasts.errors.networkEffects);
+      const parsed = await parseEdgeFunctionError(err);
+      const message =
+        parsed.message && parsed.message !== 'Edge Function returned a non-2xx status code'
+          ? parsed.message
+          : mc.toasts.errors.networkEffects;
+      toast.error(message);
     } finally {
       setIsCommitting(false);
     }

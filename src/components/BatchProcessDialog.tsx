@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { mapErrorMessage, TOOL_ERROR_MESSAGES } from "@/lib/toolErrorMessages";
+import { parseEdgeFunctionError } from "@/lib/edgeFunctionErrors";
 import { useToolsModal } from "@/contexts/ToolsModalContext";
 import { ToolDrawer } from "./ToolDrawer";
 
@@ -338,27 +339,23 @@ export const BatchProcessDialog = ({ open, onOpenChange, initialOperation }: Bat
     });
 
     if (error) {
-      // Extract error details
-      let errorData: any = error;
-      if (error.context) {
-        try {
-          errorData = typeof error.context === 'string' 
-            ? JSON.parse(error.context) 
-            : error.context;
-        } catch {
-          errorData = error;
-        }
-      }
-      
-      // Check for 402 (credits exhausted)
-      if (errorData?.details?.aiStatus === 402 || 
-          errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402 ||
-          error.message?.includes('402') ||
-          error.message?.includes('Credits exhausted') ||
-          error.message?.includes('credits exhausted')) {
+      const parsedError = await parseEdgeFunctionError(error);
+      const rawMessage = parsedError.rawMessage || '';
+      const msgLower = parsedError.message.toLowerCase();
+
+      // Check for credits exhausted
+      if (parsedError.errorType === 'insufficient_credits' ||
+          parsedError.details?.aiStatus === 402 ||
+          parsedError.status === 402 ||
+          rawMessage.includes('402') ||
+          msgLower.includes('credits exhausted')) {
         throw new Error("Your credits are used up. Choose a plan to continue.");
       }
-      
+
+      if (parsedError.message && parsedError.message !== 'Edge Function returned a non-2xx status code') {
+        throw new Error(parsedError.message);
+      }
+
       throw error;
     }
     

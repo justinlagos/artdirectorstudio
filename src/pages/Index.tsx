@@ -40,6 +40,7 @@ import { ImageComparisonView } from "@/components/ImageComparisonView";
 import { Card } from "@/components/ui/card";
 import { FUN_LAB_TOOLS } from "@/components/landing/FunLabSection";
 import { resizeImageForAnalysis } from "@/lib/imageOptimization";
+import { parseEdgeFunctionError } from "@/lib/edgeFunctionErrors";
 
 export interface Analysis {
   image_overview: string;
@@ -139,17 +140,6 @@ const Index = () => {
     (typeof window !== 'undefined' ? (localStorage.getItem('workspaceMode') as 'classic' | 'auto' | null) : null) ?? 
     'classic';
 
-  // Debug logging for view mode changes
-  useEffect(() => {
-    console.log('[Index] View mode state:', {
-      workspaceMode,
-      stableRef: stableWorkspaceModeRef.current,
-      preferencesLoading,
-      hasPreferences: !!preferences,
-      preferencesWorkspaceMode: preferences?.workspaceMode,
-      generationCount,
-    });
-  }, [workspaceMode, preferencesLoading, preferences, generationCount]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showProgressiveFeedback, setShowProgressiveFeedback] = useState(false);
@@ -158,11 +148,6 @@ const Index = () => {
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [showShortcutsGuide, setShowShortcutsGuide] = useState(false);
   const [editedPrompt, setEditedPrompt] = useState<string | null>(null);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('[Index] Component mounted/updated', { user: !!user, loading });
-  }, [user, loading]);
 
   // Pull-to-refresh functionality
   const handleRefresh = async () => {
@@ -228,7 +213,6 @@ const Index = () => {
       }
       // Defensive cleanup: ensure body overflow is reset
       if (document.body) {
-        console.log('[Index] Cleanup: resetting body overflow on unmount');
         document.body.style.overflow = '';
         document.body.style.position = '';
         document.body.style.top = '';
@@ -424,25 +408,19 @@ const Index = () => {
         if (error) {
           console.error("Analysis error:", error);
           let errorMessage = "Failed to analyze image. Please try again.";
-          let errorData: any = error;
-          if (error && typeof error === 'object' && 'context' in error && error.context) {
-            try {
-              errorData = typeof (error as any).context === 'string'
-                ? JSON.parse((error as any).context)
-                : (error as any).context;
-            } catch {
-              errorData = error;
-            }
-          }
-          const errMsg = error && typeof error === 'object' && 'message' in error ? String((error as any).message) : '';
-          if (errorData?.details?.aiStatus === 402 ||
-            (errorData?.errorType === 'ai_error' && errorData?.details?.aiStatus === 402) ||
+          const parsedError = await parseEdgeFunctionError(error);
+          const errMsg = parsedError.rawMessage || '';
+          const msgLower = parsedError.message.toLowerCase();
+          if (parsedError.errorType === 'insufficient_credits' ||
+            parsedError.details?.aiStatus === 402 ||
+            parsedError.status === 402 ||
             errMsg?.includes('402') ||
-            errMsg?.includes('Credits exhausted') ||
-            errMsg?.includes('credits exhausted')) {
+            msgLower.includes('credits exhausted')) {
             errorMessage = "Your credits are used up. Choose a plan to continue.";
-          } else if (errorData?.error) {
-            errorMessage = errorData.error;
+          } else if (parsedError.errorType === 'invalid_reservation' || msgLower.includes('invalid_reservation')) {
+            errorMessage = "Your reservation expired. Please try again.";
+          } else if (parsedError.message && parsedError.message !== 'Edge Function returned a non-2xx status code') {
+            errorMessage = parsedError.message;
           } else if (errMsg) {
             errorMessage = errMsg;
           }
@@ -450,8 +428,8 @@ const Index = () => {
             tool: "analyze",
             action: "analyze",
             success: false,
-            error_type: errorData?.errorType || errMsg?.substring(0, 50) || "unknown",
-            status_code: errorData?.details?.aiStatus || errorData?.status,
+            error_type: parsedError.errorType || errMsg?.substring(0, 50) || "unknown",
+            status_code: parsedError.details?.aiStatus || parsedError.status,
           });
           toast.error(errorMessage);
           resetAnalyzingState();
@@ -543,7 +521,12 @@ const Index = () => {
 
       if (error) {
         console.error("Regeneration error:", error);
-        toast.error("Failed to regenerate prompt. Please try again.");
+        const parsedError = await parseEdgeFunctionError(error);
+        const message =
+          parsedError.message && parsedError.message !== "Edge Function returned a non-2xx status code"
+            ? parsedError.message
+            : "Failed to regenerate prompt. Please try again.";
+        toast.error(message);
         setIsAnalyzing(false);
         return;
       }
@@ -589,6 +572,12 @@ const Index = () => {
 
       if (error) {
         console.error("Generation error:", error);
+        const parsedError = await parseEdgeFunctionError(error);
+        const parsedMessage =
+          parsedError.message && parsedError.message !== "Edge Function returned a non-2xx status code"
+            ? parsedError.message
+            : error.message;
+        const messageLower = (parsedMessage || "").toLowerCase();
 
         // Track generation failure
         analytics.track("Image Generation", {
@@ -596,13 +585,20 @@ const Index = () => {
           action: "generate",
           success: false,
           has_reference: false,
-          error_type: error.message?.substring(0, 50) || "unknown",
+          error_type: parsedError.errorType || parsedMessage?.substring(0, 50) || "unknown",
         });
 
-        if (error.message?.includes("Rate limit")) {
+        if (parsedError.status === 429 || parsedError.errorType === 'rate_limit' || messageLower.includes("rate limit")) {
           toast.error("Too many requests. Please wait a moment and try again.");
-        } else if (error.message?.includes("credits exhausted")) {
-          toast.error("AI service temporarily unavailable. Please try again later.");
+        } else if (
+          parsedError.status === 402 ||
+          parsedError.errorType === "insufficient_credits" ||
+          messageLower.includes("credits exhausted") ||
+          messageLower.includes("insufficient credits")
+        ) {
+          toast.error(parsedMessage || "Your credits are used up. Choose a plan to continue.");
+        } else if (parsedMessage) {
+          toast.error(parsedMessage);
         } else {
           toast.error("Failed to generate image. Please try again.");
         }
@@ -693,7 +689,13 @@ const Index = () => {
       return data.image;
     } catch (error) {
       console.error("Error during image generation:", error);
-      const errorMsg = error instanceof Error ? error.message : "An error occurred during image generation.";
+      const parsedError = await parseEdgeFunctionError(error);
+      const errorMsg =
+        parsedError.message && parsedError.message !== "Edge Function returned a non-2xx status code"
+          ? parsedError.message
+          : error instanceof Error
+            ? error.message
+            : "An error occurred during image generation.";
       toast.error(errorMsg);
 
       // Retry logic for network errors
